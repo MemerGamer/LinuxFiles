@@ -1,10 +1,11 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 #if !WINDOWS
 using Files.App.Dialogs;
 using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
+using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
@@ -40,7 +41,11 @@ namespace Files.App.Helpers
 					return false;
 				}
 
-				return await OpenFileLinuxAsync(path, openViaApplicationPicker);
+				var opened = await OpenFileLinuxAsync(path, openViaApplicationPicker);
+				if (!opened)
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(path));
+
+				return opened;
 			}
 			catch (Exception ex) when (ex is not OperationCanceledException)
 			{
@@ -50,36 +55,102 @@ namespace Files.App.Helpers
 		}
 
 		/// <summary>
-		/// Opens several files together with their default applications.
+		/// Opens several files. Files that need a gate (executables, launchers) are opened one by one through
+		/// <see cref="OpenFileLinuxAsync"/>; plain documents are passed to their default applications together.
 		/// </summary>
-		private static Task<bool> OpenFilesLinuxAsync(IEnumerable<string> paths)
-			=> LinuxLauncher.OpenAsync(paths);
+		private static async Task<bool> OpenFilesLinuxAsync(IEnumerable<string> paths)
+		{
+			var list = paths.ToList();
+
+			// Opening many files at once is easy to do by accident: ask first
+			if (list.Count > Constants.Actions.MaxSelectedItems)
+			{
+				var confirmed = await DialogDisplayHelper.ShowDialogAsync(
+					Strings.LinuxOpenManyTitle.GetLocalizedFormatResource(list.Count),
+					Strings.LinuxOpenManyText.GetLocalizedResource(),
+					Strings.Open.GetLocalizedResource(),
+					Strings.Cancel.GetLocalizedResource());
+
+				if (!confirmed)
+					return true;
+			}
+
+			var plain = new List<string>();
+			var success = true;
+			foreach (var path in list)
+			{
+				var (action, _) = await ClassifyAsync(path);
+				if (action == OpenAction.OpenDefault)
+					plain.Add(path);
+				else
+					success &= await OpenFileLinuxAsync(path);
+			}
+
+			if (plain.Count > 0)
+				success &= await LinuxLauncher.OpenAsync(plain);
+
+			return success;
+		}
+
+		private static async Task<(OpenAction Action, ExecutableKind Kind)> ClassifyAsync(string path)
+		{
+			var target = ResolveFinalTarget(path);
+			var mime = await LinuxMimeTypes.GetMimeTypeAsync(target);
+			var isDesktop = (mime == "application/x-desktop" || target.EndsWith(".desktop", StringComparison.OrdinalIgnoreCase)) &&
+				DesktopEntryParser.ParseFile(target, Path.GetFileName(target), CultureInfo.CurrentUICulture) is { } e &&
+				!string.IsNullOrWhiteSpace(e.Application.Exec);
+
+			var hasExec = HasExecuteBit(target);
+			var kind = hasExec && !isDesktop ? DetectExecutableKind(target, mime) : ExecutableKind.None;
+			return (OpenDecision.Decide(isDesktop, isDesktop && IsInApplicationsDirectory(target), hasExec, kind), kind);
+		}
+
+		/// <summary>
+		/// Follows symlinks so decisions are made on what would actually run.
+		/// </summary>
+		private static string ResolveFinalTarget(string path)
+		{
+			try
+			{
+				var info = new FileInfo(path);
+				if (info.LinkTarget is not null && info.ResolveLinkTarget(true) is { } resolved)
+					return resolved.FullName;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+			}
+
+			return path;
+		}
 
 		internal static async Task<bool> OpenFileLinuxAsync(string path, bool openViaApplicationPicker = false)
 		{
 			if (openViaApplicationPicker)
 				return await LinuxOpenWithDialog.ShowAsync(path);
 
-			var mime = await LinuxMimeTypes.GetMimeTypeAsync(path);
+			var (action, _) = await ClassifyAsync(path);
+			var target = ResolveFinalTarget(path);
+			var workingDirectory = Path.GetDirectoryName(target);
 
-			if (mime == "application/x-desktop" || path.EndsWith(".desktop", StringComparison.OrdinalIgnoreCase))
+			switch (action)
 			{
-				var handled = await TryLaunchDesktopFileAsync(path);
-				if (handled is not null)
-					return handled.Value;
-			}
-			else if (HasExecuteBit(path))
-			{
-				var kind = DetectExecutableKind(path, mime);
-				if (kind == LinuxExecutableKind.Binary)
-					return await LinuxLauncher.RunExecutableAsync(path, null, Path.GetDirectoryName(path));
+				case OpenAction.RunBinaryWithConfirm:
+				{
+					var confirmed = await DialogDisplayHelper.ShowDialogAsync(
+						Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(Path.GetFileName(target)),
+						Strings.LinuxRunBinaryText.GetLocalizedFormatResource(target),
+						Strings.Run.GetLocalizedResource(),
+						Strings.Cancel.GetLocalizedResource());
 
-				if (kind == LinuxExecutableKind.Script)
+					return !confirmed || await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory);
+				}
+
+				case OpenAction.RunScriptWithConfirm:
 				{
 					var dialog = new DynamicDialog(new DynamicDialogViewModel()
 					{
-						TitleText = Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(Path.GetFileName(path)),
-						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedResource(),
+						TitleText = Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(Path.GetFileName(target)),
+						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedFormatResource(target),
 						PrimaryButtonText = Strings.Run.GetLocalizedResource(),
 						SecondaryButtonText = Strings.LinuxDisplayFile.GetLocalizedResource(),
 						CloseButtonText = Strings.Cancel.GetLocalizedResource(),
@@ -89,39 +160,37 @@ namespace Files.App.Helpers
 					switch (await DialogDisplayHelper.ShowDialogAsync(dialog))
 					{
 						case DynamicDialogResult.Primary:
-							return await LinuxLauncher.RunExecutableAsync(path, null, Path.GetDirectoryName(path));
+							return await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory);
 						case DynamicDialogResult.Secondary:
-							break;
+							return await LinuxLauncher.OpenAsync([path]);
 						default:
 							return true;
 					}
 				}
+
+				case OpenAction.LaunchDesktopTrusted:
+				case OpenAction.LaunchDesktopConfirm:
+				{
+					var entry = DesktopEntryParser.ParseFile(target, Path.GetFileName(target), CultureInfo.CurrentUICulture)!;
+					if (action == OpenAction.LaunchDesktopConfirm)
+					{
+						// The execute bit is not trust: always show exactly what would run
+						var confirmed = await DialogDisplayHelper.ShowDialogAsync(
+							Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(entry.Application.Name),
+							Strings.LinuxUntrustedLauncherText.GetLocalizedFormatResource(entry.Application.Exec),
+							Strings.Run.GetLocalizedResource(),
+							Strings.Cancel.GetLocalizedResource());
+
+						if (!confirmed)
+							return true;
+					}
+
+					return await LinuxLauncher.OpenWithAsync(entry.Application, []);
+				}
+
+				default:
+					return await LinuxLauncher.OpenAsync([path]);
 			}
-
-			return await LinuxLauncher.OpenAsync([path]);
-		}
-
-		/// <returns>Null when the file is not a launchable application entry and should be opened as a regular file.</returns>
-		private static async Task<bool?> TryLaunchDesktopFileAsync(string path)
-		{
-			var entry = DesktopEntryParser.ParseFile(path, Path.GetFileName(path), CultureInfo.CurrentUICulture);
-			if (entry is null || string.IsNullOrWhiteSpace(entry.Application.Exec))
-				return null;
-
-			// Like Nautilus, only launch .desktop files that are trusted: executable, or installed in an applications directory
-			if (!HasExecuteBit(path) && !IsInApplicationsDirectory(path))
-			{
-				var confirmed = await DialogDisplayHelper.ShowDialogAsync(
-					Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(entry.Application.Name),
-					Strings.LinuxUntrustedLauncherText.GetLocalizedResource(),
-					Strings.Run.GetLocalizedResource(),
-					Strings.Cancel.GetLocalizedResource());
-
-				if (!confirmed)
-					return true;
-			}
-
-			return await LinuxLauncher.OpenWithAsync(entry.Application, []);
 		}
 
 		private static bool IsInApplicationsDirectory(string path)
@@ -144,14 +213,7 @@ namespace Files.App.Helpers
 			}
 		}
 
-		private enum LinuxExecutableKind
-		{
-			None,
-			Binary,
-			Script,
-		}
-
-		private static LinuxExecutableKind DetectExecutableKind(string path, string mime)
+		private static ExecutableKind DetectExecutableKind(string path, string mime)
 		{
 			try
 			{
@@ -160,20 +222,20 @@ namespace Files.App.Helpers
 				var read = stream.Read(head);
 
 				if (read >= 4 && head[0] == 0x7F && head[1] == (byte)'E' && head[2] == (byte)'L' && head[3] == (byte)'F')
-					return LinuxExecutableKind.Binary;
+					return ExecutableKind.Binary;
 
 				if (read >= 2 && head[0] == (byte)'#' && head[1] == (byte)'!')
-					return LinuxExecutableKind.Script;
+					return ExecutableKind.Script;
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
-				return LinuxExecutableKind.None;
+				return ExecutableKind.None;
 			}
 
 			if (mime is "application/vnd.appimage" or "application/x-executable" or "application/x-pie-executable")
-				return LinuxExecutableKind.Binary;
+				return ExecutableKind.Binary;
 
-			return LinuxExecutableKind.None;
+			return ExecutableKind.None;
 		}
 	}
 }

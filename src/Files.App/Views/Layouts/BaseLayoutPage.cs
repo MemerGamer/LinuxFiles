@@ -151,6 +151,18 @@ namespace Files.App.Views.Layouts
 		{
 			IsSourceGrouped = true,
 		};
+		/// <summary>
+		/// Items source for the layout lists. On Uno the CollectionView built over the bulk-updated collection never
+		/// generates item containers, so the non-grouped list binds to the source collection directly.
+		/// </summary>
+		// LINUX-TODO(listing): fall back to CollectionViewSource.View once Uno's CollectionView handles bulk Reset
+		public object? LayoutItemsSource
+#if WINDOWS
+			=> CollectionViewSource.View;
+#else
+			=> CollectionViewSource.IsSourceGrouped ? CollectionViewSource.View : CollectionViewSource.Source;
+#endif
+
 		public CollectionViewSource CollectionViewSource
 		{
 			get => collectionViewSource;
@@ -165,6 +177,7 @@ namespace Files.App.Views.Layouts
 				collectionViewSource = value;
 
 				NotifyPropertyChanged(nameof(CollectionViewSource));
+				NotifyPropertyChanged(nameof(LayoutItemsSource));
 
 				if (collectionViewSource.View is not null)
 					collectionViewSource.View.VectorChanged += View_VectorChanged;

@@ -1,0 +1,83 @@
+# Copyright (c) Files Community
+# Licensed under the MIT License.
+
+# Abstract:
+#   This CI builds the platform-neutral projects on Linux. It is executed on
+#   pushes to main and linux/** branches, and on pull requests.
+#   It is skipped if files not directly related to source code maintenance
+#   are updated.
+
+name: Files CI (Linux)
+
+on:
+  push:
+    branches:
+      - main
+      - 'linux/**'
+    paths-ignore:
+      - 'assets/**'
+      - 'builds/**'
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    paths-ignore:
+      - 'assets/**'
+      - 'builds/**'
+      - 'docs/**'
+      - '*.md'
+
+run-name: ${{ github.event_name == 'pull_request' && 'Files Linux PR Validation' || 'Files Linux CI Validation' }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  build-linux:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout the repository
+      uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Build Files.Shared
+      run: dotnet build src/Files.Shared/Files.Shared.csproj -c Release -warnaserror
+
+    - name: Build Files.Core.Storage
+      run: dotnet build src/Files.Core.Storage/Files.Core.Storage.csproj -c Release -warnaserror
+
+    - name: Build Files.Core.SourceGenerator
+      run: dotnet build src/Files.Core.SourceGenerator/Files.Core.SourceGenerator.csproj -c Release -warnaserror
+
+    - name: Build and test platform test projects (if any)
+      shell: bash
+      run: |
+        shopt -s nullglob
+        projects=(tests/*.Platform.Tests/*.csproj tests/*.Linux.Tests/*.csproj)
+        if [ ${#projects[@]} -eq 0 ]; then
+          echo "No platform test projects found; skipping."
+          exit 0
+        fi
+        for project in "${projects[@]}"; do
+          dotnet build "$project" -c Release -warnaserror
+          dotnet test "$project" -c Release --no-build
+        done

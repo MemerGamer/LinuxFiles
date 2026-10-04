@@ -17,6 +17,10 @@ namespace Files.App.Helpers
 	{
 		public static async Task PasteItemAsync(string destinationPath, IShellPage associatedInstance)
 		{
+#if !WINDOWS
+			if (await Files.App.Services.Desktop.DesktopFileDragHelper.TryPasteFilesAsync(destinationPath, associatedInstance))
+				return;
+#endif
 			FilesystemResult<DataPackageView> packageView = await FilesystemTasks.Wrap(() => Task.FromResult(Clipboard.GetContent()));
 			if (packageView && packageView.Result is { } content)
 			{

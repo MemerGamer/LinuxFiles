@@ -74,6 +74,25 @@ namespace Files.Platform.Linux.Thumbnails
 			return result;
 		}
 
+		/// <summary>
+		/// Reads the IHDR dimensions of a PNG without decoding it.
+		/// </summary>
+		public static bool TryReadDimensions(ReadOnlySpan<byte> png, out int width, out int height)
+		{
+			width = height = 0;
+			if (!HasSignature(png) || png.Length < 33 || !png.Slice(12, 4).SequenceEqual("IHDR"u8))
+				return false;
+
+			var w = BinaryPrimitives.ReadUInt32BigEndian(png.Slice(16, 4));
+			var h = BinaryPrimitives.ReadUInt32BigEndian(png.Slice(20, 4));
+			if (w > int.MaxValue || h > int.MaxValue)
+				return false;
+
+			width = (int)w;
+			height = (int)h;
+			return true;
+		}
+
 		private static bool HasSignature(ReadOnlySpan<byte> png) => png.Length >= 8 && png[..8].SequenceEqual(Signature);
 
 		private static void WriteChunk(System.IO.Stream stream, string type, byte[] data)

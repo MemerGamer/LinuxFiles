@@ -27,6 +27,11 @@ namespace Files.Platform.Linux.Trash
 		public IMountResolver MountResolver { get; set; } = new MountInfoMountResolver();
 
 		/// <summary>
+		/// Gets or sets the inspector used to verify that topdir trash folders are owned by this user.
+		/// </summary>
+		public IFileOwnershipInspector OwnershipInspector { get; set; } = new StatxFileOwnershipInspector();
+
+		/// <summary>
 		/// Gets or sets the clock used for deletion dates; must return local time.
 		/// </summary>
 		public Func<DateTime> LocalNow { get; set; } = () => DateTime.Now;

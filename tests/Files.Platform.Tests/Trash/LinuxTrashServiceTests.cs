@@ -18,7 +18,7 @@ using System.Threading.Tasks;
 namespace Files.Platform.Tests.Trash
 {
 	[TestClass]
-	public sealed class LinuxTrashServiceTests
+	public sealed partial class LinuxTrashServiceTests
 	{
 		private const uint Uid = 4242;
 
@@ -27,6 +27,7 @@ namespace Files.Platform.Tests.Trash
 		private string _usb = null!;
 		private string _dataHome = null!;
 		private LinuxTrashService _service = null!;
+		private FakeOwnershipInspector _inspector = null!;
 
 		[TestInitialize]
 		public void Setup()
@@ -62,11 +63,13 @@ namespace Files.Platform.Tests.Trash
 		private LinuxTrashService CreateService(uint uid, Func<DateTime>? now = null)
 		{
 			var mounts = new FakeMountResolver(_root, _home, _usb);
+			_inspector = new FakeOwnershipInspector(uid);
 			return new LinuxTrashService(new LinuxTrashOptions
 			{
 				DataHome = _dataHome,
 				UserId = uid,
 				MountResolver = mounts,
+				OwnershipInspector = _inspector,
 				LocalNow = now ?? (() => new DateTime(2026, 10, 4, 13, 5, 9, DateTimeKind.Local)),
 			});
 		}
@@ -654,6 +657,31 @@ namespace Files.Platform.Tests.Trash
 		}
 
 		#endregion
+
+		private sealed class FakeOwnershipInspector : IFileOwnershipInspector
+		{
+			private readonly uint _defaultOwner;
+
+			public FakeOwnershipInspector(uint defaultOwner)
+			{
+				_defaultOwner = defaultOwner;
+			}
+
+			public Dictionary<string, uint> Owners { get; } = [];
+
+			public bool TryGetInfo(string path, out FileEntryInfo info)
+			{
+				info = null!;
+				var fsi = new DirectoryInfo(path);
+				var link = fsi.LinkTarget is not null;
+				if (!link && !fsi.Exists)
+					return false;
+
+				var owner = Owners.TryGetValue(path, out var o) ? o : _defaultOwner;
+				info = new FileEntryInfo(!link, link, owner, link ? 0 : File.GetUnixFileMode(path));
+				return true;
+			}
+		}
 
 		private sealed class FakeMountResolver : IMountResolver
 		{

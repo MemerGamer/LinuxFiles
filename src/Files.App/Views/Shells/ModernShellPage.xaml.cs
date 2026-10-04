@@ -55,6 +55,10 @@ namespace Files.App.Views.Shells
 #if WINDOWS
 			_navigationInteractionTracker = new NavigationInteractionTracker(this, BackIcon, ForwardIcon);
 			_navigationInteractionTracker.NavigationRequested += OverscrollNavigationRequested;
+#else
+			// Without the tracker nothing hides the swipe indicators, so they would float over the content
+			BackIcon.Visibility = Visibility.Collapsed;
+			ForwardIcon.Visibility = Visibility.Collapsed;
 #endif
 			// LINUX-TODO(overscroll): touchpad overscroll navigation needs InteractionTracker, which Uno does not implement
 		}

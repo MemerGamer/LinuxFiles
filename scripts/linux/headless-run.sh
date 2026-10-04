@@ -79,6 +79,9 @@ if [[ -n "$actions" ]]; then
 		case "$line" in
 			sleep\ *) sleep "${line#sleep }" ;;
 			shot\ *) shot "${line#shot }" ;;
+			exec\ *) # Runs a shell command in the sandboxed HOME, to mutate files while the app runs.
+				[[ "${FILES_REAL_HOME:-0}" == "1" ]] && { echo "exec: refused with FILES_REAL_HOME=1" >&2; continue; }
+				(cd "$home" && env HOME="$home" sh -c "${line#exec }") ;;
 			*) # shellcheck disable=SC2086
 				DISPLAY=":$display" xdotool $line ;;
 		esac

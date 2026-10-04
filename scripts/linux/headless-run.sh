@@ -4,7 +4,7 @@
 #
 # Usage: headless-run.sh [-s seconds] [-o outdir] [-a actions-file] [-- app args...]
 #   actions-file: one xdotool command per line (e.g. "mousemove 100 200 click 1", "key ctrl+l",
-#                 "type /etc", "sleep 2", "shot name"), run against the private display.
+#                 "type /etc", "sleep 2", "shot name", "exec <sh cmd>" runs in the sandbox home), run against the private display.
 # Env: FILES_BIN (default src/Files.App/bin/Debug/net10.0-desktop), XVFB_SIZE (default 1600x1000).
 set -euo pipefail
 
@@ -76,6 +76,8 @@ if [[ -n "$actions" ]]; then
 		case "$line" in
 			sleep\ *) sleep "${line#sleep }" ;;
 			shot\ *) shot "${line#shot }" ;;
+			exec\ *) # Runs a shell command in the sandboxed HOME, to mutate files while the app runs.
+				(cd "${home:-$outdir}" && env HOME="${home:-$outdir}" sh -c "${line#exec }") ;;
 			*) # shellcheck disable=SC2086
 				DISPLAY=":$display" xdotool $line ;;
 		esac

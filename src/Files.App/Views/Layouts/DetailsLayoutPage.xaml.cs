@@ -90,6 +90,10 @@ namespace Files.App.Views.Layouts
 		public DetailsLayoutPage() : base()
 		{
 			InitializeComponent();
+#if !WINDOWS
+			HoistSemanticZoomContent(RootGridZoom);
+#endif
+			_ = DbgProbeAsync();
 			DataContext = this;
 			var selectionRectangle = RectangleSelection.Create(FileList, SelectionRectangle, FileList_SelectionChanged);
 			selectionRectangle.SelectionStarted += SelectionRectangle_SelectionStarted;
@@ -1069,9 +1073,20 @@ namespace Files.App.Views.Layouts
 			return columnIndexFromName != -1 && columnIndexFromName == columnIndex;
 		}
 
+		private async Task DbgProbeAsync()
+		{
+			for (int i = 0; i < 3; i++)
+			{
+				await Task.Delay(2000);
+				try {
+				Microsoft.Extensions.Logging.LoggerExtensions.LogInformation(App.Logger, "LINUXDBG probe root={RW}x{RH} zoom={ZW}x{ZH} vis={ZV} list={LW}x{LH} vis={LV} src={S} items={IC} page={PW}x{PH}", RootGrid.ActualWidth, RootGrid.ActualHeight, RootGridZoom.ActualWidth, RootGridZoom.ActualHeight, RootGridZoom.Visibility, FileList.ActualWidth, FileList.ActualHeight, FileList.Visibility, FileList.ItemsSource?.GetType().Name, FileList.Items.Count, ActualWidth, ActualHeight); } catch (Exception ex) { Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, ex, "LINUXDBG probe failed"); }
+			}
+		}
+
 		private void FileList_Loaded(object sender, RoutedEventArgs e)
 		{
 			ContentScroller = FileList.FindDescendant<ScrollViewer>(x => x.Name == "ScrollViewer");
+			_ = DbgProbeAsync();
 			const double OffsetCorrection = 88; // HeaderGrid (40) + ListViewHeaderItem (44 + 4 margin)
 
 			RootGridZoom.ViewChangeStarted += (_, args) =>
@@ -1120,6 +1135,7 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(ListViewItem))]
 		private new void FileList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
 		{
+			Microsoft.Extensions.Logging.LoggerExtensions.LogInformation(App.Logger, "LINUXDBG container {R} root={T}", args.InRecycleQueue, args.ItemContainer.ContentTemplateRoot?.GetType().Name);
 			var selectionCheckbox = GetSelectionCheckbox(args.ItemContainer);
 
 			selectionCheckbox.PointerEntered -= SelectionCheckbox_PointerEntered;

@@ -55,6 +55,10 @@ namespace Files.App.Views.Shells
 #if WINDOWS
 			_navigationInteractionTracker = new NavigationInteractionTracker(this, BackIcon, ForwardIcon);
 			_navigationInteractionTracker.NavigationRequested += OverscrollNavigationRequested;
+#else
+			// Without the tracker nothing hides the swipe indicators, so they would float over the content
+			BackIcon.Visibility = Visibility.Collapsed;
+			ForwardIcon.Visibility = Visibility.Collapsed;
 #endif
 			// LINUX-TODO(overscroll): touchpad overscroll navigation needs InteractionTracker, which Uno does not implement
 		}
@@ -160,6 +164,7 @@ namespace Files.App.Views.Shells
 
 		private async void ItemDisplayFrame_Navigated(object sender, NavigationEventArgs e)
 		{
+			Microsoft.Extensions.Logging.LoggerExtensions.LogInformation(App.Logger, "LINUXDBG navigated {T} content={C} fsz={W}x{H}", e.SourcePageType?.Name, ItemDisplayFrame.Content?.GetType().Name, ItemDisplayFrame.ActualWidth, ItemDisplayFrame.ActualHeight);
 			ContentPage = await GetContentOrNullAsync();
 
 			ToolbarViewModel.UpdateAdditionalActions();

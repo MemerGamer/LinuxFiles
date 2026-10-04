@@ -177,6 +177,9 @@ namespace Files.App.Views.Layouts
 		public GridLayoutPage() : base()
 		{
 			InitializeComponent();
+#if !WINDOWS
+			HoistSemanticZoomContent(RootGridZoom);
+#endif
 			DataContext = this;
 
 			var selectionRectangle = RectangleSelection.Create(ListViewBase, SelectionRectangle, FileList_SelectionChanged);

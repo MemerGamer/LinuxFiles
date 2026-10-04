@@ -504,6 +504,22 @@ namespace Files.App.Views.Layouts
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
 		}
 
+		/// <summary>
+		/// Uno's SemanticZoom does not realize its ZoomedInView on Skia desktop (the list never loads), so the
+		/// zoomed-in view is hoisted into the SemanticZoom's parent panel instead. Semantic zoom grouping jumps are lost.
+		/// </summary>
+		// LINUX-TODO(listing): restore grouped semantic zoom once Uno's SemanticZoom template works
+		protected static void HoistSemanticZoomContent(SemanticZoom zoom)
+		{
+			if (zoom.ZoomedInView is not UIElement content || zoom.Parent is not Panel panel)
+				return;
+
+			var index = panel.Children.IndexOf(zoom);
+			zoom.ZoomedInView = null;
+			zoom.ZoomedOutView = null;
+			panel.Children[index] = content;
+		}
+
 		protected override async void OnNavigatedTo(NavigationEventArgs e)
 		{
 			base.OnNavigatedTo(e);

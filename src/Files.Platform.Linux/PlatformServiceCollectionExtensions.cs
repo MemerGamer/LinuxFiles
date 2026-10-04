@@ -3,6 +3,7 @@
 
 using Files.Platform.Abstractions;
 using Files.Platform.Linux.Enumeration;
+using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
@@ -32,7 +33,8 @@ namespace Files.Platform.Linux
 				.AddLinuxIcons()
 				.AddLinuxTrash()
 				.AddLinuxMime()
-				.AddLinuxLaunching();
+				.AddLinuxLaunching()
+				.AddLinuxFileOperations();
 		}
 	}
 }

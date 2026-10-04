@@ -35,7 +35,7 @@ namespace Files.Platform.Tests.Launching
 
 		private static (LinuxLauncherService Service, RecordingStarter Starter) Create(XdgFixture fx, Dictionary<string, string?>? env = null, params string[] executables)
 		{
-			fx.Write("usr-share/mime/globs2", "50:text/plain:*.txt\n50:image/png:*.png\n");
+			fx.Write("usr-share/mime/globs2", "50:text/plain:*.txt\n50:image/png:*.png\n50:application/vnd.appimage:*.AppImage\n50:application/x-desktop:*.desktop\n50:application/x-shellscript:*.sh\n");
 			var culture = CultureInfo.InvariantCulture;
 			var locator = new FakeLocator(executables);
 			var starter = new RecordingStarter();
@@ -64,6 +64,66 @@ namespace Files.Platform.Tests.Launching
 			CollectionAssert.AreEqual(new[] { "/a.txt", "/c.txt" }, starter.Launches[0].Arguments.ToArray());
 			CollectionAssert.AreEqual(new[] { "/b.png" }, starter.Launches[1].Arguments.ToArray());
 			CollectionAssert.AreEqual(new[] { "/d.png" }, starter.Launches[2].Arguments.ToArray());
+		}
+
+		[TestMethod]
+		public async Task Open_ExecutableMimeTypes_AreNeverHandedToAHandler()
+		{
+			using var fx = new XdgFixture();
+			fx.WriteDesktop("usr-share", "any.desktop", "Any", "any %f");
+			fx.Write("config/mimeapps.list", "[Default Applications]\napplication/vnd.appimage=any.desktop;\napplication/x-desktop=any.desktop;\n");
+			var (svc, starter) = Create(fx);
+
+			Assert.IsFalse(await svc.OpenAsync(["/x/tool.AppImage"]));
+			Assert.IsFalse(await svc.OpenAsync(["/x/evil.desktop"]));
+			Assert.AreEqual(0, starter.Launches.Count);
+		}
+
+		[TestMethod]
+		public async Task Open_ExecBitFileWithoutDefaultApp_DoesNotFallBackToXdgOpen_AlsoThroughSymlink()
+		{
+			using var fx = new XdgFixture();
+			var (svc, starter) = Create(fx);
+			var script = fx.Write("home/run.sh", "echo hi\n");
+			if (OperatingSystem.IsWindows()) return;
+			File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+			var link = Path.Combine(fx.Home, "link.sh");
+			File.CreateSymbolicLink(link, script);
+
+			Assert.IsFalse(await svc.OpenAsync([script]));
+			Assert.IsFalse(await svc.OpenAsync([link]));
+			Assert.AreEqual(0, starter.Launches.Count);
+
+			if (OperatingSystem.IsWindows()) return;
+			File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+			Assert.IsTrue(await svc.OpenAsync([script]));
+			Assert.AreEqual("xdg-open", starter.Launches.Single().FileName);
+		}
+
+		[TestMethod]
+		public async Task LaunchUri_RefusesFileUris()
+		{
+			using var fx = new XdgFixture();
+			var (svc, starter) = Create(fx);
+
+			Assert.IsFalse(await svc.LaunchUriAsync(new Uri("file:///tmp/x")));
+			Assert.AreEqual(0, starter.Launches.Count);
+		}
+
+		[TestMethod]
+		public async Task RunCommand_StartsExactlyTheDisplayedArgv_PlainAndInTerminal()
+		{
+			using var fx = new XdgFixture();
+			var (svc, starter) = Create(fx, new Dictionary<string, string?> { ["TERMINAL"] = "xterm" }, "xterm");
+			var app = new Files.Platform.Abstractions.Mime.DesktopApplication("x.desktop", "X", "/bin/echo \"a b\" \\\\s 'c d' %c", "/x.desktop");
+			var argv = DesktopExecExpander.Expand(app, [])[0];
+
+			Assert.IsTrue(await svc.RunCommandAsync(argv, false));
+			Assert.AreEqual(argv[0], starter.Launches[0].FileName);
+			CollectionAssert.AreEqual(argv.Skip(1).ToArray(), starter.Launches[0].Arguments.ToArray());
+
+			Assert.IsTrue(await svc.RunCommandAsync(argv, true));
+			CollectionAssert.IsSubsetOf(argv.ToArray(), new[] { starter.Launches[1].FileName }.Concat(starter.Launches[1].Arguments).ToArray());
 		}
 
 		[TestMethod]

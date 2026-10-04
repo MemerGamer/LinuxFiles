@@ -1,4 +1,4 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Files.Platform.Linux.Launching;
@@ -6,6 +6,7 @@ using Files.Platform.Linux.Mime;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Files.Platform.Tests.Launching
@@ -72,6 +73,40 @@ namespace Files.Platform.Tests.Launching
 			Assert.IsNull(Strict(text, out var error));
 			Assert.IsNotNull(error);
 		}
+
+		[TestMethod]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=safe\nExec[hu]=evil\n")]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=safe\nTerminal[de]=true\n")]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=safe\nPath[fr]=/\n")]
+		public void StrictParse_RejectsLocalizedBehaviorKeys(string text)
+			=> Assert.IsNull(Strict(text, out _));
+
+		[TestMethod]
+		public void Exec_ParsedOnceMeansDisplayedArgvIsTheLaunchedArgv()
+		{
+			var entry = Strict("[Desktop Entry]\nType=Application\nName=X\nExec=/bin/echo \"a\\\\\\\\ b\" 'c d' \\\\s %c\n", out var error)!;
+			Assert.IsNull(error);
+
+			var first = Files.Platform.Linux.Launching.DesktopExecExpander.Expand(entry.Application, [])[0];
+			var second = Files.Platform.Linux.Launching.DesktopExecExpander.Expand(entry.Application, [])[0];
+			CollectionAssert.AreEqual(first.ToArray(), second.ToArray());
+			Assert.AreEqual("/bin/echo", first[0]);
+		}
+
+		[TestMethod]
+		[DataRow(OpenAction.RunBinaryWithConfirm, ConfirmChoice.Run, FollowUp.RunExact)]
+		[DataRow(OpenAction.RunBinaryWithConfirm, ConfirmChoice.Display, FollowUp.Nothing)]
+		[DataRow(OpenAction.RunBinaryWithConfirm, ConfirmChoice.Cancel, FollowUp.Nothing)]
+		[DataRow(OpenAction.RunScriptWithConfirm, ConfirmChoice.Run, FollowUp.RunExact)]
+		[DataRow(OpenAction.RunScriptWithConfirm, ConfirmChoice.Display, FollowUp.DisplayAsText)]
+		[DataRow(OpenAction.RunScriptWithConfirm, ConfirmChoice.Cancel, FollowUp.Nothing)]
+		[DataRow(OpenAction.LaunchDesktopConfirm, ConfirmChoice.Run, FollowUp.RunExact)]
+		[DataRow(OpenAction.LaunchDesktopConfirm, ConfirmChoice.Display, FollowUp.Nothing)]
+		[DataRow(OpenAction.LaunchDesktopConfirm, ConfirmChoice.Cancel, FollowUp.Nothing)]
+		[DataRow(OpenAction.Refuse, ConfirmChoice.Run, FollowUp.Nothing)]
+		[DataRow(OpenAction.OpenDefault, ConfirmChoice.Cancel, FollowUp.Nothing)]
+		public void DialogAnswerMapsToExactlyTheDescribedFollowUp(OpenAction action, ConfirmChoice choice, FollowUp expected)
+			=> Assert.AreEqual(expected, OpenDecision.Resolve(action, choice));
 
 		[TestMethod]
 		public void FileIdentity_DetectsChange()

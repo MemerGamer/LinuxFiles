@@ -29,7 +29,7 @@ namespace Files.App.Views.Settings
 
 			// Move window to cursor position, matching properties window behavior
 			PInvoke.GetCursorPos(out var pointerPosition);
-			var displayArea = DisplayArea.GetFromPoint(new PointInt32(pointerPosition.X, pointerPosition.Y), DisplayAreaFallback.Nearest);
+			var displayArea = DisplayArea.GetFromPoint(new PointInt32 { X = pointerPosition.X, Y = pointerPosition.Y }, DisplayAreaFallback.Nearest);
 			var appWindow = window.AppWindow;
 			appWindow.Move(new PointInt32
 			{
@@ -57,9 +57,11 @@ namespace Files.App.Views.Settings
 			appWindow.TitleBar.ExtendsContentIntoTitleBar = true;
 			appWindow.SetIcon(AppLifecycleHelper.AppIconPath);
 			frame.Navigate(typeof(ToolbarCustomizationPage), window, new SuppressNavigationTransitionInfo());
-			appWindow.Resize(new SizeInt32(
-				Math.Max(1, Convert.ToInt32(760 * App.AppModel.AppWindowDPI)),
-				Math.Max(1, Convert.ToInt32(560 * App.AppModel.AppWindowDPI))));
+			appWindow.Resize(new SizeInt32
+			{
+				Width = Math.Max(1, Convert.ToInt32(760 * App.AppModel.AppWindowDPI)),
+				Height = Math.Max(1, Convert.ToInt32(560 * App.AppModel.AppWindowDPI))
+			});
 			return window;
 		}
 	}

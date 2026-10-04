@@ -128,7 +128,7 @@
 		</Style>
 
 		<Style
-			x:Name="CompactItemContainerStyle"
+			x:Key="CompactItemContainerStyle"
 			BasedOn="{StaticResource DefaultListViewItemStyle}"
 			TargetType="ListViewItem">
 			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -138,7 +138,7 @@
 		</Style>
 
 		<Style
-			x:Name="RegularItemContainerStyle"
+			x:Key="RegularItemContainerStyle"
 			BasedOn="{StaticResource DefaultListViewItemStyle}"
 			TargetType="ListViewItem">
 			<Setter Property="HorizontalContentAlignment" Value="Stretch" />

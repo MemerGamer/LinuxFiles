@@ -102,18 +102,15 @@
 							<Border Clip="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=TemplateSettings.ClipRect}">
 								<Grid Height="{TemplateBinding MinHeight}">
 
-									<!--<Rectangle
+									<!--  Track is intentionally hidden; kept as a named element because the visual states below target it (Uno requires the target to exist).  -->
+									<Rectangle
 										x:Name="ProgressBarTrack"
-										Width="{TemplateBinding Width}"
-										Height="{ThemeResource ProgressBarTrackHeight}"
 										VerticalAlignment="Center"
-										Fill="{TemplateBinding Background}"
-										RadiusX="{Binding Source={StaticResource ProgressBarTrackCornerRadius}, Converter={StaticResource TopLeftCornerRadiusDoubleValueConverter}}"
-										RadiusY="{Binding Source={StaticResource ProgressBarTrackCornerRadius}, Converter={StaticResource BottomRightCornerRadiusDoubleValueConverter}}">
+										Visibility="Collapsed">
 										<Rectangle.RenderTransform>
 											<CompositeTransform />
 										</Rectangle.RenderTransform>
-									</Rectangle>-->
+									</Rectangle>
 
 									<Rectangle
 										x:Name="DeterminateProgressBarIndicator"

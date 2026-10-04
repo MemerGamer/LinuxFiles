@@ -316,8 +316,8 @@ namespace Files.App.Views.Layouts
 			if (itemContainerSize != size)
 			{
 				// Changing size still requires a style refresh, even when both sizes use the same style.
-				FileList.ItemContainerStyle = size == DetailsViewSizeKind.Compact ? RegularItemContainerStyle : CompactItemContainerStyle;
-				FileList.ItemContainerStyle = size == DetailsViewSizeKind.Compact ? CompactItemContainerStyle : RegularItemContainerStyle;
+				FileList.ItemContainerStyle = size == DetailsViewSizeKind.Compact ? (Style)Resources["RegularItemContainerStyle"] : (Style)Resources["CompactItemContainerStyle"];
+				FileList.ItemContainerStyle = size == DetailsViewSizeKind.Compact ? (Style)Resources["CompactItemContainerStyle"] : (Style)Resources["RegularItemContainerStyle"];
 				itemContainerSize = size;
 			}
 

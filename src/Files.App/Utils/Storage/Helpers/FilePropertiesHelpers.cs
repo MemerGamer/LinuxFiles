@@ -113,7 +113,7 @@ namespace Files.App.Utils.Storage
 
 			var appWindow = propertiesWindow.AppWindow;
 			appWindow.Title = Strings.Properties.GetLocalizedResource();
-			appWindow.TitleBar.ExtendsContentIntoTitleBar = true;
+			appWindow.TitleBar.ExtendsContentIntoTitleBar = !OperatingSystem.IsLinux();
 			appWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
 			appWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
 

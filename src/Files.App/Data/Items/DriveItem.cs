@@ -165,8 +165,10 @@ namespace Files.App.Data.Items
 				if (!SetProperty(ref percentageUsed, value))
 					return;
 
+#if WINDOWS
 				if (Type == DriveType.Fixed)
 					ShowStorageSense = percentageUsed >= Constants.Widgets.Drives.LowStorageSpacePercentageThreshold;
+#endif
 			}
 		}
 
@@ -255,11 +257,16 @@ namespace Files.App.Data.Items
 			if (imageStream is not null)
 				item.IconData = await imageStream.ToByteArrayAsync();
 
+#if WINDOWS
 			item.Text = type switch
 			{
 				DriveType.CDRom when !string.IsNullOrEmpty(label) => root.DisplayName.Replace(label.Left(32), label),
 				_ => root.DisplayName
 			};
+#else
+			// The label already is the display name (volume label, "<size> Volume" or "File System")
+			item.Text = !string.IsNullOrEmpty(label) ? label : root.DisplayName;
+#endif
 			item.Type = type;
 			item.MenuOptions = new ContextMenuOptions
 			{
@@ -308,6 +315,24 @@ namespace Files.App.Data.Items
 					catch { }
 				}
 
+#if !WINDOWS
+				var info = await Task.Run(() =>
+				{
+					var driveInfo = new SystemIO.DriveInfo(Path ?? throw new InvalidOperationException("The drive path has not been initialized."));
+					return (Total: driveInfo.TotalSize, Free: driveInfo.AvailableFreeSpace, Format: driveInfo.DriveFormat);
+				}).WithTimeoutAsync(TimeSpan.FromSeconds(5));
+
+				MaxSpace = ByteSize.FromBytes(info.Total);
+				FreeSpace = ByteSize.FromBytes(info.Free);
+				SpaceUsed = MaxSpace - FreeSpace;
+				SpaceText = GetSizeString();
+				if (MaxSpace.Bytes > 0)
+					PercentageUsed = 100.0f - (float)(FreeSpace.Bytes / MaxSpace.Bytes) * 100.0f;
+				Filesystem = info.Format;
+
+				OnPropertyChanged(nameof(ShowDriveDetails));
+				return;
+#endif
 				var root = Root ?? throw new InvalidOperationException("The drive root has not been initialized.");
 				var properties = await root.Properties.RetrievePropertiesAsync((string[])["System.FreeSpace", "System.Capacity", "System.Volume.FileSystem"])
 					.AsTask().WithTimeoutAsync(TimeSpan.FromSeconds(5));
@@ -365,7 +390,10 @@ namespace Files.App.Data.Items
 
 		public async Task LoadThumbnailAsync()
 		{
-			if (!string.IsNullOrEmpty(DeviceID) && !string.Equals(DeviceID, "network-folder"))
+#if !WINDOWS
+			IconData ??= await DriveHelpers.GetDriveIconAsync(Type, Constants.ShellIconSizes.Small);
+#endif
+			if (IconData is null && !string.IsNullOrEmpty(DeviceID) && !string.Equals(DeviceID, "network-folder"))
 			{
 				var result = await FileThumbnailHelper.GetIconAsync(
 					DeviceID,

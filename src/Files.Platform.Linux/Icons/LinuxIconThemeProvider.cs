@@ -86,6 +86,7 @@ namespace Files.Platform.Linux.Icons
 	/// </summary>
 	public sealed class LinuxIconThemeProvider : IIconThemeProvider
 	{
+		private static readonly string[] FallbackThemes = ["Adwaita", "breeze", "gnome", "Papirus"];
 		private static readonly string[] Extensions = [".png", ".svg", ".xpm"];
 
 		private readonly LinuxIconThemeOptions _options;
@@ -170,6 +171,9 @@ namespace Files.Platform.Linux.Icons
 		{
 			var visited = new HashSet<string>(StringComparer.Ordinal);
 			var result = FindInTheme(CurrentThemeName, name, size, scale, visited) ?? FindInTheme("hicolor", name, size, scale, visited);
+			foreach (var fallbackTheme in FallbackThemes)
+				result ??= FindInTheme(fallbackTheme, name, size, scale, visited);
+
 			return result ?? FindFallback(name);
 		}
 

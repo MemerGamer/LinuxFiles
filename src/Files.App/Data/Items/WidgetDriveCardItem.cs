@@ -24,6 +24,11 @@ namespace Files.App.Data.Items
 
 		public async Task LoadCardThumbnailAsync()
 		{
+#if !WINDOWS
+			var result = await DriveHelpers.GetDriveIconAsync(Item.Type, Constants.ShellIconSizes.Large);
+			if (result is null)
+				return;
+#else
 			var result = await FileThumbnailHelper.GetIconAsync(
 				Item.Path,
 				Constants.ShellIconSizes.Large,
@@ -35,6 +40,7 @@ namespace Files.App.Data.Items
 				using var thumbnail = await DriveHelpers.GetThumbnailAsync(Item.Root!);
 				result ??= await thumbnail.ToByteArrayAsync();
 			}
+#endif
 
 			var bitmapImage = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => result.ToBitmapAsync(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal);
 			if (bitmapImage is not null)

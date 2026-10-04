@@ -46,7 +46,7 @@ namespace Files.App.Views.Settings
 			var frame = new Frame { RequestedTheme = themeService.AppThemeMode };
 			var window = new WindowEx(460, 400)
 			{
-				ExtendsContentIntoTitleBar = true,
+				ExtendsContentIntoTitleBar = !OperatingSystem.IsLinux(),
 				IsMaximizable = false,
 				Content = frame,
 				SystemBackdrop = new AppSystemBackdrop(true),
@@ -54,7 +54,7 @@ namespace Files.App.Views.Settings
 			window.Closed += (_, _) => customizationWindow = null;
 			var appWindow = window.AppWindow;
 			appWindow.Title = Strings.CustomizeToolbar.GetLocalizedResource();
-			appWindow.TitleBar.ExtendsContentIntoTitleBar = true;
+			appWindow.TitleBar.ExtendsContentIntoTitleBar = !OperatingSystem.IsLinux();
 			appWindow.SetIcon(AppLifecycleHelper.AppIconPath);
 			frame.Navigate(typeof(ToolbarCustomizationPage), window, new SuppressNavigationTransitionInfo());
 			appWindow.Resize(new SizeInt32

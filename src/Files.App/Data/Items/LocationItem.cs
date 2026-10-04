@@ -313,8 +313,16 @@ namespace Files.App.Data.Items
 
 		public RecycleBinLocationItem()
 		{
+#if WINDOWS
 			StorageTrashBinService.Watcher.ItemAdded += RefreshSpaceUsed;
 			StorageTrashBinService.Watcher.ItemDeleted += RefreshSpaceUsed;
+#else
+			var trashWatcher = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Trash.ITrashService>().Watcher;
+			trashWatcher.ItemAdded += RefreshSpaceUsed;
+			trashWatcher.ItemDeleted += RefreshSpaceUsed;
+			trashWatcher.RefreshRequested += RefreshSpaceUsed;
+			trashWatcher.StartWatcher();
+#endif
 
 			_ = RefreshSpaceUsedAsync();
 		}

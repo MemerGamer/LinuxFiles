@@ -47,6 +47,10 @@ namespace Files.App.ViewModels.UserControls.Widgets
 			PinToSidebarCommand = new AsyncRelayCommand<WidgetFolderCardItem>(ExecutePinToSidebarCommand);
 			UnpinFromSidebarCommand = new AsyncRelayCommand<WidgetFolderCardItem>(ExecuteUnpinFromSidebarCommand);
 
+#if !WINDOWS
+			App.QuickAccessManager.UpdateQuickAccessWidget += QuickAccessChanged;
+#endif
+
 			var automaticDestinationsPath = SystemIO.Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Windows", "Recent", "AutomaticDestinations");
 			if (!SystemIO.Directory.Exists(automaticDestinationsPath))
 				return;
@@ -71,6 +75,29 @@ namespace Files.App.ViewModels.UserControls.Widgets
 				await RefreshWidgetAsync();
 		}
 
+#if !WINDOWS
+		private async void QuickAccessChanged(object? sender, ModifyQuickAccessEventArgs e)
+		{
+			if (!isDisposed)
+				await RefreshWidgetAsync();
+		}
+
+		public Task RefreshWidgetAsync()
+		{
+			return MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
+			{
+				Items.Clear();
+
+				foreach (var folder in await QuickAccessService.GetPinnedFoldersAsync())
+				{
+					if (string.IsNullOrEmpty(folder.FilePath))
+						continue;
+
+					Items.Add(new WidgetFolderCardItem(folder.FilePath, folder.FileName ?? folder.FilePath, true, folder.FilePath));
+				}
+			});
+		}
+#else
 		public Task RefreshWidgetAsync()
 		{
 			return MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
@@ -95,6 +122,8 @@ namespace Files.App.ViewModels.UserControls.Widgets
 				}
 			});
 		}
+
+#endif
 
 		public override List<ContextMenuFlyoutItemViewModel> GetItemMenuItems(WidgetCardItem item, bool isPinned, bool isFolder = false)
 		{
@@ -228,6 +257,11 @@ namespace Files.App.ViewModels.UserControls.Widgets
 			if (item is not WidgetFolderCardItem folderCardItem || folderCardItem.Path is null)
 				return;
 
+#if !WINDOWS
+			await QuickAccessService.PinToSidebarAsync(folderCardItem.Path);
+			return;
+#endif
+
 			var lastPinnedItemIndex = Items.LastOrDefault(x => x.IsPinned) is { } lastPinnedItem ? Items.IndexOf(lastPinnedItem) : 0;
 			var currentPinnedItemIndex = Items.IndexOf(folderCardItem);
 
@@ -257,6 +291,11 @@ namespace Files.App.ViewModels.UserControls.Widgets
 		{
 			if (item is not WidgetFolderCardItem folderCardItem || folderCardItem.Path is null)
 				return;
+
+#if !WINDOWS
+			await QuickAccessService.UnpinFromSidebarAsync(folderCardItem.Path);
+			return;
+#endif
 
 			HRESULT hr = PInvoke.RoGetAgileReference(AgileReferenceOptions.AGILEREFERENCE_DEFAULT, typeof(IShellItem).GUID, folderCardItem.Item.ThisPtr, out IAgileReference pAgileReference);
 			if (hr.ThrowIfFailedOnDebug().Failed)
@@ -332,6 +371,9 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 			isDisposed = true;
 			Items.CollectionChanged -= Items_CollectionChanged;
+#if !WINDOWS
+			App.QuickAccessManager.UpdateQuickAccessWidget -= QuickAccessChanged;
+#endif
 			if (_quickAccessFolderWatcher is not null)
 			{
 				_quickAccessFolderWatcher.EnableRaisingEvents = false;

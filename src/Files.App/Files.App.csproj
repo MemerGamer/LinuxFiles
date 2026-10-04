@@ -226,6 +226,13 @@
         <Compile Remove="ViewModels\UserControls\Previews\MarkdownPreviewViewModel.cs" />
     </ItemGroup>
 
+    <ItemGroup Condition="'$(TargetFramework)' != '$(DesktopTargetFramework)'">
+        <Compile Remove="Utils\Storage\Helpers\DriveHelpers.Linux.cs" />
+        <Compile Remove="Utils\Storage\Helpers\FontFileHelper.Linux.cs" />
+        <Compile Remove="Utils\Global\LinuxStorageDeviceWatcher.cs" />
+        <Compile Remove="Helpers\Application\AppToastNotificationHelper.Linux.cs" />
+    </ItemGroup>
+
     <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->
     <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
         <DefaultItemExcludes>$(DefaultItemExcludes);UserControls/FilePreviews/ShellPreview.xaml;UserControls/FilePreviews/CodePreview.xaml;UserControls/FilePreviews/MarkdownPreview.xaml</DefaultItemExcludes>

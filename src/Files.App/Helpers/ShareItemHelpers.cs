@@ -15,6 +15,17 @@ namespace Files.App.Helpers
 				(!item.IsShortcut || item.IsLinkItem) &&
 				(item.PrimaryItemAttribute != StorageItemTypes.Folder || item.IsArchive);
 
+		public static bool IsSupported()
+#if WINDOWS
+			=> DataTransferManager.IsSupported();
+#else
+			=> false; // LINUX-TODO(share): no system share UI on Linux (could use xdg-desktop-portal)
+#endif
+
+#if !WINDOWS
+		public static Task ShareItemsAsync(IEnumerable<ListedItem> itemsToShare)
+			=> Task.CompletedTask; // LINUX-TODO(share): see IsSupported
+#else
 		public static async Task ShareItemsAsync(IEnumerable<ListedItem> itemsToShare)
 		{
 			if (itemsToShare is null)
@@ -106,5 +117,6 @@ namespace Files.App.Helpers
 				dataRequestDeferral.Complete();
 			}
 		}
+#endif
 	}
 }

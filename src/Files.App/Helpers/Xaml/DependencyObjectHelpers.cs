@@ -26,7 +26,7 @@ namespace Files.App.Helpers
 					return retVal;
 				}
 			}
-			return null;
+			return default;
 		}
 
 		public static T? FindChild<T>(DependencyObject startNode, Func<T, bool> predicate) where T : DependencyObject
@@ -49,7 +49,7 @@ namespace Files.App.Helpers
 					return retVal;
 				}
 			}
-			return null;
+			return default;
 		}
 
 		public static IEnumerable<T> FindChildren<T>(DependencyObject startNode) where T : DependencyObject
@@ -72,7 +72,7 @@ namespace Files.App.Helpers
 
 		public static T? FindParent<T>(DependencyObject? child) where T : DependencyObject
 		{
-			T? parent = null;
+			T? parent = default;
 			if (child is null)
 			{
 				return parent;

@@ -105,7 +105,7 @@ namespace Files.App.Utils.Storage
 			var width = Math.Max(1, Convert.ToInt32(800 * App.AppModel.AppWindowDPI));
 			var height = Math.Max(1, Convert.ToInt32(500 * App.AppModel.AppWindowDPI));
 
-			propertiesWindow.AppWindow.Resize(new(width, height));
+			propertiesWindow.AppWindow.Resize(new SizeInt32 { Width = width, Height = height });
 			propertiesWindow.IsMinimizable = false;
 			propertiesWindow.IsMaximizable = false;
 			propertiesWindow.Content = frame;
@@ -137,7 +137,7 @@ namespace Files.App.Utils.Storage
 			PInvoke.GetCursorPos(out var pointerPosition);
 
 			// Null when no display is available, e.g. while monitors are detached
-			var displayArea = DisplayArea.GetFromPoint(new PointInt32(pointerPosition.X, pointerPosition.Y), DisplayAreaFallback.Nearest);
+			var displayArea = DisplayArea.GetFromPoint(new PointInt32 { X = pointerPosition.X, Y = pointerPosition.Y }, DisplayAreaFallback.Nearest);
 			if (displayArea is not null)
 			{
 				var appWindowPos = new PointInt32

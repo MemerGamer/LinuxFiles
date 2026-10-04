@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
@@ -12,13 +12,22 @@ namespace Files.App.Services
 	{
 		public IStorageDeviceWatcher CreateWatcher()
 		{
+#if WINDOWS
 			return new WindowsStorageDeviceWatcher();
+#else
+			return new LinuxStorageDeviceWatcher();
+#endif
 		}
 
 		public async IAsyncEnumerable<IFolder> GetDrivesAsync()
 		{
 			var pCloudDrivePath = App.AppModel.PCloudDrivePath;
+#if WINDOWS
 			var drives = await Task.Run(DriveInfo.GetDrives).ConfigureAwait(false);
+#else
+			// Only real mounts (pseudo file systems such as proc/tmpfs are filtered out)
+			var drives = await Task.Run(() => DriveHelpers.GetMounts().Select(m => new DriveInfo(m.MountPoint)).ToArray()).ConfigureAwait(false);
+#endif
 
 			// Probe drives in parallel so one slow drive doesn't delay the rest
 			var pending = drives.Select(drive => GetDriveItemAsync(drive, pCloudDrivePath)).ToList();
@@ -75,7 +84,12 @@ namespace Files.App.Services
 
 		public Task<IFolder?> GetPrimaryDriveAsync()
 		{
+#if WINDOWS
 			var cDrivePath = $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\";
+#else
+			// LINUX-TODO(drives): primary drive is the root file system
+			var cDrivePath = "/";
+#endif
 			if (!Directory.Exists(cDrivePath))
 			{
 				App.Logger.LogWarning($"Primary system drive '{cDrivePath}' could not be found.");

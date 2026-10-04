@@ -209,6 +209,12 @@ namespace Files.App.Services.Settings
 			set => Set(value);
 		}
 
+		public bool UseAsDefaultFileManager
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
 		public bool IsPinnedSectionExpanded
 		{
 			get => Get(true);

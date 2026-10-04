@@ -139,6 +139,9 @@ namespace Files.Platform.Tests.SystemIntegration
 		{
 			var runtime = Path.Combine(Path.GetTempPath(), "fr-" + Guid.NewGuid().ToString("N")[..8]);
 			Directory.CreateDirectory(runtime);
+#pragma warning disable CA1416
+			File.SetUnixFileMode(runtime, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+#pragma warning restore CA1416
 			try
 			{
 				var options = new SingleInstanceOptions { DisableDBus = true, RuntimeDirectory = runtime };

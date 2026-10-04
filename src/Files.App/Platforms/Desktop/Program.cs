@@ -1,6 +1,8 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Instance;
+using Files.Platform.Linux.Instance;
 using System.Text;
 using Uno.UI.Hosting;
 
@@ -22,6 +24,16 @@ namespace Files.App
 		/// </summary>
 		public static string ConsumeLaunchCwd() => Environment.CurrentDirectory;
 
+		/// <summary>
+		/// Gets the command line arguments (without the program name) this process was started with.
+		/// </summary>
+		public static string[] LaunchArguments { get; private set; } = [];
+
+		/// <summary>
+		/// Gets the single instance service this process owns. Null when single instance handling is disabled.
+		/// </summary>
+		internal static LinuxSingleInstanceService? SingleInstance { get; private set; }
+
 		[STAThread]
 		public static int Main(string[] args)
 		{
@@ -30,7 +42,34 @@ namespace Files.App
 			// Selawik weights (Regular/Semibold/Bold/Light) are matched by family name + weight through fontconfig
 			Files.Platform.Linux.Native.FontConfigNative.RegisterFontDirectory(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Linux"));
 
-			// TODO: single instance via ISingleInstanceService (D-Bus or Unix socket); forward args to the running instance
+			LaunchArguments = args;
+
+			// Single instance: D-Bus name (socket fallback). A second launch forwards its arguments to the running instance and exits.
+			// FILES_NO_SINGLE_INSTANCE=1 skips this (for running several instances side by side while developing).
+			if (Environment.GetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE") != "1")
+			{
+				var singleInstance = new LinuxSingleInstanceService();
+				var request = new InstanceRequest(InstanceRequestKind.CommandLine, Environment.CurrentDirectory, args);
+
+				bool isPrimary;
+				try
+				{
+					isPrimary = singleInstance.TryBecomePrimaryAsync(request).GetAwaiter().GetResult();
+				}
+				catch (Exception ex) when (ex is System.IO.IOException or InvalidOperationException or System.Net.Sockets.SocketException or UnauthorizedAccessException)
+				{
+					Console.Error.WriteLine($"[Files] Single instance check failed, continuing: {ex.Message}");
+					isPrimary = true;
+				}
+
+				if (!isPrimary)
+				{
+					Console.Error.WriteLine("[Files] Forwarded the command line to the running instance.");
+					return 0;
+				}
+
+				SingleInstance = singleInstance;
+			}
 
 			var host = UnoPlatformHostBuilder.Create()
 				.App(() => new App())
@@ -38,6 +77,8 @@ namespace Files.App
 				.Build();
 
 			host.Run();
+
+			SingleInstance?.DisposeAsync().AsTask().GetAwaiter().GetResult();
 
 			return 0;
 		}

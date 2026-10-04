@@ -171,6 +171,11 @@ namespace Files.App.Data.Contracts
 		bool ShowFileTagsSection { get; set; }
 
 		/// <summary>
+		/// Gets or sets a value indicating whether Files answers org.freedesktop.FileManager1 (other applications' "Show in folder") on Linux.
+		/// </summary>
+		bool UseAsDefaultFileManager { get; set; }
+
+		/// <summary>
 		/// Gets or sets a value indicating if the pinned section should be expanded.
 		/// </summary>
 		bool IsPinnedSectionExpanded { get; set; }

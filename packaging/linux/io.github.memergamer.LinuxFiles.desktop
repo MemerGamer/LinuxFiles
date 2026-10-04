@@ -1,3 +1,9 @@
+# DBusActivatable is deliberately not set. Files claims io.github.memergamer.LinuxFiles itself at startup and a second
+# launch forwards its command line to the running instance (org.freedesktop.Application is implemented for other
+# callers such as `gio open`/`gdbus call`, but the bus does not start Files). Making it activatable needs a D-Bus
+# .service file per package format and gains nothing over `Exec=files %U` today.
+# org.freedesktop.FileManager1 is also not activatable: it is only offered while Files runs and the user enabled
+# "Use Files as the default file manager"; other file managers keep working otherwise.
 [Desktop Entry]
 Type=Application
 Name=Files
@@ -15,4 +21,4 @@ Actions=new-window;
 
 [Desktop Action new-window]
 Name=New Window
-Exec=files
+Exec=files --new-window

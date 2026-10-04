@@ -5,9 +5,11 @@
 
 using Files.Platform.Abstractions.Instance;
 using Files.Platform.Linux.DBus;
+using Files.Platform.Linux.Native;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -32,6 +34,46 @@ namespace Files.Platform.Linux.Instance
 
 		/// <summary>Gets the directory for the fallback socket and lock file. Null means <c>$XDG_RUNTIME_DIR</c>.</summary>
 		public string? RuntimeDirectory { get; init; }
+
+		/// <summary>Gets the file ownership lookup (a test seam; defaults to <c>statx</c>).</summary>
+		public IFileOwnershipInspector? Inspector { get; init; }
+
+		/// <summary>Gets the user id this process runs as (a test seam; defaults to <c>geteuid</c>).</summary>
+		public uint? CurrentUserId { get; init; }
+
+		/// <summary>Gets how the user id of a connecting peer is read (a test seam; defaults to <c>SO_PEERCRED</c>).</summary>
+		public Func<Socket, uint?>? PeerUserIdReader { get; init; }
+	}
+
+	/// <summary>
+	/// Decides whether directories and entries used for the socket fallback can be trusted.
+	/// </summary>
+	public static class SingleInstanceSecurity
+	{
+		/// <summary>
+		/// A directory is trusted when it is a real directory (not a symbolic link) owned by <paramref name="userId"/> that nobody else can read, write or enter (<c>0700</c>).
+		/// </summary>
+		public static bool IsTrustedDirectory(string path, IFileOwnershipInspector inspector, uint userId)
+		{
+			if (!inspector.TryGetInfo(path, out var info))
+				return false;
+
+			const UnixFileMode Others = UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+				| UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute;
+
+			return info.IsDirectory && !info.IsSymbolicLink && info.OwnerUserId == userId && (info.Mode & Others) == 0;
+		}
+
+		/// <summary>
+		/// An entry (lock file or socket) is safe to reuse when it does not exist, or is a non-directory, non-symlink owned by <paramref name="userId"/>.
+		/// </summary>
+		public static bool IsSafeEntry(string path, IFileOwnershipInspector inspector, uint userId)
+		{
+			if (!inspector.TryGetInfo(path, out var info))
+				return !File.Exists(path) && !Directory.Exists(path);
+
+			return !info.IsDirectory && !info.IsSymbolicLink && info.OwnerUserId == userId;
+		}
 	}
 
 	/// <summary>
@@ -270,17 +312,25 @@ namespace Files.Platform.Linux.Instance
 
 		// ---- Unix socket fallback ----
 
+		private IFileOwnershipInspector Inspector => options.Inspector ?? new StatxFileOwnershipInspector();
+
+		private uint UserId => options.CurrentUserId ?? ProcessIdentityNative.CurrentUserId;
+
+		/// <summary>
+		/// Returns a directory only this user controls, or null if none can be trusted (then there is no socket coordination).
+		/// </summary>
 		private string? ResolveRuntimeDirectory()
 		{
 			var dir = options.RuntimeDirectory ?? Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
 			if (!string.IsNullOrEmpty(dir) && Path.IsPathRooted(dir))
-				return dir;
+				return SingleInstanceSecurity.IsTrustedDirectory(dir, Inspector, UserId) ? dir : null;
 
-			var fallback = Path.Combine(Path.GetTempPath(), "files-linux-" + Environment.UserName);
+			// No runtime directory: a private, randomly named directory (created 0700). Other launches cannot find it, which only
+			// costs single-instance coordination, never safety. Never a predictable path under /tmp.
 			try
 			{
-				Directory.CreateDirectory(fallback, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-				return fallback;
+				var created = Directory.CreateTempSubdirectory("files-").FullName;
+				return SingleInstanceSecurity.IsTrustedDirectory(created, Inspector, UserId) ? created : null;
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
@@ -299,6 +349,9 @@ namespace Files.Platform.Linux.Instance
 
 			// A Unix socket path is limited to ~108 bytes; if ours does not fit we cannot coordinate
 			if (Encoding.UTF8.GetByteCount(path) > 100)
+				return true;
+
+			if (!SingleInstanceSecurity.IsSafeEntry(lockPath, Inspector, UserId) || !SingleInstanceSecurity.IsSafeEntry(path, Inspector, UserId))
 				return true;
 
 			// .NET takes an advisory flock() on the file for FileShare.None, released when the process exits (even if it crashes)
@@ -381,6 +434,11 @@ namespace Files.Platform.Linux.Instance
 				using var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
 				timeout.CancelAfter(ForwardTimeout);
 
+				// Only the same user may talk to us (the directory is 0700 already; this is the second line of defence)
+				var peerUid = (options.PeerUserIdReader ?? ProcessIdentityNative.GetPeerUserId)(client);
+				if (peerUid is null || peerUid != UserId)
+					return;
+
 				var request = await ReadRequestAsync(stream, timeout.Token).ConfigureAwait(false);
 				if (request is not null)
 				{
@@ -430,7 +488,10 @@ namespace Files.Platform.Linux.Instance
 
 		private static async Task<InstanceRequest?> ReadRequestAsync(Stream stream, CancellationToken token)
 		{
-			const int MaxArguments = 10_000;
+			const int MaxArguments = 1024;
+			const int MaxStringBytes = 8192;
+			const int MaxTotalBytes = 256 * 1024;
+			var total = 0;
 			var header = new byte[4];
 
 			async Task<int> ReadInt()
@@ -457,7 +518,7 @@ namespace Files.Platform.Linux.Instance
 						throw new InvalidDataException();
 				}
 
-				if (length is < 0 or > 1 << 20)
+				if (length is < 0 or > MaxStringBytes || (total += length) > MaxTotalBytes)
 					throw new InvalidDataException();
 
 				var bytes = new byte[length];
@@ -474,6 +535,10 @@ namespace Files.Platform.Linux.Instance
 			var args = new string[count];
 			for (var i = 0; i < count; i++)
 				args[i] = await ReadString().ConfigureAwait(false);
+
+			// Forwarded arguments are untrusted data: they are only ever parsed as paths and known flags by the app, never executed
+			if (args.Any(a => a.Contains('\0')) || cwd.Contains('\0'))
+				return null;
 
 			return new InstanceRequest(Enum.IsDefined((InstanceRequestKind)kind) ? (InstanceRequestKind)kind : InstanceRequestKind.CommandLine, cwd, args);
 		}

@@ -12,12 +12,13 @@ using IO = System.IO;
 namespace Files.App.Utils.FileTags
 {
 
-	public static class FileTagsHelper
+	public static partial class FileTagsHelper
 	{
 		private static readonly Lazy<FileTagsDatabase> dbInstance = new(() => new());
 
 		public static FileTagsDatabase GetDbInstance() => dbInstance.Value;
 
+#if WINDOWS
 		public static string[] ReadFileTag(string filePath)
 		{
 			var tagString = Win32Helper.ReadStringFromFile($"{filePath}:files");
@@ -126,6 +127,8 @@ namespace Files.App.Utils.FileTags
 			}
 		}
 
+#endif
+
 		/// <summary>
 		/// Prompts the user for confirmation, then removes all tags from the given items that have tags.
 		/// </summary>
@@ -151,7 +154,9 @@ namespace Files.App.Utils.FileTags
 			return true;
 		}
 
+#if WINDOWS
 		public static ulong? GetFileFRN(string filePath) => Win32Helper.GetFileFRN(filePath);
+#endif
 
 		public static Task<ulong?> GetFileFRN(IStorageItem? item)
 		{

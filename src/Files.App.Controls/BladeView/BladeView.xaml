@@ -126,7 +126,7 @@
 							Background="{TemplateBinding CloseButtonBackground}"
 							BorderThickness="1"
 							Content="&#xE711;"
-							FontFamily="Segoe MDL2 Assets"
+							FontFamily="{StaticResource SymbolThemeFontFamily}"
 							FontSize="14"
 							Foreground="{TemplateBinding CloseButtonForeground}"
 							Style="{StaticResource ButtonRevealStyle}"

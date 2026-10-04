@@ -54,7 +54,7 @@ namespace Files.App.Controls
 			{
 				_gripperDisplay = new TextBlock
 				{
-					FontFamily = new FontFamily(GripperDisplayFont),
+					FontFamily = Application.Current.Resources.TryGetValue("SymbolThemeFontFamily", out var symbolFont) && symbolFont is FontFamily symbolFontFamily ? symbolFontFamily : new FontFamily(GripperDisplayFont),
 					HorizontalAlignment = HorizontalAlignment.Center,
 					VerticalAlignment = VerticalAlignment.Center,
 					Foreground = GripperForeground,

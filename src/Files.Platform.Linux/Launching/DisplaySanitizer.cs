@@ -14,11 +14,8 @@ namespace Files.Platform.Linux.Launching
 	/// </summary>
 	public static class DisplaySanitizer
 	{
-		/// <summary>The maximum number of characters shown per field.</summary>
+		/// <summary>The maximum number of characters shown per label that is not executed (titles, claimed names).</summary>
 		public const int MaxFieldLength = 200;
-
-		/// <summary>The maximum number of argv items shown.</summary>
-		public const int MaxArguments = 12;
 
 		/// <summary>
 		/// Escapes Cc/Cf characters and line/paragraph separators as visible <c>\uXXXX</c> text.
@@ -51,16 +48,22 @@ namespace Files.Platform.Linux.Launching
 			return escaped[..keep] + "…" + escaped[^(maxLength - 1 - keep)..];
 		}
 
-		/// <summary>
-		/// Renders argv one item per line, each sanitized, with at most <see cref="MaxArguments"/> items and a count of the rest.
-		/// </summary>
-		public static IReadOnlyList<string> Arguments(IReadOnlyList<string> argv)
-		{
-			var lines = argv.Take(MaxArguments).Select(a => Field(a)).ToList();
-			if (argv.Count > MaxArguments)
-				lines.Add($"… {argv.Count - MaxArguments} more");
+		/// <summary>The most argv items that can be shown (and therefore run after confirmation).</summary>
+		public const int MaxExecutedArguments = 1000;
 
-			return lines;
+		/// <summary>The most total characters of argv that can be shown (and therefore run after confirmation).</summary>
+		public const int MaxExecutedCharacters = 64 * 1024;
+
+		/// <summary>
+		/// Renders the complete argv, one sanitized item per line and never truncated, because it is what will run.
+		/// Returns null when it is too large to be shown in full; the caller must then refuse to run it.
+		/// </summary>
+		public static IReadOnlyList<string>? FullArguments(IReadOnlyList<string> argv)
+		{
+			if (argv.Count > MaxExecutedArguments || argv.Sum(a => (long)a.Length) > MaxExecutedCharacters)
+				return null;
+
+			return argv.Select(Escape).ToList();
 		}
 	}
 }

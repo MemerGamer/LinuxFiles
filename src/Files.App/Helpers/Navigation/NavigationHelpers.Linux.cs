@@ -210,7 +210,7 @@ namespace Files.App.Helpers
 				{
 					var confirmed = await DialogDisplayHelper.ShowDialogAsync(
 						Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
-						Strings.LinuxRunBinaryText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)),
+						Strings.LinuxRunBinaryText.GetLocalizedFormatResource(DisplaySanitizer.Escape(target)),
 						Strings.Run.GetLocalizedResource(),
 						Strings.Cancel.GetLocalizedResource());
 
@@ -225,7 +225,7 @@ namespace Files.App.Helpers
 					var dialog = new DynamicDialog(new DynamicDialogViewModel()
 					{
 						TitleText = Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
-						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)),
+						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedFormatResource(DisplaySanitizer.Escape(target)),
 						PrimaryButtonText = Strings.Run.GetLocalizedResource(),
 						SecondaryButtonText = Strings.LinuxDisplayFile.GetLocalizedResource(),
 						CloseButtonText = Strings.Cancel.GetLocalizedResource(),
@@ -290,16 +290,28 @@ namespace Files.App.Helpers
 
 		private static async Task<bool> ShowLauncherConfirmationAsync(string target, string claimedName, IReadOnlyList<string> argv, bool inTerminal)
 		{
+			// What will run must be shown in full; if it cannot be, it does not run
+			if (DisplaySanitizer.FullArguments(argv) is not { } lines)
+			{
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxCommandTooLong.GetLocalizedResource());
+				return false;
+			}
+
 			var panel = new Microsoft.UI.Xaml.Controls.StackPanel { Spacing = 8 };
-			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxFileLabel.GetLocalizedResource() + " " + DisplaySanitizer.Field(target), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap, IsTextSelectionEnabled = true });
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxFileLabel.GetLocalizedResource() + " " + DisplaySanitizer.Escape(target), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap, IsTextSelectionEnabled = true });
 			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxClaimsToBe.GetLocalizedResource() + " " + DisplaySanitizer.Field(claimedName), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap });
 			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxWouldRun.GetLocalizedResource() + (inTerminal ? " (" + Strings.LinuxInTerminal.GetLocalizedResource() + ")" : string.Empty) });
-			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.ScrollViewer
 			{
-				Text = string.Join('\n', DisplaySanitizer.Arguments(argv)),
-				FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("monospace"),
-				TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
-				IsTextSelectionEnabled = true,
+				MaxHeight = 240,
+				VerticalScrollBarVisibility = Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Auto,
+				HorizontalScrollBarVisibility = Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Auto,
+				Content = new Microsoft.UI.Xaml.Controls.TextBlock
+				{
+					Text = string.Join('\n', lines),
+					FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("monospace"),
+					IsTextSelectionEnabled = true,
+				},
 			});
 
 			var dialog = new DynamicDialog(new DynamicDialogViewModel()

@@ -4820,4 +4820,7 @@
   <data name="LinuxInTerminal" xml:space="preserve">
     <value>in a terminal</value>
   </data>
+  <data name="LinuxCommandTooLong" xml:space="preserve">
+    <value>The command is too long to be shown in full, so it will not be run.</value>
+  </data>
 </root>

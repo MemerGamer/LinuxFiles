@@ -73,6 +73,78 @@ namespace Files.Platform.Linux.Mime
 		}
 
 		/// <summary>
+		/// Strictly parses a desktop file that is about to be executed on the user's confirmation. Unlike <see cref="Parse"/> it
+		/// rejects anything ambiguous, so what is shown is exactly what is run: multiple [Desktop Entry] groups, duplicate keys,
+		/// a missing or repeated Type/Exec, NUL or control characters, and a Type other than Application.
+		/// </summary>
+		public static Entry? ParseStrict(IReadOnlyList<string> lines, string path, string desktopId, CultureInfo culture, out string? error)
+		{
+			error = null;
+			var groups = 0;
+			var inGroup = false;
+			var keys = new HashSet<string>(StringComparer.Ordinal);
+
+			foreach (var rawLine in lines)
+			{
+				if (rawLine.Contains('\0'))
+				{
+					error = "NUL character";
+					return null;
+				}
+
+				var line = rawLine.Trim();
+				if (line.Length == 0 || line[0] == '#')
+					continue;
+
+				if (line[0] == '[')
+				{
+					inGroup = line == "[Desktop Entry]";
+					if (inGroup && ++groups > 1)
+					{
+						error = "multiple [Desktop Entry] groups";
+						return null;
+					}
+
+					continue;
+				}
+
+				if (!inGroup)
+					continue;
+
+				var eq = line.IndexOf('=');
+				if (eq <= 0)
+					continue;
+
+				if (!keys.Add(line[..eq].TrimEnd()))
+				{
+					error = "duplicate key " + line[..eq].TrimEnd();
+					return null;
+				}
+			}
+
+			if (!keys.Contains("Type") || !keys.Contains("Exec"))
+			{
+				error = "missing Type or Exec";
+				return null;
+			}
+
+			var entry = Parse(lines, path, desktopId, culture);
+			if (entry is null || string.IsNullOrWhiteSpace(entry.Application.Exec))
+			{
+				error = "not an Application entry";
+				return null;
+			}
+
+			if (entry.Application.Exec.Any(char.IsControl))
+			{
+				error = "control character in Exec";
+				return null;
+			}
+
+			return entry;
+		}
+
+		/// <summary>
 		/// Splits a semicolon-separated list value, honoring <c>\;</c> escapes.
 		/// </summary>
 		public static string[] SplitList(string value)

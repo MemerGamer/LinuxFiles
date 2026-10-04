@@ -75,34 +75,85 @@ namespace Files.App.Helpers
 					return true;
 			}
 
-			var plain = new List<string>();
 			var success = true;
+			var plain = new List<(string Path, LinuxOpenPlan Plan)>();
 			foreach (var path in list)
 			{
-				var (action, _) = await ClassifyAsync(path);
-				if (action == OpenAction.OpenDefault)
-					plain.Add(path);
+				var plan = await PlanAsync(path);
+				if (plan.Action == OpenAction.OpenDefault)
+					plain.Add((path, plan));
 				else
-					success &= await OpenFileLinuxAsync(path);
+					success &= await ExecutePlanAsync(path, plan);
 			}
 
-			if (plain.Count > 0)
-				success &= await LinuxLauncher.OpenAsync(plain);
+			// Files could have changed while the dialogs were open: re-verify each one before the shared launch
+			var verified = plain.Where(p => p.Plan.StillValid()).Select(p => p.Path).ToList();
+			if (verified.Count != plain.Count)
+				success = false;
+
+			if (verified.Count > 0)
+				success &= await LinuxLauncher.OpenAsync(verified);
 
 			return success;
 		}
 
-		private static async Task<(OpenAction Action, ExecutableKind Kind)> ClassifyAsync(string path)
+		/// <summary>
+		/// Everything decided about a file before any dialog: the resolved target, its identity, the decision and the
+		/// parsed .desktop entry. The same entry object is shown in the dialog and launched.
+		/// </summary>
+		private sealed record LinuxOpenPlan(OpenAction Action, string Target, FileIdentity? Identity, DesktopEntryParser.Entry? Entry)
+		{
+			public bool StillValid() => Identity is { } id && id.StillMatches(Target);
+		}
+
+		private static async Task<LinuxOpenPlan> PlanAsync(string path)
 		{
 			var target = ResolveFinalTarget(path);
-			var mime = await LinuxMimeTypes.GetMimeTypeAsync(target);
-			var isDesktop = (mime == "application/x-desktop" || target.EndsWith(".desktop", StringComparison.OrdinalIgnoreCase)) &&
-				DesktopEntryParser.ParseFile(target, Path.GetFileName(target), CultureInfo.CurrentUICulture) is { } e &&
-				!string.IsNullOrWhiteSpace(e.Application.Exec);
+			var identity = FileIdentity.TryCapture(target);
+			if (identity is null)
+				return new LinuxOpenPlan(OpenAction.Refuse, target, null, null);
 
-			var hasExec = HasExecuteBit(target);
-			var kind = hasExec && !isDesktop ? DetectExecutableKind(target, mime) : ExecutableKind.None;
-			return (OpenDecision.Decide(isDesktop, isDesktop && IsInApplicationsDirectory(target), hasExec, kind), kind);
+			var mime = await LinuxMimeTypes.GetMimeTypeAsync(path);
+			var hasExec = (identity.Value.Mode & 0b001_001_001) != 0;
+
+			// Read the bytes once; the identity must be unchanged afterwards so the bytes belong to that version
+			byte[] head;
+			DesktopEntryParser.Entry? entry = null;
+			var desktop = DesktopState.None;
+			var looksDesktop = mime == "application/x-desktop" || target.EndsWith(".desktop", StringComparison.OrdinalIgnoreCase);
+			try
+			{
+				if (looksDesktop)
+				{
+					var bytes = await File.ReadAllBytesAsync(target);
+					head = bytes.Length > 4 ? bytes[..4] : bytes;
+					var lines = System.Text.Encoding.UTF8.GetString(bytes).Replace("\r\n", "\n").Split('\n');
+					entry = DesktopEntryParser.ParseStrict(lines, target, Path.GetFileName(target), CultureInfo.CurrentUICulture, out var error);
+					if (entry is not null && DesktopExecExpander.Expand(entry.Application, []).Count == 0)
+						entry = null;
+
+					desktop = entry is null ? DesktopState.Invalid : DesktopState.Valid;
+					if (entry is null)
+						App.Logger.LogWarning("Rejected desktop file {Path}: {Error}", target, error);
+				}
+				else
+				{
+					head = new byte[4];
+					using var stream = new FileStream(target, new FileStreamOptions { Mode = FileMode.Open, Access = FileAccess.Read, Share = FileShare.ReadWrite, Options = FileOptions.None });
+					var read = await stream.ReadAsync(head);
+					head = head[..read];
+				}
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return new LinuxOpenPlan(OpenAction.Refuse, target, null, null);
+			}
+
+			if (!identity.Value.StillMatches(target))
+				return new LinuxOpenPlan(OpenAction.Refuse, target, null, null);
+
+			var action = OpenDecision.Decide(desktop, desktop == DesktopState.Valid && IsInApplicationsDirectory(target), hasExec, OpenDecision.Sniff(head), mime);
+			return new LinuxOpenPlan(action, target, identity, entry);
 		}
 
 		/// <summary>
@@ -128,12 +179,29 @@ namespace Files.App.Helpers
 			if (openViaApplicationPicker)
 				return await LinuxOpenWithDialog.ShowAsync(path);
 
-			var (action, _) = await ClassifyAsync(path);
-			var target = ResolveFinalTarget(path);
+			return await ExecutePlanAsync(path, await PlanAsync(path));
+		}
+
+		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan)
+		{
+			var target = plan.Target;
 			var workingDirectory = Path.GetDirectoryName(target);
 
-			switch (action)
+			// The file may have been replaced while a dialog was open (TOCTOU). Residual risk: a swap in the instants between
+			// this check and the exec in the launched process, which would need write access to the file's directory.
+			async Task<bool> ChangedAsync()
 			{
+				App.Logger.LogWarning("File changed before it was opened: {Path}", target);
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxFileChangedTitle.GetLocalizedResource(), Strings.LinuxFileChangedText.GetLocalizedFormatResource(target));
+				return false;
+			}
+
+			switch (plan.Action)
+			{
+				case OpenAction.Refuse:
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(target));
+					return false;
+
 				case OpenAction.RunBinaryWithConfirm:
 				{
 					var confirmed = await DialogDisplayHelper.ShowDialogAsync(
@@ -142,7 +210,10 @@ namespace Files.App.Helpers
 						Strings.Run.GetLocalizedResource(),
 						Strings.Cancel.GetLocalizedResource());
 
-					return !confirmed || await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory);
+					if (!confirmed)
+						return true;
+
+					return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory) : await ChangedAsync();
 				}
 
 				case OpenAction.RunScriptWithConfirm:
@@ -160,9 +231,9 @@ namespace Files.App.Helpers
 					switch (await DialogDisplayHelper.ShowDialogAsync(dialog))
 					{
 						case DynamicDialogResult.Primary:
-							return await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory);
+							return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory) : await ChangedAsync();
 						case DynamicDialogResult.Secondary:
-							return await LinuxLauncher.OpenAsync([path]);
+							return plan.StillValid() ? await LinuxLauncher.OpenAsync([path]) : await ChangedAsync();
 						default:
 							return true;
 					}
@@ -171,13 +242,15 @@ namespace Files.App.Helpers
 				case OpenAction.LaunchDesktopTrusted:
 				case OpenAction.LaunchDesktopConfirm:
 				{
-					var entry = DesktopEntryParser.ParseFile(target, Path.GetFileName(target), CultureInfo.CurrentUICulture)!;
-					if (action == OpenAction.LaunchDesktopConfirm)
+					var application = plan.Entry!.Application;
+					if (plan.Action == OpenAction.LaunchDesktopConfirm)
 					{
-						// The execute bit is not trust: always show exactly what would run
+						// Show the fully expanded command of the very entry that is launched below
+						var argv = DesktopExecExpander.Expand(application, [])[0];
+						var command = string.Join(' ', argv.Select(DesktopExecExpander.ShellQuote)) + (application.RunInTerminal ? " (in a terminal)" : string.Empty);
 						var confirmed = await DialogDisplayHelper.ShowDialogAsync(
-							Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(entry.Application.Name),
-							Strings.LinuxUntrustedLauncherText.GetLocalizedFormatResource(entry.Application.Exec),
+							Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(application.Name),
+							Strings.LinuxUntrustedLauncherText.GetLocalizedFormatResource(command),
 							Strings.Run.GetLocalizedResource(),
 							Strings.Cancel.GetLocalizedResource());
 
@@ -185,11 +258,11 @@ namespace Files.App.Helpers
 							return true;
 					}
 
-					return await LinuxLauncher.OpenWithAsync(entry.Application, []);
+					return plan.StillValid() ? await LinuxLauncher.OpenWithAsync(application, []) : await ChangedAsync();
 				}
 
 				default:
-					return await LinuxLauncher.OpenAsync([path]);
+					return plan.StillValid() ? await LinuxLauncher.OpenAsync([path]) : await ChangedAsync();
 			}
 		}
 
@@ -199,43 +272,6 @@ namespace Files.App.Helpers
 			return XdgDirectories.FromEnvironment().AllDataDirs
 				.Select(d => Path.Combine(d, "applications") + Path.DirectorySeparatorChar)
 				.Any(d => full.StartsWith(d, StringComparison.Ordinal));
-		}
-
-		private static bool HasExecuteBit(string path)
-		{
-			try
-			{
-				return (File.GetUnixFileMode(path) & (UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute)) != 0;
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
-			{
-				return false;
-			}
-		}
-
-		private static ExecutableKind DetectExecutableKind(string path, string mime)
-		{
-			try
-			{
-				Span<byte> head = stackalloc byte[4];
-				using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-				var read = stream.Read(head);
-
-				if (read >= 4 && head[0] == 0x7F && head[1] == (byte)'E' && head[2] == (byte)'L' && head[3] == (byte)'F')
-					return ExecutableKind.Binary;
-
-				if (read >= 2 && head[0] == (byte)'#' && head[1] == (byte)'!')
-					return ExecutableKind.Script;
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-			{
-				return ExecutableKind.None;
-			}
-
-			if (mime is "application/vnd.appimage" or "application/x-executable" or "application/x-pie-executable")
-				return ExecutableKind.Binary;
-
-			return ExecutableKind.None;
 		}
 	}
 }

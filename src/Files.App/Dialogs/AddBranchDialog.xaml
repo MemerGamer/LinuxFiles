@@ -7,16 +7,16 @@
 	xmlns:helpers="using:Files.App.Helpers"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	x:Name="AddBranch"
-	Title="{helpers:ResourceString Name=CreateNewBranch}"
+	Title="{helpers:ResourceString Key=CreateNewBranch}"
 	Closing="ContentDialog_Closing"
 	CornerRadius="{StaticResource OverlayCornerRadius}"
 	DefaultButton="Primary"
 	HighContrastAdjustment="None"
 	IsPrimaryButtonEnabled="{x:Bind ViewModel.IsBranchValid, Mode=OneWay}"
 	PrimaryButtonStyle="{StaticResource AccentButtonStyle}"
-	PrimaryButtonText="{helpers:ResourceString Name=Create}"
+	PrimaryButtonText="{helpers:ResourceString Key=Create}"
 	RequestedTheme="{x:Bind RootAppElement.RequestedTheme, Mode=OneWay}"
-	SecondaryButtonText="{helpers:ResourceString Name=Cancel}"
+	SecondaryButtonText="{helpers:ResourceString Key=Cancel}"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
 
@@ -37,17 +37,17 @@
 			<TextBlock
 				Grid.Column="0"
 				VerticalAlignment="Center"
-				Text="{helpers:ResourceString Name=Name}" />
+				Text="{helpers:ResourceString Key=Name}" />
 			<TextBox
 				x:Name="BranchNameBox"
 				Grid.Column="1"
 				Width="260"
-				PlaceholderText="{helpers:ResourceString Name=EnterName}"
+				PlaceholderText="{helpers:ResourceString Key=EnterName}"
 				Text="{x:Bind ViewModel.NewBranchName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 				<TextBox.Resources>
 					<TeachingTip
 						x:Name="InvalidNameWarning"
-						Title="{helpers:ResourceString Name=InvalidBranchName}"
+						Title="{helpers:ResourceString Key=InvalidBranchName}"
 						IsOpen="{x:Bind ViewModel.ShowWarningTip, Mode=OneWay}"
 						PreferredPlacement="Bottom"
 						Target="{x:Bind BranchNameBox}" />
@@ -78,7 +78,7 @@
 				Grid.Row="0"
 				Grid.Column="0"
 				VerticalAlignment="Center"
-				Text="{helpers:ResourceString Name=BasedOn}" />
+				Text="{helpers:ResourceString Key=BasedOn}" />
 			<ComboBox
 				x:Name="BranchBox"
 				Grid.Row="0"
@@ -92,7 +92,7 @@
 				Grid.Row="1"
 				Grid.Column="0"
 				VerticalAlignment="Center"
-				Text="{helpers:ResourceString Name=SwitchToNewBranch}" />
+				Text="{helpers:ResourceString Key=SwitchToNewBranch}" />
 			<ToggleSwitch
 				Grid.Row="1"
 				Grid.Column="1"

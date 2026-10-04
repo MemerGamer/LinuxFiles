@@ -394,6 +394,7 @@ namespace Files.App
 			}
 		}
 
+#if WINDOWS
 		protected override bool OnWindowMessageReceived(uint message, WPARAM wParam, LPARAM lParam, ref LRESULT result)
 		{
 			if ((!CanWindowToFront) && message == Windows.Win32.PInvoke.WM_WINDOWPOSCHANGING)
@@ -409,5 +410,6 @@ namespace Files.App
 
 			return false;
 		}
+#endif
 	}
 }

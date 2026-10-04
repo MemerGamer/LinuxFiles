@@ -75,7 +75,11 @@ global using global::OwlCore.Storage;
 // Files.Platform
 
 global using global::Files.Platform.Abstractions;
+#if WINDOWS
 global using global::Files.Platform.Windows;
+#else
+global using global::Files.Platform.Linux;
+#endif
 
 // Files.App.Storage
 
@@ -87,3 +91,8 @@ global using global::Files.App.Storage.Watchers;
 global using global::Files.Shared;
 global using global::Files.Shared.Attributes;
 global using global::Files.Shared.Extensions;
+
+#if !WINDOWS
+// Uno declares ThumbnailMode in both Windows.Storage and Windows.Storage.FileProperties
+global using ThumbnailMode = global::Windows.Storage.FileProperties.ThumbnailMode;
+#endif

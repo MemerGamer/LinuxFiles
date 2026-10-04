@@ -9,7 +9,7 @@ using WinRT;
 namespace Files.App.UserControls.Menus
 {
 	[Microsoft.UI.Xaml.Data.Bindable]
-	public sealed class MenuFlyoutSubItemCustomProperties : DependencyObject
+	public sealed partial class MenuFlyoutSubItemCustomProperties : DependencyObject
 	{
 		public static readonly DependencyProperty BitmapIconProperty =
 			DependencyProperty.Register("BitmapIcon", typeof(BitmapImage), typeof(MenuFlyoutSubItemCustomProperties), new PropertyMetadata(null, OnBitmapIconChanged));

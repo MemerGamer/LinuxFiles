@@ -9,14 +9,14 @@
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:vm="using:Files.App.ViewModels.Dialogs.AddItemDialog"
 	x:Name="AddDialog"
-	Title="{helpers:ResourceString Name=AddDialog/Title}"
+	Title="{helpers:ResourceString Key=AddDialog/Title}"
 	Grid.RowSpan="4"
 	BorderThickness="0"
 	CornerRadius="{StaticResource OverlayCornerRadius}"
 	HighContrastAdjustment="None"
 	Loaded="AddItemDialog_Loaded"
 	RequestedTheme="{x:Bind RootAppElement.RequestedTheme, Mode=OneWay}"
-	SecondaryButtonText="{helpers:ResourceString Name=Cancel}"
+	SecondaryButtonText="{helpers:ResourceString Key=Cancel}"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
 
@@ -31,7 +31,7 @@
 		</Grid.RowDefinitions>
 
 		<Grid x:Name="SubtitleArea">
-			<TextBlock x:Name="Description" Text="{helpers:ResourceString Name=AddDialogDescription/Text}" />
+			<TextBlock x:Name="Description" Text="{helpers:ResourceString Key=AddDialogDescription/Text}" />
 		</Grid>
 
 		<Grid

@@ -42,15 +42,15 @@
 			<TextBlock
 				Padding="0,0,0,12"
 				Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
-				Text="{helpers:ResourceString Name=DevTools}" />
+				Text="{helpers:ResourceString Key=DevTools}" />
 
 			<!--  Display Open IDE status bar button  -->
-			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=DisplayOpenIDE}">
+			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Key=DisplayOpenIDE}">
 				<wctcontrols:SettingsExpander.HeaderIcon>
 					<FontIcon Glyph="&#xE7AC;" />
 				</wctcontrols:SettingsExpander.HeaderIcon>
 				<uc:ComboBoxEx
-					AutomationProperties.Name="{helpers:ResourceString Name=DisplayOpenIDE}"
+					AutomationProperties.Name="{helpers:ResourceString Key=DisplayOpenIDE}"
 					ItemsSource="{x:Bind ViewModel.OpenInIDEOptions.Values}"
 					SelectedItem="{x:Bind ViewModel.SelectedOpenInIDEOption, Mode=TwoWay}" />
 				<wctcontrols:SettingsExpander.ItemsHeader>
@@ -78,7 +78,7 @@
 								VerticalAlignment="Center"
 								x:Load="{x:Bind ViewModel.IsEditingIDEConfig, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
 								LineHeight="18"
-								Text="{helpers:ResourceString Name=Name}"
+								Text="{helpers:ResourceString Key=Name}"
 								TextTrimming="CharacterEllipsis" />
 
 							<TextBlock
@@ -93,14 +93,14 @@
 								Grid.ColumnSpan="3"
 								HorizontalAlignment="Stretch"
 								VerticalAlignment="Center"
-								Header="{helpers:ResourceString Name=Name}"
-								PlaceholderText="{helpers:ResourceString Name=Name}"
+								Header="{helpers:ResourceString Key=Name}"
+								PlaceholderText="{helpers:ResourceString Key=Name}"
 								Text="{x:Bind ViewModel.IDEName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
 								Visibility="{x:Bind ViewModel.IsEditingIDEConfig, Converter={StaticResource BoolVisibilityConverter}, Mode=OneWay}">
 								<TextBox.Resources>
 									<TeachingTip
 										x:Name="InvalidIDENameWarning"
-										Title="{helpers:ResourceString Name=InvalidIDENameError}"
+										Title="{helpers:ResourceString Key=InvalidIDENameError}"
 										IsLightDismissEnabled="True"
 										IsOpen="{x:Bind ViewModel.IsIDENameValid, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
 										PreferredPlacement="Bottom"
@@ -116,7 +116,7 @@
 								VerticalAlignment="Center"
 								x:Load="{x:Bind ViewModel.IsEditingIDEConfig, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
 								LineHeight="18"
-								Text="{helpers:ResourceString Name=PathOrAlias}"
+								Text="{helpers:ResourceString Key=PathOrAlias}"
 								TextTrimming="CharacterEllipsis" />
 
 							<TextBlock
@@ -140,13 +140,13 @@
 									x:Name="IDEPathTextBox"
 									HorizontalAlignment="Stretch"
 									VerticalAlignment="Center"
-									Header="{helpers:ResourceString Name=PathOrAlias}"
-									PlaceholderText="{helpers:ResourceString Name=IDEPathPlaceholder}"
+									Header="{helpers:ResourceString Key=PathOrAlias}"
+									PlaceholderText="{helpers:ResourceString Key=IDEPathPlaceholder}"
 									Text="{x:Bind ViewModel.IDEPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
 									<TextBox.Resources>
 										<TeachingTip
 											x:Name="InvalidPathWarning"
-											Title="{helpers:ResourceString Name=InvalidPath}"
+											Title="{helpers:ResourceString Key=InvalidPath}"
 											IsLightDismissEnabled="True"
 											IsOpen="{x:Bind ViewModel.IsIDEPathValid, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
 											KeyTipHorizontalOffset="-80"
@@ -160,7 +160,7 @@
 									Height="32"
 									VerticalAlignment="Bottom"
 									Command="{x:Bind ViewModel.OpenFilePickerForIDECommand, Mode=OneWay}"
-									Content="{helpers:ResourceString Name=Browse}">
+									Content="{helpers:ResourceString Key=Browse}">
 									<SplitButton.Flyout>
 										<MenuFlyout Placement="Bottom">
 											<!--  Test Integration  -->
@@ -168,7 +168,7 @@
 												x:Name="TestIDE"
 												Command="{x:Bind ViewModel.TestIDECommand, Mode=OneWay}"
 												IsEnabled="{x:Bind ViewModel.IsIDEPathValid, Mode=OneWay}"
-												Text="{helpers:ResourceString Name=TestIntegration}" />
+												Text="{helpers:ResourceString Key=TestIntegration}" />
 										</MenuFlyout>
 									</SplitButton.Flyout>
 								</SplitButton>
@@ -184,7 +184,7 @@
 								Background="Transparent"
 								BorderBrush="Transparent"
 								Command="{x:Bind ViewModel.StartEditingIDECommand, Mode=OneWay}"
-								Content="{helpers:ResourceString Name=Edit}"
+								Content="{helpers:ResourceString Key=Edit}"
 								Visibility="{x:Bind ViewModel.IsEditingIDEConfig, Converter={StaticResource InvertedBoolVisibilityConverter}, Mode=OneWay}" />
 						</Grid>
 
@@ -196,12 +196,12 @@
 							Orientation="Horizontal"
 							Spacing="8">
 							<!--  Cancel  -->
-							<Button Command="{x:Bind ViewModel.CancelIDEChangesCommand, Mode=OneWay}" Content="{helpers:ResourceString Name=Cancel}" />
+							<Button Command="{x:Bind ViewModel.CancelIDEChangesCommand, Mode=OneWay}" Content="{helpers:ResourceString Key=Cancel}" />
 
 							<!--  Save Changes  -->
 							<Button
 								Command="{x:Bind ViewModel.SaveIDEChangesCommand, Mode=OneWay}"
-								Content="{helpers:ResourceString Name=Save}"
+								Content="{helpers:ResourceString Key=Save}"
 								IsEnabled="{x:Bind ViewModel.CanSaveIDEChanges, Mode=OneWay, FallbackValue=False}"
 								Style="{StaticResource AccentButtonStyle}" />
 						</StackPanel>
@@ -213,22 +213,22 @@
 			<wctcontrols:SettingsCard
 				x:Name="ConnectToGitHubSection"
 				x:Load="{x:Bind ViewModel.IsLogoutEnabled, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=ConnectToGitHub}">
+				Header="{helpers:ResourceString Key=ConnectToGitHub}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xF0B9;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
-				<Button Command="{x:Bind ViewModel.ConnectToGitHubCommand}" Content="{helpers:ResourceString Name=Login}" />
+				<Button Command="{x:Bind ViewModel.ConnectToGitHubCommand}" Content="{helpers:ResourceString Key=Login}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Remove credentials  -->
 			<wctcontrols:SettingsCard
 				x:Name="RemoveCredentialsSection"
 				x:Load="{x:Bind ViewModel.IsLogoutEnabled, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=ConnectedToGitHub}">
+				Header="{helpers:ResourceString Key=ConnectedToGitHub}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xF0B9;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
-				<Button Command="{x:Bind ViewModel.RemoveCredentialsCommand}" Content="{helpers:ResourceString Name=Logout}" />
+				<Button Command="{x:Bind ViewModel.RemoveCredentialsCommand}" Content="{helpers:ResourceString Key=Logout}" />
 			</wctcontrols:SettingsCard>
 
 		</StackPanel>

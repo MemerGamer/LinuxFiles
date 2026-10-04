@@ -21,7 +21,7 @@ namespace Files.Core.SourceGenerator.Generators
 		public void Initialize(IncrementalGeneratorInitializationContext context)
 		{
 			var additionalFiles = context
-				.AdditionalTextsProvider.Where(af => af.Path.Contains("en-US\\Resources"));
+				.AdditionalTextsProvider.Where(af => af.Path.Replace('\\', '/').Contains("en-US/Resources"));
 
 			context.RegisterSourceOutput(additionalFiles, Execute);
 

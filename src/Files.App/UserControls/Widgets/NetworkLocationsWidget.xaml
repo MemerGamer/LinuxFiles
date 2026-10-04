@@ -27,14 +27,14 @@
 				<TextBlock
 					Grid.Column="0"
 					VerticalAlignment="Center"
-					Text="{helpers:ResourceString Name=NoNetworkLocationsInfo}" />
+					Text="{helpers:ResourceString Key=NoNetworkLocationsInfo}" />
 				<Button
 					x:Name="NoNetworkLocationsInfoBarButton"
 					Grid.Column="1"
 					Margin="8"
 					HorizontalAlignment="Right"
 					Click="NoNetworkLocationsInfoBarButton_Click"
-					Content="{helpers:ResourceString Name=Disable}" />
+					Content="{helpers:ResourceString Key=Disable}" />
 			</Grid>
 		</InfoBar>
 

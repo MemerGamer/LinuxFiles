@@ -45,13 +45,13 @@
 			<TextBlock
 				Padding="0,0,0,12"
 				Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
-				Text="{helpers:ResourceString Name=Actions}" />
+				Text="{helpers:ResourceString Key=Actions}" />
 
 			<!--  Commands  -->
 			<controls:SettingsExpander
 				Margin="0,4,0,0"
 				HorizontalAlignment="Stretch"
-				Header="{helpers:ResourceString Name=Commands}"
+				Header="{helpers:ResourceString Key=Commands}"
 				IsExpanded="True">
 				<controls:SettingsExpander.HeaderIcon>
 					<FontIcon Glyph="&#xE765;" />
@@ -61,12 +61,12 @@
 				<SplitButton
 					x:Name="AddCommandSplitButton"
 					Click="AddCommandButton_Click"
-					Content="{helpers:ResourceString Name=AddCommand}">
+					Content="{helpers:ResourceString Key=AddCommand}">
 					<SplitButton.Flyout>
 						<MenuFlyout Placement="Bottom">
 							<MenuFlyoutItem
 								Command="{x:Bind ViewModel.ShowRestoreDefaultsConfirmationCommand, Mode=OneWay}"
-								Text="{helpers:ResourceString Name=RestoreDefaults}">
+								Text="{helpers:ResourceString Key=RestoreDefaults}">
 								<MenuFlyoutItem.Icon>
 									<FontIcon Glyph="&#xE777;" />
 								</MenuFlyoutItem.Icon>
@@ -93,13 +93,13 @@
 							<TextBlock
 								VerticalAlignment="Center"
 								FontWeight="SemiBold"
-								Text="{helpers:ResourceString Name=KeyboardShortcuts}" />
+								Text="{helpers:ResourceString Key=KeyboardShortcuts}" />
 
 							<TextBox
 								x:Name="SearchBox"
 								Grid.Column="1"
 								Width="240"
-								PlaceholderText="{helpers:ResourceString Name=Search}"
+								PlaceholderText="{helpers:ResourceString Key=Search}"
 								TextChanged="SearchBox_TextChanged" />
 						</Grid>
 
@@ -160,10 +160,10 @@
 													Width="32"
 													Height="32"
 													Padding="0"
-													AutomationProperties.Name="{helpers:ResourceString Name=Edit}"
+													AutomationProperties.Name="{helpers:ResourceString Key=Edit}"
 													Click="EditButton_Click"
 													Tag="{x:Bind}"
-													ToolTipService.ToolTip="{helpers:ResourceString Name=Edit}">
+													ToolTipService.ToolTip="{helpers:ResourceString Key=Edit}">
 													<FontIcon FontSize="14" Glyph="&#xE70F;" />
 												</Button>
 
@@ -172,10 +172,10 @@
 													Width="32"
 													Height="32"
 													Padding="0"
-													AutomationProperties.Name="{helpers:ResourceString Name=Delete}"
+													AutomationProperties.Name="{helpers:ResourceString Key=Delete}"
 													Click="DeleteButton_Click"
 													Tag="{x:Bind}"
-													ToolTipService.ToolTip="{helpers:ResourceString Name=Delete}">
+													ToolTipService.ToolTip="{helpers:ResourceString Key=Delete}">
 													<FontIcon FontSize="14" Glyph="&#xE74D;" />
 												</Button>
 											</StackPanel>
@@ -194,24 +194,24 @@
 		<TeachingTip
 			x:Name="RestoreDefaultsConfirmationTeachingTip"
 			ActionButtonCommand="{x:Bind ViewModel.RestoreDefaultsCommand, Mode=OneWay}"
-			ActionButtonContent="{helpers:ResourceString Name=Yes}"
+			ActionButtonContent="{helpers:ResourceString Key=Yes}"
 			ActionButtonStyle="{ThemeResource AccentButtonStyle}"
-			CloseButtonContent="{helpers:ResourceString Name=No}"
+			CloseButtonContent="{helpers:ResourceString Key=No}"
 			IsLightDismissEnabled="True"
 			IsOpen="{x:Bind ViewModel.IsResetAllConfirmationTeachingTipOpened, Mode=TwoWay}"
 			PreferredPlacement="BottomLeft"
-			Subtitle="{helpers:ResourceString Name=RestoreDefaultKeybindingsConfirmation}"
+			Subtitle="{helpers:ResourceString Key=RestoreDefaultKeybindingsConfirmation}"
 			Target="{x:Bind AddCommandSplitButton}" />
 
 		<!--  Delete Key Binding Confirmation TeachingTip  -->
 		<TeachingTip
 			x:Name="DeleteConfirmationTeachingTip"
 			ActionButtonClick="DeleteConfirmationTeachingTip_ActionButtonClick"
-			ActionButtonContent="{helpers:ResourceString Name=Yes}"
+			ActionButtonContent="{helpers:ResourceString Key=Yes}"
 			ActionButtonStyle="{ThemeResource AccentButtonStyle}"
-			CloseButtonContent="{helpers:ResourceString Name=No}"
+			CloseButtonContent="{helpers:ResourceString Key=No}"
 			IsLightDismissEnabled="True"
 			PreferredPlacement="Left"
-			Subtitle="{helpers:ResourceString Name=DeleteKeyBindingConfirmation}" />
+			Subtitle="{helpers:ResourceString Key=DeleteKeyBindingConfirmation}" />
 	</Grid>
 </Page>

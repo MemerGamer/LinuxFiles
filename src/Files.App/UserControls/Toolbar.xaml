@@ -70,7 +70,7 @@
 		<Grid Grid.Column="0" Background="Transparent">
 			<Grid.ContextFlyout>
 				<MenuFlyout>
-					<MenuFlyoutItem Click="CustomizeToolbar_Click" Text="{helpers:ResourceString Name=CustomizeToolbar}" />
+					<MenuFlyoutItem Click="CustomizeToolbar_Click" Text="{helpers:ResourceString Key=CustomizeToolbar}" />
 				</MenuFlyout>
 			</Grid.ContextFlyout>
 
@@ -114,11 +114,11 @@
 				x:Load="{x:Bind ViewModel.InstanceViewModel.IsPageTypeNotHome, Mode=OneWay}"
 				AccessKey="S"
 				AccessKeyInvoked="AppBarButton_AccessKeyInvoked"
-				AutomationProperties.Name="{helpers:ResourceString Name=SelectionOptions}"
-				Label="{helpers:ResourceString Name=NavToolbarSelectionOptions/Label}"
+				AutomationProperties.Name="{helpers:ResourceString Key=SelectionOptions}"
+				Label="{helpers:ResourceString Key=NavToolbarSelectionOptions/Label}"
 				LabelPosition="Collapsed"
 				Style="{StaticResource ToolBarAppBarButtonFlyoutStyle}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=SelectionOptions}">
+				ToolTipService.ToolTip="{helpers:ResourceString Key=SelectionOptions}">
 
 				<controls:ThemedIcon Style="{StaticResource App.ThemedIcons.SelectMode}" />
 
@@ -158,11 +158,11 @@
 				x:Load="{x:Bind ViewModel.InstanceViewModel.IsPageTypeNotHome, Mode=OneWay}"
 				AccessKey="A"
 				AccessKeyInvoked="AppBarButton_AccessKeyInvoked"
-				AutomationProperties.Name="{helpers:ResourceString Name=Sort}"
-				Label="{helpers:ResourceString Name=Sort}"
+				AutomationProperties.Name="{helpers:ResourceString Key=Sort}"
+				Label="{helpers:ResourceString Key=Sort}"
 				LabelPosition="Collapsed"
 				Style="{StaticResource ToolBarAppBarButtonFlyoutStyle}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=Sort}">
+				ToolTipService.ToolTip="{helpers:ResourceString Key=Sort}">
 
 				<controls:ThemedIcon Style="{StaticResource App.ThemedIcons.Sorting}" />
 
@@ -171,7 +171,7 @@
 						<MenuFlyoutSubItem
 							AccessKey="S"
 							AccessKeyInvoked="SortGroup_AccessKeyInvoked"
-							Text="{helpers:ResourceString Name=SortBy}">
+							Text="{helpers:ResourceString Key=SortBy}">
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByName.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByName.Label}" />
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByDateModified.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateModified.Label}" />
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.SortByDateCreated.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.SortByDateCreated.Label}" />
@@ -207,7 +207,7 @@
 						<MenuFlyoutSubItem
 							AccessKey="G"
 							AccessKeyInvoked="SortGroup_AccessKeyInvoked"
-							Text="{helpers:ResourceString Name=GroupBy}">
+							Text="{helpers:ResourceString Key=GroupBy}">
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.GroupByNone.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.GroupByNone.Label}" />
 							<ToggleMenuFlyoutItem IsChecked="{x:Bind Commands.GroupByName.IsOn, Mode=TwoWay}" Text="{x:Bind Commands.GroupByName.Label}" />
 							<MenuFlyoutSubItem Text="{x:Bind Commands.GroupByDateModified.Label}">
@@ -269,11 +269,11 @@
 				x:Load="{x:Bind ViewModel.InstanceViewModel.IsPageTypeNotHome, Mode=OneWay}"
 				AccessKey="L"
 				AccessKeyInvoked="AppBarButton_AccessKeyInvoked"
-				AutomationProperties.Name="{helpers:ResourceString Name=Layout}"
-				Label="{helpers:ResourceString Name=Layout}"
+				AutomationProperties.Name="{helpers:ResourceString Key=Layout}"
+				Label="{helpers:ResourceString Key=Layout}"
 				LabelPosition="Collapsed"
 				Style="{StaticResource ToolBarAppBarButtonFlyoutStyle}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=Layout}">
+				ToolTipService.ToolTip="{helpers:ResourceString Key=Layout}">
 
 				<controls:ThemedIcon Style="{x:Bind ViewModel.LayoutThemedIcon, Mode=OneWay}" />
 
@@ -285,7 +285,7 @@
 						<StackPanel Spacing="12">
 
 							<!--  Header  -->
-							<TextBlock FontWeight="Medium" Text="{helpers:ResourceString Name=Layout}" />
+							<TextBlock FontWeight="Medium" Text="{helpers:ResourceString Key=Layout}" />
 
 							<!--  Layout  -->
 							<StackPanel Orientation="Horizontal" Spacing="8">
@@ -423,7 +423,7 @@
 								BorderThickness=".5" />
 
 							<!--  Sizes  -->
-							<TextBlock FontWeight="Medium" Text="{helpers:ResourceString Name=Size}" />
+							<TextBlock FontWeight="Medium" Text="{helpers:ResourceString Key=Size}" />
 							<Grid>
 
 								<!--  Details  -->

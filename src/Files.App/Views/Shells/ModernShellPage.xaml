@@ -145,12 +145,12 @@
 				<TextBlock
 					VerticalAlignment="Center"
 					Style="{StaticResource BodyStrongTextBlockStyle}"
-					Text="{helpers:ResourceString Name=FilteringFor}" />
+					Text="{helpers:ResourceString Key=FilteringFor}" />
 				<AutoSuggestBox
 					x:Name="FilterTextBox"
 					Width="180"
 					VerticalAlignment="Center"
-					PlaceholderText="{helpers:ResourceString Name=Filename}"
+					PlaceholderText="{helpers:ResourceString Key=Filename}"
 					PreviewKeyDown="FilterTextBox_PreviewKeyDown"
 					Text="{x:Bind ShellViewModel.FilesAndFoldersFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 			</StackPanel>

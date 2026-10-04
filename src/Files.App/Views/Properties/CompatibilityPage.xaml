@@ -31,7 +31,7 @@
 			<!--  Run Troubleshooter  -->
 			<wctcontrols:SettingsCard
 				Command="{x:Bind CompatibilityViewModel.RunTroubleshooterCommand}"
-				Header="{helpers:ResourceString Name=CompatibilityRunTroubleshooter}"
+				Header="{helpers:ResourceString Key=CompatibilityRunTroubleshooter}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.ActionIcon>
 					<FontIcon Glyph="&#xE8A7;" />
@@ -39,53 +39,53 @@
 			</wctcontrols:SettingsCard>
 
 			<!--  Compatibility Mode  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=CompatibilityMode}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=CompatibilityMode}">
 				<ComboBox
-					AutomationProperties.Name="{helpers:ResourceString Name=CompatibilityMode}"
+					AutomationProperties.Name="{helpers:ResourceString Key=CompatibilityMode}"
 					ItemsSource="{x:Bind CompatibilityViewModel.CompatibilityModes.Values, Mode=OneWay}"
 					SelectedItem="{x:Bind CompatibilityViewModel.SelectedCompatibilityMode, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Reduce Color Mode  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=CompatibilityReducedColorMode}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=CompatibilityReducedColorMode}">
 				<ComboBox
-					AutomationProperties.Name="{helpers:ResourceString Name=CompatibilityReducedColorMode}"
+					AutomationProperties.Name="{helpers:ResourceString Key=CompatibilityReducedColorMode}"
 					ItemsSource="{x:Bind CompatibilityViewModel.ReducedColorModes.Values, Mode=OneWay}"
 					SelectedItem="{x:Bind CompatibilityViewModel.SelectedReducedColorMode, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Run In Low Resolution  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=CompatibilityRunIn640x480Resolution}">
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=CompatibilityRunIn640x480Resolution}" IsOn="{x:Bind CompatibilityViewModel.RunIn40x480Resolution, Mode=TwoWay}" />
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=CompatibilityRunIn640x480Resolution}">
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=CompatibilityRunIn640x480Resolution}" IsOn="{x:Bind CompatibilityViewModel.RunIn40x480Resolution, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Disable Full Screen Optimizations  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=CompatibilityDisableFullscreenOptimizations}">
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=CompatibilityDisableFullscreenOptimizations}" IsOn="{x:Bind CompatibilityViewModel.DisableFullscreenOptimization, Mode=TwoWay}" />
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=CompatibilityDisableFullscreenOptimizations}">
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=CompatibilityDisableFullscreenOptimizations}" IsOn="{x:Bind CompatibilityViewModel.DisableFullscreenOptimization, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Run As Admin  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=RunAsAdministrator}">
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=RunAsAdministrator}" IsOn="{x:Bind CompatibilityViewModel.RunAsAdministrator, Mode=TwoWay}" />
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=RunAsAdministrator}">
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=RunAsAdministrator}" IsOn="{x:Bind CompatibilityViewModel.RunAsAdministrator, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Register App For Restart  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=CompatibilityRegisterThisProgramForRestart}">
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=CompatibilityRegisterThisProgramForRestart}" IsOn="{x:Bind CompatibilityViewModel.RegisterForRestart, Mode=TwoWay}" />
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=CompatibilityRegisterThisProgramForRestart}">
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=CompatibilityRegisterThisProgramForRestart}" IsOn="{x:Bind CompatibilityViewModel.RegisterForRestart, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  High DPI Options  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=CompatibilityUseDPISettings}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=CompatibilityUseDPISettings}">
 				<ComboBox
-					AutomationProperties.Name="{helpers:ResourceString Name=CompatibilityUseDPISettings}"
+					AutomationProperties.Name="{helpers:ResourceString Key=CompatibilityUseDPISettings}"
 					ItemsSource="{x:Bind CompatibilityViewModel.HighDpiOptions.Values, Mode=OneWay}"
 					SelectedItem="{x:Bind CompatibilityViewModel.SelectedHighDpiOption, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Override High DPI Scaling Behavior  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=CompatibilityOverrideHighDPIBehavior}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=CompatibilityOverrideHighDPIBehavior}">
 				<ComboBox
-					AutomationProperties.Name="{helpers:ResourceString Name=CompatibilityOverrideHighDPIBehavior}"
+					AutomationProperties.Name="{helpers:ResourceString Key=CompatibilityOverrideHighDPIBehavior}"
 					ItemsSource="{x:Bind CompatibilityViewModel.HighDpiOverrides.Values, Mode=OneWay}"
 					SelectedItem="{x:Bind CompatibilityViewModel.SelectedHighDpiOverride, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>

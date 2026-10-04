@@ -7,7 +7,7 @@
 	xmlns:dataitems="using:Files.App.Data.Items"
 	xmlns:helpers="using:Files.App.Helpers"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-	CloseButtonText="{helpers:ResourceString Name=Cancel}"
+	CloseButtonText="{helpers:ResourceString Key=Cancel}"
 	DefaultButton="Primary"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
@@ -20,7 +20,7 @@
 			HorizontalAlignment="Stretch"
 			DropDownClosed="ActionPickerComboBox_DropDownClosed"
 			ItemsSource="{x:Bind AllActionItems, Mode=OneTime}"
-			PlaceholderText="{helpers:ResourceString Name=ChooseAnAction}"
+			PlaceholderText="{helpers:ResourceString Key=ChooseAnAction}"
 			SelectionChanged="ActionPickerComboBox_SelectionChanged"
 			Visibility="{x:Bind IsAddMode, Mode=OneTime}">
 			<ComboBox.ItemTemplate>

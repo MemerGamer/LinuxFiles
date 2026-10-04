@@ -34,7 +34,7 @@
 						<MenuFlyoutItem
 							x:Name="MenuItemMoveTabToNewWindow"
 							Click="MoveTabToNewWindowAsync"
-							Text="{helpers:ResourceString Name=HorizontalMultitaskingControlMoveTabToNewWindow/Text}">
+							Text="{helpers:ResourceString Key=HorizontalMultitaskingControlMoveTabToNewWindow/Text}">
 							<MenuFlyoutItem.Icon>
 								<FontIcon Glyph="&#xE8A7;" />
 							</MenuFlyoutItem.Icon>
@@ -83,7 +83,7 @@
 			DragLeave="TabView_DragLeave"
 			IsAddTabButtonVisible="False"
 			PointerWheelChanged="TabView_PointerWheelChanged"
-			SelectedIndex="{x:Bind root:App.AppModel.TabStripSelectedIndex, Mode=TwoWay}"
+			SelectedIndex="{x:Bind AppModel.TabStripSelectedIndex, Mode=TwoWay}"
 			SelectionChanged="TabView_SelectionChanged"
 			TabCloseRequested="TabView_TabCloseRequested"
 			TabDragCompleted="TabView_TabDragCompleted"
@@ -102,10 +102,10 @@
 					Margin="4,0,-2,0"
 					Padding="0"
 					VerticalAlignment="Center"
-					AutomationProperties.Name="{helpers:ResourceString Name=TabActions}"
+					AutomationProperties.Name="{helpers:ResourceString Key=TabActions}"
 					Background="Transparent"
 					BorderThickness="0"
-					ToolTipService.ToolTip="{helpers:ResourceString Name=TabActions}"
+					ToolTipService.ToolTip="{helpers:ResourceString Key=TabActions}"
 					Visibility="{x:Bind ShowTabActionsButton, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
 
 					<controls:ThemedIcon
@@ -144,7 +144,7 @@
 							<MenuFlyoutSubItem
 								x:Name="SplitPaneMenuItem"
 								x:Load="{x:Bind Commands.SplitPaneHorizontally.IsExecutable, Mode=OneWay}"
-								Text="{helpers:ResourceString Name=SplitPane}">
+								Text="{helpers:ResourceString Key=SplitPane}">
 								<MenuFlyoutSubItem.Items>
 									<!--  Vertical  -->
 									<uc:MenuFlyoutItemWithThemedIcon
@@ -168,7 +168,7 @@
 							<MenuFlyoutSubItem
 								x:Name="ArrangePanesMenuItem"
 								x:Load="{x:Bind Commands.CloseActivePane.IsExecutable, Mode=OneWay}"
-								Text="{helpers:ResourceString Name=ArrangePanes}">
+								Text="{helpers:ResourceString Key=ArrangePanes}">
 								<MenuFlyoutSubItem.Items>
 									<!--  Vertical  -->
 									<uc:ToggleMenuFlyoutItemWithThemedIcon

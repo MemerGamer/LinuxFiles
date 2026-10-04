@@ -22,6 +22,9 @@ namespace Files.App.UserControls.TabBar
 		private readonly IGeneralSettingsService GeneralSettingsService = Ioc.Default.GetRequiredService<IGeneralSettingsService>();
 		private readonly IWindowContext WindowContext = Ioc.Default.GetRequiredService<IWindowContext>();
 
+		// Static App.AppModel as an instance member; Uno's x:Bind cannot resolve a "root:App.AppModel" static path
+		private AppModel AppModel => App.AppModel;
+
 		// Fields
 
 		private readonly DispatcherTimer tabHoverTimer = new();

@@ -36,7 +36,7 @@
 					x:Name="LoadingTextBlock"
 					HorizontalAlignment="Center"
 					Style="{StaticResource App.Theme.BodyStrongTextBlockStyle}"
-					Text="{helpers:ResourceString Name=Loading}" />
+					Text="{helpers:ResourceString Key=Loading}" />
 			</StackPanel>
 
 			<!--  Details Expander List  -->
@@ -134,15 +134,15 @@
 						x:Name="ClearPropertiesButton"
 						Margin="0,4,0,0"
 						HorizontalAlignment="Stretch"
-						Content="{helpers:ResourceString Name=ClearPropertiesButton/Content}">
+						Content="{helpers:ResourceString Key=ClearPropertiesButton/Content}">
 						<Button.Flyout>
 							<Flyout x:Name="ClearPropertiesFlyout">
 								<StackPanel Orientation="Vertical" Spacing="8">
-									<TextBlock Text="{helpers:ResourceString Name=ClearPropertiesFlyoutText/Text}" />
+									<TextBlock Text="{helpers:ResourceString Key=ClearPropertiesFlyoutText/Text}" />
 									<Button
 										HorizontalAlignment="Right"
 										Click="ClearPropertiesConfirmation_Click"
-										Content="{helpers:ResourceString Name=Clear}" />
+										Content="{helpers:ResourceString Key=Clear}" />
 								</StackPanel>
 							</Flyout>
 						</Button.Flyout>

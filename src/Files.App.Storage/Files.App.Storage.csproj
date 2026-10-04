@@ -1,25 +1,47 @@
 ﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Uno.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
-        <TargetPlatformMinVersion>$(MinimalWindowsVersion)</TargetPlatformMinVersion>
+        <TargetFrameworks>$(DesktopTargetFramework)</TargetFrameworks>
+        <!--  Linux-first: Windows TFM is not built; Windows/ is excluded from the desktop build  -->
+        <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
+        <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
+        <UnoSingleProject>false</UnoSingleProject>
         <Nullable>enable</Nullable>
         <IsTrimmable>true</IsTrimmable>
         <Configurations>Debug;Release</Configurations>
         <Platforms>x86;x64;arm64</Platforms>
-        <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <IsAotCompatible>true</IsAotCompatible>
         <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="Uno.WinUI" />
         <PackageReference Include="FluentFTP" />
     </ItemGroup>
 
+    <!--  Win32/WinRT-only storage implementation; not part of the Linux build  -->
+    <ItemGroup Condition="'$(FilesWin32Compat)' != 'true'">
+        <Compile Remove="Windows\**" />
+        <Compile Remove="Legacy\HomeFolder\HomeFolder.cs" />
+    </ItemGroup>
+
+    <!--  Transitional inventory mode (-p:FilesWin32Compat=true), see Files.App.csproj  -->
+    <ItemGroup Condition="'$(FilesWin32Compat)' == 'true'">
+        <Reference Include="Files.App.CsWin32">
+            <HintPath>..\Files.App.CsWin32\bin\x64\$(Configuration)\$(WindowsTargetFramework)\Files.App.CsWin32.dll</HintPath>
+        </Reference>
+    </ItemGroup>
+
+    <!--  Uno.Sdk drops a root-level Windows/ folder from Compile on non-Windows targets; add it back late in compat mode  -->
+    <Target Name="AddWin32CompatSources" BeforeTargets="BeforeCompile;CoreCompile" Condition="'$(FilesWin32Compat)' == 'true'">
+        <ItemGroup>
+            <Compile Include="Windows\**\*.cs" />
+        </ItemGroup>
+    </Target>
+
     <ItemGroup>
-        <ProjectReference Include="..\Files.App.CsWin32\Files.App.CsWin32.csproj" />
         <ProjectReference Include="..\Files.Core.Storage\Files.Core.Storage.csproj" />
         <ProjectReference Include="..\Files.Shared\Files.Shared.csproj" />
     </ItemGroup>

@@ -9,7 +9,7 @@ using WinRT;
 namespace Files.App.Helpers
 {
 	[Obsolete("Must not use this helper to generate menu flyout any longer.")]
-	public sealed class MenuFlyoutHelper : DependencyObject
+	public sealed partial class MenuFlyoutHelper : DependencyObject
 	{
 		public interface IMenuFlyoutItemViewModel { }
 

@@ -49,7 +49,7 @@
 					Grid.Column="0"
 					VerticalAlignment="Center"
 					Style="{StaticResource PropertyName}"
-					Text="{helpers:ResourceString Name=PropertiesShortcutItemType/Text}"
+					Text="{helpers:ResourceString Key=PropertiesShortcutItemType/Text}"
 					Visibility="Visible" />
 
 				<TextBlock
@@ -65,7 +65,7 @@
 					Grid.Column="0"
 					VerticalAlignment="Center"
 					Style="{StaticResource PropertyName}"
-					Text="{helpers:ResourceString Name=PropertiesShortcutItemPath/Text}"
+					Text="{helpers:ResourceString Key=PropertiesShortcutItemPath/Text}"
 					Visibility="Visible" />
 
 				<TextBox
@@ -108,7 +108,7 @@
 					VerticalAlignment="Center"
 					x:Load="{x:Bind ViewModel.ShortcutItemArgumentsVisibility, Mode=OneWay}"
 					Style="{StaticResource PropertyName}"
-					Text="{helpers:ResourceString Name=PropertiesShortcutItemArgs/Text}" />
+					Text="{helpers:ResourceString Key=PropertiesShortcutItemArgs/Text}" />
 
 				<TextBox
 					x:Name="shortcutItemArgsValue"
@@ -125,7 +125,7 @@
 					VerticalAlignment="Center"
 					x:Load="{x:Bind ViewModel.ShortcutItemWorkingDirVisibility, Mode=OneWay}"
 					Style="{StaticResource PropertyName}"
-					Text="{helpers:ResourceString Name=ShortcutItemWorkingDir}" />
+					Text="{helpers:ResourceString Key=ShortcutItemWorkingDir}" />
 
 				<TextBox
 					x:Name="shortcutItemWorkingDirValue"
@@ -139,15 +139,15 @@
 			<wctcontrols:SettingsCard
 				x:Name="WindowArgsSetting"
 				x:Load="{x:Bind ViewModel.ShortcutItemWindowArgsVisibility, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=StartWindow}">
+				Header="{helpers:ResourceString Key=StartWindow}">
 				<ComboBox ItemsSource="{x:Bind ViewModel.ShowWindowCommandTypes.Values, Mode=OneWay}" SelectedItem="{x:Bind ViewModel.SelectedShowWindowCommand, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<wctcontrols:SettingsCard
 				x:Name="RunAsAdminCheckbox"
 				x:Load="{x:Bind ViewModel.RunAsAdminEnabled, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=RunAsAdministrator}">
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=RunAsAdministrator}" IsOn="{x:Bind ViewModel.RunAsAdminEditedValue, Mode=TwoWay}" />
+				Header="{helpers:ResourceString Key=RunAsAdministrator}">
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=RunAsAdministrator}" IsOn="{x:Bind ViewModel.RunAsAdminEditedValue, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<wctcontrols:SettingsCard
@@ -156,7 +156,7 @@
 				Grid.Column="0"
 				x:Load="{x:Bind ViewModel.IsSelectedItemShortcut, Mode=OneWay}"
 				Command="{x:Bind ViewModel.ShortcutItemOpenLinkCommand, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=OpenFileLocation}"
+				Header="{helpers:ResourceString Key=OpenFileLocation}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.ActionIcon>
 					<FontIcon Glyph="&#xE8A7;" />

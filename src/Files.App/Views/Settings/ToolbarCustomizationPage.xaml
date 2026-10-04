@@ -73,7 +73,7 @@
 			<TextBlock
 				VerticalAlignment="Center"
 				Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-				Text="{helpers:ResourceString Name=CustomizeToolbar}" />
+				Text="{helpers:ResourceString Key=CustomizeToolbar}" />
 		</Grid>
 
 		<!--  Context picker  -->
@@ -85,13 +85,13 @@
 				<TextBlock
 					x:Name="ToolbarModeLabel"
 					VerticalAlignment="Center"
-					Text="{helpers:ResourceString Name=ChooseToolbarModeToCustomize}"
+					Text="{helpers:ResourceString Key=ChooseToolbarModeToCustomize}"
 					TextWrapping="WrapWholeWords" />
 				<uc:ComboBoxEx
 					x:Name="ToolbarModeComboBox"
 					Width="240"
 					HorizontalAlignment="Left"
-					AutomationProperties.Name="{helpers:ResourceString Name=ChooseToolbarModeToCustomize}"
+					AutomationProperties.Name="{helpers:ResourceString Key=ChooseToolbarModeToCustomize}"
 					ItemsSource="{x:Bind ViewModel.ToolbarContexts, Mode=OneWay}"
 					SelectedItem="{x:Bind ViewModel.SelectedToolbarContext, Mode=TwoWay}">
 					<uc:ComboBoxEx.ItemTemplate>
@@ -120,12 +120,12 @@
 			<TextBlock
 				Margin="4,0,0,8"
 				Style="{StaticResource HeaderTextStyle}"
-				Text="{helpers:ResourceString Name=AvailableToolbarItems}" />
+				Text="{helpers:ResourceString Key=AvailableToolbarItems}" />
 			<TextBlock
 				Grid.Column="1"
 				Margin="4,0,0,8"
 				Style="{StaticResource HeaderTextStyle}"
-				Text="{helpers:ResourceString Name=AddedToolbarItems}" />
+				Text="{helpers:ResourceString Key=AddedToolbarItems}" />
 
 			<!--  Available items search + tree  -->
 			<Grid
@@ -138,7 +138,7 @@
 				</Grid.RowDefinitions>
 				<TextBox
 					x:Name="AvailableToolbarItemsSearchBox"
-					PlaceholderText="{helpers:ResourceString Name=Search}"
+					PlaceholderText="{helpers:ResourceString Key=Search}"
 					Text="{x:Bind ViewModel.SearchQuery, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 				<Border
 					Grid.Row="1"
@@ -222,7 +222,7 @@
 								<TextBlock
 									Margin="24,0,0,0"
 									Style="{StaticResource HeaderTextStyle}"
-									Text="{helpers:ResourceString Name=Action}" />
+									Text="{helpers:ResourceString Key=Action}" />
 								<Border
 									Grid.Column="1"
 									Padding="12,0"
@@ -231,7 +231,7 @@
 									<TextBlock
 										HorizontalAlignment="Center"
 										Style="{StaticResource HeaderTextStyle}"
-										Text="{helpers:ResourceString Name=Icon}" />
+										Text="{helpers:ResourceString Key=Icon}" />
 								</Border>
 								<Border
 									Grid.Column="2"
@@ -241,7 +241,7 @@
 									<TextBlock
 										HorizontalAlignment="Center"
 										Style="{StaticResource HeaderTextStyle}"
-										Text="{helpers:ResourceString Name=Label}" />
+										Text="{helpers:ResourceString Key=Label}" />
 								</Border>
 								<Border
 									Grid.Column="3"
@@ -274,18 +274,18 @@
 									ToolTipService.ToolTip="{x:Bind ExtendedDisplayNameWithGroupSuffix}" />
 								<CheckBox
 									Grid.Column="1"
-									AutomationProperties.Name="{helpers:ResourceString Name=ShowToolbarIconOnly}"
+									AutomationProperties.Name="{helpers:ResourceString Key=ShowToolbarIconOnly}"
 									IsChecked="{x:Bind ShowIcon, Mode=TwoWay}"
 									IsEnabled="{x:Bind HasIcon, Mode=OneWay}"
 									Style="{StaticResource ItemCheckBoxStyle}"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=ShowToolbarIconOnly}"
+									ToolTipService.ToolTip="{helpers:ResourceString Key=ShowToolbarIconOnly}"
 									Visibility="{x:Bind IsSeparator, Converter={StaticResource NegatedBoolToVisibilityConverter}}" />
 								<CheckBox
 									Grid.Column="2"
-									AutomationProperties.Name="{helpers:ResourceString Name=ShowToolbarLabels}"
+									AutomationProperties.Name="{helpers:ResourceString Key=ShowToolbarLabels}"
 									IsChecked="{x:Bind ShowLabel, Mode=TwoWay}"
 									Style="{StaticResource ItemCheckBoxStyle}"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=ShowToolbarLabels}"
+									ToolTipService.ToolTip="{helpers:ResourceString Key=ShowToolbarLabels}"
 									Visibility="{x:Bind IsSeparator, Converter={StaticResource NegatedBoolToVisibilityConverter}}" />
 								<Button
 									Grid.Column="3"
@@ -294,12 +294,12 @@
 									Padding="0"
 									HorizontalAlignment="Center"
 									VerticalAlignment="Center"
-									AutomationProperties.Name="{helpers:ResourceString Name=Remove}"
+									AutomationProperties.Name="{helpers:ResourceString Key=Remove}"
 									Background="Transparent"
 									BorderThickness="0"
 									Command="{Binding ElementName=PageRoot, Path=DataContext.RemoveToolbarItemCommand, Mode=OneWay}"
 									CommandParameter="{x:Bind}"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=Remove}">
+									ToolTipService.ToolTip="{helpers:ResourceString Key=Remove}">
 									<Button.Resources>
 										<SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{ThemeResource SystemFillColorCritical}" />
 										<SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{ThemeResource SubtleFillColorSecondary}" />
@@ -357,7 +357,7 @@
 				<ColumnDefinition Width="*" />
 				<ColumnDefinition Width="Auto" />
 			</Grid.ColumnDefinitions>
-			<Button Command="{x:Bind ViewModel.ResetToolbarCommand, Mode=OneWay}" Content="{helpers:ResourceString Name=ResetDefaults}" />
+			<Button Command="{x:Bind ViewModel.ResetToolbarCommand, Mode=OneWay}" Content="{helpers:ResourceString Key=ResetDefaults}" />
 			<StackPanel
 				Grid.Column="2"
 				Orientation="Horizontal"
@@ -365,13 +365,13 @@
 				<Button
 					MinWidth="96"
 					Command="{x:Bind ViewModel.SaveToolbarCommand, Mode=OneWay}"
-					Content="{helpers:ResourceString Name=Save}"
+					Content="{helpers:ResourceString Key=Save}"
 					IsEnabled="{x:Bind ViewModel.HasToolbarChanges, Mode=OneWay}"
 					Style="{StaticResource AccentButtonStyle}" />
 				<Button
 					MinWidth="96"
 					Command="{x:Bind ViewModel.CancelToolbarCommand, Mode=OneWay}"
-					Content="{helpers:ResourceString Name=Cancel}" />
+					Content="{helpers:ResourceString Key=Cancel}" />
 			</StackPanel>
 		</Grid>
 		<VisualStateManager.VisualStateGroups>

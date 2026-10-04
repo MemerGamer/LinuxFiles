@@ -31,7 +31,7 @@
 				<MenuFlyoutSubItem
 					x:Name="SplitPaneSubMenu"
 					x:Load="{x:Bind Commands.SplitPaneHorizontally.IsExecutable, Mode=OneWay}"
-					Text="{helpers:ResourceString Name=SplitPane}">
+					Text="{helpers:ResourceString Key=SplitPane}">
 					<uc:MenuFlyoutItemWithThemedIcon
 						Command="{x:Bind Commands.SplitPaneVertically, Mode=OneWay}"
 						Text="{x:Bind Commands.SplitPaneVertically.Label}"
@@ -61,7 +61,7 @@
 					x:Name="PageHeaderTextBlock"
 					Margin="16,12,0,4"
 					Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
-					Text="{helpers:ResourceString Name=Settings}" />
+					Text="{helpers:ResourceString Key=Settings}" />
 			</controls:SidebarView.Header>
 
 			<controls:SidebarView.InnerContent>
@@ -78,7 +78,7 @@
 
 							<TextBlock
 								Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-								Text="{helpers:ResourceString Name=NoSearchResults}"
+								Text="{helpers:ResourceString Key=NoSearchResults}"
 								Visibility="{x:Bind ViewModel.HasNoSearchResults, Mode=OneWay, Converter={StaticResource BoolToVisibilityConverter}}" />
 
 							<ItemsRepeater ItemsSource="{x:Bind ViewModel.SearchResults, Mode=OneWay}">

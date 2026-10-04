@@ -54,7 +54,7 @@
 					Margin="0,0,12,12"
 					HorizontalAlignment="Right"
 					Click="OpenSecurityAdvancedPageButton_Click"
-					Content="{helpers:ResourceString Name=AdvancedPermissions}" />
+					Content="{helpers:ResourceString Key=AdvancedPermissions}" />
 			</InfoBar>
 
 			<!--  Access Control Entries  -->
@@ -83,7 +83,7 @@
 						Grid.Column="0"
 						Margin="4"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=SecurityUsersGroupLabel/Text}" />
+						Text="{helpers:ResourceString Key=SecurityUsersGroupLabel/Text}" />
 
 					<StackPanel
 						Grid.Column="1"
@@ -172,7 +172,7 @@
 					Grid.Row="2"
 					Margin="16,16,16,16"
 					x:Load="{x:Bind SecurityViewModel.AccessControlList.AccessControlEntries, Converter={StaticResource EmptyCollectionToBoolConverter}, Mode=OneWay}"
-					Text="{helpers:ResourceString Name=SecurityNoAccessControlEntriesText}"
+					Text="{helpers:ResourceString Key=SecurityNoAccessControlEntriesText}"
 					TextWrapping="Wrap" />
 
 			</Grid>
@@ -215,11 +215,11 @@
 						Grid.Column="1"
 						Padding="8,6,4,6"
 						VerticalAlignment="Center"
-						AutomationProperties.Name="{helpers:ResourceString Name=AdvancedPermissions}"
+						AutomationProperties.Name="{helpers:ResourceString Key=AdvancedPermissions}"
 						Click="OpenSecurityAdvancedPageButton_Click"
-						ToolTipService.ToolTip="{helpers:ResourceString Name=AdvancedPermissions}">
+						ToolTipService.ToolTip="{helpers:ResourceString Key=AdvancedPermissions}">
 						<StackPanel Orientation="Horizontal" Spacing="4">
-							<TextBlock Text="{helpers:ResourceString Name=AdvancedPermissions}" />
+							<TextBlock Text="{helpers:ResourceString Key=AdvancedPermissions}" />
 							<FontIcon FontSize="14" Glyph="&#xE76C;" />
 						</StackPanel>
 					</Button>
@@ -264,7 +264,7 @@
 						Margin="0,0,0,4"
 						HorizontalAlignment="Center"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=Allow}" />
+						Text="{helpers:ResourceString Key=Allow}" />
 
 					<!--  Deny  -->
 					<TextBlock
@@ -273,7 +273,7 @@
 						Margin="0,0,0,4"
 						HorizontalAlignment="Center"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=Deny}" />
+						Text="{helpers:ResourceString Key=Deny}" />
 
 					<!--  Full Control  -->
 					<TextBlock
@@ -281,7 +281,7 @@
 						Grid.Column="0"
 						HorizontalAlignment="Left"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=SecurityFullControlLabel/Text}" />
+						Text="{helpers:ResourceString Key=SecurityFullControlLabel/Text}" />
 
 					<CheckBox
 						Grid.Row="1"
@@ -309,7 +309,7 @@
 						Grid.Column="0"
 						HorizontalAlignment="Left"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=Modify}" />
+						Text="{helpers:ResourceString Key=Modify}" />
 
 					<CheckBox
 						Grid.Row="2"
@@ -337,7 +337,7 @@
 						Grid.Column="0"
 						HorizontalAlignment="Left"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=SecurityReadAndExecuteLabel/Text}" />
+						Text="{helpers:ResourceString Key=SecurityReadAndExecuteLabel/Text}" />
 
 					<CheckBox
 						Grid.Row="3"
@@ -365,7 +365,7 @@
 						Grid.Column="0"
 						HorizontalAlignment="Left"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=SecurityListDirectoryLabel/Text}"
+						Text="{helpers:ResourceString Key=SecurityListDirectoryLabel/Text}"
 						Visibility="{x:Bind SecurityViewModel.AccessControlList.IsFolder, Mode=OneWay}" />
 
 					<CheckBox
@@ -396,7 +396,7 @@
 						Grid.Column="0"
 						HorizontalAlignment="Left"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=SecurityReadLabel/Text}" />
+						Text="{helpers:ResourceString Key=SecurityReadLabel/Text}" />
 
 					<CheckBox
 						Grid.Row="5"
@@ -424,7 +424,7 @@
 						Grid.Column="0"
 						HorizontalAlignment="Left"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=Write}" />
+						Text="{helpers:ResourceString Key=Write}" />
 
 					<CheckBox
 						Grid.Row="6"

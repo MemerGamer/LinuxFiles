@@ -3,6 +3,9 @@
     "version": "10.0.102",
     "rollForward": "latestMajor"
   },
+  "msbuild-sdks": {
+    "Uno.Sdk": "6.7.30"
+  },
   "test": {
     "runner": "Microsoft.Testing.Platform"
   }

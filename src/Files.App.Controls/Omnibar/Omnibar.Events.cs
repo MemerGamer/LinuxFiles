@@ -73,7 +73,7 @@ namespace Files.App.Controls
 		private void AutoSuggestBox_LostFocus(object sender, RoutedEventArgs e)
 		{
 			// TextBox still has focus if the context menu for selected text is open
-			var element = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(this.XamlRoot);
+			var element = Microsoft.UI.Xaml.Input.FocusManager.GetFocusedElement(this.XamlRoot!);
 			if (element is FlyoutBase or Popup)
 				return;
 

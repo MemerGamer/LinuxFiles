@@ -1,0 +1,94 @@
+# Copyright (c) Files Community
+# Licensed under the MIT License.
+
+# Abstract:
+#   This CI builds Files on Windows for forks only (it is skipped on the
+#   files-community organization, where ci.yml already runs). It is executed
+#   on pushes to linux/** branches and on pull requests.
+#   It only compiles the app (Release | x64): MSIX packaging, signing
+#   certificates, bundle-size reporting and interaction tests from ci.yml are
+#   intentionally left out. Packaging is disabled with AppxBundle=Never and
+#   GenerateAppxPackageOnBuild=false, as in the non-Release legs of ci.yml.
+#   It is skipped if files not directly related to source code maintenance
+#   are updated.
+
+name: Files CI (Windows fork)
+
+on:
+  push:
+    branches:
+      - 'linux/**'
+    paths-ignore:
+      - 'assets/**'
+      - 'builds/**'
+      - 'docs/**'
+      - '*.md'
+  pull_request:
+    paths-ignore:
+      - 'assets/**'
+      - 'builds/**'
+      - 'docs/**'
+      - '*.md'
+
+run-name: ${{ github.event_name == 'pull_request' && 'Files Windows PR Validation' || 'Files Windows CI Validation' }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  SOLUTION_PATH: '${{ github.workspace }}\Files.slnx'
+  APP_PROJECT_PATH: '${{ github.workspace }}\src\Files.App\Files.App.csproj'
+
+jobs:
+
+  build-windows:
+
+    if: github.repository_owner != 'files-community'
+
+    runs-on: windows-2025-vs2026
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Release]
+        platform: [x64]
+    env:
+      CONFIGURATION: ${{ matrix.configuration }}
+      ARCHITECTURE: ${{ matrix.platform }}
+
+    steps:
+
+    - name: Checkout the repository
+      uses: actions/checkout@v6
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v3
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+
+    - name: Restore Files
+      shell: pwsh
+      run: |
+        msbuild $env:SOLUTION_PATH `
+          -t:Restore `
+          -p:Platform=$env:ARCHITECTURE `
+          -p:Configuration=$env:CONFIGURATION `
+          -p:PublishReadyToRun=true `
+          -v:quiet
+
+    - name: Build Files
+      run: |
+        msbuild `
+          $env:APP_PROJECT_PATH `
+          -t:Build `
+          -p:Configuration=$env:CONFIGURATION `
+          -p:Platform=$env:ARCHITECTURE `
+          -p:AppxBundle=Never `
+          -p:GenerateAppxPackageOnBuild=false `
+          -v:quiet

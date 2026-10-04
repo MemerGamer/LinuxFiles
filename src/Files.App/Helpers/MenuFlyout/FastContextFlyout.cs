@@ -677,7 +677,7 @@ namespace Files.App.Helpers.ContextFlyouts
 				// menu upward (bottom at the pointer, top clamped to the screen when needed) whenever it
 				// does not fit below - it never slides down and never compares the two sides.
 				var workArea = Microsoft.UI.Windowing.DisplayArea.GetFromPoint(
-					new Windows.Graphics.PointInt32((int)referenceX, (int)referenceY),
+					new Windows.Graphics.PointInt32 { X = (int)referenceX, Y = (int)referenceY },
 					Microsoft.UI.Windowing.DisplayAreaFallback.Nearest).WorkArea;
 				var spaceBelow = workArea.Y + workArea.Height - referenceY;
 				return spaceBelow < estimatedHeight * scale;

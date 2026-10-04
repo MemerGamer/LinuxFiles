@@ -20,7 +20,6 @@
 				<ResourceDictionary>
 					<MenuFlyout
 						x:Key="TabFlyout"
-						x:Name="TabItemContextMenu"
 						Closing="TabItemContextMenu_Closing"
 						Opening="TabItemContextMenu_Opening">
 						<MenuFlyoutItem
@@ -127,7 +126,7 @@
 							<!--  Enter Compact Overlay  -->
 							<uc:MenuFlyoutItemWithThemedIcon
 								x:Name="EnterCompactOverlayTabActionButton"
-								x:Load="{x:Bind Commands.EnterCompactOverlay.IsExecutable, Mode=OneWay}"
+								Visibility="{x:Bind Commands.EnterCompactOverlay.IsExecutable, Mode=OneWay}"
 								Command="{x:Bind Commands.EnterCompactOverlay}"
 								Text="{x:Bind Commands.EnterCompactOverlay.Label}"
 								ThemedIconStyle="{x:Bind Commands.EnterCompactOverlay.ThemedIconStyle}" />
@@ -135,7 +134,7 @@
 							<!--  Exit Compact Overlay  -->
 							<uc:MenuFlyoutItemWithThemedIcon
 								x:Name="ExitCompactOverlayTabActionButton"
-								x:Load="{x:Bind Commands.ExitCompactOverlay.IsExecutable, Mode=OneWay}"
+								Visibility="{x:Bind Commands.ExitCompactOverlay.IsExecutable, Mode=OneWay}"
 								Command="{x:Bind Commands.ExitCompactOverlay}"
 								Text="{x:Bind Commands.ExitCompactOverlay.Label}"
 								ThemedIconStyle="{x:Bind Commands.ExitCompactOverlay.ThemedIconStyle}" />
@@ -143,7 +142,7 @@
 							<!--  Add Pane  -->
 							<MenuFlyoutSubItem
 								x:Name="SplitPaneMenuItem"
-								x:Load="{x:Bind Commands.SplitPaneHorizontally.IsExecutable, Mode=OneWay}"
+								Visibility="{x:Bind Commands.SplitPaneHorizontally.IsExecutable, Mode=OneWay}"
 								Text="{helpers:ResourceString Key=SplitPane}">
 								<MenuFlyoutSubItem.Items>
 									<!--  Vertical  -->
@@ -167,7 +166,7 @@
 							<!--  Arrange Panes  -->
 							<MenuFlyoutSubItem
 								x:Name="ArrangePanesMenuItem"
-								x:Load="{x:Bind Commands.CloseActivePane.IsExecutable, Mode=OneWay}"
+								Visibility="{x:Bind Commands.CloseActivePane.IsExecutable, Mode=OneWay}"
 								Text="{helpers:ResourceString Key=ArrangePanes}">
 								<MenuFlyoutSubItem.Items>
 									<!--  Vertical  -->
@@ -193,7 +192,7 @@
 							<!--  Close Active Pane  -->
 							<uc:MenuFlyoutItemWithThemedIcon
 								x:Name="CloseActivePaneTabActionButton"
-								x:Load="{x:Bind Commands.CloseActivePane.IsExecutable, Mode=OneWay}"
+								Visibility="{x:Bind Commands.CloseActivePane.IsExecutable, Mode=OneWay}"
 								Command="{x:Bind Commands.CloseActivePane}"
 								KeyboardAcceleratorTextOverride="{x:Bind Commands.CloseActivePane.HotKeyText, Mode=OneWay}"
 								Text="{x:Bind Commands.CloseActivePane.Label}"

@@ -36,9 +36,9 @@ namespace Files.App.Helpers
 			{
 				// region under the buttons
 				const int borderThickness = 5;
-				source.SetRegionRects(NonClientRegionKind.LeftBorder, [GetScaledRect(uiElement, new(0, 0, borderThickness, titleBarHeight))]);
-				source.SetRegionRects(NonClientRegionKind.RightBorder, [GetScaledRect(uiElement, new(size.Width, 0, borderThickness, titleBarHeight))]);
-				source.SetRegionRects(NonClientRegionKind.Caption, [GetScaledRect(uiElement, new(0, 0, size.Width, titleBarHeight))]);
+				source.SetRegionRects(NonClientRegionKind.LeftBorder, [GetScaledRect(uiElement, new RectInt32 { X = 0, Y = 0, Width = borderThickness, Height = titleBarHeight })]);
+				source.SetRegionRects(NonClientRegionKind.RightBorder, [GetScaledRect(uiElement, new RectInt32 { X = size.Width, Y = 0, Width = borderThickness, Height = titleBarHeight })]);
+				source.SetRegionRects(NonClientRegionKind.Caption, [GetScaledRect(uiElement, new RectInt32 { X = 0, Y = 0, Width = size.Width, Height = titleBarHeight })]);
 			}
 		}
 
@@ -47,13 +47,18 @@ namespace Files.App.Helpers
 			if (r is { } rect)
 			{
 				var scaleFactor = uiElement.XamlRoot.RasterizationScale;
-				return new((int)(rect.X * scaleFactor), (int)(rect.Y * scaleFactor), (int)(rect.Width * scaleFactor),
-					(int)(rect.Height * scaleFactor));
+				return new RectInt32
+				{
+					X = (int)(rect.X * scaleFactor),
+					Y = (int)(rect.Y * scaleFactor),
+					Width = (int)(rect.Width * scaleFactor),
+					Height = (int)(rect.Height * scaleFactor)
+				};
 			}
 			else
 			{
 				var pos = uiElement.TransformToVisual(null).TransformPoint(new(0, 0));
-				rect = new RectInt32((int)pos.X, (int)pos.Y, (int)uiElement.ActualSize.X, (int)uiElement.ActualSize.Y);
+				rect = new RectInt32 { X = (int)pos.X, Y = (int)pos.Y, Width = (int)uiElement.ActualSize.X, Height = (int)uiElement.ActualSize.Y };
 				return GetScaledRect(uiElement, rect);
 			}
 		}

@@ -113,7 +113,7 @@ namespace Files.App
 						if (parsedArgs[0] == "tab" && parsedArgs.Length > 3 &&
 							int.TryParse(parsedArgs[2].Split('&')[0], out var dx) &&
 							int.TryParse(parsedArgs[3], out var dy))
-							AppWindow?.Move(new(dx - 100, dy - 16));
+							AppWindow?.Move(new Windows.Graphics.PointInt32 { X = dx - 100, Y = dy - 16 });
 						var folderResult = await FilesystemTasks.Wrap(() => StorageFolder.GetFolderFromPathAsync(unescapedValue).AsTask());
 						if (folderResult.Result is { } folder && !string.IsNullOrEmpty(folder.Path))
 						{

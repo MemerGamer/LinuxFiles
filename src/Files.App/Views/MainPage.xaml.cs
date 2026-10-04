@@ -132,7 +132,7 @@ namespace Files.App.Views
 		private int SetTitleBarDragRegion(InputNonClientPointerSource source, SizeInt32 size, double scaleFactor, Func<UIElement, RectInt32?, RectInt32> getScaledRect)
 		{
 			var height = (int)TabControl.ActualHeight;
-			source.SetRegionRects(NonClientRegionKind.Passthrough, [getScaledRect(this, new RectInt32(0, 0, (int)(TabControl.ActualWidth + TabControl.Margin.Left - TabControl.DragArea.ActualWidth), height))]);
+			source.SetRegionRects(NonClientRegionKind.Passthrough, [getScaledRect(this, new RectInt32 { X = 0, Y = 0, Width = (int)(TabControl.ActualWidth + TabControl.Margin.Left - TabControl.DragArea.ActualWidth), Height = height })]);
 			AttachTitleBarMessageMonitor();
 			return height;
 		}

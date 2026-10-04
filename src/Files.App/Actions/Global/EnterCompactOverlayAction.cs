@@ -40,7 +40,7 @@ namespace Files.App.Actions
 		{
 			var appWindow = MainWindow.Instance.AppWindow;
 			appWindow.SetPresenter(AppWindowPresenterKind.CompactOverlay);
-			appWindow.Resize(new SizeInt32(400, 350));
+			appWindow.Resize(new SizeInt32 { Width = 400, Height = 350 });
 
 			return Task.CompletedTask;
 		}

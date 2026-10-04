@@ -362,13 +362,13 @@ namespace Files.App.Views.Layouts
 			switch (folderSettings.LayoutMode)
 			{
 				case FolderLayoutModes.ListView:
-					FileList.ItemTemplate = ListViewBrowserTemplate;
+					FileList.ItemTemplate = (DataTemplate)Resources["ListViewBrowserTemplate"];
 					break;
 				case FolderLayoutModes.CardsView:
-					FileList.ItemTemplate = CardsBrowserTemplate;
+					FileList.ItemTemplate = (DataTemplate)Resources["CardsBrowserTemplate"];
 					break;
 				default:
-					FileList.ItemTemplate = GridViewBrowserTemplate;
+					FileList.ItemTemplate = (DataTemplate)Resources["GridViewBrowserTemplate"];
 					break;
 			}
 		}

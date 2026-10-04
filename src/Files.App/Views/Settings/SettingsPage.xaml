@@ -30,7 +30,7 @@
 			<MenuFlyout x:Name="SettingsPageContextMenu">
 				<MenuFlyoutSubItem
 					x:Name="SplitPaneSubMenu"
-					x:Load="{x:Bind Commands.SplitPaneHorizontally.IsExecutable, Mode=OneWay}"
+					Visibility="{x:Bind Commands.SplitPaneHorizontally.IsExecutable, Mode=OneWay}"
 					Text="{helpers:ResourceString Key=SplitPane}">
 					<uc:MenuFlyoutItemWithThemedIcon
 						Command="{x:Bind Commands.SplitPaneVertically, Mode=OneWay}"
@@ -43,7 +43,7 @@
 				</MenuFlyoutSubItem>
 				<uc:MenuFlyoutItemWithThemedIcon
 					x:Name="CloseActivePaneMenuItem"
-					x:Load="{x:Bind Commands.CloseActivePane.IsExecutable, Mode=OneWay}"
+					Visibility="{x:Bind Commands.CloseActivePane.IsExecutable, Mode=OneWay}"
 					Command="{x:Bind Commands.CloseActivePane}"
 					Text="{x:Bind Commands.CloseActivePane.Label}"
 					ThemedIconStyle="{x:Bind Commands.CloseActivePane.ThemedIconStyle}" />

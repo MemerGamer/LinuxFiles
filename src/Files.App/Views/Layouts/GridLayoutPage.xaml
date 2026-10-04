@@ -80,7 +80,7 @@
 		<converters:BoolToSelectionModeConverter x:Key="BoolToSelectionModeConverter" />
 
 		<!--  Grid View  -->
-		<DataTemplate x:Name="GridViewBrowserTemplate" x:DataType="filesystem:ListedItem">
+		<DataTemplate x:Key="GridViewBrowserTemplate" x:DataType="filesystem:ListedItem">
 			<UserControl>
 				<Grid
 					x:Name="GridViewBrowserListedItem"
@@ -257,7 +257,7 @@
 		</DataTemplate>
 
 		<!--  List View  -->
-		<DataTemplate x:Name="ListViewBrowserTemplate" x:DataType="filesystem:ListedItem">
+		<DataTemplate x:Key="ListViewBrowserTemplate" x:DataType="filesystem:ListedItem">
 			<UserControl>
 				<Grid
 					x:Name="FilesRootGrid"
@@ -410,7 +410,7 @@
 		</DataTemplate>
 
 		<!--  Cards View  -->
-		<DataTemplate x:Name="CardsBrowserTemplate" x:DataType="filesystem:ListedItem">
+		<DataTemplate x:Key="CardsBrowserTemplate" x:DataType="filesystem:ListedItem">
 			<UserControl>
 				<Grid
 					Padding="0"

@@ -334,8 +334,8 @@ namespace Files.App.Views.Layouts
 			if (itemContainerSize == size)
 				return;
 
-			FileList.ItemContainerStyle = size == ColumnsViewSizeKind.Compact ? RegularItemContainerStyle : CompactItemContainerStyle;
-			FileList.ItemContainerStyle = size == ColumnsViewSizeKind.Compact ? CompactItemContainerStyle : RegularItemContainerStyle;
+			FileList.ItemContainerStyle = size == ColumnsViewSizeKind.Compact ? (Style)Resources["RegularItemContainerStyle"] : (Style)Resources["CompactItemContainerStyle"];
+			FileList.ItemContainerStyle = size == ColumnsViewSizeKind.Compact ? (Style)Resources["CompactItemContainerStyle"] : (Style)Resources["RegularItemContainerStyle"];
 			itemContainerSize = size;
 		}
 

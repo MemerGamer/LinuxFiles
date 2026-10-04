@@ -1,4 +1,8 @@
+#if WINDOWS
 using Microsoft.Graphics.Canvas.Geometry;
+#else
+using SkiaSharp;
+#endif
 using Microsoft.UI.Composition;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -212,6 +216,7 @@ namespace Files.App.UserControls.StatusCenter
 
 		CompositionPath CreatePathFromPoints()
 		{
+#if WINDOWS
 			using var pathBuilder = new CanvasPathBuilder(null);
 			pathBuilder.BeginFigure(0f, height);
 			for (int i = 0; i < Points.Count; i++)
@@ -227,6 +232,25 @@ namespace Files.App.UserControls.StatusCenter
 			pathBuilder.EndFigure(CanvasFigureLoop.Closed);
 			var path = new CompositionPath(CanvasGeometry.CreatePath(pathBuilder));
 			return path;
+#else
+			// Uno Skia: build an SKPath and wrap it in a composition geometry source
+			var skPath = new SKPath();
+			skPath.MoveTo(0f, height);
+			for (int i = 0; i < Points.Count; i++)
+			{
+				if (Points[i].Y > highestValue)
+					highestValue = Points[i].Y;
+				skPath.LineTo(width * Points[i].X / 100f, YValue(Points[i].Y));
+			}
+			// little extra part so that steep lines don't get cut off
+			skPath.LineTo(width * Points[^1].X / 100f + 2, YValue(Points[^1].Y));
+			skPath.LineTo(width * Points[^1].X / 100f + 2, height);
+			skPath.Close();
+			// SkiaGeometrySource2D is internal to Uno's Skia runtime, so create it reflectively
+			var sourceType = typeof(CompositionPath).Assembly.GetType("Microsoft.UI.Composition.SkiaGeometrySource2D")!;
+			var source = (Windows.Graphics.IGeometrySource2D)Activator.CreateInstance(sourceType, skPath)!;
+			return new CompositionPath(source);
+#endif
 		}
 
 		void SetGraphColors()

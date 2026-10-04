@@ -52,6 +52,12 @@ The owner decided to focus on Linux first. Windows support is revisited only aft
 The Phase 2 workstreams in §7.3 still define folder ownership. Their goal is now "compiles and works on Linux",
 not "Windows code wrapped without behaviour change".
 
+### Security backlog (from Phase 3 reviews; fix in Phase 7 unless promoted)
+- File operations: same-device move (`rename`) and cross-device move recursion are still path-based. Use `renameat`/`unlinkat` on directory handles. Destination-side folders are also addressed by path.
+- Trash: a small TOCTOU window between the restore containment check and the move. Fix with `openat`/`renameat` on directory handles.
+- Thumbnailer sandbox: no seccomp filter. `--new-session` mitigates TIOCSTI.
+- Shared native interop lives in `src/Files.Platform.Linux/Native/` (`[LibraryImport]` only). Reuse it; don't add new P/Invoke elsewhere.
+
 ## 1. Executive summary
 
 Files is a WinUI 3 / Windows App SDK app (~130k LOC C#, 136 XAML files / ~30k XAML lines). Porting it to Linux is two

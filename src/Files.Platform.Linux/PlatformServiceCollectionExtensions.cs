@@ -16,7 +16,9 @@ namespace Files.Platform.Linux
 		/// </summary>
 		public static IServiceCollection AddLinuxPlatform(this IServiceCollection services)
 		{
-			return services.AddSingleton<IPlatformCapabilities, LinuxPlatformCapabilities>();
+			return services
+				.AddSingleton<IPlatformCapabilities, LinuxPlatformCapabilities>()
+				.AddLinuxAppData();
 		}
 	}
 }

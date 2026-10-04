@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>$(TargetFrameworkVersion)</TargetFramework>
+        <TargetFramework>$(BaseTargetFramework)</TargetFramework>
         <Nullable>enable</Nullable>
         <IsTrimmable>true</IsTrimmable>
         <Configurations>Debug;Release</Configurations>

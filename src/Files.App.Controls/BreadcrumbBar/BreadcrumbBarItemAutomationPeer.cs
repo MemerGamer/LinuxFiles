@@ -27,7 +27,7 @@ namespace Files.App.Controls
 			if (patternInterface is PatternInterface.ExpandCollapse or PatternInterface.Invoke)
 				return this;
 
-			return base.GetPatternCore(patternInterface);
+			return base.GetPatternCore(patternInterface)!;
 		}
 
 		protected override string GetClassNameCore()

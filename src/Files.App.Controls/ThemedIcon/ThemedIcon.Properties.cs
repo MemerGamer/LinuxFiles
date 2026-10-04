@@ -35,8 +35,24 @@ namespace Files.App.Controls
 		[GeneratedDependencyProperty]
 		public partial bool IsHighContrast { get; set; }
 
+#if WINDOWS
 		[GeneratedDependencyProperty]
 		public partial object? Layers { get; set; }
+#else
+		// Uno's XAML generator cannot see members emitted by other source generators, so a Setter with an object-element value
+		// (see ThemedIcon/Styles/*.xaml) needs the DependencyProperty field to be declared in plain source.
+		public static readonly DependencyProperty LayersProperty = DependencyProperty.Register(
+			nameof(Layers), typeof(object), typeof(ThemedIcon),
+			new PropertyMetadata(null, static (d, e) => ((ThemedIcon)d).OnLayersChanged(e.NewValue)));
+
+		public object? Layers
+		{
+			get => GetValue(LayersProperty);
+			set => SetValue(LayersProperty, value);
+		}
+
+		partial void OnLayersChanged(object? newValue);
+#endif
 
 		[GeneratedDependencyProperty(DefaultValue = ToggleBehaviors.Auto)]
 		public partial ToggleBehaviors ToggleBehavior { get; set; }

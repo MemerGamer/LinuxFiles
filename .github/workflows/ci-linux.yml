@@ -62,6 +62,12 @@ jobs:
     - name: Build Files.Core.SourceGenerator
       run: dotnet build src/Files.Core.SourceGenerator/Files.Core.SourceGenerator.csproj -c Release -warnaserror
 
+    - name: Build Files.Platform.Linux
+      run: dotnet build src/Files.Platform.Linux/Files.Platform.Linux.csproj -c Release -warnaserror
+
+    - name: Build Files.App.Controls (Uno desktop)
+      run: dotnet build src/Files.App.Controls/Files.App.Controls.csproj -c Release -f net10.0-desktop
+
     - name: Build and test platform test projects (if any)
       shell: bash
       run: |

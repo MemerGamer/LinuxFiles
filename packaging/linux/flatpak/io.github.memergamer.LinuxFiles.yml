@@ -1,0 +1,66 @@
+# Flatpak manifest for Files (Linux port). Authored, not built in CI yet.
+#
+# Build locally:
+#   flatpak install flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 \
+#       org.freedesktop.Sdk.Extension.dotnet10//25.08
+#   flatpak-builder --user --install --force-clean build-dir packaging/linux/flatpak/io.github.memergamer.LinuxFiles.yml
+#
+# Flathub requires an offline build: generate nuget-sources.json with
+#   flatpak-dotnet-generator (flatpak-builder-tools/dotnet) and add it to `sources` below.
+# The local build below uses --share=network for restore, which Flathub does not allow.
+app-id: io.github.memergamer.LinuxFiles
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.dotnet10
+command: files
+
+finish-args:
+  - --share=ipc
+  # Uno Skia desktop is X11-only; Wayland sessions use XWayland.
+  - --socket=x11
+  - --device=dri
+  # A file manager must see the whole filesystem.
+  - --filesystem=host
+  # Network/removable volumes mounted through gvfs.
+  - --filesystem=xdg-run/gvfs
+  - --filesystem=xdg-run/gvfs-fuse
+  # Future Phase 6 D-Bus service (ShowFolders/ShowItems/ShowItemProperties).
+  - --own-name=org.freedesktop.FileManager1
+  # Desktop notifications.
+  - --talk-name=org.freedesktop.Notifications
+  # Needed for `flatpak-spawn --host` (open files with host apps, terminals, disks tools).
+  # Trade-off: this lets the app run arbitrary commands on the host, defeating the sandbox.
+  # Drop it if "Open with host application" is replaced by xdg-desktop-portal OpenURI.
+  - --talk-name=org.freedesktop.Flatpak
+
+build-options:
+  append-path: /usr/lib/sdk/dotnet10/bin
+  append-ld-library-path: /usr/lib/sdk/dotnet10/lib
+  prepend-pkg-config-path: /usr/lib/sdk/dotnet10/lib/pkgconfig
+  env:
+    DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    DOTNET_SKIP_FIRST_TIME_EXPERIENCE: '1'
+
+modules:
+  - name: files
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network   # remove once nuget-sources.json is wired up
+    build-commands:
+      - /usr/lib/sdk/dotnet10/bin/dotnet publish src/Files.App/Files.App.csproj
+        -f net10.0-desktop -c Release -r linux-x64 --self-contained
+        -p:PublishTrimmed=false -p:PublishAot=false -o /app/lib/linuxfiles
+      - install -Dm755 packaging/linux/files /app/bin/files
+      - install -Dm644 packaging/linux/io.github.memergamer.LinuxFiles.desktop
+        /app/share/applications/io.github.memergamer.LinuxFiles.desktop
+      - install -Dm644 packaging/linux/io.github.memergamer.LinuxFiles.metainfo.xml
+        /app/share/metainfo/io.github.memergamer.LinuxFiles.metainfo.xml
+      - for s in 16 24 32 48 64 128 256 512; do
+        install -Dm644 packaging/linux/icons/hicolor/${s}x${s}/apps/io.github.memergamer.LinuxFiles.png
+        /app/share/icons/hicolor/${s}x${s}/apps/io.github.memergamer.LinuxFiles.png; done
+    sources:
+      - type: dir
+        path: ../../..

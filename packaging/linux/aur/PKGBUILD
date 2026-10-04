@@ -1,0 +1,46 @@
+# Maintainer: MemerGamer <kovacsbalinthunor13@gmail.com>
+pkgname=linuxfiles
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Files, a modern file manager (Linux port built on Uno Platform)'
+arch=('x86_64' 'aarch64')
+url='https://github.com/MemerGamer/LinuxFiles'
+license=('MIT')
+# Self-contained publish bundles the runtime; native libs below are loaded by Skia/Uno at runtime.
+depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'mesa' 'glib2' 'hicolor-icon-theme')
+makedepends=('dotnet-sdk>=10.0' 'git')
+optdepends=('gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives')
+options=('!strip')  # .NET single-file/self-contained binaries break when stripped
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/linux-v$pkgver.tar.gz")
+sha256sums=('SKIP')  # replace with the real checksum on release
+
+build() {
+  cd "LinuxFiles-linux-v$pkgver"
+  case "$CARCH" in
+    x86_64) _rid=linux-x64 ;;
+    aarch64) _rid=linux-arm64 ;;
+  esac
+  export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+  dotnet publish src/Files.App/Files.App.csproj \
+    -f net10.0-desktop -c Release -r "$_rid" --self-contained \
+    -p:PublishTrimmed=false -p:PublishAot=false \
+    -o "$srcdir/publish"
+}
+
+package() {
+  cd "LinuxFiles-linux-v$pkgver"
+  local id=io.github.memergamer.LinuxFiles
+
+  install -dm755 "$pkgdir/usr/lib/linuxfiles"
+  cp -a "$srcdir/publish/." "$pkgdir/usr/lib/linuxfiles/"
+  # The launcher finds /usr/lib/linuxfiles/Files.dll on its own.
+  install -Dm755 packaging/linux/files "$pkgdir/usr/bin/files"
+
+  install -Dm644 "packaging/linux/$id.desktop" "$pkgdir/usr/share/applications/$id.desktop"
+  install -Dm644 "packaging/linux/$id.metainfo.xml" "$pkgdir/usr/share/metainfo/$id.metainfo.xml"
+  for s in 16 24 32 48 64 128 256 512; do
+    install -Dm644 "packaging/linux/icons/hicolor/${s}x${s}/apps/$id.png" \
+      "$pkgdir/usr/share/icons/hicolor/${s}x${s}/apps/$id.png"
+  done
+  install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
+}

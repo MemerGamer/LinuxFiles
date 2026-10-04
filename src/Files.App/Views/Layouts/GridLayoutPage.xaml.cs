@@ -836,13 +836,15 @@ namespace Files.App.Views.Layouts
 
 		// The template-root identity check invalidates the cache when a container is re-templated
 		[DynamicWindowsRuntimeCast(typeof(CheckBox))]
-		private CheckBox GetSelectionCheckbox(SelectorItem container)
+		private CheckBox? GetSelectionCheckbox(SelectorItem container)
 		{
 			var root = container.ContentTemplateRoot;
 			if (selectionCheckboxCache.TryGetValue(container, out var cached) && ReferenceEquals(cached.Item1, root))
 				return cached.Item2;
 
-			var checkbox = (CheckBox)container.FindDescendant("SelectionCheckbox")!;
+			var checkbox = container.FindDescendant("SelectionCheckbox") as CheckBox;
+			if (checkbox is null)
+				return null;
 			selectionCheckboxCache.AddOrUpdate(container, new Tuple<object?, CheckBox>(root, checkbox));
 			return checkbox;
 		}
@@ -851,23 +853,37 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]
 		private new void FileList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
 		{
-			var selectionCheckbox = GetSelectionCheckbox(args.ItemContainer);
+			try
+			{
+				// Uno raises this before the container's content template is realized, so the checkbox may not exist yet
+				var selectionCheckbox = args.ItemContainer.ContentTemplateRoot is null ? null : GetSelectionCheckbox(args.ItemContainer);
 
-			selectionCheckbox.PointerEntered -= SelectionCheckbox_PointerEntered;
-			selectionCheckbox.PointerExited -= SelectionCheckbox_PointerExited;
-			selectionCheckbox.PointerCanceled -= SelectionCheckbox_PointerCanceled;
-			selectionCheckbox.Checked -= ItemSelected_Checked;
-			selectionCheckbox.Unchecked -= ItemSelected_Unchecked;
+				if (selectionCheckbox is not null)
+				{
+					selectionCheckbox.PointerEntered -= SelectionCheckbox_PointerEntered;
+					selectionCheckbox.PointerExited -= SelectionCheckbox_PointerExited;
+					selectionCheckbox.PointerCanceled -= SelectionCheckbox_PointerCanceled;
+					selectionCheckbox.Checked -= ItemSelected_Checked;
+					selectionCheckbox.Unchecked -= ItemSelected_Unchecked;
+				}
 
-			base.FileList_ContainerContentChanging(sender, args);
-			if (args.InRecycleQueue)
-				return;
+				base.FileList_ContainerContentChanging(sender, args);
+				if (args.InRecycleQueue)
+					return;
 
-			SetCheckboxSelectionState(args.Item, args.ItemContainer as GridViewItem);
+				SetCheckboxSelectionState(args.Item, args.ItemContainer as GridViewItem);
 
-			selectionCheckbox.PointerEntered += SelectionCheckbox_PointerEntered;
-			selectionCheckbox.PointerExited += SelectionCheckbox_PointerExited;
-			selectionCheckbox.PointerCanceled += SelectionCheckbox_PointerCanceled;
+				if (selectionCheckbox is not null)
+				{
+					selectionCheckbox.PointerEntered += SelectionCheckbox_PointerEntered;
+					selectionCheckbox.PointerExited += SelectionCheckbox_PointerExited;
+					selectionCheckbox.PointerCanceled += SelectionCheckbox_PointerCanceled;
+				}
+			}
+			catch (Exception ex)
+			{
+				Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, ex, "Failed to prepare grid item container");
+			}
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]

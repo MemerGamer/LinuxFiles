@@ -4,7 +4,7 @@
 #
 # Usage: headless-run.sh [-s seconds] [-o outdir] [-a actions-file] [-- app args...]
 #   actions-file: one xdotool command per line (e.g. "mousemove 100 200 click 1", "key ctrl+l",
-#                 "type /etc", "sleep 2", "shot name", "exec <sh cmd>" runs in the sandbox home), run against the private display.
+#                 "type /etc", "sleep 2", "shot name"), run against the private display.
 # Env: FILES_BIN (default src/Files.App/bin/Debug/net10.0-desktop), XVFB_SIZE (default 1600x1000).
 set -euo pipefail
 
@@ -35,7 +35,9 @@ Xvfb ":$display" -screen 0 "${size}x24" -nolisten tcp >"$outdir/xvfb.log" 2>&1 &
 xvfb_pid=$!
 app_pid=""
 cleanup() {
-	[[ -n "$app_pid" ]] && kill "$app_pid" 2>/dev/null || true
+	# The app runs in its own process group (setsid), so this also stops dbus-run-session and its daemon.
+	[[ -n "$app_pid" ]] && kill -- "-$app_pid" 2>/dev/null || true
+	sleep 1
 	kill "$xvfb_pid" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -62,11 +64,12 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache")
 fi
 
-(
-	cd "$bin"
-	exec env -u WAYLAND_DISPLAY "${sandbox_env[@]}" DISPLAY=":$display" LIBGL_ALWAYS_SOFTWARE=1 \
-		nice -n 19 dotnet Files.dll "$@"
-) >"$outdir/app.log" 2>&1 &
+# Private D-Bus session: notifications, portals and app launches never reach the real desktop session.
+# shellcheck disable=SC2016
+setsid bash -c 'cd "$0" && exec "$@"' "$bin" \
+	env -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS "${sandbox_env[@]}" DISPLAY=":$display" LIBGL_ALWAYS_SOFTWARE=1 \
+	FILES_LAUNCH_DRYRUN="${FILES_LAUNCH_DRYRUN:-1}" nice -n 19 dbus-run-session -- dotnet Files.dll "$@" \
+	>"$outdir/app.log" 2>&1 &
 app_pid=$!
 
 sleep "$seconds"
@@ -77,7 +80,8 @@ if [[ -n "$actions" ]]; then
 			sleep\ *) sleep "${line#sleep }" ;;
 			shot\ *) shot "${line#shot }" ;;
 			exec\ *) # Runs a shell command in the sandboxed HOME, to mutate files while the app runs.
-				(cd "${home:-$outdir}" && env HOME="${home:-$outdir}" sh -c "${line#exec }") ;;
+				[[ "${FILES_REAL_HOME:-0}" == "1" ]] && { echo "exec: refused with FILES_REAL_HOME=1" >&2; continue; }
+				(cd "$home" && env HOME="$home" sh -c "${line#exec }") ;;
 			*) # shellcheck disable=SC2086
 				DISPLAY=":$display" xdotool $line ;;
 		esac

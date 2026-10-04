@@ -164,7 +164,6 @@ namespace Files.App.Views.Shells
 
 		private async void ItemDisplayFrame_Navigated(object sender, NavigationEventArgs e)
 		{
-			Microsoft.Extensions.Logging.LoggerExtensions.LogInformation(App.Logger, "LINUXDBG navigated {T} content={C} fsz={W}x{H}", e.SourcePageType?.Name, ItemDisplayFrame.Content?.GetType().Name, ItemDisplayFrame.ActualWidth, ItemDisplayFrame.ActualHeight);
 			ContentPage = await GetContentOrNullAsync();
 
 			ToolbarViewModel.UpdateAdditionalActions();

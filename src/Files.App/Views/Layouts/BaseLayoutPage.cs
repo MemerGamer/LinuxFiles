@@ -517,7 +517,7 @@ namespace Files.App.Views.Layouts
 			var index = panel.Children.IndexOf(zoom);
 			zoom.ZoomedInView = null;
 			zoom.ZoomedOutView = null;
-			panel.Children[index] = content;
+			panel.Children.Insert(index + 1, content);
 		}
 
 		protected override async void OnNavigatedTo(NavigationEventArgs e)

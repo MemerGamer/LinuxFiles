@@ -88,9 +88,8 @@ namespace Files.App.ViewModels
 					if (entry.IsHidden && !includeHidden)
 						continue;
 
-					App.Logger.LogInformation("LINUXDBG entry {N}", entry.FullPath);
 					var item = CreateLinuxListedItem(entry);
-					try { item.PreloadedIconData = await iconCache.GetIconAsync(item.ItemPath, item.FileExtension, entry.IsDirectory, iconSize); } catch (Exception ex) { App.Logger.LogWarning(ex, "LINUXDBG icon failed"); }
+					try { item.PreloadedIconData = await iconCache.GetIconAsync(item.ItemPath, item.FileExtension, entry.IsDirectory, iconSize); } catch (Exception ex) { App.Logger.LogWarning(ex, "Could not load icon for {Path}", item.ItemPath); }
 					pending.Add(item);
 
 					if ((!firstFlushDone && pending.Count >= 25) || (firstFlushDone && lastFlush.ElapsedMilliseconds > 500))
@@ -106,12 +105,10 @@ namespace Files.App.ViewModels
 						await ApplyFilesAndFoldersChangesAsync();
 					}
 				}
-					App.Logger.LogInformation("LINUXDBG pending {N}", pending.Count);
 
 				filesAndFolders.AddRange(pending);
 
 				await OrderFilesAndFoldersAsync();
-				App.Logger.LogInformation("LINUXDBG applied {N} / {M}", filesAndFolders.Count, FilesAndFolders.Count);
 				await ApplyFilesAndFoldersChangesAsync();
 
 				// desktop.ini based customization has no Linux equivalent; the Windows services are stubs

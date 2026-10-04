@@ -15,8 +15,22 @@ namespace Files.App.Services.Desktop
 		// LINUX-TODO(trash): bridge ITrashService.Watcher into RecycleBinWatcher (its Windows-only watcher is inert on Linux)
 		public RecycleBinWatcher Watcher { get; } = new();
 
-		// LINUX-TODO(trash): list trash items through ITrashService.ListAsync instead of the Shell folder
-		public Task<List<ShellFileItem>> GetAllRecycleBinFoldersAsync() => Task.FromResult<List<ShellFileItem>>([]);
+		public async Task<List<ShellFileItem>> GetAllRecycleBinFoldersAsync()
+		{
+			var items = await _trash.ListAsync();
+			return items.Select(item => new ShellFileItem
+			{
+				IsFolder = item.IsDirectory,
+				RecyclePath = item.TrashedPath,
+				FileName = item.Name,
+				FilePath = item.OriginalPath,
+				RecycleDate = item.DeletionDate.LocalDateTime,
+				ModifiedDate = item.DeletionDate.LocalDateTime,
+				CreatedDate = item.DeletionDate.LocalDateTime,
+				FileSize = item.Size.ToSizeString(),
+				FileSizeBytes = (ulong)Math.Max(0, item.Size),
+			}).ToList();
+		}
 
 		public (bool HasRecycleBin, long NumItems, long BinSize) QueryRecycleBin(string drive = "")
 		{

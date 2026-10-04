@@ -1,0 +1,119 @@
+Actions/Global/EnterCompactOverlayAction.cs(43,25): error CS1729: 'SizeInt32' does not contain a constructor that takes 2 arguments
+Actions/Global/ToggleCompactOverlayAction.cs(47,26): error CS1729: 'SizeInt32' does not contain a constructor that takes 2 arguments
+Actions/Navigation/OpenInNewPane/OpenInNewPaneFromHomeAction.cs(26,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Actions/Navigation/OpenInNewPane/OpenInNewPaneFromSidebarAction.cs(24,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Actions/Navigation/OpenInNewTab/OpenInNewTabFromHomeAction.cs(24,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Actions/Navigation/OpenInNewTab/OpenInNewTabFromSidebarAction.cs(22,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Actions/Navigation/OpenInOtherPane/OpenInOtherPaneFromHomeAction.cs(25,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Actions/Navigation/OpenInOtherPane/OpenInOtherPaneFromSidebarAction.cs(23,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Data/Factories/PropertiesNavigationItemsFactory.cs(67,21): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Data/Factories/PropertiesNavigationItemsFactory.cs(68,37): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Data/Items/DriveItem.cs(248,4): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Data/Items/DriveItem.cs(381,33): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Data/Items/SidebarLibraryItem.cs(43,57): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Data/Items/WidgetDriveCardItem.cs(35,33): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Data/Models/PinnedFoldersManager.cs(79,56): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Helpers/MenuFlyout/FastContextFlyout.cs(680,10): error CS1729: 'PointInt32' does not contain a constructor that takes 2 arguments
+Helpers/Navigation/NavigationHelpers.cs(326,62): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Helpers/ShareItemHelpers.cs(23,38): error CS0117: 'DataTransferManager' does not contain a definition for 'As'
+Helpers/ShareItemHelpers.cs(26,18): error CS0234: The type or namespace name 'MarshalInterface' does not exist in the namespace 'WinRT' (are you missing an assembly reference?)
+Helpers/UI/DragZoneHelper.cs(39,85): error CS1729: 'RectInt32' does not contain a constructor that takes 4 arguments
+Helpers/UI/DragZoneHelper.cs(40,86): error CS1729: 'RectInt32' does not contain a constructor that takes 4 arguments
+Helpers/UI/DragZoneHelper.cs(41,82): error CS1729: 'RectInt32' does not contain a constructor that takes 4 arguments
+Helpers/UI/DragZoneHelper.cs(50,12): error CS1729: 'RectInt32' does not contain a constructor that takes 4 arguments
+Helpers/UI/DragZoneHelper.cs(56,16): error CS1729: 'RectInt32' does not contain a constructor that takes 4 arguments
+Helpers/UI/UIHelpers.cs(84,6): error CS0103: The name 'AppToastNotificationHelper' does not exist in the current context
+Helpers/Xaml/DependencyObjectHelpers.cs(29,11): error CS0403: Cannot convert null to type parameter 'T' because it could be a non-nullable value type. Consider using 'default(T)' instead.
+Helpers/Xaml/DependencyObjectHelpers.cs(52,11): error CS0403: Cannot convert null to type parameter 'T' because it could be a non-nullable value type. Consider using 'default(T)' instead.
+Helpers/Xaml/DependencyObjectHelpers.cs(75,16): error CS0403: Cannot convert null to type parameter 'T' because it could be a non-nullable value type. Consider using 'default(T)' instead.
+MainWindow.xaml.cs(116,24): error CS1729: 'PointInt32' does not contain a constructor that takes 2 arguments
+GridLayoutPage_5d25565e813183bec901f5e6ff7eea07.cs(1347,4): error CS0103: The name 'GridViewBrowserTemplate' does not exist in the current context
+GridLayoutPage_5d25565e813183bec901f5e6ff7eea07.cs(1348,4): error CS0103: The name 'ListViewBrowserTemplate' does not exist in the current context
+GridLayoutPage_5d25565e813183bec901f5e6ff7eea07.cs(1349,4): error CS0103: The name 'CardsBrowserTemplate' does not exist in the current context
+HomePage_2749c506dac740e4dfd9534d6f41af5b.cs(659,8): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+HomePage_2749c506dac740e4dfd9534d6f41af5b.cs(659,8): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some inva
+HomePage_2749c506dac740e4dfd9534d6f41af5b.cs(692,8): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+HomePage_2749c506dac740e4dfd9534d6f41af5b.cs(692,8): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some inva
+SettingsPage_717cdd26d248d5673a42e87fcfbe56f7.cs(392,8): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+SettingsPage_717cdd26d248d5673a42e87fcfbe56f7.cs(392,8): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some 
+SettingsPage_717cdd26d248d5673a42e87fcfbe56f7.cs(425,8): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+SettingsPage_717cdd26d248d5673a42e87fcfbe56f7.cs(425,8): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some 
+StatusCenterStyles_88bef5a3a9ff24fe488dcb9817664a13.cs(1236,85): error CS0103: The name '_ProgressBarTrackSubject' does not exist in the current context
+StatusCenterStyles_88bef5a3a9ff24fe488dcb9817664a13.cs(1377,85): error CS0103: The name '_ProgressBarTrackSubject' does not exist in the current context
+StatusCenterStyles_88bef5a3a9ff24fe488dcb9817664a13.cs(2008,85): error CS0103: The name '_ProgressBarTrackSubject' does not exist in the current context
+StatusCenterStyles_88bef5a3a9ff24fe488dcb9817664a13.cs(2228,85): error CS0103: The name '_ProgressBarTrackSubject' does not exist in the current context
+TabBar_c05c8514ec640a3d93899649be002833.cs(1537,4): error CS0103: The name 'TabItemContextMenu' does not exist in the current context
+TabBar_c05c8514ec640a3d93899649be002833.cs(208,13): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+TabBar_c05c8514ec640a3d93899649be002833.cs(208,13): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some inval
+TabBar_c05c8514ec640a3d93899649be002833.cs(220,13): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+TabBar_c05c8514ec640a3d93899649be002833.cs(220,13): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some inval
+TabBar_c05c8514ec640a3d93899649be002833.cs(232,13): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+TabBar_c05c8514ec640a3d93899649be002833.cs(232,13): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some inval
+TabBar_c05c8514ec640a3d93899649be002833.cs(268,13): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+TabBar_c05c8514ec640a3d93899649be002833.cs(268,13): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some inval
+TabBar_c05c8514ec640a3d93899649be002833.cs(304,13): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.MenuFlyoutItemBase'
+TabBar_c05c8514ec640a3d93899649be002833.cs(304,13): error CS1950: The best overloaded Add method 'ICollection<MenuFlyoutItemBase>.Add(MenuFlyoutItemBase)' for the collection initializer has some inval
+Toolbar_c0d673ff22aff408a77c107d8afb7ade.cs(381,10): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.ICommandBarElement'
+Toolbar_c0d673ff22aff408a77c107d8afb7ade.cs(381,10): error CS1950: The best overloaded Add method 'ICollection<ICommandBarElement>.Add(ICommandBarElement)' for the collection initializer has some inva
+Toolbar_c0d673ff22aff408a77c107d8afb7ade.cs(451,10): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.ICommandBarElement'
+Toolbar_c0d673ff22aff408a77c107d8afb7ade.cs(451,10): error CS1950: The best overloaded Add method 'ICollection<ICommandBarElement>.Add(ICommandBarElement)' for the collection initializer has some inva
+Toolbar_c0d673ff22aff408a77c107d8afb7ade.cs(888,10): error CS1503: Argument 1: cannot convert from 'Microsoft.UI.Xaml.ElementStub' to 'Microsoft.UI.Xaml.Controls.ICommandBarElement'
+Toolbar_c0d673ff22aff408a77c107d8afb7ade.cs(888,10): error CS1950: The best overloaded Add method 'ICollection<ICommandBarElement>.Add(ICommandBarElement)' for the collection initializer has some inva
+Services/Storage/StorageDevicesService.cs(15,15): error CS0246: The type or namespace name 'WindowsStorageDeviceWatcher' could not be found (are you missing a using directive or an assembly reference?
+Services/Storage/StorageDevicesService.cs(40,10): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Services/Storage/StorageDevicesService.cs(40,53): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Services/Storage/StorageDevicesService.cs(62,33): error CS0103: The name 'DriveHelpers' does not exist in the current context
+UserControls/Pane/ShelfPane.xaml.cs(83,12): error CS1061: 'DataPackage' does not contain a definition for 'As' and no accessible extension method 'As' accepting a first argument of type 'DataPackage' 
+UserControls/StatusCenter/SpeedGraph.cs(215,32): error CS0122: 'CanvasPathBuilder' is inaccessible due to its protection level
+UserControls/StatusCenter/SpeedGraph.cs(216,16): error CS0122: 'CanvasPathBuilder.BeginFigure(Vector2, CanvasFigureFill)' is inaccessible due to its protection level
+UserControls/StatusCenter/SpeedGraph.cs(222,17): error CS0122: 'CanvasPathBuilder.AddLine(Vector2)' is inaccessible due to its protection level
+UserControls/StatusCenter/SpeedGraph.cs(225,16): error CS0122: 'CanvasPathBuilder.AddLine(Vector2)' is inaccessible due to its protection level
+UserControls/StatusCenter/SpeedGraph.cs(226,16): error CS0122: 'CanvasPathBuilder.AddLine(Vector2)' is inaccessible due to its protection level
+UserControls/StatusCenter/SpeedGraph.cs(227,16): error CS0122: 'CanvasPathBuilder.EndFigure(CanvasFigureLoop)' is inaccessible due to its protection level
+UserControls/StatusCenter/SpeedGraph.cs(227,26): error CS0122: 'CanvasFigureLoop' is inaccessible due to its protection level
+UserControls/StatusCenter/SpeedGraph.cs(228,35): error CS0122: 'CanvasGeometry' is inaccessible due to its protection level
+UserControls/Widgets/DrivesWidget.xaml.cs(41,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+UserControls/Widgets/NetworkLocationsWidget.xaml.cs(41,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Utils/Storage/Helpers/FilePropertiesHelpers.cs(108,38): error CS1729: 'SizeInt32' does not contain a constructor that takes 2 arguments
+Utils/Storage/Helpers/FilePropertiesHelpers.cs(140,51): error CS1729: 'PointInt32' does not contain a constructor that takes 2 arguments
+Utils/Storage/Helpers/FileThumbnailHelper.cs(35,33): error CS0103: The name 'FontFileHelper' does not exist in the current context
+Utils/Storage/Helpers/FileThumbnailHelper.cs(41,51): error CS0103: The name 'FontFileHelper' does not exist in the current context
+Utils/Storage/Helpers/StorageHelpers.cs(114,61): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Utils/Storage/Helpers/StorageHelpers.cs(120,61): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Utils/Storage/Helpers/StorageHelpers.cs(134,60): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Utils/Storage/StorageItems/ZipStorageFile.cs(469,41): error CS1061: 'IStorageFile' does not contain a definition for 'CreateSafeFileHandle' and no accessible extension method 'CreateSafeFileHandle' ac
+Utils/Storage/StorageItems/ZipStorageFile.cs(497,43): error CS1061: 'IStorageFile' does not contain a definition for 'CreateSafeFileHandle' and no accessible extension method 'CreateSafeFileHandle' ac
+ViewModels/Properties/Items/DriveProperties.cs(47,62): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/ShellViewModel.cs(1698,32): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/ShellViewModel.cs(240,60): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/InfoPaneViewModel.cs(322,21): error CS0246: The type or namespace name 'MarkdownPreviewViewModel' could not be found (are you missing a using directive or an assembly reference
+ViewModels/UserControls/InfoPaneViewModel.cs(325,16): error CS0246: The type or namespace name 'MarkdownPreview' could not be found (are you missing a using directive or an assembly reference?)
+ViewModels/UserControls/InfoPaneViewModel.cs(368,8): error CS0103: The name 'CodePreviewViewModel' does not exist in the current context
+ViewModels/UserControls/InfoPaneViewModel.cs(370,21): error CS0246: The type or namespace name 'CodePreviewViewModel' could not be found (are you missing a using directive or an assembly reference?)
+ViewModels/UserControls/InfoPaneViewModel.cs(373,16): error CS0246: The type or namespace name 'CodePreview' could not be found (are you missing a using directive or an assembly reference?)
+ViewModels/UserControls/InfoPaneViewModel.cs(376,8): error CS0103: The name 'ShellPreviewViewModel' does not exist in the current context
+ViewModels/UserControls/InfoPaneViewModel.cs(380,21): error CS0246: The type or namespace name 'ShellPreviewViewModel' could not be found (are you missing a using directive or an assembly reference?)
+ViewModels/UserControls/InfoPaneViewModel.cs(383,16): error CS0246: The type or namespace name 'ShellPreview' could not be found (are you missing a using directive or an assembly reference?)
+ViewModels/UserControls/InfoPaneViewModel.cs(557,30): error CS0246: The type or namespace name 'ShellPreview' could not be found (are you missing a using directive or an assembly reference?)
+ViewModels/UserControls/NavigationToolbarViewModel.cs(588,49): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/NavigationToolbarViewModel.cs(604,8): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/NavigationToolbarViewModel.cs(898,58): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/NavigationToolbarViewModel.cs(911,9): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/Previews/BasePreviewModel.cs(60,61): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/Previews/FolderPreviewViewModel.cs(28,60): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/SidebarViewModel.cs(1033,4): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/SidebarViewModel.cs(831,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/Widgets/DrivesWidgetViewModel.cs(220,4): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/Widgets/DrivesWidgetViewModel.cs(68,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/Widgets/NetworkLocationsWidgetViewModel.cs(218,4): error CS0103: The name 'DriveHelpers' does not exist in the current context
+ViewModels/UserControls/Widgets/NetworkLocationsWidgetViewModel.cs(76,14): error CS0103: The name 'DriveHelpers' does not exist in the current context
+Views/Layouts/DetailsLayoutPage.xaml.cs(319,101): error CS0103: The name 'CompactItemContainerStyle' does not exist in the current context
+Views/Layouts/DetailsLayoutPage.xaml.cs(319,73): error CS0103: The name 'RegularItemContainerStyle' does not exist in the current context
+Views/Layouts/DetailsLayoutPage.xaml.cs(320,101): error CS0103: The name 'RegularItemContainerStyle' does not exist in the current context
+Views/Layouts/DetailsLayoutPage.xaml.cs(320,73): error CS0103: The name 'CompactItemContainerStyle' does not exist in the current context
+Views/Layouts/GridLayoutPage.xaml.cs(365,30): error CS0103: The name 'ListViewBrowserTemplate' does not exist in the current context
+Views/Layouts/GridLayoutPage.xaml.cs(368,30): error CS0103: The name 'CardsBrowserTemplate' does not exist in the current context
+Views/Layouts/GridLayoutPage.xaml.cs(371,30): error CS0103: The name 'GridViewBrowserTemplate' does not exist in the current context
+Views/MainPage.xaml.cs(135,84): error CS1729: 'RectInt32' does not contain a constructor that takes 4 arguments
+Views/Settings/ToolbarCustomizationDialog.cs(32,51): error CS1729: 'PointInt32' does not contain a constructor that takes 2 arguments
+Views/Settings/ToolbarCustomizationDialog.cs(60,25): error CS1729: 'SizeInt32' does not contain a constructor that takes 2 arguments

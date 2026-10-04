@@ -73,12 +73,21 @@ setsid bash -c 'cd "$0" && exec "$@"' "$bin" \
 app_pid=$!
 
 sleep "$seconds"
+# Xvfb has no window manager, so nothing has keyboard focus: give it to the Files window explicitly
+# (XSetInputFocus works without a WM). Re-run with the "focus" action after opening new windows.
+focus_files() {
+	local win
+	win="$(DISPLAY=":$display" xdotool search --class Files 2>/dev/null | tail -1 || true)"
+	[[ -n "$win" ]] && DISPLAY=":$display" xdotool windowfocus --sync "$win" 2>/dev/null || true
+}
+focus_files
 if [[ -n "$actions" ]]; then
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		[[ -z "$line" || "$line" == \#* ]] && continue
 		case "$line" in
 			sleep\ *) sleep "${line#sleep }" ;;
 			shot\ *) shot "${line#shot }" ;;
+			focus) focus_files ;;
 			*) # shellcheck disable=SC2086
 				DISPLAY=":$display" xdotool $line ;;
 		esac

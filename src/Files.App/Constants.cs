@@ -221,7 +221,12 @@ namespace Files.App
 #endif
 
 			// Currently is the command to open the folder from cmd ("cmd /c start Shell:RecycleBinFolder")
+#if WINDOWS
 			public const string RecycleBinPath = @"Shell:RecycleBinFolder";
+#else
+			// Virtual location of the freedesktop.org trash; listed through ITrashService
+			public const string RecycleBinPath = @"trash:///";
+#endif
 
 			public const string NetworkFolderPath = @"Shell:NetworkPlacesFolder";
 

@@ -36,12 +36,45 @@ namespace Files.App.Data.Items
 			Tooltip = tooltip;
 		}
 
+#if !WINDOWS
+		/// <summary>
+		/// Creates a card for a plain folder path; there is no shell item behind it on Linux.
+		/// </summary>
+		public WidgetFolderCardItem(string path, string text, bool isPinned, string tooltip)
+		{
+			AutomationProperties = text;
+			Item = null!;
+			Text = text;
+			IsPinned = isPinned;
+			Path = path;
+			Tooltip = tooltip;
+		}
+#endif
+
 		// Methods
 
 		public async Task LoadCardThumbnailAsync()
 		{
 			if (string.IsNullOrEmpty(Path))
 				return;
+
+			if (Item is null)
+			{
+				// SVG-only theme sizes are not rasterized yet (LINUX-TODO(icons)), so try the sizes that have PNGs
+				byte[]? icon = Path == Constants.UserEnvironmentPaths.RecycleBinPath
+					? await DriveHelpers.GetDriveIconAsync(null, Constants.ShellIconSizes.Large)
+					: null;
+				foreach (var size in new[] { (uint)Constants.ShellIconSizes.Large, 48u, (uint)Constants.ShellIconSizes.Small })
+				{
+					if (icon is not null)
+						break;
+
+					icon = await FileThumbnailHelper.GetIconAsync(Path, size, true, IconOptions.ReturnIconOnly);
+				}
+				if (icon is not null)
+					Thumbnail = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => icon.ToBitmapAsync(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal);
+				return;
+			}
 
 			var thumbnailSize = (int)(Constants.ShellIconSizes.Large * App.AppModel.AppWindowDPI);
 			// Ensure thumbnail size is at least 1 to prevent layout errors
@@ -55,7 +88,7 @@ namespace Files.App.Data.Items
 
 		public void Dispose()
 		{
-			Item.Dispose();
+			Item?.Dispose();
 		}
 	}
 }

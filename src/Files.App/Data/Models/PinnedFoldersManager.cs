@@ -105,6 +105,14 @@ namespace Files.App.Data.Models
 			locationItem.IsDefaultLocation = false;
 			locationItem.Text = libraryDisplayName ?? res?.Result?.DisplayName ?? Path.GetFileName(path.TrimEnd('\\'));
 
+			if (locationItem is RecycleBinLocationItem)
+			{
+				locationItem.Text = Strings.RecycleBin.GetLocalizedResource();
+				locationItem.IsInvalid = false;
+				_ = LoadRecycleBinIconAsync(locationItem);
+				return locationItem;
+			}
+
 			// Load icons fire-and-forget so the section renders immediately; Icon is observable and swaps in when ready.
 			if (isLibrary)
 			{
@@ -161,6 +169,34 @@ namespace Files.App.Data.Models
 			catch (Exception ex)
 			{
 				App.Logger.LogWarning(ex, $"Error loading icon for {path}");
+			}
+		}
+
+		private async Task LoadRecycleBinIconAsync(LocationItem locationItem)
+		{
+			try
+			{
+#if WINDOWS
+				var icon = await FileThumbnailHelper.GetIconAsync(
+					Constants.UserEnvironmentPaths.RecycleBinPath,
+					Constants.ShellIconSizes.Small,
+					true,
+					IconOptions.ReturnIconOnly | IconOptions.SkipSizeSnapping);
+#else
+				var icon = await DriveHelpers.GetDriveIconAsync(null, Constants.ShellIconSizes.Small);
+#endif
+				icon ??= UIHelpers.GetSidebarIconResourceInfo(Constants.ImageRes.RecycleBin)?.IconData;
+
+				await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
+				{
+					var bitmapImage = await icon.ToBitmapAsync();
+					if (bitmapImage is not null)
+						locationItem.Icon = bitmapImage;
+				});
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Error loading the recycle bin icon");
 			}
 		}
 

@@ -11,7 +11,7 @@ namespace Files.App.Services.Desktop
 	/// Quick access (pinned sidebar folders) persisted as a JSON list under the app's XDG settings directory.
 	/// </summary>
 	/// <remarks>
-	/// LINUX-TODO(quickaccess): also merge GTK bookmarks (~/.config/gtk-3.0/bookmarks).
+	/// On first run the list is seeded with the XDG user directories and the GTK bookmarks (~/.config/gtk-3.0/bookmarks).
 	/// </remarks>
 	internal sealed class DesktopQuickAccessService : IQuickAccessService
 	{
@@ -42,8 +42,48 @@ namespace Files.App.Services.Desktop
 						defaults.Add(dir);
 				}
 
+				defaults.AddRange(ReadGtkBookmarks().Where(p => !defaults.Contains(p)));
+
+				// The trash is pinned by default like on other desktops
+				defaults.Add(Constants.UserEnvironmentPaths.RecycleBinPath);
+
+				try { Write(defaults); }
+				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+				{
+				}
+
 				return defaults;
 			}
+		}
+
+		private static IEnumerable<string> ReadGtkBookmarks()
+		{
+			var configHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") is { Length: > 0 } xdg && Path.IsPathRooted(xdg)
+				? xdg
+				: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
+
+			var result = new List<string>();
+			foreach (var file in new[] { Path.Combine(configHome, "gtk-3.0", "bookmarks"), Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".gtk-bookmarks") })
+			{
+				try
+				{
+					if (!File.Exists(file))
+						continue;
+
+					foreach (var line in File.ReadLines(file))
+					{
+						// "file:///path/to/folder optional label"
+						var uriText = line.Split(' ', 2)[0];
+						if (Uri.TryCreate(uriText, UriKind.Absolute, out var uri) && uri.IsFile && Directory.Exists(uri.LocalPath) && !result.Contains(uri.LocalPath))
+							result.Add(uri.LocalPath);
+					}
+				}
+				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+				{
+				}
+			}
+
+			return result;
 		}
 
 		private void Write(IEnumerable<string> folders)
@@ -63,7 +103,7 @@ namespace Files.App.Services.Desktop
 			{
 				IsFolder = true,
 				FilePath = path,
-				FileName = Path.GetFileName(path.TrimEnd('/')),
+				FileName = path == Constants.UserEnvironmentPaths.RecycleBinPath ? Strings.RecycleBin.GetLocalizedResource() : Path.GetFileName(path.TrimEnd('/')),
 				Properties = new() { ["System.Home.IsPinned"] = true }
 			}).ToList();
 

@@ -4740,4 +4740,8 @@
   <data name="ConfirmRemoveTagsDialogContent" xml:space="preserve">
     <value>Are you sure you want to remove tags from the selected items?</value>
   </data>
+  <data name="VolumeSizeName" xml:space="preserve">
+    <value>{0} Volume</value>
+    <comment>Name of a drive without a label. {0} is the size, e.g. "128 GiB Volume"</comment>
+  </data>
 </root>

@@ -20,7 +20,7 @@ namespace Files.App.Utils.Storage
 
 		private static readonly HashSet<string> _networkFs = new(StringComparer.Ordinal)
 		{
-			"nfs", "nfs4", "cifs", "smb3", "smbfs", "afs", "ceph", "9p", "davfs", "fuse.sshfs", "fuse.rclone", "fuse.gvfsd-fuse",
+			"nfs", "nfs4", "cifs", "smb3", "smbfs", "afs", "ceph", "9p", "davfs", "fuse.sshfs", "fuse.rclone",
 		};
 
 		private static readonly HashSet<string> _opticalFs = new(StringComparer.Ordinal) { "iso9660", "udf" };
@@ -67,8 +67,20 @@ namespace Files.App.Utils.Storage
 			return result;
 		}
 
+		// Desktop plumbing mounts that look like network/FUSE file systems but are not user visible drives
+		private static readonly HashSet<string> _noiseFs = new(StringComparer.Ordinal)
+		{
+			"fuse.gvfsd-fuse", "fuse.portal", "fuse.xdg-document-portal", "fuse.gvfs-fuse-daemon", "fusectl", "overlay", "squashfs", "tmpfs", "ramfs",
+		};
+
 		private static bool IsRealMount(string mountPoint, string fsType, string source)
 		{
+			if (_noiseFs.Contains(fsType) ||
+				mountPoint.StartsWith("/run/user/", StringComparison.Ordinal) ||
+				mountPoint.StartsWith("/run/credentials", StringComparison.Ordinal) ||
+				mountPoint.StartsWith("/run/snapd", StringComparison.Ordinal))
+				return false;
+
 			if (mountPoint != "/" &&
 				(mountPoint.StartsWith("/snap/", StringComparison.Ordinal) ||
 				 mountPoint.StartsWith("/var/lib/", StringComparison.Ordinal) ||
@@ -250,18 +262,131 @@ namespace Files.App.Utils.Storage
 			};
 		}
 
+		/// <summary>
+		/// Display name like Nautilus/Dolphin: file system label, else "&lt;size&gt; Volume", the root is "File System".
+		/// </summary>
 		public static string GetExtendedDriveLabel(SystemIO.DriveInfo drive)
 		{
 			return SafetyExtensions.IgnoreExceptions(() =>
 			{
-				if (drive.Name == "/")
-					return "/";
+				var mountPoint = drive.Name.Length > 1 ? drive.Name.TrimEnd('/') : drive.Name;
+				if (mountPoint == "/")
+					return Strings.FileSystem.GetLocalizedResource();
 
-				var label = drive.VolumeLabel;
-				return string.IsNullOrWhiteSpace(label) || label == drive.Name
-					? SystemIO.Path.GetFileName(drive.Name.TrimEnd('/'))
-					: label;
+				var mount = GetMounts().FirstOrDefault(m => m.MountPoint == mountPoint);
+				if (mount is not null)
+				{
+					if (GetVolumeLabel(mount.Source) is { Length: > 0 } label)
+						return label;
+
+					if (_networkFs.Contains(mount.FsType))
+						return SystemIO.Path.GetFileName(mountPoint);
+
+					if (mount.FsType is "iso9660" or "udf" && !string.IsNullOrWhiteSpace(drive.VolumeLabel))
+						return drive.VolumeLabel;
+				}
+
+				var size = drive.TotalSize;
+				return size > 0
+					? string.Format(Strings.VolumeSizeName.GetLocalizedResource(), ByteSizeLib.ByteSize.FromBytes(size).ToBinaryString())
+					: SystemIO.Path.GetFileName(mountPoint);
 			}) ?? "";
+		}
+
+		/// <summary>
+		/// Looks up the file system label of a block device through the /dev/disk/by-label symlinks maintained by udev.
+		/// </summary>
+		public static string? GetVolumeLabel(string source)
+		{
+			try
+			{
+				if (!source.StartsWith("/dev/", StringComparison.Ordinal) || !SystemIO.Directory.Exists("/dev/disk/by-label"))
+					return null;
+
+				var target = SystemIO.Path.GetFullPath(source);
+				foreach (var link in SystemIO.Directory.EnumerateFileSystemEntries("/dev/disk/by-label"))
+				{
+					var resolved = SystemIO.File.ResolveLinkTarget(link, true)?.FullName;
+					if (resolved is not null && string.Equals(resolved, target, StringComparison.Ordinal))
+						return DecodeUdevName(SystemIO.Path.GetFileName(link));
+				}
+			}
+			catch
+			{
+			}
+
+			return null;
+		}
+
+		// udev escapes unsafe bytes in symlink names as \xNN (UTF-8 bytes)
+		private static string DecodeUdevName(string name)
+		{
+			if (!name.Contains("\\x", StringComparison.Ordinal))
+				return name;
+
+			var bytes = new List<byte>();
+			for (int i = 0; i < name.Length; i++)
+			{
+				if (name[i] == '\\' && i + 3 < name.Length && name[i + 1] == 'x' &&
+					byte.TryParse(name.AsSpan(i + 2, 2), System.Globalization.NumberStyles.HexNumber, null, out var b))
+				{
+					bytes.Add(b);
+					i += 3;
+				}
+				else
+				{
+					bytes.AddRange(System.Text.Encoding.UTF8.GetBytes(name[i].ToString()));
+				}
+			}
+			return System.Text.Encoding.UTF8.GetString(bytes.ToArray());
+		}
+
+		/// <summary>
+		/// Resolves the icon theme entry for a kind of drive (or the trash when <paramref name="type"/> is null) as PNG bytes.
+		/// </summary>
+		public static async Task<byte[]?> GetDriveIconAsync(Data.Items.DriveType? type, uint size)
+		{
+			string[] names = type switch
+			{
+				null => ["user-trash", "edittrash"],
+				Data.Items.DriveType.Removable => ["drive-removable-media", "media-removable", "drive-harddisk"],
+				Data.Items.DriveType.CDRom => ["drive-optical", "media-optical", "drive-harddisk"],
+				Data.Items.DriveType.Network => ["folder-remote", "network-server", "drive-harddisk"],
+				_ => ["drive-harddisk", "drive-harddisk-system"],
+			};
+
+			try
+			{
+				var theme = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Icons.IIconThemeProvider>();
+
+				// LINUX-TODO(icons): SVG theme icons need a rasterizer, so fall back to the nearest PNG size
+				foreach (var candidate in new[] { size, 48u, 32u, 24u, 16u }.Distinct())
+				{
+					var result = await theme.ResolveIconAsync(names, candidate);
+					if (result is { IsSvg: false } found)
+						return await SystemIO.File.ReadAllBytesAsync(found.Path);
+				}
+
+				// Current Adwaita ships drive icons only as SVG; the legacy PNG set is still installed next to it
+				foreach (var name in names)
+				{
+					foreach (var candidate in new[] { size, 48u, 32u, 24u, 16u }.Distinct())
+					{
+						foreach (var category in new[] { "devices", "places" })
+						{
+							var path = $"/usr/share/icons/AdwaitaLegacy/{candidate}x{candidate}/{category}/{name}.png";
+							if (SystemIO.File.Exists(path))
+								return await SystemIO.File.ReadAllBytesAsync(path);
+						}
+					}
+				}
+
+				return null;
+			}
+			catch
+			{
+				return null;
+			}
 		}
 
 		public static Task<StorageItemThumbnail?> GetThumbnailAsync(StorageFolder folder)

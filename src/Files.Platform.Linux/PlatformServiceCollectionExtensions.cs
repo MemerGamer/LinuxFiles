@@ -8,12 +8,9 @@ using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
-<<<<<<< HEAD
 using Files.Platform.Linux.Permissions;
-=======
 using Files.Platform.Linux.Search;
 using Files.Platform.Linux.Secrets;
->>>>>>> 3e6d3f9be (WIP w-search)
 using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Trash;
 using Files.Platform.Linux.Watching;
@@ -43,12 +40,9 @@ namespace Files.Platform.Linux
 				.AddLinuxLaunching()
 				.AddLinuxFileOperations()
 				.AddLinuxArchives()
-<<<<<<< HEAD
-				.AddLinuxPermissions();
-=======
+				.AddLinuxPermissions()
 				.AddLinuxSearch()
 				.AddLinuxSecrets();
->>>>>>> 3e6d3f9be (WIP w-search)
 		}
 	}
 }

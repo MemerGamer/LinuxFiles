@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using Files.Platform.Linux.Native;
 
 namespace Files.Platform.Linux.FileOperations
 {
@@ -12,12 +13,22 @@ namespace Files.Platform.Linux.FileOperations
 		File,
 		Directory,
 		Symlink,
+		Special,
 	}
 
 	internal static class UnixMode
 	{
 		public static UnixFileMode Get(string path)
 			=> OperatingSystem.IsWindows() ? default : File.GetUnixFileMode(path);
+
+		/// <summary>Creates a folder accessible only by the owner; the final mode is applied after the content is copied.</summary>
+		public static void CreatePrivateDirectory(string path)
+		{
+			if (OperatingSystem.IsWindows())
+				Directory.CreateDirectory(path);
+			else
+				Directory.CreateDirectory(path, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+		}
 
 		public static void Set(string path, UnixFileMode mode)
 		{
@@ -50,6 +61,12 @@ namespace Files.Platform.Linux.FileOperations
 		/// <summary>Gets what <paramref name="path"/> is, treating a symbolic link (even a broken one) as <see cref="EntryKind.Symlink"/>.</summary>
 		public static EntryKind GetKind(string path)
 		{
+			if (PosixNative.TryStat(PosixNative.AtFdCwd, path, PosixNative.AtSymlinkNofollow, out var stat, out var errno))
+				return FromStat(stat);
+
+			if (PosixNative.IsNotFound(errno))
+				return EntryKind.None;
+
 			try
 			{
 				if (new FileInfo(path).LinkTarget is not null)
@@ -69,6 +86,16 @@ namespace Files.Platform.Linux.FileOperations
 				return EntryKind.None;
 			}
 		}
+
+		/// <summary>Gets what <paramref name="name"/> is inside an open directory, without following a link.</summary>
+		public static EntryKind GetKindAt(int directoryDescriptor, string name)
+			=> PosixNative.TryStat(directoryDescriptor, name, PosixNative.AtSymlinkNofollow, out var stat) ? FromStat(stat) : EntryKind.None;
+
+		private static EntryKind FromStat(PosixStat stat)
+			=> stat.IsSymbolicLink ? EntryKind.Symlink
+				: stat.IsDirectory ? EntryKind.Directory
+				: stat.IsSpecial ? EntryKind.Special
+				: EntryKind.File;
 
 		/// <summary>Gets what <paramref name="path"/> resolves to after following symbolic links; a broken link is <see cref="EntryKind.None"/>.</summary>
 		public static EntryKind GetKindFollowing(string path)

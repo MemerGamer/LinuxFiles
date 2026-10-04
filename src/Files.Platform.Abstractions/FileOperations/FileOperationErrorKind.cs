@@ -40,5 +40,8 @@ namespace Files.Platform.Abstractions.FileOperations
 
 		/// <summary>The copied data did not match the source, so the destination was discarded.</summary>
 		VerificationFailed,
+
+		/// <summary>FIFOs, sockets and device files are never copied.</summary>
+		UnsupportedFileType,
 	}
 }

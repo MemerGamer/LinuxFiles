@@ -9,6 +9,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.FileOperations;
+using Files.Platform.Linux.Native;
+using Microsoft.Win32.SafeHandles;
 
 namespace Files.Platform.Linux.FileOperations
 {
@@ -46,16 +48,19 @@ namespace Files.Platform.Linux.FileOperations
 		}
 
 		/// <summary>Copies one entry (recursively for folders) to <paramref name="destination"/>, applying the conflict policy.</summary>
-		private async Task<Outcome> CopyEntryAsync(string source, string destination, FileOperationContext context, bool verifySource)
+		private async Task<Outcome> CopyEntryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle? parent = null)
 		{
 			context.CancellationToken.ThrowIfCancellationRequested();
 
-			var sourceKind = FileSystemEntry.GetKind(source);
+			var sourceKind = parent is null ? FileSystemEntry.GetKind(source) : FileSystemEntry.GetKindAt(parent.Descriptor, Path.GetFileName(source));
 			if (sourceKind == EntryKind.Symlink && context.FollowSymlinks)
 				sourceKind = FileSystemEntry.GetKindFollowing(source);
 
 			if (sourceKind == EntryKind.None)
 				return Outcome.Fail(FileOperationErrorKind.NotFound, "The source does not exist (or is a broken link).", source);
+
+			if (sourceKind == EntryKind.Special)
+				return Outcome.Fail(FileOperationErrorKind.UnsupportedFileType, "FIFOs, sockets and device files cannot be copied.", source);
 
 			try
 			{
@@ -71,9 +76,9 @@ namespace Files.Platform.Linux.FileOperations
 
 				return sourceKind switch
 				{
-					EntryKind.Directory => await CopyDirectoryAsync(source, destination, context, verifySource).ConfigureAwait(false),
-					EntryKind.Symlink => CopyLink(source, destination, resolved.Replace, context),
-					_ => await CopyFileAsync(source, destination, resolved.Replace, context, verifySource).ConfigureAwait(false),
+					EntryKind.Directory => await CopyDirectoryAsync(source, destination, context, verifySource, parent).ConfigureAwait(false),
+					EntryKind.Symlink => CopyLink(source, destination, resolved.Replace, context, parent),
+					_ => await CopyFileAsync(source, destination, resolved.Replace, context, verifySource, parent).ConfigureAwait(false),
 				};
 			}
 			catch (OperationCanceledException)
@@ -86,7 +91,7 @@ namespace Files.Platform.Linux.FileOperations
 			}
 		}
 
-		private async Task<Outcome> CopyDirectoryAsync(string source, string destination, FileOperationContext context, bool verifySource)
+		private async Task<Outcome> CopyDirectoryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle? parent)
 		{
 			string? canonical = null;
 			if (context.FollowSymlinks)
@@ -99,14 +104,18 @@ namespace Files.Platform.Linux.FileOperations
 			try
 			{
 				var created = FileSystemEntry.GetKind(destination) == EntryKind.None;
+				using var handle = OpenSourceDirectory(source, parent, context);
 				var metadata = DirectoryMetadata.Capture(source);
 				if (created)
-					Directory.CreateDirectory(destination);
+				{
+					UnixMode.CreatePrivateDirectory(destination);
+					context.Hooks?.DirectoryCreated?.Invoke(destination);
+				}
 
 				var result = Outcome.Success(destination);
-				foreach (var child in Directory.EnumerateFileSystemEntries(source, "*", FileSystemEntry.AllEntries).ToList())
+				foreach (var name in handle.ListNames())
 				{
-					var childOutcome = await CopyEntryAsync(child, Path.Combine(destination, Path.GetFileName(child)), context, verifySource).ConfigureAwait(false);
+					var childOutcome = await CopyEntryAsync(Path.Combine(source, name), Path.Combine(destination, name), context, verifySource, context.FollowSymlinks ? null : handle).ConfigureAwait(false);
 					result = result.Combine(childOutcome, destination);
 				}
 
@@ -143,9 +152,59 @@ namespace Files.Platform.Linux.FileOperations
 			}
 		}
 
-		private static Outcome CopyLink(string source, string destination, bool replace, FileOperationContext context)
+		/// <summary>Opens a source folder; unless links are followed, a link swapped in after the kind check is refused.</summary>
+		private static DirectoryHandle OpenSourceDirectory(string source, DirectoryHandle? parent, FileOperationContext context)
 		{
-			var target = new FileInfo(source).LinkTarget ?? throw new FileNotFoundException("The link no longer exists.", source);
+			context.Hooks?.BeforeOpenSource?.Invoke(source);
+			var handle = DirectoryHandle.TryOpen(
+				parent?.Descriptor ?? PosixNative.AtFdCwd,
+				parent is null ? source : Path.GetFileName(source),
+				source,
+				!context.FollowSymlinks,
+				out var errno);
+
+			if (handle is not null)
+				return handle;
+
+			if (!context.FollowSymlinks && PosixNative.IsNotFollowedError(errno))
+				throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source folder was replaced while it was being copied.", source);
+
+			throw PosixNative.CreateException(errno, source);
+		}
+
+		/// <summary>Opens a source file without blocking and verifies on the descriptor that it is a regular file.</summary>
+		private static FileStream OpenSourceFile(string source, DirectoryHandle? parent, FileOperationContext context, out PosixStat stat)
+		{
+			context.Hooks?.BeforeOpenSource?.Invoke(source);
+			var flags = PosixNative.NonBlockingFlags | (context.FollowSymlinks ? 0 : PosixNative.ONofollow);
+			var descriptor = PosixNative.OpenAt(
+				parent?.Descriptor ?? PosixNative.AtFdCwd,
+				parent is null ? source : Path.GetFileName(source),
+				flags,
+				out var errno);
+
+			if (descriptor < 0)
+			{
+				if (!context.FollowSymlinks && PosixNative.IsNotFollowedError(errno))
+					throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source was replaced by a link while it was being copied.", source);
+
+				throw PosixNative.CreateException(errno, source);
+			}
+
+			if (!PosixNative.TryStat(descriptor, out stat) || !stat.IsRegularFile)
+			{
+				PosixNative.Close(descriptor);
+				throw new FileOperationException(FileOperationErrorKind.UnsupportedFileType, "Only regular files can be copied.", source);
+			}
+
+			return new FileStream(new SafeFileHandle(descriptor, true), FileAccess.Read, 1, false);
+		}
+
+		private static Outcome CopyLink(string source, string destination, bool replace, FileOperationContext context, DirectoryHandle? parent)
+		{
+			var target = parent is not null
+				? PosixNative.ReadLinkAt(parent.Descriptor, Path.GetFileName(source), source)
+				: new FileInfo(source).LinkTarget ?? throw new FileNotFoundException("The link no longer exists.", source);
 			if (!replace)
 			{
 				File.CreateSymbolicLink(destination, target);
@@ -169,24 +228,40 @@ namespace Files.Platform.Linux.FileOperations
 			return Outcome.Success(destination);
 		}
 
-		private static async Task<Outcome> CopyFileAsync(string source, string destination, bool replace, FileOperationContext context, bool verifySource)
+		private static async Task<Outcome> CopyFileAsync(string source, string destination, bool replace, FileOperationContext context, bool verifySource, DirectoryHandle? parent = null)
 		{
 			var temporary = TemporaryPathNextTo(destination);
-			var length = new FileInfo(source).Length;
+			long length = 0;
 			long copied = 0;
+			long sourceSizeAfter = -1;
 			var completed = false;
 
 			try
 			{
-				var sourceTime = File.GetLastWriteTimeUtc(source);
-				var sourceMode = UnixMode.Get(source);
+				var input = OpenSourceFile(source, parent, context, out var sourceStat);
+				length = (long)sourceStat.Size;
+				var sourceTime = sourceStat.ModifiedUtc;
+				var sourceMode = (UnixFileMode)(sourceStat.Mode & 0xFFF);
 
-				var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.Asynchronous | FileOptions.SequentialScan);
 				await using (input.ConfigureAwait(false))
 				{
-					var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None, 1, FileOptions.Asynchronous);
+					// Owner-only until the final mode is applied, so a secret is never briefly readable by others
+					var outputOptions = new FileStreamOptions
+					{
+						Mode = FileMode.CreateNew,
+						Access = FileAccess.Write,
+						Share = FileShare.None,
+						BufferSize = 1,
+						Options = FileOptions.Asynchronous,
+					};
+
+					if (!OperatingSystem.IsWindows())
+						outputOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+
+					var output = new FileStream(temporary, outputOptions);
 					await using (output.ConfigureAwait(false))
 					{
+						context.Hooks?.TemporaryFileCreated?.Invoke(temporary);
 						var buffer = ArrayPool<byte>.Shared.Rent(CopyBufferSize);
 						try
 						{
@@ -206,12 +281,15 @@ namespace Files.Platform.Linux.FileOperations
 						await output.FlushAsync(context.CancellationToken).ConfigureAwait(false);
 						output.Flush(true);
 					}
+
+					if (PosixNative.TryStat((int)input.SafeFileHandle.DangerousGetHandle(), out var after))
+						sourceSizeAfter = (long)after.Size;
 				}
 
 				if (new FileInfo(temporary).Length != copied)
 					throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The copied file does not have the expected size.", destination);
 
-				if (verifySource && new FileInfo(source).Length != copied)
+				if (verifySource && sourceSizeAfter != copied)
 					throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being copied.", source);
 
 				UnixMode.Set(temporary, sourceMode);

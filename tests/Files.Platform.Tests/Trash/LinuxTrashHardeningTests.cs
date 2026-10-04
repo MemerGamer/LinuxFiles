@@ -5,6 +5,7 @@
 #pragma warning disable CA1416
 
 using Files.Platform.Abstractions.Trash;
+using Files.Platform.Linux.Native;
 using Files.Platform.Linux.Trash;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;

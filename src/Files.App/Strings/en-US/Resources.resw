@@ -4766,7 +4766,7 @@
     <value>Launch "{0}"?</value>
   </data>
   <data name="LinuxUntrustedLauncherText" xml:space="preserve">
-    <value>This launcher is not installed and not trusted. It would run: {0}. Only run launchers from sources you trust.</value>
+    <value>This launcher is not installed and not trusted. Only run launchers from sources you trust.</value>
   </data>
   <data name="LinuxRunBinaryText" xml:space="preserve">
     <value>This is an executable program ({0}). Only run programs from sources you trust.</value>
@@ -4807,5 +4807,17 @@
   </data>
   <data name="LinuxOpenRefusedText" xml:space="preserve">
     <value>{0} is an executable-looking or invalid file that cannot be opened safely.</value>
+  </data>
+  <data name="LinuxFileLabel" xml:space="preserve">
+    <value>File:</value>
+  </data>
+  <data name="LinuxClaimsToBe" xml:space="preserve">
+    <value>Claims to be:</value>
+  </data>
+  <data name="LinuxWouldRun" xml:space="preserve">
+    <value>Would run:</value>
+  </data>
+  <data name="LinuxInTerminal" xml:space="preserve">
+    <value>in a terminal</value>
   </data>
 </root>

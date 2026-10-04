@@ -4757,7 +4757,7 @@
     <value>Run "{0}"?</value>
   </data>
   <data name="LinuxRunExecutableText" xml:space="preserve">
-    <value>This is an executable text file. Do you want to run it or display its contents?</value>
+    <value>This is an executable text file ({0}). Do you want to run it or display its contents?</value>
   </data>
   <data name="LinuxDisplayFile" xml:space="preserve">
     <value>Display</value>
@@ -4766,6 +4766,21 @@
     <value>Launch "{0}"?</value>
   </data>
   <data name="LinuxUntrustedLauncherText" xml:space="preserve">
-    <value>This launcher is not trusted. Only run launchers from sources you trust.</value>
+    <value>This launcher is not installed and not trusted. It would run: {0}. Only run launchers from sources you trust.</value>
+  </data>
+  <data name="LinuxRunBinaryText" xml:space="preserve">
+    <value>This is an executable program ({0}). Only run programs from sources you trust.</value>
+  </data>
+  <data name="LinuxOpenManyTitle" xml:space="preserve">
+    <value>Open {0} files?</value>
+  </data>
+  <data name="LinuxOpenManyText" xml:space="preserve">
+    <value>Opening many files at once may be slow or unintended.</value>
+  </data>
+  <data name="LinuxOpenFailedTitle" xml:space="preserve">
+    <value>Cannot open file</value>
+  </data>
+  <data name="LinuxOpenFailedText" xml:space="preserve">
+    <value>No application could open {0}.</value>
   </data>
 </root>

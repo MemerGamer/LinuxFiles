@@ -45,6 +45,16 @@ namespace Files.App.Data.Items
 			}
 		} = true;
 
+		/// <summary>
+		/// Uno annotates <c>Window.Content</c> as nullable while WinUI does not; the app (and its nullable-as-error policy)
+		/// assumes it is set once the window is created.
+		/// </summary>
+		public new UIElement Content
+		{
+			get => base.Content!;
+			set => base.Content = value;
+		}
+
 		protected virtual bool PersistPlacement => false;
 
 		public WindowEx(int minWidth = 400, int minHeight = 300)

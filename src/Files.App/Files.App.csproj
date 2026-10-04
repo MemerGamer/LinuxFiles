@@ -170,6 +170,7 @@
 
     <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
         <PackageReference Include="Uno.WinUI" />
+        <PackageReference Include="Uno.WinUI.Runtime.Skia.X11" />
         <PackageReference Include="Uno.Microsoft.Xaml.Behaviors.WinUI.Managed" />
     </ItemGroup>
 

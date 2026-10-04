@@ -4,7 +4,7 @@
 # Abstract:
 #   This CI builds Files on Windows for forks only (it is skipped on the
 #   files-community organization, where ci.yml already runs). It is executed
-#   on pushes to linux/** branches and on pull requests.
+#   manually only (workflow_dispatch): the port is Linux-first for now.
 #   It only compiles the app (Release | x64): MSIX packaging, signing
 #   certificates, bundle-size reporting and interaction tests from ci.yml are
 #   intentionally left out. Packaging is disabled with AppxBundle=Never and
@@ -15,20 +15,7 @@
 name: Files CI (Windows fork)
 
 on:
-  push:
-    branches:
-      - 'linux/**'
-    paths-ignore:
-      - 'assets/**'
-      - 'builds/**'
-      - 'docs/**'
-      - '*.md'
-  pull_request:
-    paths-ignore:
-      - 'assets/**'
-      - 'builds/**'
-      - 'docs/**'
-      - '*.md'
+  workflow_dispatch:
 
 run-name: ${{ github.event_name == 'pull_request' && 'Files Windows PR Validation' || 'Files Windows CI Validation' }}
 

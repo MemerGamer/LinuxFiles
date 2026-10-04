@@ -2,6 +2,56 @@
 
 Status: draft v1 · 2026-10-04 · fork base `0e3c17ca4` (in sync with `files-community/Files` main)
 
+## 0. Revision 2 (2026-10-04): Linux-first
+
+**This section overrides anything below that conflicts with it.**
+
+### Decision
+The owner decided to focus on Linux first. Windows support is revisited only after the Linux version works.
+- The Windows build no longer has to stay green. `ci-windows.yml` is manual (`workflow_dispatch`) and informational.
+- We still put platform code behind `Files.Platform.Abstractions` interfaces. That keeps the Linux code clean, keeps
+  upstream merges manageable, and leaves a path back to Windows. Windows-only code may be excluded from the build
+  or left uncompiled instead of carefully wrapped.
+- Fork autonomy: agents may push branches, open and merge PRs on `MemerGamer/LinuxFiles` freely. Never touch upstream.
+
+### Findings from Phase 0 research (Uno 6.7, Skia desktop)
+- **No native Wayland in Uno.** Linux runs on X11, which means XWayland on Wayland sessions. Fractional scaling
+  can be blurry. Custom title bars and drag regions are no-ops, so we use system decorations.
+- **Outbound file drag & drop throws `NotImplementedException`.** A drag leaving the window may crash the app.
+  **The clipboard cannot publish file lists.** Both are core features. New workstream **L-DND** fixes them,
+  preferably as an upstream Uno contribution, otherwise with our own X11 selection/XDND owner.
+- **Not implemented, so guard them or replace them:**
+  - `ResourceManager().MainResourceMap`: switch to `ResourceLoader.GetString`
+  - `ElementCompositionPreview.GetScrollViewerManipulationPropertySet`: StickyHeaderBehavior
+  - `AppInstance`: replace with D-Bus or a Unix socket
+  - AccessKey/KeyTips
+  - Mica/Acrylic
+  - `InputNonClientPointerSource` regions
+  - WebView2 Profile/Settings
+  - InteractionTracker modifiers
+- **Supported:** InputKeyboardSource, AppWindow move/resize, multiple windows, TabView (no tear-out),
+  ContentDialog, TeachingTip, ItemsRepeater, x:Load, VSM, runtime theme switching, KeyboardAccelerator,
+  ExpressionAnimation, CompositionPath (fed from SKPath instead of Win2D), inbound XDND, and reading files from
+  the clipboard.
+- **Known gap:** no AT-SPI accessibility on Linux in Uno.
+- **Unproven:** ListView/GridView performance with 10k–100k items. Needs spike **P0-PERF**.
+
+### Revised roadmap (replaces §5 ordering)
+| Phase | Goal | Parallelism |
+|---|---|---|
+| 0 | Toolchain, CI, Uno spike, research. Extra spikes: **P0-PERF** (10k/100k items) and **P0-DND** (outbound XDND + file clipboard prototype) | parallel |
+| 1 | Abstraction skeleton (`Files.Platform.*`, tests, DI) | serial, small |
+| 2 | **Linux bring-up: make `Files.App` compile and launch on Uno `net10.0-desktop`.** Retarget Controls + App to Uno. Exclude Windows-only folders (`Compile Remove`). Replace Win32/WinRT calls with interface calls, backed by stub or simple Linux implementations. Fix compile errors folder by folder. | parallel by folder ownership |
+| 3 | Real Linux backends per interface (enumeration, watcher, file ops, trash, launcher, thumbnails, drives, clipboard…), with unit tests | parallel, one agent per interface |
+| 4 | Replace the legacy WinRT storage layer (`BaseStorageFile`/`Folder`) with OwlCore storables | single owner |
+| 5 | UI blockers and UX parity: L-DND, SpeedGraph, StickyHeader, title bar, previews, single instance | parallel |
+| 6 | Desktop integration and packaging (FileManager1 D-Bus, `.desktop`, Flatpak/AppImage/AUR) | parallel |
+| 7 | Hardening (performance, HiDPI, themes, localisation) | parallel |
+| 8 | (Optional) Restore Windows: multi-target again, Windows backends behind the same interfaces | later |
+
+The Phase 2 workstreams in §7.3 still define folder ownership. Their goal is now "compiles and works on Linux",
+not "Windows code wrapped without behaviour change".
+
 ## 1. Executive summary
 
 Files is a WinUI 3 / Windows App SDK app (~130k LOC C#, 136 XAML files / ~30k XAML lines). Porting it to Linux is two

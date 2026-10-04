@@ -73,5 +73,5 @@ jobs:
         fi
         for project in "${projects[@]}"; do
           dotnet build "$project" -c Release -warnaserror
-          dotnet test "$project" -c Release --no-build
+          dotnet test --project "$project" -c Release --no-build
         done

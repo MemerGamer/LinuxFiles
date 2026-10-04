@@ -103,4 +103,17 @@ namespace Files.Platform.Linux.Launching
 			await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 		}
 	}
+
+	/// <summary>
+	/// Logs launches to stderr instead of starting processes. Enabled with <c>FILES_LAUNCH_DRYRUN=1</c> so automated runs never open real windows.
+	/// </summary>
+	public sealed class DryRunProcessStarter : IProcessStarter
+	{
+		/// <inheritdoc/>
+		public Task StartDetachedAsync(ProcessLaunch launch, CancellationToken cancellationToken = default)
+		{
+			Console.Error.WriteLine($"[launch-dryrun] {launch.FileName} {string.Join(' ', launch.Arguments)} (cwd: {launch.WorkingDirectory ?? "-"})");
+			return Task.CompletedTask;
+		}
+	}
 }

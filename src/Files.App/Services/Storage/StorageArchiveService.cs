@@ -416,6 +416,34 @@ namespace Files.App.Services
 		}
 
 		/// <inheritdoc/>
+		public async Task<bool> HasMultipleTopLevelEntriesAsync(string archiveFilePath, string password = "")
+		{
+			var result = await FilesystemTasks.Wrap(async () =>
+			{
+				using SevenZipExtractor? zipFile = await GetSevenZipExtractorAsync(archiveFilePath, password);
+				if (zipFile is null)
+					return true;
+
+				string? firstTopLevel = null;
+				foreach (var file in zipFile.ArchiveFileData)
+				{
+					var segment = file.FileName.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(x => x is not "." and not "..");
+					if (segment is null)
+						continue;
+
+					if (firstTopLevel is null)
+						firstTopLevel = segment;
+					else if (segment != firstTopLevel)
+						return true;
+				}
+
+				return false;
+			});
+
+			return result;
+		}
+
+		/// <inheritdoc/>
 		public async Task<bool> IsEncryptedAsync(string archiveFilePath)
 		{
 			using SevenZipExtractor? zipFile = await GetSevenZipExtractorAsync(archiveFilePath);

@@ -12,7 +12,7 @@ namespace Files.Platform.Linux.Native
 	/// <summary>
 	/// The result of a <c>statx</c> call.
 	/// </summary>
-	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds)
+	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0)
 	{
 		public uint FileType => Mode & 0xF000;
 
@@ -44,6 +44,7 @@ namespace Files.Platform.Linux.Native
 		private const uint StatxMode = 0x2;
 		private const uint StatxUid = 0x8;
 		private const uint StatxMtime = 0x40;
+		private const uint StatxIno = 0x100;
 		private const uint StatxSize = 0x200;
 		private const int StatxBufferSize = 256;
 
@@ -83,7 +84,7 @@ namespace Files.Platform.Linux.Native
 				var buffer = new byte[StatxBufferSize];
 				fixed (byte* p = buffer)
 				{
-					const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize;
+					const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize | StatxIno;
 					if (statx(dirfd, path, flags, mask, p) != 0)
 					{
 						errno = Marshal.GetLastPInvokeError();
@@ -100,7 +101,8 @@ namespace Files.Platform.Linux.Native
 				var seconds = (returned & StatxMtime) != 0 ? BitConverter.ToInt64(buffer, 112) : 0;
 				var nanos = (returned & StatxMtime) != 0 ? BitConverter.ToUInt32(buffer, 120) : 0;
 
-				stat = new PosixStat(BitConverter.ToUInt16(buffer, 28), size, BitConverter.ToUInt32(buffer, 20), seconds, nanos);
+				stat = new PosixStat(BitConverter.ToUInt16(buffer, 28), size, BitConverter.ToUInt32(buffer, 20), seconds, nanos,
+					(returned & StatxIno) != 0 ? BitConverter.ToUInt64(buffer, 32) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140));
 				return true;
 			}
 			catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)

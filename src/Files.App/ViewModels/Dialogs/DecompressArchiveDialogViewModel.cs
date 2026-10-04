@@ -131,7 +131,11 @@ namespace Files.App.ViewModels.Dialogs
 		private string DefaultDestinationFolderPath()
 		{
 			var directory = Path.GetDirectoryName(archive.Path);
+#if HAS_UNO
+			var fileName = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().GetDefaultExtractFolderName(archive.Path);
+#else
 			var fileName = Path.GetFileNameWithoutExtension(archive.Path);
+#endif
 			return string.IsNullOrEmpty(directory) ? fileName : Path.Combine(directory, fileName);
 		}
 

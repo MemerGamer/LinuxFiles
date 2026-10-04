@@ -185,7 +185,7 @@
 			<!--  Size format  -->
 			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=SizeFormat}">
 				<wctcontrols:SettingsCard.HeaderIcon>
-					<FontIcon Glyph="&#xE67A;" />
+					<FontIcon Glyph="&#xE8B7;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
 
 				<uc:ComboBoxEx

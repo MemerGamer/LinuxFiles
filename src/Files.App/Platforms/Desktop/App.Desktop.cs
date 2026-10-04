@@ -44,6 +44,7 @@ namespace Files.App
 				Logger = Ioc.Default.GetRequiredService<ILogger<App>>();
 				AppModel = Ioc.Default.GetRequiredService<AppModel>();
 
+				MainWindow.Instance.RestorePlacement(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.ILocalSettingsStore>());
 				MainWindow.Instance.Activate();
 
 				MainWindow.Instance.Closed += Window_Closed;
@@ -77,6 +78,8 @@ namespace Files.App
 			var commandManager = Ioc.Default.GetRequiredService<ICommandManager>();
 
 			ActiveSessionTracker.OnActivationChanged(false);
+
+			MainWindow.Instance.SavePlacement(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.ILocalSettingsStore>());
 
 			if (userSettingsService.GeneralSettingsService.ContinueLastSessionOnStartUp || userSettingsService.AppSettingsService.RestoreTabsOnStartup)
 				AppLifecycleHelper.SaveSessionTabs();

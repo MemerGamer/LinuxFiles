@@ -34,7 +34,7 @@
 			VerticalAlignment="Stretch"
 			x:Load="{x:Bind ViewModel.LoadCombinedItemsGlyph, Mode=OneWay}"
 			FontSize="{x:Bind LargerItemSize}"
-			Glyph="&#xF571;" />
+			Glyph="&#xE8F1;" />
 
 		<Image
 			x:Name="DriveItemIcon"

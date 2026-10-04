@@ -438,7 +438,8 @@ namespace Files.App.UserControls.TabBar
 				? MainWindow.Instance.AppWindow.TitleBar.LeftInset
 				: MainWindow.Instance.AppWindow.TitleBar.RightInset) / DragAreaRectangle.XamlRoot.RasterizationScale) + 40;
 
-			RightPaddingColumn.Width = new(titleBarInset > 40 ? titleBarInset : 138);
+			// Native window decorations on Linux: no caption buttons to reserve space for
+			RightPaddingColumn.Width = new(OperatingSystem.IsLinux() ? 8 : titleBarInset > 40 ? titleBarInset : 138);
 			HorizontalTabView.Measure(new(
 				Math.Max(0, HorizontalTabView.ActualWidth - TabBarAddNewTabButton.Width - titleBarInset),
 				Math.Max(0, HorizontalTabView.ActualHeight)));

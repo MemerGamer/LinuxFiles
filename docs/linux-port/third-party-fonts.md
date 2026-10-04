@@ -15,5 +15,6 @@ Every PUA code point (`&#xE...;`, `\uE...`) used in `src/**/*.xaml|cs` was check
 Uncovered: `E621` (LayoutPage settings card icon), `E67A` (FoldersPage settings card icon), `F571` (FileIcon combined-items glyph). These render as a blank box.
 
 ## Known limitations
-- Uno loads a font file as a single face, so `FontWeight` Bold/SemiBold on `ContentControlThemeFontFamily` is not mapped to `selawkb.ttf`/`selawksb.ttf` (bold text renders regular weight). LINUX-TODO(fonts): register the weights through fontconfig or per-weight font keys.
+- Uno loads a font file as a single face, so weights are resolved by family name instead: `Program.Main` registers `Assets/Fonts/Linux/*.ttf` with fontconfig (`FcConfigAppFontAddFile`, `FontConfigNative`) and `ContentControlThemeFontFamily` is `Selawik, Segoe UI, Noto Sans, DejaVu Sans`, so Skia matches Bold/SemiBold/Light by weight.
+- The three uncovered glyphs were replaced: E621 -> E8A9 (LayoutPage), E67A -> E8B7 (FoldersPage), F571 -> E8F1 (FileIcon).
 - "Segoe MDL2 Assets" literals are already mapped to the Fluent icon font by Uno; `BladeView` and `GridSplitter` now use `SymbolThemeFontFamily` explicitly.

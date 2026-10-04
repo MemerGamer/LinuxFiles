@@ -5,6 +5,7 @@ using Files.Platform.Abstractions;
 using Files.Platform.Abstractions.Icons;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Abstractions.Thumbnails;
+using Files.Platform.Linux.Icons;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.IO;
@@ -63,13 +64,13 @@ namespace Files.App.Utils.Storage
 			if (isFolder || string.IsNullOrEmpty(path))
 			{
 				var special = GetSpecialFolderIconName(path);
-				return special is null ? ["folder"] : [special, "folder"];
+				return special is null ? ["folder", "inode-directory"] : [special, "folder", "inode-directory"];
 			}
 
 			var mimeType = await Mime.GetMimeTypeAsync(path);
 			var iconName = await Mime.GetIconNameAsync(mimeType);
 			var generic = await Mime.GetGenericIconNameAsync(mimeType);
-			return [iconName, generic, "text-x-generic"];
+			return [iconName, generic, "text-x-generic", "unknown"];
 		}
 
 		private static string? GetSpecialFolderIconName(string? path)
@@ -97,8 +98,10 @@ namespace Files.App.Utils.Storage
 			if (result is null)
 				return null;
 
-			// LINUX-TODO(icons): rasterize SVG theme icons (needs an SVG renderer); PNG theme entries work already
 			if (result.Value.IsSvg)
+				return await Task.Run(() => SvgRasterizer.RenderToPng(result.Value.Path, (int)size));
+
+			if (result.Value.Path.EndsWith(".xpm", StringComparison.OrdinalIgnoreCase))
 				return null;
 
 			return await File.ReadAllBytesAsync(result.Value.Path);

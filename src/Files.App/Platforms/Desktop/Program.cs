@@ -27,6 +27,9 @@ namespace Files.App
 		{
 			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
+			// Selawik weights (Regular/Semibold/Bold/Light) are matched by family name + weight through fontconfig
+			Files.Platform.Linux.Native.FontConfigNative.RegisterFontDirectory(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "Fonts", "Linux"));
+
 			// TODO: single instance via ISingleInstanceService (D-Bus or Unix socket); forward args to the running instance
 
 			var host = UnoPlatformHostBuilder.Create()

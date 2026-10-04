@@ -465,12 +465,7 @@
 										TextAlignment="Center" />
 								</StackPanel>
 
-								<!--  AnimatedVisualPlayer for Lottie  -->
-								<AnimatedVisualPlayer
-									x:Name="LottiePlayer"
-									AutoPlay="false"
-									Opacity="1"
-									Stretch="fill" />
+								<!--  LINUX-TODO(props): the Lottie AnimatedVisualPlayer placeholder is not implemented by Uno (UNO0001) and has no source  -->
 
 								<VisualStateManager.VisualStateGroups>
 									<VisualStateGroup x:Name="CommonStates">

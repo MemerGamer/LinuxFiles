@@ -3,8 +3,8 @@
 
 using Files.App.ViewModels.Properties;
 using Microsoft.UI.Xaml.Controls;
-using System.IO;
 using Microsoft.UI.Xaml.Navigation;
+using System.IO;
 
 namespace Files.App.Views.Properties
 {

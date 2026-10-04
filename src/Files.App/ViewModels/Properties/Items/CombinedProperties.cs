@@ -160,6 +160,9 @@ namespace Files.App.ViewModels.Properties
 		private async Task GetSpecialPropertiesLinuxAsync()
 		{
 			ViewModel.ItemAttributesVisibility = false;
+			ViewModel.ItemCreatedTimestampVisibility = false;
+			ViewModel.ItemModifiedTimestampVisibility = false;
+			ViewModel.ItemAccessedTimestampVisibility = false;
 			ViewModel.CanCompressContent = false;
 			ViewModel.LastSeparatorVisibility = false;
 			ViewModel.ItemSizeVisibility = true;

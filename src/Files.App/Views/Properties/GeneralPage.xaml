@@ -98,24 +98,24 @@
 						HorizontalAlignment="Center"
 						VerticalAlignment="Center"
 						x:Load="{x:Bind ViewModel.IsEditAlbumCoverVisible, Mode=OneWay}"
-						AutomationProperties.Name="{helpers:ResourceString Name=MoreOptions}"
+						AutomationProperties.Name="{helpers:ResourceString Key=MoreOptions}"
 						Background="Transparent"
 						BorderThickness="0"
 						Opacity="0"
 						PointerEntered="EditAlbumCoverButton_PointerEntered"
 						PointerExited="EditAlbumCoverButton_PointerExited"
-						ToolTipService.ToolTip="{helpers:ResourceString Name=MoreOptions}">
+						ToolTipService.ToolTip="{helpers:ResourceString Key=MoreOptions}">
 						<Button.Resources>
 							<SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
 						</Button.Resources>
 						<Button.Flyout>
 							<MenuFlyout Placement="Bottom">
-								<MenuFlyoutItem Command="{x:Bind ViewModel.EditAlbumCoverCommand, Mode=OneWay}" Text="{helpers:ResourceString Name=ChangeAlbumCover}">
+								<MenuFlyoutItem Command="{x:Bind ViewModel.EditAlbumCoverCommand, Mode=OneWay}" Text="{helpers:ResourceString Key=ChangeAlbumCover}">
 									<MenuFlyoutItem.Icon>
 										<FontIcon Glyph="&#xE70F;" />
 									</MenuFlyoutItem.Icon>
 								</MenuFlyoutItem>
-								<MenuFlyoutItem Command="{x:Bind ViewModel.RemoveAlbumCoverCommand, Mode=OneWay}" Text="{helpers:ResourceString Name=RemoveAlbumCover}">
+								<MenuFlyoutItem Command="{x:Bind ViewModel.RemoveAlbumCoverCommand, Mode=OneWay}" Text="{helpers:ResourceString Key=RemoveAlbumCover}">
 									<MenuFlyoutItem.Icon>
 										<FontIcon Glyph="&#xE74D;" />
 									</MenuFlyoutItem.Icon>
@@ -147,7 +147,7 @@
 						x:Load="{x:Bind ViewModel.ItemNameVisibility, Mode=OneWay}"
 						GettingFocus="ItemFileName_GettingFocus"
 						LosingFocus="ItemFileName_LosingFocus"
-						PlaceholderText="{helpers:ResourceString Name=PropertyItemName}"
+						PlaceholderText="{helpers:ResourceString Key=PropertyItemName}"
 						Text="{x:Bind ViewModel.ItemName, Mode=TwoWay}" />
 					<TextBlock
 						x:Name="itemFilesAndFoldersCountValueTop"
@@ -164,7 +164,7 @@
 					x:Load="{x:Bind ViewModel.ItemTypeVisibility, Mode=OneWay}"
 					FontWeight="SemiBold"
 					Style="{StaticResource PropertyName}"
-					Text="{helpers:ResourceString Name=ItemType}" />
+					Text="{helpers:ResourceString Key=ItemType}" />
 
 				<TextBlock
 					x:Name="itemTypeValue"
@@ -183,7 +183,7 @@
 					x:Load="{x:Bind ViewModel.DriveFileSystemVisibility, Mode=OneWay}"
 					FontWeight="SemiBold"
 					Style="{StaticResource PropertyName}"
-					Text="{helpers:ResourceString Name=PropertiesDriveFileSystem/Text}" />
+					Text="{helpers:ResourceString Key=PropertiesDriveFileSystem/Text}" />
 
 				<TextBlock
 					x:Name="DriveFileSystemValue"
@@ -201,7 +201,7 @@
 				HorizontalAlignment="Stretch"
 				HorizontalContentAlignment="Stretch"
 				x:Load="{x:Bind ViewModel.ItemLocationVisibility, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=MoreDetails}"
+				Header="{helpers:ResourceString Key=MoreDetails}"
 				IsExpanded="True">
 				<Expander.Content>
 					<Grid
@@ -232,7 +232,7 @@
 							Grid.Column="0"
 							HorizontalAlignment="Left"
 							Style="{StaticResource PropertyName}"
-							Text="{helpers:ResourceString Name=Location}"
+							Text="{helpers:ResourceString Key=Location}"
 							Visibility="{x:Bind ViewModel.ItemLocationVisibility, Mode=OneWay}" />
 
 						<TextBlock
@@ -250,7 +250,7 @@
 							Grid.Column="0"
 							HorizontalAlignment="Left"
 							Style="{StaticResource PropertyName}"
-							Text="{helpers:ResourceString Name=SizeLabel}"
+							Text="{helpers:ResourceString Key=SizeLabel}"
 							Visibility="{x:Bind ViewModel.ItemSizeVisibility, Mode=OneWay}" />
 
 						<Grid
@@ -284,7 +284,7 @@
 							Grid.Column="0"
 							HorizontalAlignment="Left"
 							Style="{StaticResource PropertyName}"
-							Text="{helpers:ResourceString Name=SizeOnDiskLabel}"
+							Text="{helpers:ResourceString Key=SizeOnDiskLabel}"
 							Visibility="{x:Bind ViewModel.ItemSizeOnDisk, Mode=OneWay, Converter={StaticResource StringVisibilityConverter}}" />
 
 						<Grid
@@ -318,7 +318,7 @@
 							Grid.Column="0"
 							HorizontalAlignment="Left"
 							Style="{StaticResource PropertyName}"
-							Text="{helpers:ResourceString Name=UncompressedSize}"
+							Text="{helpers:ResourceString Key=UncompressedSize}"
 							Visibility="{x:Bind ViewModel.IsUncompressedItemSizeVisibile, Mode=OneWay}" />
 
 						<TextBlock
@@ -344,7 +344,7 @@
 							Grid.Row="5"
 							Grid.Column="0"
 							Style="{StaticResource PropertyName}"
-							Text="{helpers:ResourceString Name=PropertiesCreated/Text}"
+							Text="{helpers:ResourceString Key=PropertiesCreated/Text}"
 							Visibility="{x:Bind ViewModel.ItemCreatedTimestampVisibility, Mode=OneWay}" />
 
 						<TextBlock
@@ -360,7 +360,7 @@
 							Grid.Row="6"
 							Grid.Column="0"
 							Style="{StaticResource PropertyName}"
-							Text="{helpers:ResourceString Name=PropertiesModified/Text}"
+							Text="{helpers:ResourceString Key=PropertiesModified/Text}"
 							Visibility="{x:Bind ViewModel.ItemModifiedTimestampVisibility, Mode=OneWay}" />
 
 						<TextBlock
@@ -376,7 +376,7 @@
 							Grid.Row="7"
 							Grid.Column="0"
 							Style="{StaticResource PropertyName}"
-							Text="{helpers:ResourceString Name=Accessed}"
+							Text="{helpers:ResourceString Key=Accessed}"
 							Visibility="{x:Bind ViewModel.ItemAccessedTimestampVisibility, Mode=OneWay}" />
 
 						<TextBlock
@@ -487,7 +487,7 @@
 					<TextBlock
 						VerticalAlignment="Center"
 						FontWeight="SemiBold"
-						Text="{helpers:ResourceString Name=PropertiesDriveUsedSpace/Text}" />
+						Text="{helpers:ResourceString Key=PropertiesDriveUsedSpace/Text}" />
 				</StackPanel>
 
 				<TextBlock
@@ -502,10 +502,10 @@
 					Grid.Row="0"
 					Grid.Column="3"
 					Padding="8,6"
-					AutomationProperties.Name="{helpers:ResourceString Name=Bytes}"
+					AutomationProperties.Name="{helpers:ResourceString Key=Bytes}"
 					Background="Transparent"
 					BorderBrush="Transparent"
-					ToolTipService.ToolTip="{helpers:ResourceString Name=Bytes}">
+					ToolTipService.ToolTip="{helpers:ResourceString Key=Bytes}">
 					<FontIcon FontSize="16" Glyph="&#xE946;" />
 					<Button.Flyout>
 						<Flyout>
@@ -532,7 +532,7 @@
 					<TextBlock
 						VerticalAlignment="Center"
 						FontWeight="SemiBold"
-						Text="{helpers:ResourceString Name=PropertiesDriveFreeSpace/Text}" />
+						Text="{helpers:ResourceString Key=PropertiesDriveFreeSpace/Text}" />
 				</StackPanel>
 
 				<TextBlock
@@ -547,10 +547,10 @@
 					Grid.Row="1"
 					Grid.Column="3"
 					Padding="8,6"
-					AutomationProperties.Name="{helpers:ResourceString Name=Bytes}"
+					AutomationProperties.Name="{helpers:ResourceString Key=Bytes}"
 					Background="Transparent"
 					BorderBrush="Transparent"
-					ToolTipService.ToolTip="{helpers:ResourceString Name=Bytes}">
+					ToolTipService.ToolTip="{helpers:ResourceString Key=Bytes}">
 					<FontIcon FontSize="16" Glyph="&#xE946;" />
 					<Button.Flyout>
 						<Flyout>
@@ -568,7 +568,7 @@
 					VerticalAlignment="Center"
 					x:Load="{x:Bind ViewModel.DriveCapacityVisibility, Mode=OneWay}"
 					FontWeight="SemiBold"
-					Text="{helpers:ResourceString Name=PropertiesDriveCapacity/Text}" />
+					Text="{helpers:ResourceString Key=PropertiesDriveCapacity/Text}" />
 
 				<TextBlock
 					x:Name="DriveCapacityValue"
@@ -582,10 +582,10 @@
 					Grid.Row="2"
 					Grid.Column="3"
 					Padding="8,6"
-					AutomationProperties.Name="{helpers:ResourceString Name=Bytes}"
+					AutomationProperties.Name="{helpers:ResourceString Key=Bytes}"
 					Background="Transparent"
 					BorderBrush="Transparent"
-					ToolTipService.ToolTip="{helpers:ResourceString Name=Bytes}">
+					ToolTipService.ToolTip="{helpers:ResourceString Key=Bytes}">
 					<FontIcon FontSize="16" Glyph="&#xE946;" />
 					<Button.Flyout>
 						<Flyout>
@@ -601,7 +601,7 @@
 				x:Name="CleanupDriveBlockControl"
 				x:Load="{x:Bind ViewModel.CleanupVisibility, Mode=OneWay}"
 				Command="{x:Bind ViewModel.CleanupDriveCommand}"
-				Header="{helpers:ResourceString Name=CleanupDrive}"
+				Header="{helpers:ResourceString Key=CleanupDrive}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.ActionIcon>
 					<FontIcon Glyph="&#xE8A7;" />
@@ -613,7 +613,7 @@
 				x:Name="FormatDriveBlockControl"
 				x:Load="{x:Bind ViewModel.FormatVisibility, Mode=OneWay}"
 				Command="{x:Bind ViewModel.FormatDriveCommand}"
-				Header="{helpers:ResourceString Name=FormatDrive}"
+				Header="{helpers:ResourceString Key=FormatDrive}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.ActionIcon>
 					<FontIcon Glyph="&#xE8A7;" />
@@ -626,7 +626,7 @@
 				HorizontalAlignment="Stretch"
 				HorizontalContentAlignment="Stretch"
 				x:Load="{x:Bind ViewModel.IsDownloadedFile, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=Security}"
+				Header="{helpers:ResourceString Key=Security}"
 				IsExpanded="True">
 				<Expander.Content>
 					<Grid
@@ -647,7 +647,7 @@
 							Grid.Row="0"
 							Grid.Column="0"
 							VerticalAlignment="Center"
-							Text="{helpers:ResourceString Name=UnblockDownloadedFile}"
+							Text="{helpers:ResourceString Key=UnblockDownloadedFile}"
 							TextWrapping="WrapWholeWords" />
 
 						<CheckBox
@@ -656,7 +656,7 @@
 							MinWidth="0"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Center"
-							AutomationProperties.Name="{helpers:ResourceString Name=UnblockDownloadedFile}"
+							AutomationProperties.Name="{helpers:ResourceString Key=UnblockDownloadedFile}"
 							IsChecked="{x:Bind ViewModel.IsUnblockFileSelected, Mode=TwoWay}" />
 
 					</Grid>
@@ -669,7 +669,7 @@
 				HorizontalAlignment="Stretch"
 				HorizontalContentAlignment="Stretch"
 				x:Load="{x:Bind ViewModel.ItemAttributesVisibility, Mode=OneWay}"
-				Header="{helpers:ResourceString Name=Attributes}"
+				Header="{helpers:ResourceString Key=Attributes}"
 				IsExpanded="False">
 				<Expander.Content>
 					<Grid
@@ -694,7 +694,7 @@
 							Grid.Row="0"
 							Grid.Column="0"
 							VerticalAlignment="Center"
-							Text="{helpers:ResourceString Name=PropertiesDialogReadOnly/Text}"
+							Text="{helpers:ResourceString Key=PropertiesDialogReadOnly/Text}"
 							TextWrapping="WrapWholeWords" />
 
 						<CheckBox
@@ -703,7 +703,7 @@
 							MinWidth="0"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Center"
-							AutomationProperties.Name="{helpers:ResourceString Name=ReadOnly}"
+							AutomationProperties.Name="{helpers:ResourceString Key=ReadOnly}"
 							IsChecked="{x:Bind ViewModel.IsReadOnlyEditedValue, Mode=TwoWay}"
 							IsEnabled="{x:Bind ViewModel.IsReadOnlyEnabled, Mode=OneWay}" />
 
@@ -721,7 +721,7 @@
 							Grid.Row="2"
 							Grid.Column="0"
 							VerticalAlignment="Center"
-							Text="{helpers:ResourceString Name=Hidden}"
+							Text="{helpers:ResourceString Key=Hidden}"
 							TextWrapping="WrapWholeWords" />
 
 						<CheckBox
@@ -730,7 +730,7 @@
 							MinWidth="0"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Center"
-							AutomationProperties.Name="{helpers:ResourceString Name=Hidden}"
+							AutomationProperties.Name="{helpers:ResourceString Key=Hidden}"
 							IsChecked="{x:Bind ViewModel.IsHiddenEditedValue, Mode=TwoWay}" />
 
 						<!--  (Divider)  -->
@@ -747,7 +747,7 @@
 							Grid.Row="4"
 							Grid.Column="0"
 							VerticalAlignment="Center"
-							Text="{helpers:ResourceString Name=CompressContents}"
+							Text="{helpers:ResourceString Key=CompressContents}"
 							TextWrapping="WrapWholeWords" />
 
 						<CheckBox
@@ -756,7 +756,7 @@
 							MinWidth="0"
 							HorizontalAlignment="Right"
 							VerticalAlignment="Center"
-							AutomationProperties.Name="{helpers:ResourceString Name=CompressContents}"
+							AutomationProperties.Name="{helpers:ResourceString Key=CompressContents}"
 							IsChecked="{x:Bind ViewModel.IsContentCompressedEditedValue, Mode=TwoWay}"
 							IsEnabled="{x:Bind ViewModel.CanCompressContent, Mode=OneWay}" />
 

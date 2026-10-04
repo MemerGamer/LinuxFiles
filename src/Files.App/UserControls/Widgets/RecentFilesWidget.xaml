@@ -19,7 +19,7 @@
 			IsClosable="False"
 			IsIconVisible="True"
 			IsOpen="True"
-			Message="{helpers:ResourceString Name=RecentFilesDisabledOnWindowsWarning}"
+			Message="{helpers:ResourceString Key=RecentFilesDisabledOnWindowsWarning}"
 			Severity="Warning" />
 
 		<!--  Message when there are no recent files to display  -->
@@ -28,7 +28,7 @@
 			HorizontalAlignment="Stretch"
 			x:Load="{x:Bind ViewModel.IsEmptyRecentFilesTextVisible, Mode=OneWay}"
 			FontSize="14"
-			Text="{helpers:ResourceString Name=RecentItemDescription/Text}"
+			Text="{helpers:ResourceString Key=RecentItemDescription/Text}"
 			TextAlignment="Center"
 			TextWrapping="WrapWholeWords" />
 
@@ -42,7 +42,6 @@
 			IsItemClickEnabled="True"
 			IsRightTapEnabled="True"
 			ItemClick="RecentFilesListView_ItemClick"
-			ItemContainerTransitions="{x:Null}"
 			ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}"
 			RightTapped="RecentFilesListView_RightTapped"
 			SelectionMode="None">

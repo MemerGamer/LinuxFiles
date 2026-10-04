@@ -90,7 +90,7 @@
 			<TextBlock
 				Grid.Column="0"
 				VerticalAlignment="Center"
-				Text="{helpers:ResourceString Name=SecurityOwnerLabel/Text}" />
+				Text="{helpers:ResourceString Key=SecurityOwnerLabel/Text}" />
 
 			<StackPanel
 				Grid.Column="1"
@@ -123,7 +123,7 @@
 					x:Load="{x:Bind SecurityAdvancedViewModel.AccessControlList.Owner.IsValid, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
 					IsTextSelectionEnabled="True"
 					Style="{StaticResource App.Theme.BodyTextBlockStyle}"
-					Text="{helpers:ResourceString Name=UnableToDisplayOwner}" />
+					Text="{helpers:ResourceString Key=UnableToDisplayOwner}" />
 
 				<!--  Change Owner  -->
 				<HyperlinkButton VerticalAlignment="Center" Command="{x:Bind SecurityAdvancedViewModel.ChangeOwnerCommand, Mode=OneWay}">
@@ -132,7 +132,7 @@
 							Width="16"
 							Height="16"
 							extensions:ImageFromBytes.SourceBytes="{x:Bind SecurityAdvancedViewModel.ShieldIconFileInfo.IconData, Mode=OneWay}" />
-						<TextBlock Text="{helpers:ResourceString Name=Change}" />
+						<TextBlock Text="{helpers:ResourceString Key=Change}" />
 					</StackPanel>
 				</HyperlinkButton>
 
@@ -181,7 +181,7 @@
 					Grid.Column="0"
 					Margin="4"
 					VerticalAlignment="Center"
-					Text="{helpers:ResourceString Name=Permissions}" />
+					Text="{helpers:ResourceString Key=Permissions}" />
 
 				<StackPanel
 					Grid.Column="1"
@@ -276,7 +276,7 @@
 							VerticalAlignment="Center"
 							Foreground="{ThemeResource TextFillColorSecondaryBrush}"
 							Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-							Text="{helpers:ResourceString Name=Type}"
+							Text="{helpers:ResourceString Key=Type}"
 							TextTrimming="CharacterEllipsis"
 							TextWrapping="NoWrap" />
 
@@ -292,7 +292,7 @@
 							VerticalAlignment="Center"
 							Foreground="{ThemeResource TextFillColorSecondaryBrush}"
 							Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-							Text="{helpers:ResourceString Name=Principal}"
+							Text="{helpers:ResourceString Key=Principal}"
 							TextTrimming="CharacterEllipsis"
 							TextWrapping="NoWrap" />
 
@@ -308,7 +308,7 @@
 							VerticalAlignment="Center"
 							Foreground="{ThemeResource TextFillColorSecondaryBrush}"
 							Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-							Text="{helpers:ResourceString Name=Access}"
+							Text="{helpers:ResourceString Key=Access}"
 							TextTrimming="CharacterEllipsis"
 							TextWrapping="NoWrap" />
 
@@ -324,7 +324,7 @@
 							VerticalAlignment="Center"
 							Foreground="{ThemeResource TextFillColorSecondaryBrush}"
 							Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-							Text="{helpers:ResourceString Name=Inherited}"
+							Text="{helpers:ResourceString Key=Inherited}"
 							TextTrimming="CharacterEllipsis"
 							TextWrapping="NoWrap" />
 
@@ -340,7 +340,7 @@
 							VerticalAlignment="Center"
 							Foreground="{ThemeResource TextFillColorSecondaryBrush}"
 							Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-							Text="{helpers:ResourceString Name=SecurityAdvancedAppliesTo}"
+							Text="{helpers:ResourceString Key=SecurityAdvancedAppliesTo}"
 							TextTrimming="CharacterEllipsis"
 							TextWrapping="NoWrap" />
 
@@ -409,7 +409,7 @@
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeAccessControlTypeCommand}"
 											CommandParameter="Allow"
-											Text="{helpers:ResourceString Name=Allow}">
+											Text="{helpers:ResourceString Key=Allow}">
 											<MenuFlyoutItem.Icon>
 												<FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xE73E;" />
 											</MenuFlyoutItem.Icon>
@@ -418,7 +418,7 @@
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeAccessControlTypeCommand}"
 											CommandParameter="Deny"
-											Text="{helpers:ResourceString Name=Deny}">
+											Text="{helpers:ResourceString Key=Deny}">
 											<MenuFlyoutItem.Icon>
 												<FontIcon FontFamily="{StaticResource SymbolThemeFontFamily}" Glyph="&#xF140;" />
 											</MenuFlyoutItem.Icon>
@@ -584,31 +584,31 @@
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeInheritanceFlagsCommand}"
 											CommandParameter="None,None"
-											Text="{helpers:ResourceString Name=SecurityAdvancedOnlyThisFolder/Text}" />
+											Text="{helpers:ResourceString Key=SecurityAdvancedOnlyThisFolder/Text}" />
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeInheritanceFlagsCommand}"
 											CommandParameter="3,None"
-											Text="{helpers:ResourceString Name=SecurityAdvancedFolderSubfoldersFiles/Text}" />
+											Text="{helpers:ResourceString Key=SecurityAdvancedFolderSubfoldersFiles/Text}" />
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeInheritanceFlagsCommand}"
 											CommandParameter="1,None"
-											Text="{helpers:ResourceString Name=SecurityAdvancedFolderSubfolders/Text}" />
+											Text="{helpers:ResourceString Key=SecurityAdvancedFolderSubfolders/Text}" />
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeInheritanceFlagsCommand}"
 											CommandParameter="2,None"
-											Text="{helpers:ResourceString Name=SecurityAdvancedFolderFiles/Text}" />
+											Text="{helpers:ResourceString Key=SecurityAdvancedFolderFiles/Text}" />
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeInheritanceFlagsCommand}"
 											CommandParameter="3,InheritOnly"
-											Text="{helpers:ResourceString Name=SecurityAdvancedOnlySubfoldersFiles/Text}" />
+											Text="{helpers:ResourceString Key=SecurityAdvancedOnlySubfoldersFiles/Text}" />
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeInheritanceFlagsCommand}"
 											CommandParameter="1,InheritOnly"
-											Text="{helpers:ResourceString Name=SecurityAdvancedOnlySubfolders/Text}" />
+											Text="{helpers:ResourceString Key=SecurityAdvancedOnlySubfolders/Text}" />
 										<MenuFlyoutItem
 											Command="{x:Bind ChangeInheritanceFlagsCommand}"
 											CommandParameter="2,InheritOnly"
-											Text="{helpers:ResourceString Name=SecurityAdvancedOnlyFiles/Text}" />
+											Text="{helpers:ResourceString Key=SecurityAdvancedOnlyFiles/Text}" />
 									</MenuFlyout>
 								</DropDownButton.Flyout>
 
@@ -626,7 +626,7 @@
 				Grid.Row="2"
 				Margin="4,4,4,4"
 				x:Load="{x:Bind SecurityAdvancedViewModel.AccessControlList.AccessControlEntries, Converter={StaticResource EmptyCollectionToBoolConverter}, Mode=OneWay}"
-				Text="{helpers:ResourceString Name=SecurityNoAccessControlEntriesText}"
+				Text="{helpers:ResourceString Key=SecurityNoAccessControlEntriesText}"
 				TextWrapping="Wrap" />
 
 			<!--  (Divider)  -->
@@ -659,19 +659,19 @@
 								Command="{x:Bind SecurityAdvancedViewModel.SetDisableInheritanceOptionCommand, Mode=OneWay}"
 								CommandParameter="False,False"
 								IsEnabled="{x:Bind SecurityAdvancedViewModel.AccessControlList.IsProtected, Mode=OneWay}"
-								Text="{helpers:ResourceString Name=SecurityAdvancedInheritedEnable/Text}" />
+								Text="{helpers:ResourceString Key=SecurityAdvancedInheritedEnable/Text}" />
 
 							<MenuFlyoutItem
 								Command="{x:Bind SecurityAdvancedViewModel.SetDisableInheritanceOptionCommand, Mode=OneWay}"
 								CommandParameter="True,True"
 								IsEnabled="{x:Bind SecurityAdvancedViewModel.AccessControlList.IsProtected, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
-								Text="{helpers:ResourceString Name=SecurityAdvancedInheritedConvert/Text}" />
+								Text="{helpers:ResourceString Key=SecurityAdvancedInheritedConvert/Text}" />
 
 							<MenuFlyoutItem
 								Command="{x:Bind SecurityAdvancedViewModel.SetDisableInheritanceOptionCommand, Mode=OneWay}"
 								CommandParameter="True,False"
 								IsEnabled="{x:Bind SecurityAdvancedViewModel.AccessControlList.IsProtected, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
-								Text="{helpers:ResourceString Name=SecurityAdvancedInheritedRemove/Text}" />
+								Text="{helpers:ResourceString Key=SecurityAdvancedInheritedRemove/Text}" />
 
 						</MenuFlyout>
 					</SplitButton.Flyout>
@@ -683,9 +683,9 @@
 					Grid.Column="1"
 					x:Load="{x:Bind SecurityAdvancedViewModel.AccessControlList.IsFolder, Mode=OneWay}"
 					Command="{x:Bind SecurityAdvancedViewModel.ReplaceChildPermissionsCommand, Mode=OneWay}"
-					ToolTipService.ToolTip="{helpers:ResourceString Name=SecurityAdvancedReplaceChildPermissions2/ToolTipService/ToolTip}"
+					ToolTipService.ToolTip="{helpers:ResourceString Key=SecurityAdvancedReplaceChildPermissions2/ToolTipService/ToolTip}"
 					Visibility="Collapsed">
-					<TextBlock Text="{helpers:ResourceString Name=SecurityAdvancedReplaceChildPermissions/Text}" TextTrimming="CharacterEllipsis" />
+					<TextBlock Text="{helpers:ResourceString Key=SecurityAdvancedReplaceChildPermissions/Text}" TextTrimming="CharacterEllipsis" />
 				</Button>-->
 
 			<!--</Grid>-->

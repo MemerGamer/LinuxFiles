@@ -100,7 +100,7 @@
 				Background="Transparent"
 				BorderBrush="Transparent"
 				IsChecked="{x:Bind MainPageViewModel.IsSidebarPaneOpen, Mode=TwoWay}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=ToggleSidebar}">
+				ToolTipService.ToolTip="{helpers:ResourceString Key=ToggleSidebar}">
 				<AnimatedIcon Width="14">
 					<AnimatedIcon.Source>
 						<animatedvisuals:AnimatedGlobalNavigationButtonVisualSource />
@@ -144,7 +144,7 @@
 				x:Name="FlyoutButton"
 				LosingFocus="NavigationButtonOverflowFlyoutButton_LosingFocus"
 				Style="{StaticResource AddressToolbarButtonStyle}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=SeeMore}"
+				ToolTipService.ToolTip="{helpers:ResourceString Key=SeeMore}"
 				Visibility="Collapsed">
 				<FontIcon FontSize="14" Glyph="&#xE712;" />
 				<Button.Flyout>
@@ -241,19 +241,19 @@
 				IsDefault="True"
 				ItemsSource="{x:Bind ViewModel.PathModeSuggestionItems, Mode=OneWay}"
 				ModeName="{x:Bind Commands.EditPath.LabelWithHotKey, Mode=OneWay}"
-				PlaceholderText="{helpers:ResourceString Name=OmnibarPathModeTextPlaceholder}"
+				PlaceholderText="{helpers:ResourceString Key=OmnibarPathModeTextPlaceholder}"
 				Text="{x:Bind ViewModel.PathText, Mode=TwoWay}"
 				TextMemberPath="Path">
 				<controls:OmnibarMode.ContentOnInactive>
 					<controls:BreadcrumbBar
 						x:Name="BreadcrumbBar"
-						EllipsisButtonToolTip="{helpers:ResourceString Name=BreadcrumbBarEllipsisButtonToolTip}"
+						EllipsisButtonToolTip="{helpers:ResourceString Key=BreadcrumbBarEllipsisButtonToolTip}"
 						ItemClicked="BreadcrumbBar_ItemClicked"
 						ItemDropDownFlyoutClosed="BreadcrumbBar_ItemDropDownFlyoutClosed"
 						ItemDropDownFlyoutOpening="BreadcrumbBar_ItemDropDownFlyoutOpening"
 						ItemsSource="{x:Bind ViewModel.PathComponents, Mode=OneWay}"
-						RootItemChevronToolTip="{helpers:ResourceString Name=BreadcrumbBarRootChevronButtonToolTip}"
-						RootItemToolTip="{helpers:ResourceString Name=Home}">
+						RootItemChevronToolTip="{helpers:ResourceString Key=BreadcrumbBarRootChevronButtonToolTip}"
+						RootItemToolTip="{helpers:ResourceString Key=Home}">
 						<controls:BreadcrumbBar.RootItem>
 							<Image
 								Width="16"
@@ -292,7 +292,7 @@
 				IsAutoFocusEnabled="True"
 				ItemsSource="{x:Bind ViewModel.OmnibarCommandPaletteModeSuggestionItems, Mode=OneWay}"
 				ModeName="{x:Bind Commands.OpenCommandPalette.LabelWithHotKey, Mode=OneWay}"
-				PlaceholderText="{helpers:ResourceString Name=OmnibarCommandPaletteModeTextPlaceholder}"
+				PlaceholderText="{helpers:ResourceString Key=OmnibarCommandPaletteModeTextPlaceholder}"
 				Text="{x:Bind ViewModel.OmnibarCommandPaletteModeText, Mode=TwoWay}"
 				TextMemberPath="Text"
 				UpdateTextOnSelect="False">
@@ -432,9 +432,9 @@
 				Padding="0"
 				AccessKey="T"
 				AccessKeyInvoked="Button_AccessKeyInvoked"
-				AutomationProperties.Name="{helpers:ResourceString Name=StatusCenter}"
+				AutomationProperties.Name="{helpers:ResourceString Key=StatusCenter}"
 				Style="{StaticResource AddressToolbarButtonStyle}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=StatusCenter}"
+				ToolTipService.ToolTip="{helpers:ResourceString Key=StatusCenter}"
 				Visibility="{x:Bind ViewModel.ShowStatusCenterButton, Mode=OneWay}">
 
 				<Grid Margin="-16">
@@ -449,7 +449,7 @@
 						x:Name="MedianOperationProgressRing"
 						HorizontalAlignment="Center"
 						VerticalAlignment="Center"
-						AutomationProperties.Name="{helpers:ResourceString Name=StatusCenterProgressRing}"
+						AutomationProperties.Name="{helpers:ResourceString Key=StatusCenterProgressRing}"
 						IsIndeterminate="False"
 						Visibility="{x:Bind OngoingTasksViewModel.ShowProgressRing, Mode=OneWay}"
 						Value="{x:Bind OngoingTasksViewModel.AverageOperationProgressValue, Mode=OneWay}" />
@@ -465,7 +465,7 @@
 				<Button.Flyout>
 					<Flyout
 						contract8Present:ShouldConstrainToRootBounds="False"
-						AutomationProperties.Name="{helpers:ResourceString Name=StatusCenter}"
+						AutomationProperties.Name="{helpers:ResourceString Key=StatusCenter}"
 						Opened="{x:Bind OngoingTasksViewModel.OnStatusCenterFlyoutOpened, Mode=OneWay}"
 						Placement="BottomEdgeAlignedRight">
 						<Flyout.FlyoutPresenterStyle>
@@ -495,11 +495,11 @@
 				x:Load="{x:Bind ViewModel.IsUpdateAvailable, Mode=OneWay}"
 				AccessKey="1"
 				AccessKeyInvoked="Button_AccessKeyInvoked"
-				AutomationProperties.Name="{helpers:ResourceString Name=UpdateFiles}"
+				AutomationProperties.Name="{helpers:ResourceString Key=UpdateFiles}"
 				Command="{x:Bind ViewModel.UpdateCommand, Mode=OneWay}"
 				IsEnabled="{x:Bind ViewModel.IsUpdating, Mode=OneWay, Converter={StaticResource BoolNegationConverter}}"
 				Style="{StaticResource AddressToolbarButtonStyle}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=UpdateFiles}">
+				ToolTipService.ToolTip="{helpers:ResourceString Key=UpdateFiles}">
 				<Grid>
 					<!--  Icon  -->
 					<controls:ThemedIcon
@@ -525,9 +525,9 @@
 		<!--  Status Center TeachingTip  -->
 		<TeachingTip
 			x:Name="StatusCenterTeachingTip"
-			Title="{helpers:ResourceString Name=OngoingTasksTeachingTip/Title}"
+			Title="{helpers:ResourceString Key=OngoingTasksTeachingTip/Title}"
 			IsOpen="False"
-			Subtitle="{helpers:ResourceString Name=OngoingTasksTeachingTip/Subtitle}"
+			Subtitle="{helpers:ResourceString Key=OngoingTasksTeachingTip/Subtitle}"
 			Target="{x:Bind ShowStatusCenterButton}" />
 
 		<VisualStateManager.VisualStateGroups>

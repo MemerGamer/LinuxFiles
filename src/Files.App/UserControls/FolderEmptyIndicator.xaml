@@ -14,7 +14,7 @@
 	<Border>
 		<TextBlock
 			x:Name="EmptyText"
-			Text="{helpers:ResourceString Name=EmptyFolder/Text}"
+			Text="{helpers:ResourceString Key=EmptyFolder/Text}"
 			TextWrapping="Wrap"
 			Visibility="Collapsed" />
 
@@ -39,7 +39,7 @@
 					</VisualState.StateTriggers>
 					<VisualState.Setters>
 						<Setter Target="EmptyText.Visibility" Value="Visible" />
-						<Setter Target="EmptyText.Text" Value="{helpers:ResourceString Name=NoSearchResultsFound}" />
+						<Setter Target="EmptyText.Text" Value="{helpers:ResourceString Key=NoSearchResultsFound}" />
 					</VisualState.Setters>
 				</VisualState>
 			</VisualStateGroup>

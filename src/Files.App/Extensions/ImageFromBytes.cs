@@ -7,7 +7,7 @@ using WinRT;
 
 namespace Files.App.Extensions
 {
-	public sealed class ImageFromBytes : DependencyObject
+	public sealed partial class ImageFromBytes : DependencyObject
 	{
 		public static byte[] GetSourceBytes(DependencyObject obj)
 		{

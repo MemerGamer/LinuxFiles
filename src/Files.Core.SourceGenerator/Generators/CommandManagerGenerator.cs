@@ -50,16 +50,27 @@ namespace Files.Core.SourceGenerator.Generators
 					.OrderBy(static group => group, StringComparer.Ordinal)
 					.ToImmutableArray());
 
-			context.RegisterSourceOutput(sources, static (context, commandNames) =>
+			// Uno's XAML generator cannot see members emitted by other generators, so on Uno the ICommandManager interface
+			// is checked in (Files.App/Platforms/Desktop/Generated) and must not be emitted a second time.
+			var pregeneratedFlag = context.AnalyzerConfigOptionsProvider.Select(static (provider, token) =>
+				provider.GlobalOptions.TryGetValue("build_property.FilesPregeneratedICommandManager", out var value) &&
+				string.Equals(value, "true", StringComparison.OrdinalIgnoreCase));
+
+			context.RegisterSourceOutput(sources.Combine(pregeneratedFlag), static (context, input) =>
 			{
+				var (commandNames, isPregenerated) = input;
+
 				if (commandNames.Length is 0)
 					return;
 
 				string commandCodesEnum = GenerateCommandCodes(commandNames);
 				context.AddSource($"CommandCodes.g.cs", commandCodesEnum);
 
-				string commandManagerInterface = GenerateICommandManager(commandNames);
-				context.AddSource($"ICommandManager.g.cs", commandManagerInterface);
+				if (!isPregenerated)
+				{
+					string commandManagerInterface = GenerateICommandManager(commandNames);
+					context.AddSource($"ICommandManager.g.cs", commandManagerInterface);
+				}
 
 				string commandManagerClass = GenerateCommandManager(commandNames);
 				context.AddSource($"CommandManager.g.cs", commandManagerClass);

@@ -27,17 +27,17 @@
 			<TextBlock
 				Padding="0,0,0,12"
 				Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
-				Text="{helpers:ResourceString Name=General}" />
+				Text="{helpers:ResourceString Key=General}" />
 
 			<!--  Language settings  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=Language}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=Language}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xF2B7;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
 				<uc:ComboBoxEx
 					x:Name="AppLanguagesComboBox"
 					HorizontalAlignment="Left"
-					AutomationProperties.Name="{helpers:ResourceString Name=Language}"
+					AutomationProperties.Name="{helpers:ResourceString Key=Language}"
 					ItemsSource="{x:Bind ViewModel.AppLanguages}"
 					SelectedIndex="{x:Bind ViewModel.SelectedAppLanguageIndex, Mode=TwoWay}">
 					<uc:ComboBoxEx.ItemTemplate>
@@ -52,14 +52,14 @@
 			<wctcontrols:SettingsCard
 				HorizontalAlignment="Stretch"
 				Description="{x:Bind ViewModel.DateFormatSample}"
-				Header="{helpers:ResourceString Name=DateFormat}">
+				Header="{helpers:ResourceString Key=DateFormat}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xEC92;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
 				<uc:ComboBoxEx
 					x:Name="DateFormatChooser"
 					Grid.Column="1"
-					AutomationProperties.Name="{helpers:ResourceString Name=DateFormat}"
+					AutomationProperties.Name="{helpers:ResourceString Key=DateFormat}"
 					ItemsSource="{x:Bind ViewModel.DateFormats}"
 					SelectedIndex="{x:Bind ViewModel.SelectedDateTimeFormatIndex, Mode=TwoWay}">
 					<uc:ComboBoxEx.ItemTemplate>
@@ -83,18 +83,18 @@
 			</wctcontrols:SettingsCard>
 
 			<!--  Startup settings  -->
-			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=StartupSettings}" IsExpanded="False">
+			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Key=StartupSettings}" IsExpanded="False">
 				<wctcontrols:SettingsExpander.HeaderIcon>
 					<FontIcon Glyph="&#xE7E8;" />
 				</wctcontrols:SettingsExpander.HeaderIcon>
-				<uc:ComboBoxEx AutomationProperties.Name="{helpers:ResourceString Name=StartupSettings}" SelectedIndex="{x:Bind ViewModel.SelectedStartupSettingIndex, Mode=OneWay}">
-					<ComboBoxItem Content="{helpers:ResourceString Name=SettingsOnStartupOpenANewTab/Content}" IsSelected="{x:Bind ViewModel.OpenNewTabPageOnStartup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+				<uc:ComboBoxEx AutomationProperties.Name="{helpers:ResourceString Key=StartupSettings}" SelectedIndex="{x:Bind ViewModel.SelectedStartupSettingIndex, Mode=OneWay}">
+					<ComboBoxItem Content="{helpers:ResourceString Key=SettingsOnStartupOpenANewTab/Content}" IsSelected="{x:Bind ViewModel.OpenNewTabPageOnStartup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
-					<ComboBoxItem Content="{helpers:ResourceString Name=SettingsOnStartupContinueWhereYouLeftOff/Content}" IsSelected="{x:Bind ViewModel.ContinueLastSessionOnStartUp, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+					<ComboBoxItem Content="{helpers:ResourceString Key=SettingsOnStartupContinueWhereYouLeftOff/Content}" IsSelected="{x:Bind ViewModel.ContinueLastSessionOnStartUp, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 					<ComboBoxItem
 						x:Name="OpenSpecificPage"
-						Content="{helpers:ResourceString Name=SettingsOnStartupOpenASpecificPage/Content}"
+						Content="{helpers:ResourceString Key=SettingsOnStartupOpenASpecificPage/Content}"
 						IsSelected="{x:Bind ViewModel.OpenASpecificPageOnStartup, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 				</uc:ComboBoxEx>
 				<wctcontrols:SettingsExpander.ItemsHeader>
@@ -114,8 +114,8 @@
 									<MenuFlyoutItem
 										Command="{x:Bind ViewModel.AddPageCommand}"
 										CommandParameter="Home"
-										Text="{helpers:ResourceString Name=Home}" />
-									<MenuFlyoutItem Command="{x:Bind ViewModel.AddPageCommand}" Text="{helpers:ResourceString Name=Browse}" />
+										Text="{helpers:ResourceString Key=Home}" />
+									<MenuFlyoutItem Command="{x:Bind ViewModel.AddPageCommand}" Text="{helpers:ResourceString Key=Browse}" />
 								</MenuFlyout>
 							</Button.Flyout>
 							<StackPanel Orientation="Horizontal" Spacing="8">
@@ -123,7 +123,7 @@
 									VerticalAlignment="Center"
 									FontSize="14"
 									Glyph="&#xE710;" />
-								<TextBlock VerticalAlignment="Center" Text="{helpers:ResourceString Name=AddPage}" />
+								<TextBlock VerticalAlignment="Center" Text="{helpers:ResourceString Key=AddPage}" />
 							</StackPanel>
 						</Button>
 
@@ -158,9 +158,9 @@
 											ToolTipService.ToolTip="{x:Bind Text}" />
 										<Button
 											HorizontalAlignment="Right"
-											AutomationProperties.Name="{helpers:ResourceString Name=Remove}"
+											AutomationProperties.Name="{helpers:ResourceString Key=Remove}"
 											Click="RemoveStartupPage"
-											ToolTipService.ToolTip="{helpers:ResourceString Name=Remove}">
+											ToolTipService.ToolTip="{helpers:ResourceString Key=Remove}">
 											<FontIcon FontSize="16" Glyph="&#xE74D;" />
 										</Button>
 									</Grid>
@@ -170,47 +170,47 @@
 					</Grid>
 				</wctcontrols:SettingsExpander.ItemsHeader>
 				<wctcontrols:SettingsExpander.Items>
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=OpenTabInExistingInstance}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=OpenTabInExistingInstance}" IsOn="{x:Bind ViewModel.OpenTabInExistingInstance, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=OpenTabInExistingInstance}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=OpenTabInExistingInstance}" IsOn="{x:Bind ViewModel.OpenTabInExistingInstance, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 				</wctcontrols:SettingsExpander.Items>
 			</wctcontrols:SettingsExpander>
 
 			<!--  Switch to new tab  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=AlwaysSwitchToNewlyOpenedTab}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=AlwaysSwitchToNewlyOpenedTab}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE8AB;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
 				<ToggleSwitch
 					x:Name="AlwaysSwitchToNewlyOpenedTab"
-					AutomationProperties.Name="{helpers:ResourceString Name=AlwaysSwitchToNewlyOpenedTab}"
+					AutomationProperties.Name="{helpers:ResourceString Key=AlwaysSwitchToNewlyOpenedTab}"
 					IsOn="{x:Bind ViewModel.AlwaysSwitchToNewlyOpenedTab, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Widgets  -->
-			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=Widgets}">
+			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Key=Widgets}">
 				<wctcontrols:SettingsExpander.HeaderIcon>
 					<FontIcon Glyph="&#xF246;" />
 				</wctcontrols:SettingsExpander.HeaderIcon>
 				<wctcontrols:SettingsExpander.Items>
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=QuickAccess}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=QuickAccess}" IsOn="{x:Bind ViewModel.ShowQuickAccessWidget, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=QuickAccess}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=QuickAccess}" IsOn="{x:Bind ViewModel.ShowQuickAccessWidget, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=Drives}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=Drives}" IsOn="{x:Bind ViewModel.ShowDrivesWidget, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=Drives}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=Drives}" IsOn="{x:Bind ViewModel.ShowDrivesWidget, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=NetworkLocations}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=NetworkLocations}" IsOn="{x:Bind ViewModel.ShowNetworkLocationsWidget, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=NetworkLocations}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=NetworkLocations}" IsOn="{x:Bind ViewModel.ShowNetworkLocationsWidget, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=FileTags}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=FileTags}" IsOn="{x:Bind ViewModel.ShowFileTagsWidget, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=FileTags}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=FileTags}" IsOn="{x:Bind ViewModel.ShowFileTagsWidget, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=RecentFiles}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=RecentFiles}" IsOn="{x:Bind ViewModel.ShowRecentFilesWidget, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=RecentFiles}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=RecentFiles}" IsOn="{x:Bind ViewModel.ShowRecentFilesWidget, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 				</wctcontrols:SettingsExpander.Items>
 			</wctcontrols:SettingsExpander>
@@ -220,23 +220,23 @@
 				Padding="0,16,0,4"
 				FontSize="16"
 				FontWeight="Medium"
-				Text="{helpers:ResourceString Name=DualPane}" />
+				Text="{helpers:ResourceString Key=DualPane}" />
 
 			<!--  Open tabs in Dual Pane mode  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=SettingsMultitaskingAlwaysOpenDualPane}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=SettingsMultitaskingAlwaysOpenDualPane}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE89F;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=SettingsMultitaskingAlwaysOpenDualPane}" IsOn="{x:Bind ViewModel.AlwaysOpenDualPaneInNewTab, Mode=TwoWay}" />
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=SettingsMultitaskingAlwaysOpenDualPane}" IsOn="{x:Bind ViewModel.AlwaysOpenDualPaneInNewTab, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Dual Pane split direction  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=DualPaneSplitDirection}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=DualPaneSplitDirection}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE784;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
 				<uc:ComboBoxEx
-					AutomationProperties.Name="{helpers:ResourceString Name=DualPaneSplitDirection}"
+					AutomationProperties.Name="{helpers:ResourceString Key=DualPaneSplitDirection}"
 					ItemsSource="{x:Bind ViewModel.ShellPaneArrangementTypes.Values}"
 					SelectedItem="{x:Bind ViewModel.SelectedShellPaneArrangementType, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
@@ -246,96 +246,96 @@
 				Padding="0,16,0,4"
 				FontSize="16"
 				FontWeight="Medium"
-				Text="{helpers:ResourceString Name=SettingsContextMenu/Text}" />
+				Text="{helpers:ResourceString Key=SettingsContextMenu/Text}" />
 
 			<!--  Context menu options  -->
-			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=ContextMenuOptions}">
+			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Key=ContextMenuOptions}">
 				<wctcontrols:SettingsExpander.HeaderIcon>
 					<FontIcon Glyph="&#xE74C;" />
 				</wctcontrols:SettingsExpander.HeaderIcon>
 				<wctcontrols:SettingsExpander.Items>
 					<!--  Open in new tab  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowOpenInNewTab}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowOpenInNewTab}" IsOn="{x:Bind ViewModel.ShowOpenInNewTab, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowOpenInNewTab}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowOpenInNewTab}" IsOn="{x:Bind ViewModel.ShowOpenInNewTab, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Open in new window  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowOpenInNewWindow}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowOpenInNewWindow}" IsOn="{x:Bind ViewModel.ShowOpenInNewWindow, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowOpenInNewWindow}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowOpenInNewWindow}" IsOn="{x:Bind ViewModel.ShowOpenInNewWindow, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Open in new pane  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowOpenInNewPane}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowOpenInNewPane}" IsOn="{x:Bind ViewModel.ShowOpenInNewPane, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowOpenInNewPane}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowOpenInNewPane}" IsOn="{x:Bind ViewModel.ShowOpenInNewPane, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Copy path  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowCopyPath}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowCopyPath}" IsOn="{x:Bind ViewModel.ShowCopyPath, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowCopyPath}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowCopyPath}" IsOn="{x:Bind ViewModel.ShowCopyPath, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Create folder with selection  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowCreateFolderWithSelection}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowCreateFolderWithSelection}" IsOn="{x:Bind ViewModel.ShowCreateFolderWithSelection, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowCreateFolderWithSelection}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowCreateFolderWithSelection}" IsOn="{x:Bind ViewModel.ShowCreateFolderWithSelection, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Create alternate data stream  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowCreateAlternateDataStream}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowCreateAlternateDataStream}" IsOn="{x:Bind ViewModel.ShowCreateAlternateDataStream, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowCreateAlternateDataStream}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowCreateAlternateDataStream}" IsOn="{x:Bind ViewModel.ShowCreateAlternateDataStream, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Create shortcut  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowCreateShortcut}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowCreateShortcut}" IsOn="{x:Bind ViewModel.ShowCreateShortcut, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowCreateShortcut}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowCreateShortcut}" IsOn="{x:Bind ViewModel.ShowCreateShortcut, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Pin to Sidebar  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowPinToSideBar}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowPinToSideBar}" IsOn="{x:Bind ViewModel.ShowPinToSideBar, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowPinToSideBar}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowPinToSideBar}" IsOn="{x:Bind ViewModel.ShowPinToSideBar, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Compression options  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowCompressionOptions}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowCompressionOptions}" IsOn="{x:Bind ViewModel.ShowCompressionOptions, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowCompressionOptions}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowCompressionOptions}" IsOn="{x:Bind ViewModel.ShowCompressionOptions, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Flatten options  -->
 					<!--  TODO uncomment code when feature is marked as stable  -->
-					<!--<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowFlattenOptions}">
+					<!--<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowFlattenOptions}">
 							<ToggleSwitch
-								AutomationProperties.Name="{helpers:ResourceString Name=ShowFlattenOptions}"
+								AutomationProperties.Name="{helpers:ResourceString Key=ShowFlattenOptions}"
 								IsOn="{x:Bind ViewModel.ShowFlattenOptions, Mode=TwoWay}"
 								/>
 						</wctcontrols:SettingsCard>-->
 
 					<!--  Send To  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowSendToMenu}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowSendToMenu}" IsOn="{x:Bind ViewModel.ShowSendToMenu, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowSendToMenu}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowSendToMenu}" IsOn="{x:Bind ViewModel.ShowSendToMenu, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Open in Windows Terminal  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowOpenTerminal}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowOpenTerminal}" IsOn="{x:Bind ViewModel.ShowOpenTerminal, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowOpenTerminal}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowOpenTerminal}" IsOn="{x:Bind ViewModel.ShowOpenTerminal, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Edit tags  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowEditTagsMenu}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowEditTagsMenu}" IsOn="{x:Bind ViewModel.ShowEditTagsMenu, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowEditTagsMenu}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowEditTagsMenu}" IsOn="{x:Bind ViewModel.ShowEditTagsMenu, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Pin to Start  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ShowPinToStart}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=ShowPinToStart}" IsOn="{x:Bind ViewModel.ShowPinToStart, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowPinToStart}">
+						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowPinToStart}" IsOn="{x:Bind ViewModel.ShowPinToStart, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 				</wctcontrols:SettingsExpander.Items>
 			</wctcontrols:SettingsExpander>
 
 			<!--  Overflow Options  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=SettingsContextMenuOverflow}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=SettingsContextMenuOverflow}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE712;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=SettingsContextMenuOverflow}" IsOn="{x:Bind ViewModel.MoveShellExtensionsToSubMenu, Mode=TwoWay}" />
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=SettingsContextMenuOverflow}" IsOn="{x:Bind ViewModel.MoveShellExtensionsToSubMenu, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Scrolling  -->
@@ -343,27 +343,27 @@
 				Padding="0,16,0,4"
 				FontSize="16"
 				FontWeight="Medium"
-				Text="{helpers:ResourceString Name=Scrolling}" />
+				Text="{helpers:ResourceString Key=Scrolling}" />
 
 			<!--  Enable Smooth Scrolling  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=EnableSmoothScrolling}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=EnableSmoothScrolling}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xEC8F;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
-				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Name=EnableSmoothScrolling}" IsOn="{x:Bind ViewModel.EnableSmoothScrolling, Mode=TwoWay}" />
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=EnableSmoothScrolling}" IsOn="{x:Bind ViewModel.EnableSmoothScrolling, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Reverse tab scroll direction  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Name=ReverseTabScrollDirection}">
+			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ReverseTabScrollDirection}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xECE7;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
 				<uc:ComboBoxEx
 					HorizontalAlignment="Left"
-					AutomationProperties.Name="{helpers:ResourceString Name=ReverseTabScrollDirection}"
+					AutomationProperties.Name="{helpers:ResourceString Key=ReverseTabScrollDirection}"
 					SelectedIndex="{x:Bind ViewModel.SelectedTabScrollDirectionIndex, Mode=TwoWay}">
-					<ComboBoxItem Content="{helpers:ResourceString Name=DownMotionScrollsLeft}" />
-					<ComboBoxItem Content="{helpers:ResourceString Name=DownMotionScrollsRight}" />
+					<ComboBoxItem Content="{helpers:ResourceString Key=DownMotionScrollsLeft}" />
+					<ComboBoxItem Content="{helpers:ResourceString Key=DownMotionScrollsRight}" />
 				</uc:ComboBoxEx>
 			</wctcontrols:SettingsCard>
 		</StackPanel>
@@ -372,7 +372,7 @@
 		<TeachingTip
 			IsLightDismissEnabled="True"
 			IsOpen="{x:Bind ViewModel.ShowRestartControl, Mode=TwoWay}"
-			Subtitle="{helpers:ResourceString Name=RestartNotificationText/Text}"
+			Subtitle="{helpers:ResourceString Key=RestartNotificationText/Text}"
 			Target="{x:Bind AppLanguagesComboBox}">
 			<StackPanel
 				x:Name="ButtonsStackPanel"
@@ -385,14 +385,14 @@
 					x:Name="YesButton"
 					MinWidth="140"
 					Command="{x:Bind ViewModel.RestartCommand, Mode=OneWay}"
-					Content="{helpers:ResourceString Name=Yes}"
+					Content="{helpers:ResourceString Key=Yes}"
 					Style="{ThemeResource AccentButtonStyle}" />
 
 				<Button
 					x:Name="NoButton"
 					MinWidth="140"
 					Command="{x:Bind ViewModel.CancelRestartCommand, Mode=OneWay}"
-					Content="{helpers:ResourceString Name=No}" />
+					Content="{helpers:ResourceString Key=No}" />
 			</StackPanel>
 		</TeachingTip>
 	</Grid>

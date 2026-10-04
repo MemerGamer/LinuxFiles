@@ -11,8 +11,9 @@ namespace Files.App.Helpers
 	{
 		private static readonly ResourceLoader resourceLoader = new();
 
-		public string Name { get; set; } = string.Empty;
+		// Not called "Name": Uno's XAML generator treats a markup-extension member named Name as an x:Name inside x:Load subtrees
+		public string Key { get; set; } = string.Empty;
 
-		protected override object ProvideValue() => resourceLoader.GetString(Name);
+		protected override object ProvideValue() => resourceLoader.GetString(Key);
 	}
 }

@@ -26,7 +26,7 @@
 			<TextBlock
 				Padding="0,0,0,12"
 				Style="{StaticResource App.Theme.SubtitleTextBlockStyle}"
-				Text="{helpers:ResourceString Name=About}" />
+				Text="{helpers:ResourceString Key=About}" />
 
 			<!--  App Info  -->
 			<wctcontrols:SettingsCard
@@ -36,12 +36,12 @@
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE946;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
-				<Button x:Name="CopyVersionInfo" Content="{helpers:ResourceString Name=Copy}">
+				<Button x:Name="CopyVersionInfo" Content="{helpers:ResourceString Key=Copy}">
 					<Button.Flyout>
 						<MenuFlyout>
-							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyAppVersionCommand}" Text="{helpers:ResourceString Name=AppVersion}" />
-							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyWindowsVersionCommand}" Text="{helpers:ResourceString Name=WindowsVersion}" />
-							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyUserIDCommand}" Text="{helpers:ResourceString Name=UserID}" />
+							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyAppVersionCommand}" Text="{helpers:ResourceString Key=AppVersion}" />
+							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyWindowsVersionCommand}" Text="{helpers:ResourceString Key=WindowsVersion}" />
+							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyUserIDCommand}" Text="{helpers:ResourceString Key=UserID}" />
 						</MenuFlyout>
 					</Button.Flyout>
 				</Button>
@@ -50,7 +50,7 @@
 			<!--  GitHub Sponsor  -->
 			<wctcontrols:SettingsCard
 				Command="{x:Bind ViewModel.SupportUsCommand}"
-				Header="{helpers:ResourceString Name=SponsorUsOnGitHub}"
+				Header="{helpers:ResourceString Key=SponsorUsOnGitHub}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xEB51;" />
@@ -67,13 +67,13 @@
 				Padding="0,16,0,4"
 				FontSize="16"
 				FontWeight="Medium"
-				Text="{helpers:ResourceString Name=HelpAndSupport}" />
+				Text="{helpers:ResourceString Key=HelpAndSupport}" />
 
 			<!--  Documentation  -->
 			<wctcontrols:SettingsCard
 				HorizontalAlignment="Stretch"
 				Command="{x:Bind ViewModel.OpenDocumentationCommand}"
-				Header="{helpers:ResourceString Name=Documentation}"
+				Header="{helpers:ResourceString Key=Documentation}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE736;" />
@@ -88,7 +88,7 @@
 			<wctcontrols:SettingsCard
 				HorizontalAlignment="Stretch"
 				Command="{x:Bind ViewModel.OpenDiscordCommand}"
-				Header="{helpers:ResourceString Name=QuestionsAndDiscussions}"
+				Header="{helpers:ResourceString Key=QuestionsAndDiscussions}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE8F2;" />
@@ -100,7 +100,7 @@
 			</wctcontrols:SettingsCard>
 
 			<!--  Feedback  -->
-			<wctcontrols:SettingsExpander HorizontalAlignment="Stretch" Header="{helpers:ResourceString Name=Feedback}">
+			<wctcontrols:SettingsExpander HorizontalAlignment="Stretch" Header="{helpers:ResourceString Key=Feedback}">
 				<wctcontrols:SettingsExpander.HeaderIcon>
 					<FontIcon Glyph="&#xED15;" />
 				</wctcontrols:SettingsExpander.HeaderIcon>
@@ -109,7 +109,7 @@
 					<wctcontrols:SettingsCard
 						HorizontalAlignment="Stretch"
 						Command="{x:Bind ViewModel.SubmitFeatureRequestCommand}"
-						Header="{helpers:ResourceString Name=SubmitFeatureRequest}"
+						Header="{helpers:ResourceString Key=SubmitFeatureRequest}"
 						IsClickEnabled="True">
 						<wctcontrols:SettingsCard.ActionIcon>
 							<FontIcon Glyph="&#xE8A7;" />
@@ -120,7 +120,7 @@
 					<wctcontrols:SettingsCard
 						HorizontalAlignment="Stretch"
 						Command="{x:Bind ViewModel.SubmitBugReportCommand}"
-						Header="{helpers:ResourceString Name=SubmitBugReport}"
+						Header="{helpers:ResourceString Key=SubmitBugReport}"
 						IsClickEnabled="True">
 						<wctcontrols:SettingsCard.ActionIcon>
 							<FontIcon Glyph="&#xE8A7;" />
@@ -133,7 +133,7 @@
 			<wctcontrols:SettingsCard
 				HorizontalAlignment="Stretch"
 				Command="{x:Bind ViewModel.OpenLogLocationCommand}"
-				Header="{helpers:ResourceString Name=OpenLogLocation}"
+				Header="{helpers:ResourceString Key=OpenLogLocation}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE838;" />
@@ -150,13 +150,13 @@
 				Padding="0,16,0,4"
 				FontSize="16"
 				FontWeight="Medium"
-				Text="{helpers:ResourceString Name=OpenSource}" />
+				Text="{helpers:ResourceString Key=OpenSource}" />
 
 			<!--  Translate  -->
 			<wctcontrols:SettingsCard
 				HorizontalAlignment="Stretch"
 				Command="{x:Bind ViewModel.OpenCrowdinCommand}"
-				Header="{helpers:ResourceString Name=ImproveTranslation}"
+				Header="{helpers:ResourceString Key=ImproveTranslation}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xF2B7;" />
@@ -168,7 +168,7 @@
 			</wctcontrols:SettingsCard>
 
 			<!--  Third Party Licenses  -->
-			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Name=ThirdPartyLibraries}">
+			<wctcontrols:SettingsExpander Header="{helpers:ResourceString Key=ThirdPartyLibraries}">
 				<wctcontrols:SettingsExpander.HeaderIcon>
 					<FontIcon Glyph="&#xE90F;" />
 				</wctcontrols:SettingsExpander.HeaderIcon>
@@ -202,7 +202,7 @@
 			<wctcontrols:SettingsCard
 				HorizontalAlignment="Stretch"
 				Command="{x:Bind ViewModel.OpenGitHubRepoCommand}"
-				Header="{helpers:ResourceString Name=OpenGitHubRepo}"
+				Header="{helpers:ResourceString Key=OpenGitHubRepo}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE774;" />
@@ -217,7 +217,7 @@
 			<wctcontrols:SettingsCard
 				HorizontalAlignment="Stretch"
 				Command="{x:Bind ViewModel.OpenPrivacyPolicyCommand}"
-				Header="{helpers:ResourceString Name=Privacy}"
+				Header="{helpers:ResourceString Key=Privacy}"
 				IsClickEnabled="True">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE72E;" />

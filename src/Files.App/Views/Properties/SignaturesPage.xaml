@@ -38,7 +38,7 @@
 				x:Load="{x:Bind SignaturesViewModel.NoSignatureFound}"
 				FontSize="20"
 				FontWeight="SemiBold"
-				Text="{helpers:ResourceString Name=NoSignatureFound}"
+				Text="{helpers:ResourceString Key=NoSignatureFound}"
 				TextAlignment="Center" />
 
 			<!--  Signatures ItemsRepeater  -->
@@ -97,7 +97,7 @@
 										Grid.RowSpan="2"
 										Grid.Column="2"
 										Command="{x:Bind OpenDetailsCommand, Mode=OneWay}"
-										Content="{helpers:ResourceString Name=Details}" />
+										Content="{helpers:ResourceString Key=Details}" />
 								</Grid>
 							</Expander.Header>
 							<Expander.Content>
@@ -126,7 +126,7 @@
 										Grid.Column="0"
 										HorizontalAlignment="Left"
 										Style="{StaticResource PropertyName}"
-										Text="{helpers:ResourceString Name=SettingsAboutVersionTitle}" />
+										Text="{helpers:ResourceString Key=SettingsAboutVersionTitle}" />
 
 									<TextBlock
 										x:Name="DigitalSignatureVersionValue"
@@ -142,7 +142,7 @@
 										Grid.Column="0"
 										HorizontalAlignment="Left"
 										Style="{StaticResource PropertyName}"
-										Text="{helpers:ResourceString Name=IssuedBy}" />
+										Text="{helpers:ResourceString Key=IssuedBy}" />
 
 									<TextBlock
 										x:Name="DigitalSignatureIssuedByValue"
@@ -158,7 +158,7 @@
 										Grid.Column="0"
 										HorizontalAlignment="Left"
 										Style="{StaticResource PropertyName}"
-										Text="{helpers:ResourceString Name=IssuedTo}" />
+										Text="{helpers:ResourceString Key=IssuedTo}" />
 
 									<TextBlock
 										x:Name="DigitalSignatureIssuedToValue"
@@ -174,7 +174,7 @@
 										Grid.Column="0"
 										HorizontalAlignment="Left"
 										Style="{StaticResource PropertyName}"
-										Text="{helpers:ResourceString Name=ValidFrom}" />
+										Text="{helpers:ResourceString Key=ValidFrom}" />
 
 									<TextBlock
 										x:Name="DigitalSignatureValidFromValue"
@@ -190,7 +190,7 @@
 										Grid.Column="0"
 										HorizontalAlignment="Left"
 										Style="{StaticResource PropertyName}"
-										Text="{helpers:ResourceString Name=ValidTo}" />
+										Text="{helpers:ResourceString Key=ValidTo}" />
 
 									<TextBlock
 										x:Name="DigitalSignatureValidToValue"

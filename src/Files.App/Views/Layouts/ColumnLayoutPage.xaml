@@ -177,9 +177,9 @@
 		<TeachingTip
 			x:Name="FileNameTeachingTip"
 			Grid.RowSpan="2"
-			CloseButtonContent="{helpers:ResourceString Name=OK}"
+			CloseButtonContent="{helpers:ResourceString Key=OK}"
 			PreferredPlacement="Auto"
-			Subtitle="{helpers:ResourceString Name=FileNameTeachingTip/Subtitle}"
+			Subtitle="{helpers:ResourceString Key=FileNameTeachingTip/Subtitle}"
 			Visibility="Collapsed" />
 
 		<!--  Grouping/Ungrouping  -->
@@ -210,7 +210,6 @@
 					IsDoubleTapEnabled="True"
 					IsRightTapEnabled="True"
 					IsTabStop="True"
-					ItemContainerTransitions="{x:Null}"
 					ItemsSource="{x:Bind CollectionViewSource.View, Mode=OneWay}"
 					Loaded="FileList_Loaded"
 					PointerPressed="FileList_PointerPressed"

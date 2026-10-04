@@ -16,7 +16,7 @@
 	xmlns:usercontrols="using:Files.App.UserControls"
 	x:Name="Root"
 	MinWidth="90"
-	AutomationProperties.Name="{helpers:ResourceString Name=SelectedFilePreviewPane/AutomationProperties/Name}"
+	AutomationProperties.Name="{helpers:ResourceString Key=SelectedFilePreviewPane/AutomationProperties/Name}"
 	SizeChanged="Root_SizeChanged"
 	Unloaded="Root_Unloaded"
 	mc:Ignorable="d">
@@ -167,13 +167,13 @@
 			<!--  Details  -->
 			<RadioButton
 				Command="{x:Bind Commands.ToggleDetailsPane, Mode=OneWay}"
-				Content="{helpers:ResourceString Name=Details}"
+				Content="{helpers:ResourceString Key=Details}"
 				IsChecked="{x:Bind ViewModel.SelectedTab, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Details, Mode=OneWay}"
 				Style="{StaticResource Local.RadioButtonStyle}" />
 			<!--  Preview  -->
 			<RadioButton
 				Command="{x:Bind Commands.TogglePreviewPane, Mode=OneWay}"
-				Content="{helpers:ResourceString Name=Preview}"
+				Content="{helpers:ResourceString Key=Preview}"
 				IsChecked="{x:Bind ViewModel.SelectedTab, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Preview, Mode=OneWay}"
 				Style="{StaticResource Local.RadioButtonStyle}" />
 		</StackPanel>
@@ -186,15 +186,15 @@
 			Margin="8"
 			HorizontalAlignment="Stretch"
 			VerticalAlignment="Stretch"
-			AutomationProperties.Name="{helpers:ResourceString Name=PreviewPaneFilePreview/AutomationProperties/Name}">
+			AutomationProperties.Name="{helpers:ResourceString Key=PreviewPaneFilePreview/AutomationProperties/Name}">
 			<Grid.ContextFlyout>
 				<MenuFlyout>
 					<MenuFlyoutItem
 						HorizontalAlignment="Stretch"
 						IsEnabled="{x:Bind ViewModel.ShowCloudItemButton, Mode=OneWay}"
 						Tapped="MenuFlyoutItem_Tapped"
-						Text="{helpers:ResourceString Name=PreviewPaneLoadCloudItemButton/Text}"
-						ToolTipService.ToolTip="{helpers:ResourceString Name=PreviewPaneLoadCloudItemButton/ToolTipService/ToolTip}" />
+						Text="{helpers:ResourceString Key=PreviewPaneLoadCloudItemButton/Text}"
+						ToolTipService.ToolTip="{helpers:ResourceString Key=PreviewPaneLoadCloudItemButton/ToolTipService/ToolTip}" />
 				</MenuFlyout>
 			</Grid.ContextFlyout>
 			<Grid.RowDefinitions>
@@ -205,7 +205,7 @@
 				x:Name="PreviewErrorText"
 				HorizontalAlignment="Center"
 				VerticalAlignment="Center"
-				Text="{helpers:ResourceString Name=NoItemSelected}"
+				Text="{helpers:ResourceString Key=NoItemSelected}"
 				TextWrapping="WrapWholeWords" />
 			<ContentPresenter
 				x:Name="PreviewControlPresenter"
@@ -224,7 +224,7 @@
 			Grid.Row="2"
 			Grid.Column="0"
 			Grid.ColumnSpan="2"
-			AutomationProperties.Name="{helpers:ResourceString Name=PreviewPaneFileDetails/AutomationProperties/Name}"
+			AutomationProperties.Name="{helpers:ResourceString Key=PreviewPaneFileDetails/AutomationProperties/Name}"
 			Visibility="Visible">
 			<StackPanel Orientation="Vertical">
 				<TextBlock
@@ -309,7 +309,7 @@
 						Grid.Row="1"
 						HorizontalAlignment="Left"
 						Style="{ThemeResource BodyTextBlockStyle}"
-						Text="{helpers:ResourceString Name=Available}"
+						Text="{helpers:ResourceString Key=Available}"
 						TextAlignment="Left"
 						TextWrapping="Wrap" />
 					<TextBlock
@@ -319,7 +319,7 @@
 						HorizontalAlignment="Right"
 						Foreground="{ThemeResource TextFillColorTertiaryBrush}"
 						Style="{ThemeResource BodyTextBlockStyle}"
-						Text="{helpers:ResourceString Name=Total}"
+						Text="{helpers:ResourceString Key=Total}"
 						TextAlignment="Right"
 						TextWrapping="Wrap" />
 				</Grid>
@@ -369,7 +369,7 @@
 						HorizontalAlignment="Stretch"
 						VerticalAlignment="Center"
 						Style="{StaticResource Local.FileDetailsHeaderTextBlockStyle}"
-						Text="{helpers:ResourceString Name=FileTags}" />
+						Text="{helpers:ResourceString Key=FileTags}" />
 
 					<GridView
 						HorizontalAlignment="Stretch"
@@ -426,11 +426,11 @@
 											Padding="12,0,12,0"
 											VerticalAlignment="Center"
 											x:Load="{x:Bind IsFlyout, Mode=OneTime}"
-											AutomationProperties.Name="{helpers:ResourceString Name=EditTags}"
+											AutomationProperties.Name="{helpers:ResourceString Key=EditTags}"
 											Background="Transparent"
 											BorderThickness="0"
 											Flyout="{x:Bind AsFlyout.Flyout, Mode=OneTime}"
-											ToolTipService.ToolTip="{helpers:ResourceString Name=EditTags}">
+											ToolTipService.ToolTip="{helpers:ResourceString Key=EditTags}">
 											<Button.Resources>
 												<SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="Transparent" />
 											</Button.Resources>
@@ -450,7 +450,7 @@
 														HorizontalAlignment="Stretch"
 														VerticalAlignment="Center"
 														Style="{StaticResource Local.FileDetailsTextBlockStyle}"
-														Text="{helpers:ResourceString Name=EditTags}" />
+														Text="{helpers:ResourceString Key=EditTags}" />
 												</StackPanel>
 											</Button.Content>
 										</Button>
@@ -484,7 +484,7 @@
 					<Button.Content>
 						<StackPanel Orientation="Horizontal" Spacing="8">
 							<controls:ThemedIcon Style="{x:Bind Commands.OpenProperties.ThemedIconStyle}" />
-							<TextBlock Text="{helpers:ResourceString Name=Properties}" />
+							<TextBlock Text="{helpers:ResourceString Key=Properties}" />
 						</StackPanel>
 					</Button.Content>
 				</Button>
@@ -505,7 +505,7 @@
 					</VisualState.StateTriggers>
 					<VisualState.Setters>
 						<Setter Target="PreviewErrorText.Visibility" Value="Visible" />
-						<Setter Target="PreviewErrorText.Text" Value="{helpers:ResourceString Name=DetailsPanePreviewNotAvaliableText}" />
+						<Setter Target="PreviewErrorText.Text" Value="{helpers:ResourceString Key=DetailsPanePreviewNotAvaliableText}" />
 						<Setter Target="FileDetailsRepeater.Visibility" Value="Visible" />
 						<Setter Target="DetailsTagsList.Visibility" Value="Visible" />
 						<Setter Target="DetailsOpenProperties.Visibility" Value="Visible" />
@@ -519,7 +519,7 @@
 					</VisualState.StateTriggers>
 					<VisualState.Setters>
 						<Setter Target="PreviewErrorText.Visibility" Value="Visible" />
-						<Setter Target="PreviewErrorText.Text" Value="{helpers:ResourceString Name=DetailsPanePreviewNotAvaliableText}" />
+						<Setter Target="PreviewErrorText.Text" Value="{helpers:ResourceString Key=DetailsPanePreviewNotAvaliableText}" />
 						<Setter Target="FileDetailsRepeater.Visibility" Value="Collapsed" />
 						<Setter Target="DetailsTagsList.Visibility" Value="Collapsed" />
 						<Setter Target="DetailsOpenProperties.Visibility" Value="Collapsed" />

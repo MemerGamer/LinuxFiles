@@ -52,7 +52,7 @@
 
 				<TextBlock
 					Padding="4"
-					Text="{helpers:ResourceString Name=ChooseCustomIcon}"
+					Text="{helpers:ResourceString Key=ChooseCustomIcon}"
 					TextTrimming="CharacterEllipsis"
 					TextWrapping="NoWrap" />
 
@@ -60,7 +60,7 @@
 					x:Name="RestoreDefaultButton"
 					Grid.Column="1"
 					Command="{x:Bind CustomizationViewModel.RestoreDefaultIconCommand, Mode=OneWay}"
-					Content="{helpers:ResourceString Name=RestoreDefault}" />
+					Content="{helpers:ResourceString Key=RestoreDefault}" />
 
 			</Grid>
 
@@ -87,7 +87,7 @@
 					x:Name="PickDllFileButton"
 					Grid.Column="1"
 					Command="{x:Bind CustomizationViewModel.OpenFilePickerCommand, Mode=OneWay}"
-					Content="{helpers:ResourceString Name=Browse}" />
+					Content="{helpers:ResourceString Key=Browse}" />
 
 			</Grid>
 
@@ -100,7 +100,7 @@
 				Message="{x:Bind CustomizationViewModel.ConvertImageInfoBarMessage, Mode=OneWay}"
 				Severity="{x:Bind CustomizationViewModel.ConvertImageInfoBarSeverity, Mode=OneWay}">
 				<InfoBar.ActionButton>
-					<Button Command="{x:Bind CustomizationViewModel.ConvertImageToIconCommand, Mode=OneWay}" Content="{helpers:ResourceString Name=Browse}" />
+					<Button Command="{x:Bind CustomizationViewModel.ConvertImageToIconCommand, Mode=OneWay}" Content="{helpers:ResourceString Key=Browse}" />
 				</InfoBar.ActionButton>
 			</InfoBar>
 

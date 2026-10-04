@@ -66,7 +66,7 @@
 				HorizontalAlignment="Center"
 				Foreground="{ThemeResource TextFillColorTertiaryBrush}"
 				Style="{StaticResource App.Theme.BodyTextBlockStyle}"
-				Text="{helpers:ResourceString Name=Shelf}" />
+				Text="{helpers:ResourceString Key=Shelf}" />
 
 			<!--  (Divider)  -->
 			<Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
@@ -92,7 +92,7 @@
 				MaxWidth="240"
 				Foreground="{ThemeResource TextFillColorTertiaryBrush}"
 				Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-				Text="{helpers:ResourceString Name=EmptyShelfText}"
+				Text="{helpers:ResourceString Key=EmptyShelfText}"
 				TextAlignment="Center" />
 
 		</StackPanel>
@@ -112,7 +112,6 @@
 			CanDragItems="True"
 			DragItemsStarting="ListView_DragItemsStarting"
 			GotFocus="ShelfItemsList_GotFocus"
-			ItemContainerTransitions="{x:Null}"
 			ItemsSource="{x:Bind ItemsSource, Mode=OneWay}"
 			RightTapped="ShelfItemsList_RightTapped"
 			ScrollViewer.VerticalScrollBarVisibility="Auto"
@@ -171,7 +170,7 @@
 					HorizontalAlignment="Center"
 					VerticalAlignment="Center"
 					Command="{x:Bind ClearCommand, Mode=OneWay}"
-					Content="{helpers:ResourceString Name=ClearItems}" />
+					Content="{helpers:ResourceString Key=ClearItems}" />
 
 				<!--  Batch actions  -->
 				<HyperlinkButton
@@ -181,21 +180,21 @@
 					Background="Transparent"
 					BorderThickness="0"
 					Click="HyperlinkBatch_Click"
-					Content="{helpers:ResourceString Name=BatchAction}"
+					Content="{helpers:ResourceString Key=BatchAction}"
 					Visibility="Collapsed">
 					<HyperlinkButton.ContextFlyout>
 						<MenuFlyout x:Name="BatchFlyout" Placement="Top">
 							<uc:MenuFlyoutItemWithThemedIcon
 								Command="{x:Bind Commands.CopyItemFromShelf}"
-								Text="{helpers:ResourceString Name=Copy}"
+								Text="{helpers:ResourceString Key=Copy}"
 								ThemedIconStyle="{x:Bind Commands.CopyItemFromShelf.ThemedIconStyle}" />
 							<uc:MenuFlyoutItemWithThemedIcon
 								Command="{x:Bind Commands.CutItemFromShelf}"
-								Text="{helpers:ResourceString Name=Cut}"
+								Text="{helpers:ResourceString Key=Cut}"
 								ThemedIconStyle="{x:Bind Commands.CutItemFromShelf.ThemedIconStyle}" />
 							<uc:MenuFlyoutItemWithThemedIcon
 								Command="{x:Bind Commands.DeleteItemFromShelf}"
-								Text="{helpers:ResourceString Name=Delete}"
+								Text="{helpers:ResourceString Key=Delete}"
 								ThemedIconStyle="{x:Bind Commands.DeleteItemFromShelf.ThemedIconStyle}" />
 						</MenuFlyout>
 					</HyperlinkButton.ContextFlyout>

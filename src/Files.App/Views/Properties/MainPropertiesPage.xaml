@@ -46,7 +46,7 @@
 				Command="{x:Bind MainPropertiesViewModel.DoBackwardNavigationCommand, Mode=OneWay}"
 				CommandParameter="{x:Bind}"
 				IsEnabled="{x:Bind MainContentFrame.CanGoBack, Mode=OneWay}"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=Back}">
+				ToolTipService.ToolTip="{helpers:ResourceString Key=Back}">
 				<Button.Resources>
 					<ResourceDictionary>
 						<StaticResource x:Key="ButtonBackgroundDisabled" ResourceKey="SystemControlTransparentBrush" />
@@ -76,7 +76,7 @@
 					Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
 					TextTrimming="CharacterEllipsis"
 					TextWrapping="NoWrap">
-					<Run Text="{helpers:ResourceString Name=Properties}" />
+					<Run Text="{helpers:ResourceString Key=Properties}" />
 				</TextBlock>
 			</Border>
 
@@ -123,14 +123,14 @@
 								x:Name="SaveChangesButton"
 								Width="96"
 								Command="{x:Bind MainPropertiesViewModel.SaveChangedPropertiesCommand, Mode=OneWay}"
-								Content="{helpers:ResourceString Name=Save}"
+								Content="{helpers:ResourceString Key=Save}"
 								Style="{StaticResource AccentButtonStyle}" />
 
 							<Button
 								x:Name="CancelChangesButton"
 								Width="96"
 								Command="{x:Bind MainPropertiesViewModel.CancelChangedPropertiesCommand, Mode=OneWay}"
-								Content="{helpers:ResourceString Name=Cancel}" />
+								Content="{helpers:ResourceString Key=Cancel}" />
 
 						</StackPanel>
 					</Grid>

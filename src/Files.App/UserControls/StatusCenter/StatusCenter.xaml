@@ -34,7 +34,7 @@
 				VerticalAlignment="Center"
 				FontSize="14"
 				Style="{StaticResource BodyStrongTextBlockStyle}"
-				Text="{helpers:ResourceString Name=StatusCenter}" />
+				Text="{helpers:ResourceString Key=StatusCenter}" />
 
 			<!--  Remove All Cards Button  -->
 			<Button
@@ -43,7 +43,7 @@
 				Padding="8,0"
 				HorizontalAlignment="Right"
 				Click="CloseAllItemsButton_Click"
-				Content="{helpers:ResourceString Name=ClearCompleted}"
+				Content="{helpers:ResourceString Key=ClearCompleted}"
 				FontSize="12"
 				IsEnabled="{x:Bind ViewModel.HasAnyItem, Mode=OneWay}" />
 
@@ -153,11 +153,11 @@
 									Height="32"
 									Padding="0"
 									x:Load="{x:Bind IsInProgress, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
-									AutomationProperties.Name="{helpers:ResourceString Name=Clear}"
+									AutomationProperties.Name="{helpers:ResourceString Key=Clear}"
 									Background="Transparent"
 									BorderBrush="Transparent"
 									Click="CloseItemButton_Click"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=Clear}">
+									ToolTipService.ToolTip="{helpers:ResourceString Key=Clear}">
 									<Button.Content>
 										<FontIcon FontSize="16" Glyph="&#xE711;" />
 									</Button.Content>
@@ -248,7 +248,7 @@
 										FontSize="10"
 										Foreground="{ThemeResource TextFillColorSecondaryBrush}"
 										Style="{StaticResource CaptionTextBlockStyle}"
-										Text="{helpers:ResourceString Name=SpeedWithColon}" />
+										Text="{helpers:ResourceString Key=SpeedWithColon}" />
 
 									<TextBlock
 										x:Name="OperationSpeedPerSecTextBlock"
@@ -292,7 +292,7 @@
 										TextTrimming="CharacterEllipsis"
 										TextWrapping="NoWrap"
 										ToolTipService.ToolTip="{x:Bind CurrentProcessingItemName, Mode=OneWay}">
-										<Run Text="{helpers:ResourceString Name=NameWithColon}" />
+										<Run Text="{helpers:ResourceString Key=NameWithColon}" />
 										<Run Text="{x:Bind CurrentProcessingItemName, Mode=OneWay}" />
 									</TextBlock>
 
@@ -322,10 +322,10 @@
 									Height="32"
 									Padding="0"
 									x:Load="{x:Bind IsCancelable, Mode=OneWay}"
-									AutomationProperties.Name="{helpers:ResourceString Name=MoreOptions}"
+									AutomationProperties.Name="{helpers:ResourceString Key=MoreOptions}"
 									Background="Transparent"
 									BorderBrush="Transparent"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=MoreOptions}"
+									ToolTipService.ToolTip="{helpers:ResourceString Key=MoreOptions}"
 									Visibility="{x:Bind IsInProgress, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
 									<Button.Flyout>
 										<MenuFlyout>
@@ -334,7 +334,7 @@
 												Command="{x:Bind CancelCommand}"
 												DataContext="{x:Bind}"
 												IsEnabled="{x:Bind IsCancelable, Mode=OneWay}"
-												Text="{helpers:ResourceString Name=Cancel}">
+												Text="{helpers:ResourceString Key=Cancel}">
 												<MenuFlyoutItem.Icon>
 													<FontIcon FontSize="16" Glyph="&#xE711;" />
 												</MenuFlyoutItem.Icon>
@@ -363,7 +363,7 @@
 			HorizontalAlignment="Center"
 			VerticalAlignment="Center"
 			x:Load="{x:Bind ViewModel.HasAnyItem, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
-			Text="{helpers:ResourceString Name=NoFileOperations}" />
+			Text="{helpers:ResourceString Key=NoFileOperations}" />
 
 	</Grid>
 </UserControl>

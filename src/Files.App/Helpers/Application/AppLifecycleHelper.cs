@@ -102,7 +102,9 @@ namespace Files.App.Helpers
 			var userSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 			var addItemService = Ioc.Default.GetRequiredService<IAddItemService>();
 			var generalSettingsService = userSettingsService.GeneralSettingsService;
+#if WINDOWS
 			var jumpListService = Ioc.Default.GetRequiredService<IWindowsJumpListService>();
+#endif
 
 			ActiveSessionTracker.ReportPersistedTime();
 
@@ -114,8 +116,10 @@ namespace Files.App.Helpers
 					OptionalTaskAsync(CloudDrivesManager.UpdateDrivesAsync(), generalSettingsService.ShowCloudDrivesSection),
 					App.LibraryManager.UpdateLibrariesAsync(),
 					OptionalTaskAsync(WSLDistroManager.UpdateDrivesAsync(), generalSettingsService.ShowWslSection),
-					OptionalTaskAsync(App.FileTagsManager.UpdateFileTagsAsync(), generalSettingsService.ShowFileTagsSection),
-					jumpListService.InitializeAsync()
+					OptionalTaskAsync(App.FileTagsManager.UpdateFileTagsAsync(), generalSettingsService.ShowFileTagsSection)
+#if WINDOWS
+					, jumpListService.InitializeAsync()
+#endif
 				);
 
 				//Start the tasks separately to reduce resource contention
@@ -316,7 +320,11 @@ namespace Files.App.Helpers
 
 			services
 					// Platform services
+#if WINDOWS
 					.AddWindowsPlatform()
+#else
+					.AddLinuxPlatform()
+#endif
 					// Settings services
 					.AddSingleton<IUserSettingsService, UserSettingsService>()
 					.AddSingleton<IAppearanceSettingsService, AppearanceSettingsService>(sp => new AppearanceSettingsService(((UserSettingsService)sp.GetRequiredService<IUserSettingsService>()).GetSharingContext()))
@@ -340,10 +348,12 @@ namespace Files.App.Helpers
 					.AddSingleton<ISidebarContext, SidebarContext>()
 					.AddSingleton<IShelfContext, ShelfContext>()
 					// Services
+#if WINDOWS
 					.AddSingleton<IWindowsRecentItemsService, WindowsRecentItemsService>()
 					.AddSingleton<IWindowsIniService, WindowsIniService>()
 					.AddSingleton<IWindowsWallpaperService, WindowsWallpaperService>()
 					.AddSingleton<IWindowsSecurityService, WindowsSecurityService>()
+#endif
 					.AddSingleton<IAppThemeModeService, AppThemeModeService>()
 					.AddSingleton<IDialogService, DialogService>()
 					.AddSingleton<ICommonDialogService, CommonDialogService>()
@@ -363,7 +373,9 @@ namespace Files.App.Helpers
 					.AddSingleton<ISizeProvider, UserSizeProvider>()
 					.AddSingleton<IQuickAccessService, QuickAccessService>()
 					.AddSingleton<IResourcesService, ResourcesService>()
+#if WINDOWS
 					.AddSingleton<IWindowsJumpListService, WindowsJumpListService>()
+#endif
 					.AddSingleton<IStorageTrashBinService, StorageTrashBinService>()
 					.AddSingleton<IRemovableDrivesService, RemovableDrivesService>()
 					.AddSingleton<INetworkService, NetworkService>()
@@ -372,7 +384,9 @@ namespace Files.App.Helpers
 					.AddSingleton<IIconCacheService, IconCacheService>()
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
 					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
+#if WINDOWS
 					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
+#endif
 					.AddSingleton</*IVersionControlService,*/ LibGit2Service>()
 					// ViewModels
 					.AddSingleton<MainPageViewModel>()
@@ -398,11 +412,13 @@ namespace Files.App.Helpers
 					.AddSingleton(appModel);
 
 			// Conditional DI
+#if WINDOWS
 			if (AppEnvironment is AppEnvironment.SideloadPreview or AppEnvironment.SideloadStable)
 				services.AddSingleton<IUpdateService, SideloadUpdateService>();
 			else if (AppEnvironment is AppEnvironment.StorePreview or AppEnvironment.StoreStable)
 				services.AddSingleton<IUpdateService, StoreUpdateService>();
 			else
+#endif
 				services.AddSingleton<IUpdateService, DummyUpdateService>();
 
 			return services.BuildServiceProvider();
@@ -585,7 +601,9 @@ namespace Files.App.Helpers
 				if (!showToastNotification)
 					return;
 
+#if WINDOWS
 				SafetyExtensions.IgnoreExceptions(AppToastNotificationHelper.ShowUnhandledExceptionToast);
+#endif
 
 				SafetyExtensions.IgnoreExceptions(() =>
 				{
@@ -637,10 +655,12 @@ namespace Files.App.Helpers
 
 			if (e.PropertyName == nameof(IGeneralSettingsService.ShowSystemTrayIcon))
 			{
+#if WINDOWS
 				if (generalSettingsService.ShowSystemTrayIcon)
 					App.SystemTrayIcon?.Show();
 				else
 					App.SystemTrayIcon?.Hide();
+#endif
 			}
 		}
 	}

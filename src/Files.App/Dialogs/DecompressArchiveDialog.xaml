@@ -8,15 +8,15 @@
 	xmlns:items="using:Files.App.Data.Items"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:uc="using:Files.App.UserControls"
-	Title="{helpers:ResourceString Name=ExtractArchive}"
+	Title="{helpers:ResourceString Key=ExtractArchive}"
 	CornerRadius="{StaticResource OverlayCornerRadius}"
 	DefaultButton="Primary"
 	HighContrastAdjustment="None"
 	IsPrimaryButtonEnabled="{x:Bind ViewModel.IsDestinationPathValid, Mode=OneWay}"
 	PrimaryButtonClick="ContentDialog_PrimaryButtonClick"
-	PrimaryButtonText="{helpers:ResourceString Name=Extract}"
+	PrimaryButtonText="{helpers:ResourceString Key=Extract}"
 	RequestedTheme="{x:Bind RootAppElement.RequestedTheme, Mode=OneWay}"
-	SecondaryButtonText="{helpers:ResourceString Name=Cancel}"
+	SecondaryButtonText="{helpers:ResourceString Key=Cancel}"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
 
@@ -42,7 +42,7 @@
 				<TextBlock
 					Grid.Row="0"
 					Grid.ColumnSpan="2"
-					Text="{helpers:ResourceString Name=ExtractToPath}" />
+					Text="{helpers:ResourceString Key=ExtractToPath}" />
 
 				<!--  Path Box  -->
 				<AutoSuggestBox
@@ -59,7 +59,7 @@
 					Grid.Row="1"
 					Grid.Column="1"
 					Command="{x:Bind ViewModel.SelectDestinationCommand}"
-					Content="{helpers:ResourceString Name=Browse}" />
+					Content="{helpers:ResourceString Key=Browse}" />
 
 			</Grid>
 
@@ -74,13 +74,13 @@
 					x:Name="PasswordHeader"
 					HorizontalAlignment="Stretch"
 					VerticalAlignment="Stretch"
-					Text="{helpers:ResourceString Name=ArchivePassword}" />
+					Text="{helpers:ResourceString Key=ArchivePassword}" />
 
 				<PasswordBox
 					x:Name="Password"
 					HorizontalAlignment="Stretch"
 					VerticalAlignment="Stretch"
-					PlaceholderText="{helpers:ResourceString Name=Password}" />
+					PlaceholderText="{helpers:ResourceString Key=Password}" />
 
 			</StackPanel>
 
@@ -95,7 +95,7 @@
 					x:Name="EncodingHeader"
 					HorizontalAlignment="Stretch"
 					VerticalAlignment="Stretch"
-					Text="{helpers:ResourceString Name=Encoding}" />
+					Text="{helpers:ResourceString Key=Encoding}" />
 
 				<ComboBox
 					x:Name="EncodingBox"
@@ -116,7 +116,7 @@
 			<CheckBox
 				x:Name="OpenDestination"
 				Grid.Row="3"
-				Content="{helpers:ResourceString Name=DecompressArchiveDialogOpenDestinationWhenComplete/Content}"
+				Content="{helpers:ResourceString Key=DecompressArchiveDialogOpenDestinationWhenComplete/Content}"
 				IsChecked="{x:Bind ViewModel.OpenDestinationFolderOnCompletion, Mode=TwoWay}"
 				Visibility="{x:Bind ViewModel.ShowPathSelection}" />
 

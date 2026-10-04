@@ -419,20 +419,20 @@
 	<ScrollViewer Background="Transparent" RightTapped="ScrollViewer_RightTapped">
 		<FlyoutBase.AttachedFlyout>
 			<MenuFlyout x:Name="HomePageContextMenu">
-				<MenuFlyoutSubItem Text="{helpers:ResourceString Name=Widgets}">
+				<MenuFlyoutSubItem Text="{helpers:ResourceString Key=Widgets}">
 					<MenuFlyoutSubItem.Icon>
 						<FontIcon Glyph="&#xF246;" />
 					</MenuFlyoutSubItem.Icon>
-					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowQuickAccessWidget, Mode=TwoWay}" Text="{helpers:ResourceString Name=QuickAccess}" />
-					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowDrivesWidget, Mode=TwoWay}" Text="{helpers:ResourceString Name=Drives}" />
-					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowNetworkLocationsWidget, Mode=TwoWay}" Text="{helpers:ResourceString Name=NetworkLocations}" />
-					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowFileTagsWidget, Mode=TwoWay}" Text="{helpers:ResourceString Name=FileTags}" />
-					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowRecentFilesWidget, Mode=TwoWay}" Text="{helpers:ResourceString Name=RecentFiles}" />
+					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowQuickAccessWidget, Mode=TwoWay}" Text="{helpers:ResourceString Key=QuickAccess}" />
+					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowDrivesWidget, Mode=TwoWay}" Text="{helpers:ResourceString Key=Drives}" />
+					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowNetworkLocationsWidget, Mode=TwoWay}" Text="{helpers:ResourceString Key=NetworkLocations}" />
+					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowFileTagsWidget, Mode=TwoWay}" Text="{helpers:ResourceString Key=FileTags}" />
+					<ToggleMenuFlyoutItem IsChecked="{x:Bind ViewModel.ShowRecentFilesWidget, Mode=TwoWay}" Text="{helpers:ResourceString Key=RecentFiles}" />
 				</MenuFlyoutSubItem>
 				<MenuFlyoutSubItem
 					x:Name="SplitPaneSubMenu"
 					x:Load="{x:Bind Commands.SplitPaneHorizontally.IsExecutable, Mode=OneWay}"
-					Text="{helpers:ResourceString Name=SplitPane}">
+					Text="{helpers:ResourceString Key=SplitPane}">
 					<uc:MenuFlyoutItemWithThemedIcon
 						Command="{x:Bind Commands.SplitPaneVertically, Mode=OneWay}"
 						Text="{x:Bind Commands.SplitPaneVertically.Label}"
@@ -497,10 +497,10 @@
 							HorizontalAlignment="Right"
 							VerticalAlignment="Top"
 							x:Load="{x:Bind ShowMenuFlyout, Mode=OneWay}"
-							AutomationProperties.Name="{helpers:ResourceString Name=MoreOptions}"
+							AutomationProperties.Name="{helpers:ResourceString Key=MoreOptions}"
 							Background="Transparent"
 							BorderBrush="Transparent"
-							ToolTipService.ToolTip="{helpers:ResourceString Name=MoreOptions}">
+							ToolTipService.ToolTip="{helpers:ResourceString Key=MoreOptions}">
 
 							<FontIcon
 								HorizontalAlignment="Center"

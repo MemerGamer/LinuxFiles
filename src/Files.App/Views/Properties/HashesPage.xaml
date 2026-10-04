@@ -51,7 +51,7 @@
 			<TextBox
 				x:Name="HashInputTextBox"
 				Grid.Column="0"
-				PlaceholderText="{helpers:ResourceString Name=EnterHashToCompare}"
+				PlaceholderText="{helpers:ResourceString Key=EnterHashToCompare}"
 				Text="{x:Bind HashesViewModel.HashInput, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
 
 			<!--  Compare File Button  -->
@@ -59,7 +59,7 @@
 				x:Name="CompareFileButton"
 				Grid.Column="1"
 				Command="{x:Bind HashesViewModel.CompareFileCommand}"
-				Content="{helpers:ResourceString Name=CompareFile}" />
+				Content="{helpers:ResourceString Key=CompareFile}" />
 		</Grid>
 
 		<InfoBar
@@ -106,7 +106,7 @@
 						<TextBlock
 							VerticalAlignment="Center"
 							Style="{StaticResource App.Theme.BaseTextBlockStyle}"
-							Text="{helpers:ResourceString Name=Algorithm}" />
+							Text="{helpers:ResourceString Key=Algorithm}" />
 
 						<!--  (Divider)  -->
 						<Border
@@ -121,17 +121,17 @@
 							Grid.Column="2"
 							VerticalAlignment="Center"
 							Style="{StaticResource App.Theme.BaseTextBlockStyle}"
-							Text="{helpers:ResourceString Name=HashValue}" />
+							Text="{helpers:ResourceString Key=HashValue}" />
 
 						<!--  Toggle Hashes  -->
 						<Button
 							x:Name="SelectAlgorithmsButton"
 							Grid.Column="3"
 							Padding="6"
-							AutomationProperties.Name="{helpers:ResourceString Name=SelectHashesToShow}"
+							AutomationProperties.Name="{helpers:ResourceString Key=SelectHashesToShow}"
 							Background="Transparent"
 							BorderBrush="Transparent"
-							ToolTipService.ToolTip="{helpers:ResourceString Name=SelectHashesToShow}">
+							ToolTipService.ToolTip="{helpers:ResourceString Key=SelectHashesToShow}">
 							<FontIcon FontSize="14" Glyph="&#xE7B3;" />
 							<Button.Flyout>
 								<MenuFlyout x:Name="SelectAlgorithmsMenuFlyout" Closing="MenuFlyout_Closing">
@@ -204,7 +204,7 @@
 									<TextBlock
 										VerticalAlignment="Center"
 										Style="{StaticResource App.Theme.BodyTextBlockStyle}"
-										Text="{helpers:ResourceString Name=Calculating}" />
+										Text="{helpers:ResourceString Key=Calculating}" />
 
 									<ProgressBar
 										Width="100"
@@ -231,11 +231,11 @@
 									Grid.Column="3"
 									Padding="6"
 									x:Load="{x:Bind IsCalculated, Mode=OneWay}"
-									AutomationProperties.Name="{helpers:ResourceString Name=Copy}"
+									AutomationProperties.Name="{helpers:ResourceString Key=Copy}"
 									Background="Transparent"
 									BorderBrush="Transparent"
 									Click="CopyHashButton_Click"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=Copy}">
+									ToolTipService.ToolTip="{helpers:ResourceString Key=Copy}">
 									<FontIcon FontSize="14" Glyph="&#xE8C8;" />
 								</Button>
 

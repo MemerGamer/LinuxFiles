@@ -1,13 +1,31 @@
-﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
-<Project Sdk="Microsoft.NET.Sdk">
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<Project Sdk="Uno.Sdk">
 
     <PropertyGroup>
-        <EnableMsixTooling>true</EnableMsixTooling>
-        <PublishProfile>Properties\PublishProfiles\win-$(Platform).pubxml</PublishProfile>
-        <TargetFramework>$(WindowsTargetFramework)</TargetFramework>
-        <OutputType>WinExe</OutputType>
+        <TargetFrameworks>$(DesktopTargetFramework)</TargetFrameworks>
+        <OutputType>Exe</OutputType>
         <AssemblyName>Files</AssemblyName>
         <DefaultLanguage>en-US</DefaultLanguage>
+        <Nullable>Enable</Nullable>
+        <NoWarn>$(NoWarn);CS8305</NoWarn>
+        <Platforms>x86;x64;arm64</Platforms>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <Configurations>Debug;Release</Configurations>
+        <ApplicationIcon>Assets\AppTiles\Dev\Logo.ico</ApplicationIcon>
+        <IsTrimmable>true</IsTrimmable>
+        <!--  Lets restore resolve the Windows TFM on Linux/macOS  -->
+        <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
+        <!--  Uno.Sdk is only needed to understand the -desktop TFM; keep it from injecting implicit packages/single-project items  -->
+        <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
+        <UnoSingleProject>false</UnoSingleProject>
+        <UnoFeatures>SkiaRenderer</UnoFeatures>
+    </PropertyGroup>
+
+    <!--  Windows (WinAppSDK) target; not built in the Linux-first phase, kept for reference  -->
+    <PropertyGroup Condition="$(TargetFramework.Contains('-windows'))">
+        <EnableMsixTooling>true</EnableMsixTooling>
+        <PublishProfile>Properties\PublishProfiles\win-$(Platform).pubxml</PublishProfile>
+        <OutputType>WinExe</OutputType>
         <AppxBundleAutoResourcePackageQualifiers>Scale|DXFeatureLevel</AppxBundleAutoResourcePackageQualifiers>
         <AppxDefaultResourceQualifiers>Language=en-US;af;ar;be-BY;bg;ca;cs-CZ;da;de-DE;el;en-GB;es-ES;es-419;fa-IR;fi-FI;fil-PH;fr-FR;he-IL;hi-IN;hr-HR;hu-HU;hy-AM;id-ID;it-IT;ja-JP;ka;km-KH;ko-KR;lt-LT;lv-LV;ms-MY;nb-NO;nl-NL;pl-PL;pt-BR;pt-PT;ro-RO;ru-RU;sk-SK;sq-AL;sr-Cyrl;sv-SE;ta;th-TH;tr-TR;uk-UA;vi;zh-Hans;zh-Hant</AppxDefaultResourceQualifiers>
         <TargetPlatformMinVersion>$(MinimalWindowsVersion)</TargetPlatformMinVersion>
@@ -19,27 +37,34 @@
         <DisableXbfLineInfo>False</DisableXbfLineInfo>
         <AppxBundlePlatforms>x86|x64|arm64</AppxBundlePlatforms>
         <HoursBetweenUpdateChecks>0</HoursBetweenUpdateChecks>
-        <Nullable>Enable</Nullable>
-        <NoWarn>$(NoWarn);CS8305</NoWarn>
         <ApplicationManifest>app.manifest</ApplicationManifest>
-        <Platforms>x86;x64;arm64</Platforms>
         <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
         <UseWinUI>true</UseWinUI>
         <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
-        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <CETCompat>false</CETCompat>
-        <Configurations>Debug;Release</Configurations>
         <CsWinRTIncludes>Files.App.Server;Microsoft.UI.Content.ContentExternalOutputLink;Microsoft.UI.Content.IContentExternalOutputLink</CsWinRTIncludes>
         <PublishDir>bin\$(Configuration)\$(TargetFramework)\$(RuntimeIdentifier)\publish\</PublishDir>
         <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
         <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
         <PublishReadyToRunComposite Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRunComposite>
-        <ApplicationIcon>Assets\AppTiles\Dev\Logo.ico</ApplicationIcon>
-        <IsTrimmable>true</IsTrimmable>
         <IsAotCompatible>true</IsAotCompatible>
         <IlcGenerateMstatFile>true</IlcGenerateMstatFile>
         <IlcGenerateDgmlFile>true</IlcGenerateDgmlFile>
     </PropertyGroup>
+
+    <!--  Uno Platform (Skia desktop) target  -->
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <!--  Enables Files.Core.SourceGenerator's UnoDependencyPropertyGenerator ([GeneratedDependencyProperty] stand-in)  -->
+        <FilesUnoDependencyProperty>true</FilesUnoDependencyProperty>
+        <!--  XAML cannot see generator output on Uno; ICommandManager is checked in under Platforms/Desktop/Generated  -->
+        <FilesPregeneratedICommandManager Condition="'$(FilesPregeneratedICommandManager)' == ''">true</FilesPregeneratedICommandManager>
+        <DefineConstants>$(DefineConstants);DESKTOP</DefineConstants>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <CompilerVisibleProperty Include="FilesUnoDependencyProperty" />
+        <CompilerVisibleProperty Include="FilesPregeneratedICommandManager" />
+    </ItemGroup>
 
     <PropertyGroup>
         <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
@@ -51,7 +76,8 @@
         <SentryUploadSymbols>true</SentryUploadSymbols>
     </PropertyGroup>
 
-    <ItemGroup>
+    <!--  Windows-only native/packaging items  -->
+    <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
         <DirectPInvoke Include="ADVAPI32" />
         <DirectPInvoke Include="api-ms-win-core-com-l1-1-0" />
         <DirectPInvoke Include="api-ms-win-core-com-l1-1-1" />
@@ -68,13 +94,7 @@
         <_WindowsAppRuntimeBootstrapLibrary Include="@(WindowsAppSdkComponentPackages->'%(FullPath)lib\native\$(Platform)\Microsoft.WindowsAppRuntime.Bootstrap.lib')" />
         <NativeLibrary Include="runtimeobject.lib" />
         <NativeLibrary Include="@(_WindowsAppRuntimeBootstrapLibrary->Exists())" />
-    </ItemGroup>
-  
-    <ItemGroup>
         <Manifest Include="app.manifest" />
-        <Content Update="Assets\Resources\**">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </Content>
         <Content Update="Assets\FilesOpenDialog\SetFilesAsDefault.reg">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
@@ -96,10 +116,15 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!--  Uno.Sdk's default Page glob excludes App.xaml but only single-project mode adds the ApplicationDefinition  -->
+        <ApplicationDefinition Include="App.xaml" Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'" />
+        <Content Update="Assets\Resources\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="ByteSize" />
-        <PackageReference Include="ColorCode.WinUI" />
-        <PackageReference Include="CommunityToolkit.Labs.WinUI.Controls.MarkdownTextBlock" />
-        <PackageReference Include="CommunityToolkit.Labs.WinUI.DependencyPropertyGenerator" />
         <PackageReference Include="CommunityToolkit.Mvvm" />
         <PackageReference Include="CommunityToolkit.WinUI.Behaviors" />
         <PackageReference Include="CommunityToolkit.WinUI.Controls.ColorPicker" />
@@ -118,56 +143,123 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
         <PackageReference Include="Microsoft.Extensions.Logging" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
-        <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
-        <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" />
         <PackageReference Include="Sentry" />
         <PackageReference Include="SevenZipSharp" />
         <PackageReference Include="SharpZipLib" />
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
         <PackageReference Include="System.Drawing.Common" />
-        <PackageReference Include="Microsoft.WindowsAppSDK" />
-        <PackageReference Include="Microsoft.Graphics.Win2D" />
         <PackageReference Include="TagLibSharp" />
         <PackageReference Include="UTF.Unknown" />
+    </ItemGroup>
+
+    <!--  Packages that need Windows or have no Uno build yet. ColorCode/MarkdownTextBlock (README/markdown preview) are deferred  -->
+    <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
+        <PackageReference Include="ColorCode.WinUI" />
+        <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" />
+        <PackageReference Include="CommunityToolkit.Labs.WinUI.Controls.MarkdownTextBlock" />
+        <PackageReference Include="CommunityToolkit.Labs.WinUI.DependencyPropertyGenerator" />
+        <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
+        <PackageReference Include="Microsoft.WindowsAppSDK" />
+        <PackageReference Include="Microsoft.Graphics.Win2D" />
         <PackageReference Include="Microsoft.Windows.CsWinRT" />
+        <PackageReference Update="Microsoft.WindowsAppSDK.AI" ExcludeAssets="all" />
+        <PackageReference Update="Microsoft.WindowsAppSDK.ML" ExcludeAssets="all" />
+        <PackageReference Update="Microsoft.Windows.AI.MachineLearning" ExcludeAssets="all" />
+        <PackageReference Update="Microsoft.WindowsAppSDK.Widgets" ExcludeAssets="all" />
     </ItemGroup>
 
-    <ItemGroup>
-        <PackageReference Include="Microsoft.WindowsAppSDK.AI" ExcludeAssets="all" />
-        <PackageReference Include="Microsoft.WindowsAppSDK.ML" ExcludeAssets="all" />
-        <PackageReference Include="Microsoft.Windows.AI.MachineLearning" ExcludeAssets="all" />
-        <PackageReference Include="Microsoft.WindowsAppSDK.Widgets" ExcludeAssets="all" />
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <PackageReference Include="Uno.WinUI" />
+        <PackageReference Include="Uno.WinUI.Runtime.Skia.X11" />
+        <PackageReference Include="Uno.Microsoft.Xaml.Behaviors.WinUI.Managed" />
     </ItemGroup>
 
-    <ItemGroup>
+    <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
         <CsWinRTInputs Include="Assets\Libraries\Microsoft.UI.winmd" />
         <CsWinRTInputs Include="..\Files.App.Server\bin\$(Platform)\$(Configuration)\$(TargetFramework)\win-$(Platform)\Files.App.Server.winmd" />
         <None Include="..\Files.App.Server\bin\$(Platform)\$(Configuration)\$(TargetFramework)\win-$(Platform)\Files.App.Server.winmd">
-          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <Link>Files.App.Server.winmd</Link>
             <Visible>false</Visible>
         </None>
     </ItemGroup>
 
-    <ItemGroup>
+    <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
         <ProjectReference Include="..\Files.App.CsWin32\Files.App.CsWin32.csproj" />
         <ProjectReference Include="..\Files.App.BackgroundTasks\Files.App.BackgroundTasks.csproj" />
+        <ProjectReference Include="..\Files.Platform.Windows\Files.Platform.Windows.csproj" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <ProjectReference Include="..\Files.Platform.Linux\Files.Platform.Linux.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\Files.App.Controls\Files.App.Controls.csproj" />
         <ProjectReference Include="..\Files.App.Storage\Files.App.Storage.csproj" />
         <ProjectReference Include="..\Files.Core.Storage\Files.Core.Storage.csproj" />
         <ProjectReference Include="..\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
-        <ProjectReference Include="..\Files.Platform.Windows\Files.Platform.Windows.csproj" />
         <ProjectReference Include="..\Files.Shared\Files.Shared.csproj" />
         <ProjectReference Include="..\Files.Core.SourceGenerator\Files.Core.SourceGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+
+    <!--  Linux-first: Windows-only code excluded from the desktop (Uno Skia) build. Each entry is Win32/WinRT/WinAppSDK specific
+          (CsWin32 `Windows.Win32`, Shell COM, MSIX, AppLifecycle). Consumers of these types now fail to compile and are replaced
+          by Files.Platform.Abstractions interfaces + Linux implementations (see docs/linux-port/phase2-errors.md).  -->
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <!--  WinAppSDK-specific: no equivalent on Uno regardless of Win32 types. Program.cs/WindowEx.cs have desktop replacements under Platforms/Desktop  -->
+        <Compile Remove="Program.cs" />
+        <Compile Remove="Data\Items\WindowEx.cs" />
+        <Compile Remove="Helpers\Application\AppToastNotificationHelper.cs" />
+        <Compile Remove="Services\App\AppUpdateSideloadService.cs" />
+        <!--  Windows.Devices.Portable (device enumeration) and Win2D font APIs do not exist on Uno  -->
+        <Compile Remove="Utils\Global\WindowsStorageDeviceWatcher.cs" />
+        <Compile Remove="Utils\Storage\Helpers\DriveHelpers.cs" />
+        <Compile Remove="Utils\Storage\Helpers\FontFileHelper.cs" />
+        <!--  Shell preview handlers: DirectComposition + WinAppSDK ContentExternalOutputLink hosting  -->
+        <Compile Remove="UserControls\FilePreviews\ShellPreview.xaml.cs" />
+        <Compile Remove="ViewModels\UserControls\Previews\ShellPreviewViewModel.cs" />
+        <!--  Deferred: ColorCode.WinUI and CommunityToolkit.Labs MarkdownTextBlock have no Uno build  -->
+        <Compile Remove="UserControls\FilePreviews\CodePreview.xaml.cs" />
+        <Compile Remove="ViewModels\UserControls\Previews\CodePreviewViewModel.cs" />
+        <Compile Remove="UserControls\FilePreviews\MarkdownPreview.xaml.cs" />
+        <Compile Remove="ViewModels\UserControls\Previews\MarkdownPreviewViewModel.cs" />
+    </ItemGroup>
+
+    <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <DefaultItemExcludes>$(DefaultItemExcludes);UserControls/FilePreviews/ShellPreview.xaml;UserControls/FilePreviews/CodePreview.xaml;UserControls/FilePreviews/MarkdownPreview.xaml</DefaultItemExcludes>
+    </PropertyGroup>
+
+    <!--  Win32/Shell COM code: compiled only in the FilesWin32Compat inventory mode (see below)  -->
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(FilesWin32Compat)' != 'true'">
+        <Compile Remove="Helpers\Win32\**" />
+        <Compile Remove="Utils\Shell\**" />
+        <Compile Remove="Utils\Taskbar\**" />
+        <Compile Remove="Utils\Signatures\**" />
+        <Compile Remove="Services\Windows\**" />
+        <Compile Remove="Data\Items\WindowMessageMonitor.cs" />
+        <Compile Remove="Extensions\Win32FindDataExtensions.cs" />
+        <Compile Remove="Services\PreviewPopupProviders\SeerProProvider.cs" />
+    </ItemGroup>
+
+    <!--  Opt-in transitional aid (-p:FilesWin32Compat=true): compiles against the CsWin32-generated Windows.Win32 types (built for
+          the Windows TFM with Platform=x64, which works on Linux) so Win32-touching code gets past declaration binding and the compiler
+          reports the remaining, Uno-specific errors. Nothing here runs on Linux; replace Win32 usage with Files.Platform interfaces,
+          then drop this switch. Prerequisite: dotnet build src/Files.App.CsWin32 -p:EnableWindowsTargeting=true -p:Platform=x64  -->
+    <ItemGroup Condition="'$(FilesWin32Compat)' == 'true' And '$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <Reference Include="Files.App.CsWin32">
+            <HintPath>..\Files.App.CsWin32\bin\x64\$(Configuration)\$(WindowsTargetFramework)\Files.App.CsWin32.dll</HintPath>
+        </Reference>
     </ItemGroup>
 
     <ItemGroup>
         <AdditionalFiles Include="Strings\en-US\Resources.resw" />
     </ItemGroup>
 
-    <!-- Files.App.Server is an out-of-process COM server, not a project reference.
-         Build it before we resolve assemblies so its .winmd is available for CsWinRT. -->
-    <Target Name="BuildFilesAppServer" BeforeTargets="ResolveAssemblyReferences">
+    <!--  Files.App.Server is an out-of-process COM server, not a project reference.
+         Build it before we resolve assemblies so its .winmd is available for CsWinRT.  -->
+    <Target Name="BuildFilesAppServer" BeforeTargets="ResolveAssemblyReferences" Condition="$(TargetFramework.Contains('-windows'))">
         <MSBuild Projects="..\Files.App.Server\Files.App.Server.csproj"
                  Targets="Build"
                  Properties="Configuration=$(Configuration);Platform=$(Platform)" />

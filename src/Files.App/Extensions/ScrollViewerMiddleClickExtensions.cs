@@ -21,7 +21,7 @@ namespace Files.App.Extensions
 	/// <summary>
 	/// Provides middle-click auto-scroll for list controls backed by a <see cref="ScrollViewer"/>.
 	/// </summary>
-	public sealed class ScrollViewerMiddleClickExtensions : DependencyObject
+	public sealed partial class ScrollViewerMiddleClickExtensions : DependencyObject
 	{
 		private static readonly ConditionalWeakTable<FrameworkElement, MiddleClickScrollController> Controllers = new();
 

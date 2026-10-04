@@ -116,9 +116,9 @@
 					SelectedIndex="{x:Bind ConflictResolveOption, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Converter={StaticResource ConflictResolveOptionToIndexConverter}}"
 					Visibility="{x:Bind IsConflict, Mode=OneWay}">
 					<ComboBox.Items>
-						<ComboBoxItem Content="{helpers:ResourceString Name=GenerateNewName}" />
-						<ComboBoxItem Content="{helpers:ResourceString Name=ReplaceExisting}" />
-						<ComboBoxItem Content="{helpers:ResourceString Name=Skip}" />
+						<ComboBoxItem Content="{helpers:ResourceString Key=GenerateNewName}" />
+						<ComboBoxItem Content="{helpers:ResourceString Key=ReplaceExisting}" />
+						<ComboBoxItem Content="{helpers:ResourceString Key=Skip}" />
 					</ComboBox.Items>
 				</ComboBox>
 			</Grid>
@@ -169,7 +169,7 @@
 					Grid.Column="0"
 					HorizontalAlignment="Left"
 					VerticalAlignment="Center"
-					Text="{helpers:ResourceString Name=ApplyToAllConflictingItems}"
+					Text="{helpers:ResourceString Key=ApplyToAllConflictingItems}"
 					TextWrapping="Wrap" />
 
 				<ComboBox
@@ -179,10 +179,10 @@
 					VerticalAlignment="Center"
 					SelectedIndex="{x:Bind ViewModel.AggregatedResolveOption, UpdateSourceTrigger=PropertyChanged, Mode=TwoWay, Converter={StaticResource GenericEnumConverter}, ConverterParameter='4-0,0-1,1-2,2-3'}">
 					<ComboBox.Items>
-						<ComboBoxItem Content="{helpers:ResourceString Name=Custom}" />
-						<ComboBoxItem Content="{helpers:ResourceString Name=GenerateNewName}" />
-						<ComboBoxItem Content="{helpers:ResourceString Name=ReplaceExisting}" />
-						<ComboBoxItem Content="{helpers:ResourceString Name=Skip}" />
+						<ComboBoxItem Content="{helpers:ResourceString Key=Custom}" />
+						<ComboBoxItem Content="{helpers:ResourceString Key=GenerateNewName}" />
+						<ComboBoxItem Content="{helpers:ResourceString Key=ReplaceExisting}" />
+						<ComboBoxItem Content="{helpers:ResourceString Key=Skip}" />
 					</ComboBox.Items>
 				</ComboBox>
 
@@ -204,7 +204,7 @@
 
 			<CheckBox
 				x:Name="chkPermanentlyDelete"
-				Content="{helpers:ResourceString Name=DeleteItemsDialogPermanentlyDeleteCheckBox/Content}"
+				Content="{helpers:ResourceString Key=DeleteItemsDialogPermanentlyDeleteCheckBox/Content}"
 				IsChecked="{x:Bind ViewModel.DeletePermanently, Mode=TwoWay}"
 				IsEnabled="{x:Bind ViewModel.IsDeletePermanentlyEnabled, Mode=OneWay}"
 				Visibility="{x:Bind ViewModel.FileSystemDialogMode.IsInDeleteMode, Mode=OneWay}" />

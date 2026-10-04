@@ -8,12 +8,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
+#if WINDOWS
 using Microsoft.Windows.AppLifecycle;
+using Windows.Win32;
+#endif
 using System.Runtime;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using Windows.Win32;
 using WinRT;
 
 namespace Files.App
@@ -23,7 +25,9 @@ namespace Files.App
 	/// </summary>
 	public partial class App : Application
 	{
+#if WINDOWS
 		public static SystemTrayIcon? SystemTrayIcon { get; private set; }
+#endif
 
 		public static TaskCompletionSource? SplashScreenLoadingTCS { get; private set; }
 		public static string? OutputPath { get; set; }
@@ -67,6 +71,7 @@ namespace Files.App
 				SafetyExtensions.IgnoreExceptions(() => Ioc.Default.GetService<FileLoggerProvider>()?.TryCompleteAndFlush(TimeSpan.FromSeconds(2)));
 		}
 
+#if WINDOWS
 		/// <summary>
 		/// Gets invoked when the application is launched normally by the end user.
 		/// </summary>
@@ -498,6 +503,7 @@ namespace Files.App
 			})
 			{ IsBackground = true }.Start();
 		}
+#endif
 
 		/// <summary>
 		/// Gets invoked when the last opened flyout is closed.

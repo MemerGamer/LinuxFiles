@@ -6,14 +6,14 @@
 	xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 	xmlns:helpers="using:Files.App.Helpers"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-	Title="{helpers:ResourceString Name=NewShortcutDialogTitle}"
+	Title="{helpers:ResourceString Key=NewShortcutDialogTitle}"
 	DefaultButton="Primary"
 	HighContrastAdjustment="None"
 	IsPrimaryButtonEnabled="{x:Bind ViewModel.IsShortcutValid, Mode=OneWay}"
 	PrimaryButtonCommand="{x:Bind ViewModel.PrimaryButtonCommand}"
-	PrimaryButtonText="{helpers:ResourceString Name=Create}"
+	PrimaryButtonText="{helpers:ResourceString Key=Create}"
 	RequestedTheme="{x:Bind RootAppElement.RequestedTheme, Mode=OneWay}"
-	SecondaryButtonText="{helpers:ResourceString Name=Cancel}"
+	SecondaryButtonText="{helpers:ResourceString Key=Cancel}"
 	Style="{StaticResource DefaultContentDialogStyle}"
 	mc:Ignorable="d">
 
@@ -38,13 +38,13 @@
 			<TextBlock
 				Grid.ColumnSpan="2"
 				Margin="0,0,0,20"
-				Text="{helpers:ResourceString Name=NewShortcutDialogDescription}"
+				Text="{helpers:ResourceString Key=NewShortcutDialogDescription}"
 				TextWrapping="Wrap" />
 
 			<TextBlock
 				Grid.Row="1"
 				Grid.ColumnSpan="2"
-				Text="{helpers:ResourceString Name=NewShortcutDialogPrompt}" />
+				Text="{helpers:ResourceString Key=NewShortcutDialogPrompt}" />
 
 			<!--  Path Box  -->
 			<TextBox
@@ -57,7 +57,7 @@
 				<TextBox.Resources>
 					<TeachingTip
 						x:Name="InvalidPathWarning"
-						Title="{helpers:ResourceString Name=InvalidLocation}"
+						Title="{helpers:ResourceString Key=InvalidLocation}"
 						IsOpen="{x:Bind ViewModel.ShowWarningTip, Mode=OneWay}"
 						PreferredPlacement="Bottom" />
 				</TextBox.Resources>
@@ -68,13 +68,13 @@
 				Grid.Row="2"
 				Grid.Column="1"
 				Command="{x:Bind ViewModel.SelectDestinationCommand}"
-				Content="{helpers:ResourceString Name=Browse}" />
+				Content="{helpers:ResourceString Key=Browse}" />
 
 			<TextBlock
 				Grid.Row="3"
 				Grid.ColumnSpan="2"
 				Margin="0,12,0,0"
-				Text="{helpers:ResourceString Name=EnterAnItemName}" />
+				Text="{helpers:ResourceString Key=EnterAnItemName}" />
 
 			<!--  Name Box  -->
 			<TextBox
@@ -86,7 +86,7 @@
 				<TextBox.Resources>
 					<TeachingTip
 						x:Name="InvalidNameTeachingTip"
-						Title="{helpers:ResourceString Name=InvalidFilename/Text}"
+						Title="{helpers:ResourceString Key=InvalidFilename/Text}"
 						IsOpen="{x:Bind ViewModel.ShowNameWarningTip, Mode=OneWay}"
 						PreferredPlacement="Bottom"
 						Target="{x:Bind ShortcutNameTextBox}" />

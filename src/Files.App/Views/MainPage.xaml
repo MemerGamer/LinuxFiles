@@ -56,16 +56,16 @@
 
 
 			<MenuFlyout x:Key="SidebarContextMenu">
-				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowPinnedFoldersSection, Mode=TwoWay}" Text="{helpers:ResourceString Name=Pinned}" />
-				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowLibrarySection, Mode=TwoWay}" Text="{helpers:ResourceString Name=SidebarLibraries}" />
-				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowDrivesSection, Mode=TwoWay}" Text="{helpers:ResourceString Name=Drives}" />
-				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowCloudDrivesSection, Mode=TwoWay}" Text="{helpers:ResourceString Name=SidebarCloudDrives}" />
-				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowNetworkSection, Mode=TwoWay}" Text="{helpers:ResourceString Name=Network}" />
-				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowWslSection, Mode=TwoWay}" Text="{helpers:ResourceString Name=WSL}" />
+				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowPinnedFoldersSection, Mode=TwoWay}" Text="{helpers:ResourceString Key=Pinned}" />
+				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowLibrarySection, Mode=TwoWay}" Text="{helpers:ResourceString Key=SidebarLibraries}" />
+				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowDrivesSection, Mode=TwoWay}" Text="{helpers:ResourceString Key=Drives}" />
+				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowCloudDrivesSection, Mode=TwoWay}" Text="{helpers:ResourceString Key=SidebarCloudDrives}" />
+				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowNetworkSection, Mode=TwoWay}" Text="{helpers:ResourceString Key=Network}" />
+				<ToggleMenuFlyoutItem IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowWslSection, Mode=TwoWay}" Text="{helpers:ResourceString Key=WSL}" />
 				<ToggleMenuFlyoutItem
 					x:Name="SidebarContextMenuFileTagsSection"
 					IsChecked="{x:Bind SidebarAdaptiveViewModel.ShowFileTagsSection, Mode=TwoWay}"
-					Text="{helpers:ResourceString Name=FileTags}" />
+					Text="{helpers:ResourceString Key=FileTags}" />
 			</MenuFlyout>
 		</ResourceDictionary>
 	</Page.Resources>
@@ -226,7 +226,7 @@
 							<Button
 								Grid.Column="1"
 								Command="{x:Bind ViewModel.OpenNetworkSharingSettingsCommand}"
-								Content="{helpers:ResourceString Name=OpenSettings}" />
+								Content="{helpers:ResourceString Key=OpenSettings}" />
 						</Grid>
 					</InfoBar>
 
@@ -293,7 +293,7 @@
 						MaxWidth="240"
 						Foreground="{ThemeResource TextFillColorTertiaryBrush}"
 						Style="{StaticResource App.Theme.CaptionTextBlockStyle}"
-						Text="{helpers:ResourceString Name=SectionsHiddenMessage}"
+						Text="{helpers:ResourceString Key=SectionsHiddenMessage}"
 						TextAlignment="Center" />
 				</StackPanel>
 			</controls:SidebarView.SidebarContent>
@@ -339,27 +339,27 @@
 
 		<!--  Review Files Prompt  -->
 		<TeachingTip
-			Title="{helpers:ResourceString Name=Hello}"
+			Title="{helpers:ResourceString Key=Hello}"
 			Grid.RowSpan="3"
 			HorizontalAlignment="Center"
 			VerticalAlignment="Bottom"
 			ActionButtonCommand="{x:Bind ViewModel.ReviewAppCommand}"
-			ActionButtonContent="{helpers:ResourceString Name=RateUs}"
-			CloseButtonContent="{helpers:ResourceString Name=Dismiss}"
+			ActionButtonContent="{helpers:ResourceString Key=RateUs}"
+			CloseButtonContent="{helpers:ResourceString Key=Dismiss}"
 			IsOpen="{x:Bind ViewModel.ShowReviewPrompt, Mode=OneWay}"
-			Subtitle="{helpers:ResourceString Name=ReviewFilesSubtitle}" />
+			Subtitle="{helpers:ResourceString Key=ReviewFilesSubtitle}" />
 
 		<!--  Sponsor Prompt  -->
 		<TeachingTip
-			Title="{helpers:ResourceString Name=Hello}"
+			Title="{helpers:ResourceString Key=Hello}"
 			Grid.RowSpan="3"
 			HorizontalAlignment="Center"
 			VerticalAlignment="Bottom"
 			ActionButtonCommand="{x:Bind ViewModel.SponsorCommand}"
-			ActionButtonContent="{helpers:ResourceString Name=Sponsor}"
-			CloseButtonContent="{helpers:ResourceString Name=Dismiss}"
+			ActionButtonContent="{helpers:ResourceString Key=Sponsor}"
+			CloseButtonContent="{helpers:ResourceString Key=Dismiss}"
 			IsOpen="{x:Bind ViewModel.ShowSponsorPrompt, Mode=OneWay}"
-			Subtitle="{helpers:ResourceString Name=SponsorSubtitle}" />
+			Subtitle="{helpers:ResourceString Key=SponsorSubtitle}" />
 
 		<VisualStateManager.VisualStateGroups>
 			<VisualStateGroup x:Name="SidebarWidthStates">

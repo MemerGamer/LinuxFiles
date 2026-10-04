@@ -101,12 +101,12 @@
 								HorizontalContentAlignment="Center"
 								VerticalContentAlignment="Center"
 								x:Load="{x:Bind Item.ShowStorageSense, Mode=OneWay}"
-								AutomationProperties.Name="{helpers:ResourceString Name=OpenStorageSense}"
+								AutomationProperties.Name="{helpers:ResourceString Key=OpenStorageSense}"
 								Background="Transparent"
 								BorderBrush="Transparent"
 								Click="GoToStorageSense_Click"
 								Tag="{x:Bind Item.Path}"
-								ToolTipService.ToolTip="{helpers:ResourceString Name=OpenStorageSense}">
+								ToolTipService.ToolTip="{helpers:ResourceString Key=OpenStorageSense}">
 								<FontIcon
 									HorizontalAlignment="Center"
 									VerticalAlignment="Center"

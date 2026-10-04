@@ -99,10 +99,10 @@
 				Padding="8,0,8,0"
 				HorizontalAlignment="Left"
 				VerticalAlignment="Center"
-				AutomationProperties.Name="{helpers:ResourceString Name=Status}"
+				AutomationProperties.Name="{helpers:ResourceString Key=Status}"
 				Background="Transparent"
 				BorderBrush="Transparent"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=Status}"
+				ToolTipService.ToolTip="{helpers:ResourceString Key=Status}"
 				Visibility="Collapsed">
 				<StackPanel Orientation="Horizontal" Spacing="8">
 					<controls:ThemedIcon
@@ -113,7 +113,7 @@
 					<TextBlock
 						x:Name="StatusButtonLabel"
 						VerticalAlignment="Center"
-						Text="{helpers:ResourceString Name=Status}" />
+						Text="{helpers:ResourceString Key=Status}" />
 				</StackPanel>
 
 				<Button.Flyout>
@@ -235,7 +235,7 @@
 				Padding="8,0,8,0"
 				Background="Transparent"
 				BorderBrush="Transparent"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=ManageBranches}"
+				ToolTipService.ToolTip="{helpers:ResourceString Key=ManageBranches}"
 				Visibility="{x:Bind StatusBarViewModel.GitBranchDisplayName, Mode=OneWay, Converter={StaticResource NullToVisibilityCollapsedConverter}, FallbackValue=Collapsed}">
 
 				<Button.Content>
@@ -278,8 +278,8 @@
 									HorizontalAlignment="Left"
 									SelectedIndex="0"
 									Style="{StaticResource PivotSegmentedStyle}">
-									<toolkit:SegmentedItem Content="{helpers:ResourceString Name=Locals}" IsSelected="{x:Bind StatusBarViewModel.ShowLocals, Mode=TwoWay}" />
-									<toolkit:SegmentedItem Content="{helpers:ResourceString Name=Remotes}" />
+									<toolkit:SegmentedItem Content="{helpers:ResourceString Key=Locals}" IsSelected="{x:Bind StatusBarViewModel.ShowLocals, Mode=TwoWay}" />
+									<toolkit:SegmentedItem Content="{helpers:ResourceString Key=Remotes}" />
 								</toolkit:Segmented>
 
 								<!--  New Branch Button  -->
@@ -289,9 +289,9 @@
 									Padding="8,0"
 									HorizontalAlignment="Right"
 									Command="{x:Bind StatusBarViewModel.NewBranchCommand, Mode=OneWay}"
-									Content="{helpers:ResourceString Name=CreateBranch}"
+									Content="{helpers:ResourceString Key=CreateBranch}"
 									FontSize="12"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=CreateBranch}" />
+									ToolTipService.ToolTip="{helpers:ResourceString Key=CreateBranch}" />
 							</Grid>
 
 							<!--  Branches List  -->
@@ -320,11 +320,11 @@
 												TextTrimming="CharacterEllipsis" />
 											<Button
 												Grid.Column="1"
-												AutomationProperties.Name="{helpers:ResourceString Name=Delete}"
+												AutomationProperties.Name="{helpers:ResourceString Key=Delete}"
 												Background="Transparent"
 												BorderBrush="Transparent"
 												Click="DeleteBranch_Click"
-												ToolTipService.ToolTip="{helpers:ResourceString Name=Delete}"
+												ToolTipService.ToolTip="{helpers:ResourceString Key=Delete}"
 												Visibility="{x:Bind converters:MultiBooleanConverter.NorConvertToVisibility(IsHead, IsRemote)}">
 												<FontIcon FontSize="12" Glyph="&#xE74D;" />
 											</Button>
@@ -355,7 +355,7 @@
 				Padding="8,0,8,0"
 				VerticalAlignment="Center"
 				x:Load="{x:Bind StatusBarViewModel.ShowOpenInIDEButton, Mode=OneWay}"
-				AutomationProperties.Name="{helpers:ResourceString Name=Open}"
+				AutomationProperties.Name="{helpers:ResourceString Key=Open}"
 				Background="Transparent"
 				BorderBrush="Transparent">
 				<Button.Content>
@@ -364,7 +364,7 @@
 							Width="16"
 							Height="16"
 							Style="{StaticResource App.ThemedIcons.Open}" />
-						<TextBlock Text="{helpers:ResourceString Name=Open}" />
+						<TextBlock Text="{helpers:ResourceString Key=Open}" />
 					</StackPanel>
 				</Button.Content>
 
@@ -399,17 +399,17 @@
 				Height="24"
 				Padding="8,0,8,0"
 				VerticalAlignment="Center"
-				AutomationProperties.Name="{helpers:ResourceString Name=Git}"
+				AutomationProperties.Name="{helpers:ResourceString Key=Git}"
 				Background="Transparent"
 				BorderBrush="Transparent"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=Git}"
+				ToolTipService.ToolTip="{helpers:ResourceString Key=Git}"
 				Visibility="Collapsed">
 				<StackPanel Orientation="Horizontal" Spacing="8">
 					<controls:ThemedIcon
 						Width="16"
 						Height="16"
 						Style="{StaticResource App.ThemedIcons.Git}" />
-					<TextBlock x:Name="GitOverflowButtonLabel" Text="{helpers:ResourceString Name=Git}" />
+					<TextBlock x:Name="GitOverflowButtonLabel" Text="{helpers:ResourceString Key=Git}" />
 				</StackPanel>
 
 				<Button.Flyout>
@@ -475,7 +475,7 @@
 									Background="Transparent"
 									BorderBrush="Transparent"
 									Click="GitBranchCompact_Click"
-									ToolTipService.ToolTip="{helpers:ResourceString Name=ManageBranches}">
+									ToolTipService.ToolTip="{helpers:ResourceString Key=ManageBranches}">
 									<StackPanel Orientation="Horizontal" Spacing="8">
 										<controls:ThemedIcon
 											Width="16"
@@ -555,7 +555,7 @@
 				Background="Transparent"
 				BorderBrush="Transparent"
 				SizeChanged="Content_SizeChanged"
-				ToolTipService.ToolTip="{helpers:ResourceString Name=Encoding}">
+				ToolTipService.ToolTip="{helpers:ResourceString Key=Encoding}">
 
 				<StackPanel Orientation="Horizontal" Spacing="8">
 					<FontIcon

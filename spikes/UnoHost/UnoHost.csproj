@@ -1,0 +1,21 @@
+<!--  Throwaway spike (docs/linux-port/spikes.md). Not part of Files.slnx.  -->
+<Project Sdk="Uno.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>$(DesktopTargetFramework)</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <UnoSingleProject>true</UnoSingleProject>
+        <ApplicationTitle>UnoHost</ApplicationTitle>
+        <ApplicationId>com.files.unohost</ApplicationId>
+        <UnoFeatures>SkiaRenderer;</UnoFeatures>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <WarningsAsErrors></WarningsAsErrors>
+        <NoWarn>$(NoWarn);NU1507;NETSDK1201;PRI257</NoWarn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\Files.App.Controls\Files.App.Controls.csproj" />
+    </ItemGroup>
+
+</Project>

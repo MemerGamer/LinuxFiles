@@ -50,7 +50,7 @@ namespace Files.App.Controls
 			var setter = view.ItemContainerStyle?.Setters.OfType<Setter>().FirstOrDefault(s => s.Property == FrameworkElement.MarginProperty);
 			if (setter != null)
 			{
-				return (Thickness)setter.Value;
+				return (Thickness)setter.Value!;
 			}
 			else
 			{

@@ -26,7 +26,7 @@ namespace Files.App.Controls
 			if (patternInterface is PatternInterface.Selection)
 				return this;
 
-			return base.GetPatternCore(patternInterface);
+			return base.GetPatternCore(patternInterface)!;
 		}
 
 		public IRawElementProviderSimple[] GetSelection()

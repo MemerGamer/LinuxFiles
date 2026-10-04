@@ -56,7 +56,7 @@ namespace Files.App.Controls
 					return this;
 			}
 
-			return base.GetPatternCore(patternInterface);
+			return base.GetPatternCore(patternInterface)!;
 		}
 
 		public void Collapse()

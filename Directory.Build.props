@@ -3,11 +3,12 @@
   <PropertyGroup>
 
     <!--  Generic properties  -->
-    <TargetFrameworkVersion>net10.0</TargetFrameworkVersion>
+    <BaseTargetFramework>net10.0</BaseTargetFramework>
     <TargetWindowsVersion>10.0.26100.0</TargetWindowsVersion>
     <MinimalWindowsVersion>10.0.19041.0</MinimalWindowsVersion>
     <WindowsSdkPackageVersion>10.0.26100.67-preview</WindowsSdkPackageVersion>
-    <WindowsTargetFramework>$(TargetFrameworkVersion)-windows$(TargetWindowsVersion)</WindowsTargetFramework>
+    <WindowsTargetFramework>$(BaseTargetFramework)-windows$(TargetWindowsVersion)</WindowsTargetFramework>
+    <DesktopTargetFramework>$(BaseTargetFramework)-desktop</DesktopTargetFramework>
     <LangVersion>preview</LangVersion>
     <WarningsAsErrors>nullable</WarningsAsErrors>
 

@@ -24,6 +24,7 @@ namespace Files.Platform.Linux.Trash
 		private const string FilesDirectoryName = "files";
 		private const string InfoDirectoryName = "info";
 		private const int MaxUniqueNameAttempts = 10000;
+		private const string OutsideVolumeMessage = "Original location outside the volume";
 
 		private const UnixFileMode PrivateDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
 
@@ -370,19 +371,13 @@ namespace Files.Platform.Linux.Trash
 				var trashedPath = Path.Combine(location.FilesDirectory, name);
 
 				// Orphaned or corrupt .trashinfo files are ignored.
-				if (name.Length == 0 || !EntryExists(trashedPath))
+				if (!IsValidEntryName(name) || !EntryExists(trashedPath))
 					return null;
 
 				if (!TrashInfoFile.TryParse(File.ReadAllText(infoPath), out var storedPath, out var date))
 					return null;
 
-				string originalPath;
-				if (Path.IsPathRooted(storedPath))
-					originalPath = storedPath;
-				else if (location.TopDirectory is not null)
-					originalPath = Path.GetFullPath(Path.Combine(location.TopDirectory, storedPath));
-				else
-					return null;
+				var originalPath = ResolveOriginalPath(location, storedPath, out var invalidReason) ?? storedPath;
 
 				var infoMtime = new DateTimeOffset(new FileInfo(infoPath).LastWriteTimeUtc);
 				var deletionDate = date is { } d
@@ -401,7 +396,7 @@ namespace Files.Platform.Linux.Trash
 					cache.Set(name, size, infoMtime.ToUnixTimeSeconds());
 				}
 
-				return new TrashItem(trashedPath, originalPath, deletionDate, size, isDirectory, infoPath);
+				return new TrashItem(trashedPath, originalPath, deletionDate, size, isDirectory, infoPath, invalidReason);
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
 			{
@@ -429,13 +424,27 @@ namespace Files.Platform.Linux.Trash
 
 		private TrashOperationResult RestoreOne(TrashItem item, TrashRestoreConflictBehavior conflictBehavior)
 		{
-			if (!TryGetItemLocation(item, out var root, out var name, out var infoPath))
+			if (!TryGetItemLocation(item, out var location, out var name, out var infoPath))
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
 			if (!EntryExists(item.TrashedPath))
 				return TrashOperationResult.Failure(item.TrashedPath, "The trashed item no longer exists.");
 
-			var destination = item.OriginalPath;
+			// The destination is always re-derived from the .trashinfo; the caller-supplied item is not trusted.
+			if (!TrashInfoFile.TryParse(File.ReadAllText(infoPath), out var storedPath, out _))
+				return TrashOperationResult.Failure(item.TrashedPath, "The .trashinfo file is invalid.");
+
+			var destination = ResolveOriginalPath(location, storedPath, out var invalidReason);
+			if (destination is null)
+				return TrashOperationResult.Failure(item.TrashedPath, invalidReason!);
+
+			var parent = Path.GetDirectoryName(destination)!;
+			if (location.TopDirectory is not null &&
+				!MountInfoMountResolver.IsUnder(RealPath(parent), RealPath(location.TopDirectory)))
+			{
+				return TrashOperationResult.Failure(item.TrashedPath, OutsideVolumeMessage);
+			}
+
 			if (EntryExists(destination))
 			{
 				switch (conflictBehavior)
@@ -459,28 +468,32 @@ namespace Files.Platform.Linux.Trash
 				File.Move(item.TrashedPath, destination);
 
 			TryDelete(infoPath);
-			new DirectorySizesCache(root).Remove([name]);
+			new DirectorySizesCache(location.Root).Remove([name]);
 
 			return TrashOperationResult.Success(item.TrashedPath, destination);
 		}
 
 		private TrashOperationResult DeleteOne(TrashItem item)
 		{
-			if (!TryGetItemLocation(item, out var root, out var name, out var infoPath))
+			if (!TryGetItemLocation(item, out var location, out var name, out var infoPath))
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
 			if (EntryExists(item.TrashedPath))
 				DeleteEntry(item.TrashedPath);
 
 			TryDelete(infoPath);
-			new DirectorySizesCache(root).Remove([name]);
+			new DirectorySizesCache(location.Root).Remove([name]);
 
 			return TrashOperationResult.Success(item.TrashedPath);
 		}
 
-		private static bool TryGetItemLocation(TrashItem item, out string root, out string name, out string infoPath)
+		/// <summary>
+		/// Maps an item to one of the known, trusted trash folders; arbitrary paths named <c>files/x</c> are rejected.
+		/// </summary>
+		private bool TryGetItemLocation(TrashItem item, out TrashLocation location, out string name, out string infoPath)
 		{
-			root = name = infoPath = string.Empty;
+			location = null!;
+			name = infoPath = string.Empty;
 
 			if (!Path.IsPathRooted(item.TrashedPath))
 				return false;
@@ -490,10 +503,53 @@ namespace Files.Platform.Linux.Trash
 			if (filesDirectory is null || Path.GetFileName(filesDirectory) != FilesDirectoryName)
 				return false;
 
-			root = Path.GetDirectoryName(filesDirectory)!;
+			var root = Path.GetDirectoryName(filesDirectory)!;
 			name = Path.GetFileName(trashedPath);
+			if (!IsValidEntryName(name))
+				return false;
+
+			var match = GetLocations().FirstOrDefault(l => l.Root == root);
+			if (match is null)
+				return false;
+
+			location = match;
 			infoPath = Path.Combine(root, InfoDirectoryName, name + TrashInfoFile.Extension);
-			return root.Length > 0 && name.Length > 0;
+			return true;
+		}
+
+		private static bool IsValidEntryName(string name)
+		{
+			return name.Length > 0 && name != "." && name != ".." && !name.Contains('/') && !name.Contains('\0');
+		}
+
+		/// <summary>
+		/// Resolves the stored <c>Path</c> to an absolute location. Home trash entries must be absolute; topdir trash entries
+		/// must stay inside the top directory. Returns <see langword="null"/> and a reason otherwise.
+		/// </summary>
+		private static string? ResolveOriginalPath(TrashLocation location, string storedPath, out string? invalidReason)
+		{
+			invalidReason = null;
+
+			if (location.TopDirectory is null)
+			{
+				if (Path.IsPathRooted(storedPath))
+					return Path.GetFullPath(storedPath);
+
+				invalidReason = "The stored original path is not absolute.";
+				return null;
+			}
+
+			var top = Path.GetFullPath(location.TopDirectory);
+			var candidate = Path.GetFullPath(Path.IsPathRooted(storedPath) ? storedPath : Path.Combine(top, storedPath));
+			var prefix = top.EndsWith('/') ? top : top + "/";
+
+			if (!candidate.StartsWith(prefix, StringComparison.Ordinal) || candidate.Length == prefix.Length)
+			{
+				invalidReason = OutsideVolumeMessage;
+				return null;
+			}
+
+			return candidate;
 		}
 
 		private static string GetUniqueDestination(string destination)
@@ -551,11 +607,11 @@ namespace Files.Platform.Linux.Trash
 				try
 				{
 					var shared = GetSharedTrashRoot(mount.MountPoint);
-					if (shared is not null && Directory.Exists(shared))
+					if (shared is not null && Directory.Exists(shared) && IsTrusted(new TrashLocation(shared, mount.MountPoint)))
 						locations.Add(new TrashLocation(shared, mount.MountPoint));
 
 					var perUser = GetPerUserTrashRoot(mount.MountPoint);
-					if (Directory.Exists(perUser))
+					if (Directory.Exists(perUser) && IsTrusted(new TrashLocation(perUser, mount.MountPoint)))
 						locations.Add(new TrashLocation(perUser, mount.MountPoint));
 				}
 				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -605,18 +661,56 @@ namespace Files.Platform.Linux.Trash
 
 		private TrashLocation? PrepareLocation(TrashLocation location, bool create)
 		{
+			// A topdir trash that another user pre-created, symlinked or made writable must never be used.
+			if (location.TopDirectory is not null && EntryExists(location.Root) && !IsTrusted(location))
+				return null;
+
 			if (!create)
 				return location;
 
 			try
 			{
 				EnsureLayout(location);
-				return location;
+				return location.TopDirectory is not null && !IsTrusted(location) ? null : location;
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
 				return null;
 			}
+		}
+
+		/// <summary>
+		/// Checks that a topdir trash and its <c>files</c>/<c>info</c> subdirectories are real directories owned by the current
+		/// user that are not writable by group or others. The home trash is not checked.
+		/// </summary>
+		private bool IsTrusted(TrashLocation location)
+		{
+			if (location.TopDirectory is null)
+				return true;
+
+			var forbidden = UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+
+			foreach (var directory in new[] { location.Root, location.FilesDirectory, location.InfoDirectory })
+			{
+				if (!EntryExists(directory))
+				{
+					if (directory == location.Root)
+						return false;
+
+					continue;
+				}
+
+				if (!_options.OwnershipInspector.TryGetInfo(directory, out var info) ||
+					!info.IsDirectory ||
+					info.IsSymbolicLink ||
+					info.OwnerUserId != _options.UserId ||
+					(info.Mode & forbidden) != 0)
+				{
+					return false;
+				}
+			}
+
+			return true;
 		}
 
 		private string? GetSharedTrashRoot(string topDirectory)

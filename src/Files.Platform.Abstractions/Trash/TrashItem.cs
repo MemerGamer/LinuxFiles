@@ -15,14 +15,21 @@ namespace Files.Platform.Abstractions.Trash
 	/// <param name="Size">The size in bytes; for directories the total size of their contents.</param>
 	/// <param name="IsDirectory">Whether the item is a directory.</param>
 	/// <param name="TrashId">An opaque identifier that is unique across all trash folders.</param>
+	/// <param name="InvalidReason">Why the item cannot be restored (for example a crafted original path), or <see langword="null"/> if it is valid.</param>
 	public sealed record TrashItem(
 		string TrashedPath,
 		string OriginalPath,
 		DateTimeOffset DeletionDate,
 		long Size,
 		bool IsDirectory,
-		string TrashId)
+		string TrashId,
+		string? InvalidReason = null)
 	{
+		/// <summary>
+		/// Gets a value indicating whether the item can be restored.
+		/// </summary>
+		public bool IsValid => InvalidReason is null;
+
 		/// <summary>
 		/// Gets the file or directory name the item had before it was trashed.
 		/// </summary>

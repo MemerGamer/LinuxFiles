@@ -23,6 +23,26 @@ namespace Files.Platform.Linux.Thumbnails
 		public string CacheHome { get; set; } = GetDefaultCacheHome();
 
 		/// <summary>
+		/// Gets or sets the maximum number of pixels (width times height) of a source image that will be decoded.
+		/// </summary>
+		public long MaxImagePixels { get; set; } = 100_000_000;
+
+		/// <summary>
+		/// Gets or sets the maximum size in bytes of a source file that will be used for generation.
+		/// </summary>
+		public long MaxSourceFileBytes { get; set; } = 512L * 1024 * 1024;
+
+		/// <summary>
+		/// Gets or sets the maximum size in bytes of a cache entry or external thumbnailer output that will be read.
+		/// </summary>
+		public long MaxCacheEntryBytes { get; set; } = 32L * 1024 * 1024;
+
+		/// <summary>
+		/// Gets or sets a value indicating whether external thumbnailers run inside a bubblewrap sandbox. Defaults to whether <c>bwrap</c> is on PATH.
+		/// </summary>
+		public bool SandboxExternalThumbnailers { get; set; } = BubblewrapSandbox.IsAvailable();
+
+		/// <summary>
 		/// Gets or sets the maximum number of concurrent generations.
 		/// </summary>
 		public int MaxConcurrency { get; set; } = Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
@@ -180,14 +200,17 @@ namespace Files.Platform.Linux.Thumbnails
 		/// <inheritdoc/>
 		public void Dispose() => _gate.Dispose();
 
-		private static byte[]? TryReadValid(string cacheFile, string uri, long mtime, long? size)
+		private byte[]? TryReadValid(string cacheFile, string uri, long mtime, long? size)
 		{
 			byte[] bytes;
 			try
 			{
+				if (new FileInfo(cacheFile).Length > _options.MaxCacheEntryBytes)
+					return null;
+
 				bytes = File.ReadAllBytes(cacheFile);
 			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
 			{
 				return null;
 			}
@@ -214,17 +237,31 @@ namespace Files.Platform.Linux.Thumbnails
 			return await GenerateExternalAsync(fullPath, uri, maxSize, cachePath, cancellationToken).ConfigureAwait(false);
 		}
 
-		private static byte[]? GenerateImage(string path, int maxSize)
+		private byte[]? GenerateImage(string path, int maxSize)
 		{
 			try
 			{
+				if (new FileInfo(path).Length > _options.MaxSourceFileBytes)
+					return null;
+
 				using var codec = SKCodec.Create(path);
 				if (codec is null)
 					return null;
 
+				// Check the declared dimensions before allocating anything (decompression bombs).
+				var declared = codec.Info;
+				if (declared.Width <= 0 || declared.Height <= 0 || (long)declared.Width * declared.Height > _options.MaxImagePixels)
+					return null;
+
 				var origin = codec.EncodedOrigin;
-				using var source = SKBitmap.Decode(codec);
-				if (source is null || source.Width == 0 || source.Height == 0)
+				var longest = Math.Max(declared.Width, declared.Height);
+				var decodeSize = longest > maxSize ? codec.GetScaledDimensions((float)maxSize / longest) : declared.Size;
+				if (decodeSize.Width <= 0 || decodeSize.Height <= 0 || decodeSize.Width > declared.Width || decodeSize.Height > declared.Height)
+					decodeSize = declared.Size;
+
+				var decodeInfo = new SKImageInfo(decodeSize.Width, decodeSize.Height, SKColorType.Rgba8888, SKAlphaType.Premul);
+				using var source = new SKBitmap(decodeInfo);
+				if (codec.GetPixels(decodeInfo, source.GetPixels()) is not (SKCodecResult.Success or SKCodecResult.IncompleteInput))
 					return null;
 
 				var swap = origin >= SKEncodedOrigin.LeftTop;
@@ -283,7 +320,14 @@ namespace Files.Platform.Linux.Thumbnails
 				if (command is null)
 					return null;
 
-				if (!await _options.ProcessRunner.RunAsync(command.Value.FileName, command.Value.Arguments, cancellationToken).ConfigureAwait(false))
+				var (program, arguments) = command.Value;
+				if (_options.SandboxExternalThumbnailers && BubblewrapSandbox.IsAvailable())
+					(program, arguments) = BubblewrapSandbox.Wrap(program, arguments, Path.GetDirectoryName(cachePath)!);
+
+				if (!await _options.ProcessRunner.RunAsync(program, arguments, cancellationToken).ConfigureAwait(false))
+					return null;
+
+				if (new FileInfo(tempOutput).Length > _options.MaxCacheEntryBytes)
 					return null;
 
 				var bytes = File.ReadAllBytes(tempOutput);

@@ -62,7 +62,12 @@ namespace Files.Platform.Linux.Thumbnails
 		public (string FileName, IReadOnlyList<string> Arguments)? BuildCommand(string inputPath, string inputUri, string outputPath, uint size)
 		{
 			var tokens = Tokenize(Exec);
-			if (tokens.Count == 0)
+			if (tokens.Count == 0 || tokens[0].Length == 0 || (tokens[0].Contains('/') && !tokens[0].StartsWith('/')))
+				return null;
+
+			// Always hand the thumbnailer an absolute path so a name starting with '-' cannot be read as an option.
+			inputPath = Path.GetFullPath(inputPath);
+			if (!inputPath.StartsWith('/') || !inputUri.StartsWith("file:///", StringComparison.Ordinal))
 				return null;
 
 			var args = new List<string>(tokens.Count);
@@ -193,6 +198,47 @@ namespace Files.Platform.Linux.Thumbnails
 		/// Finds the thumbnailer registered for a MIME type.
 		/// </summary>
 		public ThumbnailerEntry? Find(string mimeType) => _byMime.GetValueOrDefault(mimeType);
+	}
+
+	/// <summary>
+	/// Builds <c>bwrap</c> (bubblewrap) command lines that run a thumbnailer read-only and without network.
+	/// </summary>
+	public static class BubblewrapSandbox
+	{
+		/// <summary>
+		/// Gets whether <c>bwrap</c> is on PATH.
+		/// </summary>
+		public static bool IsAvailable()
+		{
+			foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? string.Empty).Split(':', StringSplitOptions.RemoveEmptyEntries))
+			{
+				if (File.Exists(Path.Combine(dir, "bwrap")))
+					return true;
+			}
+
+			return false;
+		}
+
+		/// <summary>
+		/// Wraps a command so it runs with a read-only root and write access only to <paramref name="writableDirectory"/>.
+		/// </summary>
+		public static (string FileName, IReadOnlyList<string> Arguments) Wrap(string fileName, IReadOnlyList<string> arguments, string writableDirectory)
+		{
+			var args = new List<string>
+			{
+				"--ro-bind", "/", "/",
+				"--dev", "/dev",
+				"--proc", "/proc",
+				"--tmpfs", "/tmp",
+				"--bind", writableDirectory, writableDirectory,
+				"--unshare-all",
+				"--die-with-parent",
+				"--",
+				fileName,
+			};
+			args.AddRange(arguments);
+			return ("bwrap", args);
+		}
 	}
 
 	/// <summary>

@@ -18,6 +18,7 @@ namespace Files.App.ViewModels
 	{
 		private Files.Platform.Abstractions.Watching.IFolderWatcher? _linuxWatcher;
 		private CancellationTokenSource? _linuxRefreshDebounce;
+		private Files.Platform.Abstractions.Watching.IFolderWatcher? _linuxRepositoryWatcher;
 
 		/// <summary>
 		/// Lists <paramref name="path"/> into <c>filesAndFolders</c>. Returns 3 on success and -1 on failure.
@@ -111,6 +112,9 @@ namespace Files.App.ViewModels
 				await OrderFilesAndFoldersAsync();
 				await ApplyFilesAndFoldersChangesAsync();
 
+				// Uno does not raise the container update callbacks that normally trigger this, so the status columns are filled in here
+				_ = LoadLinuxRepositoryPropertiesAsync(cancellationToken);
+
 				// desktop.ini based customization has no Linux equivalent; the Windows services are stubs
 				_ = dispatcherQueue.EnqueueOrInvokeAsync(CheckForSolutionFile, Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 				desktopIniUpdateTask = dispatcherQueue.EnqueueOrInvokeAsync(() =>
@@ -124,6 +128,29 @@ namespace Files.App.ViewModels
 			return 3;
 		}
 
+		private async Task LoadLinuxRepositoryPropertiesAsync(CancellationToken cancellationToken)
+		{
+			if (!IsValidGitDirectory || EnabledGitProperties is GitProperties.None)
+				return;
+
+			try
+			{
+				// The first screens only; the rest loads when selected or when the layout reloads its items
+				var items = filesAndFolders.OfType<IGitItem>().Take(300).ToList();
+				foreach (var gitItem in items)
+				{
+					cancellationToken.ThrowIfCancellationRequested();
+					await LoadGitPropertiesAsync(gitItem);
+				}
+			}
+			catch (OperationCanceledException)
+			{
+			}
+		}
+
+		// Items inside a repository use the Git item type so the status/commit columns can be filled in on demand
+		private ListedItem NewLinuxItem() => IsValidGitDirectory ? new GitItem() : new ListedItem(null);
+
 		private ListedItem CreateLinuxListedItem(FileSystemEntryInfo entry)
 		{
 			var opacity = entry.IsHidden ? Constants.UI.DimItemOpacity : 1d;
@@ -133,21 +160,20 @@ namespace Files.App.ViewModels
 
 			if (entry.IsDirectory)
 			{
-				return new ListedItem(null)
-				{
-					PrimaryItemAttribute = StorageItemTypes.Folder,
-					ItemNameRaw = entry.Name,
-					ItemDateModifiedReal = modified,
-					ItemDateCreatedReal = created,
-					ItemType = folderTypeTextLocalized,
-					FileImage = null,
-					IsHiddenItem = entry.IsHidden,
-					Opacity = opacity,
-					LoadFileIcon = false,
-					ItemPath = entry.FullPath,
-					FileSize = null,
-					FileSizeBytes = 0,
-				};
+				var folder = NewLinuxItem();
+				folder.PrimaryItemAttribute = StorageItemTypes.Folder;
+				folder.ItemNameRaw = entry.Name;
+				folder.ItemDateModifiedReal = modified;
+				folder.ItemDateCreatedReal = created;
+				folder.ItemType = folderTypeTextLocalized;
+				folder.FileImage = null;
+				folder.IsHiddenItem = entry.IsHidden;
+				folder.Opacity = opacity;
+				folder.LoadFileIcon = false;
+				folder.ItemPath = entry.FullPath;
+				folder.FileSize = null;
+				folder.FileSizeBytes = 0;
+				return folder;
 			}
 
 			// LINUX-TODO(shortcuts): symlinks and .desktop files are listed as plain files
@@ -160,23 +186,22 @@ namespace Files.App.ViewModels
 				itemType = !string.IsNullOrEmpty(localizedType) ? localizedType : extension.Trim('.') + " " + itemType;
 			}
 
-			return new ListedItem(null)
-			{
-				PrimaryItemAttribute = StorageItemTypes.File,
-				FileExtension = extension,
-				IsHiddenItem = entry.IsHidden,
-				Opacity = opacity,
-				FileImage = null,
-				LoadFileIcon = false,
-				ItemNameRaw = entry.Name,
-				ItemDateModifiedReal = modified,
-				ItemDateAccessedReal = accessed,
-				ItemDateCreatedReal = created,
-				ItemType = itemType,
-				ItemPath = entry.FullPath,
-				FileSize = entry.Length.ToSizeString(),
-				FileSizeBytes = entry.Length,
-			};
+			var item = NewLinuxItem();
+			item.PrimaryItemAttribute = StorageItemTypes.File;
+			item.FileExtension = extension;
+			item.IsHiddenItem = entry.IsHidden;
+			item.Opacity = opacity;
+			item.FileImage = null;
+			item.LoadFileIcon = false;
+			item.ItemNameRaw = entry.Name;
+			item.ItemDateModifiedReal = modified;
+			item.ItemDateAccessedReal = accessed;
+			item.ItemDateCreatedReal = created;
+			item.ItemType = itemType;
+			item.ItemPath = entry.FullPath;
+			item.FileSize = entry.Length.ToSizeString();
+			item.FileSizeBytes = entry.Length;
+			return item;
 		}
 
 		private void WatchForLinuxFolderChanges(string path)
@@ -223,8 +248,43 @@ namespace Files.App.ViewModels
 			}
 		}
 
+		// Raises GitDirectoryUpdated when the repository metadata changes (commit, checkout, stage, fetch) so the status columns refresh
+		private void WatchForLinuxRepositoryChanges()
+		{
+			if (isDisposed || string.IsNullOrEmpty(GitDirectory))
+				return;
+
+			_linuxRepositoryWatcher?.Dispose();
+			_linuxRepositoryWatcher = null;
+
+			var metadata = Path.Combine(GitDirectory, ".git");
+			if (!Directory.Exists(metadata))
+				return;
+
+			try
+			{
+				var watcherInstance = Ioc.Default.GetRequiredService<IFolderWatcherFactory>().Create(metadata, new FolderWatcherOptions { Debounce = TimeSpan.FromMilliseconds(400) });
+
+				void OnChanged(object? s, EventArgs e) => _ = dispatcherQueue.EnqueueOrInvokeAsync(() => GitDirectoryUpdated?.Invoke(null, null!));
+
+				watcherInstance.Created += OnChanged;
+				watcherInstance.Deleted += OnChanged;
+				watcherInstance.Changed += OnChanged;
+				watcherInstance.Renamed += OnChanged;
+				watcherInstance.Start();
+
+				_linuxRepositoryWatcher = watcherInstance;
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not watch the repository metadata of {Path}", GitDirectory);
+			}
+		}
+
 		private void CloseLinuxWatcher()
 		{
+			_linuxRepositoryWatcher?.Dispose();
+			_linuxRepositoryWatcher = null;
 			_linuxRefreshDebounce?.Cancel();
 			_linuxWatcher?.Dispose();
 			_linuxWatcher = null;

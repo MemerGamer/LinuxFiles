@@ -2216,6 +2216,8 @@ namespace Files.App.ViewModels
 					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs() { IsTypeCloudDrive = false, IsTypeGitRepository = IsValidGitDirectory });
 					if (!HasNoWatcher)
 						WatchForLinuxFolderChanges(path);
+					if (IsValidGitDirectory)
+						WatchForLinuxRepositoryChanges();
 					break;
 
 				// Enumeration failed

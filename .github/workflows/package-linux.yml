@@ -1,0 +1,61 @@
+# Copyright (c) Files Community
+# Licensed under the MIT License.
+
+# Abstract:
+#   Publishes a self-contained linux-x64 build of Files and uploads it as a tarball artifact.
+#   Triggered manually or by pushing a linux-v* tag. Uses no secrets.
+
+name: Package Linux
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'linux-v*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  package-linux-x64:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout the repository
+      uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Publish self-contained linux-x64
+      run: scripts/linux/publish.sh --rid linux-x64 --tarball
+
+    - name: Bundle packaging files
+      run: |
+        tar -C packaging -czf artifacts/files-packaging.tar.gz linux
+
+    - name: Upload tarball
+      uses: actions/upload-artifact@v4
+      with:
+        name: files-linux-x64
+        path: |
+          artifacts/files-linux-x64.tar.gz
+          artifacts/files-packaging.tar.gz
+        if-no-files-found: error

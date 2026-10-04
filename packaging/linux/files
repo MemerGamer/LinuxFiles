@@ -1,0 +1,32 @@
+#!/bin/sh
+# Launcher for Files. Installed as `files` in /usr/bin or ~/.local/bin.
+# Resolves the install directory (follows symlinks) and starts the app:
+#   - self-contained build: runs the `Files` apphost
+#   - framework-dependent build: runs `dotnet Files.dll`
+set -e
+
+self="$0"
+while [ -h "$self" ]; do
+  dir="$(cd "$(dirname "$self")" && pwd)"
+  self="$(readlink "$self")"
+  case "$self" in /*) ;; *) self="$dir/$self" ;; esac
+done
+
+libdir="${FILES_LIBDIR:-}"
+if [ -z "$libdir" ]; then
+  here="$(cd "$(dirname "$self")" && pwd)"
+  for candidate in "$here" "$here/../share/linuxfiles" "$here/../lib/linuxfiles" \
+                   "$HOME/.local/share/linuxfiles" /usr/lib/linuxfiles /opt/linuxfiles; do
+    if [ -f "$candidate/Files.dll" ]; then libdir="$candidate"; break; fi
+  done
+fi
+
+if [ -z "$libdir" ] || [ ! -f "$libdir/Files.dll" ]; then
+  echo "files: cannot find Files.dll (set FILES_LIBDIR)" >&2
+  exit 1
+fi
+
+if [ -x "$libdir/Files" ]; then
+  exec "$libdir/Files" "$@"
+fi
+exec dotnet "$libdir/Files.dll" "$@"

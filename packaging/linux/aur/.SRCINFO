@@ -1,0 +1,27 @@
+pkgbase = linuxfiles
+	pkgdesc = Files, a modern file manager (Linux port built on Uno Platform)
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/MemerGamer/LinuxFiles
+	arch = x86_64
+	arch = aarch64
+	license = MIT
+	makedepends = dotnet-sdk>=10.0
+	makedepends = git
+	depends = fontconfig
+	depends = freetype2
+	depends = libx11
+	depends = libxcursor
+	depends = libxrandr
+	depends = libxi
+	depends = libxext
+	depends = mesa
+	depends = glib2
+	depends = hicolor-icon-theme
+	optdepends = gvfs: network and MTP locations
+	optdepends = gnome-disk-utility: format and manage drives
+	options = !strip
+	source = linuxfiles-0.1.0.tar.gz::https://github.com/MemerGamer/LinuxFiles/archive/refs/tags/linux-v0.1.0.tar.gz
+	sha256sums = SKIP
+
+pkgname = linuxfiles

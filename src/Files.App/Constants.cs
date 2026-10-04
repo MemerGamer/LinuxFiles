@@ -91,7 +91,9 @@ namespace Files.App
 			/// and "Segoe UI" on Windows 10, matching the WinUI ContentControlThemeFontFamily default.
 			/// </summary>
 			public static string StandardFont =>
-				OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)
+				OperatingSystem.IsLinux()
+					? "Selawik"
+					: OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22000)
 					? "Segoe UI Variable"
 					: "Segoe UI";
 		}

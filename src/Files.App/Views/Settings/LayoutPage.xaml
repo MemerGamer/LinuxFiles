@@ -37,7 +37,7 @@
 			<!--  Folder Overrides  -->
 			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=SyncFolderPreferencesAcrossDirectories}">
 				<wctcontrols:SettingsCard.HeaderIcon>
-					<FontIcon Glyph="&#xE621;" />
+					<FontIcon Glyph="&#xE8A9;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
 
 				<ToggleSwitch

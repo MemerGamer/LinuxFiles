@@ -4,7 +4,6 @@
 using CommunityToolkit.WinUI.Helpers;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
-using System.Drawing.Text;
 using System.Windows.Input;
 
 namespace Files.App.ViewModels.Settings
@@ -136,9 +135,8 @@ namespace Files.App.ViewModels.Settings
 
 			try
 			{
-				var installedFontFamilies = new InstalledFontCollection()
-					.Families
-					.Select(fontFamily => fontFamily.Name)
+				var installedFontFamilies = SkiaSharp.SKFontManager.Default
+					.FontFamilies
 					.Where(name => !string.IsNullOrWhiteSpace(name))
 					.Distinct(StringComparer.OrdinalIgnoreCase)
 					.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase);

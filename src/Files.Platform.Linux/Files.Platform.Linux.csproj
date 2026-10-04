@@ -16,6 +16,8 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
         <PackageReference Include="SkiaSharp" />
+        <PackageReference Include="Svg.Skia" />
+        <PackageReference Include="Tmds.DBus.Protocol" />
         <PackageReference Include="SkiaSharp.NativeAssets.Linux" />
     </ItemGroup>
 

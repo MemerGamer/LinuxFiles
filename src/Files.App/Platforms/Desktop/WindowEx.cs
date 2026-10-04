@@ -61,6 +61,76 @@ namespace Files.App.Data.Items
 		{
 			MinWidth = minWidth;
 			MinHeight = minHeight;
+
+			ApplyDefaultSize();
+		}
+
+		/// <summary>
+		/// Sizes the window to 80% of the primary work area (at most 1280x800 scaled up to 1600x1000 on big screens), centered.
+		/// </summary>
+		private void ApplyDefaultSize()
+		{
+			try
+			{
+				var work = DisplayArea.Primary.WorkArea;
+				var width = Math.Clamp((int)(work.Width * 0.8), Math.Min(MinWidth, work.Width), 1600);
+				var height = Math.Clamp((int)(work.Height * 0.8), Math.Min(MinHeight, work.Height), 1000);
+				AppWindow.Resize(new Windows.Graphics.SizeInt32 { Width = width, Height = height });
+				AppWindow.Move(new Windows.Graphics.PointInt32 { X = work.X + (work.Width - width) / 2, Y = work.Y + (work.Height - height) / 2 });
+			}
+			catch (Exception)
+			{
+				AppWindow.Resize(new Windows.Graphics.SizeInt32 { Width = 1280, Height = 800 });
+			}
+		}
+
+		/// <summary>
+		/// Restores the size and position saved by <see cref="SavePlacement"/>, if any, clamped to the work area.
+		/// </summary>
+		public void RestorePlacement(Files.Platform.Abstractions.ILocalSettingsStore settings)
+		{
+			try
+			{
+				var store = settings.GetContainer("WindowPlacement");
+				if (!store.TryGetValue<int>("Width", out var width) || !store.TryGetValue<int>("Height", out var height) || width < MinWidth || height < MinHeight)
+					return;
+
+				var work = DisplayArea.Primary.WorkArea;
+				width = Math.Min(width, work.Width);
+				height = Math.Min(height, work.Height);
+				AppWindow.Resize(new Windows.Graphics.SizeInt32 { Width = width, Height = height });
+
+				if (store.TryGetValue<int>("X", out var x) && store.TryGetValue<int>("Y", out var y))
+				{
+					x = Math.Clamp(x, work.X, Math.Max(work.X, work.X + work.Width - width));
+					y = Math.Clamp(y, work.Y, Math.Max(work.Y, work.Y + work.Height - height));
+					AppWindow.Move(new Windows.Graphics.PointInt32 { X = x, Y = y });
+				}
+			}
+			catch (Exception)
+			{
+			}
+		}
+
+		/// <summary>
+		/// Persists the current size and position (skipped while maximized or minimized).
+		/// </summary>
+		public void SavePlacement(Files.Platform.Abstractions.ILocalSettingsStore settings)
+		{
+			try
+			{
+				if (AppWindow.Presenter is OverlappedPresenter { State: not OverlappedPresenterState.Restored })
+					return;
+
+				var store = settings.GetContainer("WindowPlacement");
+				store.Set("Width", AppWindow.Size.Width);
+				store.Set("Height", AppWindow.Size.Height);
+				store.Set("X", AppWindow.Position.X);
+				store.Set("Y", AppWindow.Position.Y);
+			}
+			catch (Exception)
+			{
+			}
 		}
 
 		public void Dispose()

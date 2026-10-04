@@ -63,6 +63,24 @@ namespace Files.App.Services
 
 			// Registering to color changes, so that we can notice when changed system theme mode
 			UISettings.ColorValuesChanged += UISettings_ColorValuesChanged;
+
+#if HAS_UNO
+			Files.Platform.Linux.Theme.LinuxColorScheme.Initialize();
+			Files.Platform.Linux.Theme.LinuxColorScheme.Changed += async (_, _) =>
+				await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => SetAppThemeMode());
+#endif
+		}
+
+		/// <summary>
+		/// On Linux "Use system setting" follows the desktop colour scheme (XDG portal), which Uno does not track itself.
+		/// </summary>
+		private static ElementTheme ResolveRootTheme(ElementTheme theme)
+		{
+#if HAS_UNO
+			if (theme is ElementTheme.Default)
+				return Files.Platform.Linux.Theme.LinuxColorScheme.IsDark ? ElementTheme.Dark : ElementTheme.Light;
+#endif
+			return theme;
 		}
 
 		/// <inheritdoc/>
@@ -87,7 +105,7 @@ namespace Files.App.Services
 				rootTheme ??= AppThemeMode;
 
 				if (window.Content is FrameworkElement rootElement)
-					rootElement.RequestedTheme = (ElementTheme)rootTheme;
+					rootElement.RequestedTheme = ResolveRootTheme((ElementTheme)rootTheme);
 
 				if (titleBar is not null)
 				{

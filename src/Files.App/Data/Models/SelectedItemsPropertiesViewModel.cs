@@ -145,6 +145,13 @@ namespace Files.App.Data.Models
 			set => SetProperty(ref itemLocationVisibility, value);
 		}
 
+		private string? linkTarget;
+		public string? LinkTarget
+		{
+			get => linkTarget;
+			set => SetProperty(ref linkTarget, value);
+		}
+
 		private string? itemSize;
 		public string? ItemSize
 		{
@@ -547,7 +554,31 @@ namespace Files.App.Data.Models
 		public bool IsSelectedItemShortcut
 		{
 			get => isSelectedItemShortcut;
-			set => SetProperty(ref isSelectedItemShortcut, value);
+			set
+			{
+				if (SetProperty(ref isSelectedItemShortcut, value))
+					OnPropertyChanged(nameof(IsOpenTargetVisible));
+			}
+		}
+
+		private bool isLinuxOpenTargetAvailable;
+		public bool IsLinuxOpenTargetAvailable
+		{
+			get => isLinuxOpenTargetAvailable;
+			set
+			{
+				if (SetProperty(ref isLinuxOpenTargetAvailable, value))
+					OnPropertyChanged(nameof(IsOpenTargetVisible));
+			}
+		}
+
+		public bool IsOpenTargetVisible => IsSelectedItemShortcut || IsLinuxOpenTargetAvailable;
+
+		private string? desktopEntryName;
+		public string? DesktopEntryName
+		{
+			get => desktopEntryName;
+			set => SetProperty(ref desktopEntryName, value);
 		}
 
 		public void CheckAllFileExtensions(List<string?> itemExtensions)

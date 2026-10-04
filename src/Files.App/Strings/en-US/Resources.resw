@@ -4744,4 +4744,64 @@
     <value>{0} Volume</value>
     <comment>Name of a drive without a label. {0} is the size, e.g. "128 GiB Volume"</comment>
   </data>
+  <data name="PropertiesLinkTarget" xml:space="preserve">
+    <value>Link target:</value>
+  </data>
+  <data name="PropertiesPermissionsOwnerGroup" xml:space="preserve">
+    <value>Owner</value>
+  </data>
+  <data name="PropertiesPermissionsGroupGroup" xml:space="preserve">
+    <value>Group</value>
+  </data>
+  <data name="PropertiesPermissionsOthersGroup" xml:space="preserve">
+    <value>Others</value>
+  </data>
+  <data name="PropertiesPermissionsRead" xml:space="preserve">
+    <value>Read</value>
+  </data>
+  <data name="PropertiesPermissionsWrite" xml:space="preserve">
+    <value>Write</value>
+  </data>
+  <data name="PropertiesPermissionsExecute" xml:space="preserve">
+    <value>Execute</value>
+  </data>
+  <data name="PropertiesPermissionsOwnerLabel" xml:space="preserve">
+    <value>Owner:</value>
+  </data>
+  <data name="PropertiesPermissionsGroupLabel" xml:space="preserve">
+    <value>Group:</value>
+  </data>
+  <data name="PropertiesPermissionsAllowExecuting" xml:space="preserve">
+    <value>Allow executing file as program</value>
+  </data>
+  <data name="PropertiesPermissionsApplyRecursive" xml:space="preserve">
+    <value>Apply to all items inside this folder</value>
+  </data>
+  <data name="PropertiesPermissionsReadOnlyNote" xml:space="preserve">
+    <value>You are not the owner of this item, so its permissions cannot be changed.</value>
+  </data>
+  <data name="PropertiesPermissionsOwnerReadOnlyNote" xml:space="preserve">
+    <value>Only an administrator can change the owner and group.</value>
+  </data>
+  <data name="PropertiesPermissionsRecursiveTitle" xml:space="preserve">
+    <value>Change permissions of everything inside?</value>
+  </data>
+  <data name="PropertiesPermissionsRecursiveContent" xml:space="preserve">
+    <value>The permission changes will be applied to this folder and every file and folder inside it. Symbolic links are skipped.</value>
+  </data>
+  <data name="PropertiesPermissionsRecursiveConfirm" xml:space="preserve">
+    <value>Apply</value>
+  </data>
+  <data name="PropertiesPermissionsApplyFailed" xml:space="preserve">
+    <value>Some items could not be changed: {0}</value>
+  </data>
+  <data name="PropertiesDesktopEntryName" xml:space="preserve">
+    <value>Name:</value>
+  </data>
+  <data name="PropertiesDesktopEntryExec" xml:space="preserve">
+    <value>Command:</value>
+  </data>
+  <data name="PropertiesOpenTargetLocation" xml:space="preserve">
+    <value>Open target location</value>
+  </data>
 </root>

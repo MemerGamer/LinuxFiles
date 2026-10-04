@@ -1,3 +1,4 @@
+using Files.Platform.Abstractions.Permissions;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using System.IO;
@@ -53,6 +54,12 @@ namespace Files.App.ViewModels.Properties
 
 		public override async Task GetSpecialPropertiesAsync()
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				await GetSpecialPropertiesLinuxAsync();
+				return;
+			}
+
 			var itemsWithPaths = List.Select(item => (
 				Item: item,
 				Path: item.GetRequiredPath())).ToList();
@@ -150,8 +157,63 @@ namespace Files.App.ViewModels.Properties
 			SetItemsCountString();
 		}
 
+		private async Task GetSpecialPropertiesLinuxAsync()
+		{
+			ViewModel.ItemAttributesVisibility = false;
+			ViewModel.CanCompressContent = false;
+			ViewModel.LastSeparatorVisibility = false;
+			ViewModel.ItemSizeVisibility = true;
+
+			var stat = Ioc.Default.GetRequiredService<IFileStatService>();
+			long size = 0, onDisk = 0;
+			ViewModel.ItemSizeProgressVisibility = true;
+			ViewModel.ItemSizeOnDiskProgressVisibility = true;
+
+			foreach (var item in List)
+			{
+				var path = item.GetRequiredPath();
+				var isFolder = item.PrimaryItemAttribute == StorageItemTypes.Folder && !item.IsArchive;
+
+				if (isFolder)
+					ViewModel.FoldersCount++;
+				else
+					ViewModel.FilesCount++;
+
+				if (!stat.TryGetStat(path, out var info))
+					continue;
+
+				if (isFolder && !info.IsSymbolicLink)
+				{
+					try
+					{
+						var (folderSize, folderOnDisk) = await CalculateFolderSizeAsync(path, TokenSource.Token);
+						size += folderSize;
+						onDisk += folderOnDisk;
+					}
+					catch (Exception ex)
+					{
+						App.Logger.LogWarning(ex, ex.Message);
+					}
+				}
+				else
+				{
+					size += info.Size;
+					onDisk += info.SizeOnDisk;
+				}
+			}
+
+			ViewModel.ItemSizeProgressVisibility = false;
+			ViewModel.ItemSizeOnDiskProgressVisibility = false;
+			ViewModel.ItemSize = size.ToLongSizeString();
+			ViewModel.ItemSizeOnDisk = onDisk.ToLongSizeString();
+			SetItemsCountString();
+		}
+
 		private async void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{
+			if (OperatingSystem.IsLinux())
+				return;
+
 			switch (e.PropertyName)
 			{
 				case "IsReadOnly":

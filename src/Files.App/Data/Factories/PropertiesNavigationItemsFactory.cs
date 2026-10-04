@@ -3,6 +3,7 @@
 
 using Files.App.Controls;
 using Files.App.ViewModels.Properties;
+using Files.Platform.Abstractions;
 using Files.Shared.Helpers;
 using Microsoft.UI.Xaml;
 using Windows.Storage;
@@ -15,6 +16,7 @@ namespace Files.App.Data.Factories
 		public static ObservableCollection<PropertiesNavigationItem> Initialize(object item)
 		{
 			ObservableCollection<PropertiesNavigationItem> propertiesNavigationItems = [];
+			var capabilities = Ioc.Default.GetRequiredService<IPlatformCapabilities>();
 
 			var generalItem = CreateNavigationItem(PropertiesNavigationViewItemType.General, Strings.General.GetLocalizedResource(), "App.ThemedIcons.Properties.General");
 			var securityItem = CreateNavigationItem(PropertiesNavigationViewItemType.Security, Strings.Security.GetLocalizedResource(), "App.ThemedIcons.Properties.Security");
@@ -26,9 +28,12 @@ namespace Files.App.Data.Factories
 			var compatibilityItem = CreateNavigationItem(PropertiesNavigationViewItemType.Compatibility, Strings.Compatibility.GetLocalizedResource(), "App.ThemedIcons.Properties.Compatability");
 			var signaturesItem = CreateNavigationItem(PropertiesNavigationViewItemType.Signatures, Strings.Signatures.GetLocalizedResource(), "App.ThemedIcons.Properties.Signatures");
 
+			var permissionsItem = CreateNavigationItem(PropertiesNavigationViewItemType.Permissions, Strings.Permissions.GetLocalizedResource(), "App.ThemedIcons.Properties.Security");
+
 			propertiesNavigationItems.Add(generalItem);
 			propertiesNavigationItems.Add(signaturesItem);
 			propertiesNavigationItems.Add(securityItem);
+			propertiesNavigationItems.Add(permissionsItem);
 			propertiesNavigationItems.Add(hashesItem);
 			propertiesNavigationItems.Add(shortcutItem);
 			propertiesNavigationItems.Add(libraryItem);
@@ -52,6 +57,7 @@ namespace Files.App.Data.Factories
 				propertiesNavigationItems.Remove(libraryItem);
 				propertiesNavigationItems.Remove(shortcutItem);
 				propertiesNavigationItems.Remove(securityItem);
+				propertiesNavigationItems.Remove(permissionsItem);
 				propertiesNavigationItems.Remove(customizationItem);
 				propertiesNavigationItems.Remove(hashesItem);
 				propertiesNavigationItems.Remove(signaturesItem);
@@ -59,6 +65,8 @@ namespace Files.App.Data.Factories
 			else if (item is ListedItem listedItem)
 			{
 				var isShortcut = listedItem.IsShortcut;
+				if (OperatingSystem.IsLinux() && !isShortcut)
+					isShortcut = LinuxShortcutHelper.IsShortcutLike(listedItem.ItemPath);
 				var isLibrary = listedItem.IsLibrary;
 				var fileExt = listedItem.FileExtension;
 				var isFolder = listedItem.PrimaryItemAttribute == Windows.Storage.StorageItemTypes.Folder;
@@ -67,15 +75,17 @@ namespace Files.App.Data.Factories
 				var isMtpPath = DriveHelpers.IsMtpPath(itemPath);
 				var isNetworkPath = isFolder && DriveHelpers.IsNetworkPath(itemPath);
 
-				var securityItemEnabled = !isLibrary && !listedItem.IsRecycleBinItem;
+				var securityItemEnabled = capabilities.SupportsAclSecurity && !isLibrary && !listedItem.IsRecycleBinItem;
+				var permissionsItemEnabled = !capabilities.SupportsAclSecurity && !isLibrary && !listedItem.IsRecycleBinItem && !isMtpPath && !listedItem.IsFtpItem;
 				var hashItemEnabled = !(isFolder && !listedItem.IsArchive) && !isLibrary && !listedItem.IsRecycleBinItem;
 				var detailsItemEnabled = !(isFolder && !listedItem.IsArchive) && !isLibrary && !listedItem.IsRecycleBinItem;
 				var customizationItemEnabled =
 					!isLibrary &&
 					(isFolder && !listedItem.IsArchive && !listedItem.IsFtpItem && !listedItem.IsRecycleBinItem && !isMtpPath &&
 						(!isNetworkPath || PolicyHelpers.IsShellShortcutIconRemotePathEnabled()) || isShortcut);
-				var compatibilityItemEnabled = FileExtensionHelpers.IsExecutableFile(listedItem is IShortcutItem sht ? sht.TargetPath : fileExt, true);
+				var compatibilityItemEnabled = capabilities.SupportsCompatibilityProperties && FileExtensionHelpers.IsExecutableFile(listedItem is IShortcutItem sht ? sht.TargetPath : fileExt, true);
 				var signaturesItemEnabled =
+					capabilities.SupportsDigitalSignatures &&
 					!isFolder &&
 					!isLibrary &&
 					!listedItem.IsRecycleBinItem &&
@@ -83,6 +93,9 @@ namespace Files.App.Data.Factories
 
 				if (!securityItemEnabled)
 					propertiesNavigationItems.Remove(securityItem);
+
+				if (!permissionsItemEnabled)
+					propertiesNavigationItems.Remove(permissionsItem);
 
 				if (!hashItemEnabled)
 					propertiesNavigationItems.Remove(hashesItem);
@@ -107,6 +120,7 @@ namespace Files.App.Data.Factories
 			}
 			else if (item is DriveItem)
 			{
+				propertiesNavigationItems.Remove(permissionsItem);
 				propertiesNavigationItems.Remove(hashesItem);
 				propertiesNavigationItems.Remove(shortcutItem);
 				propertiesNavigationItems.Remove(libraryItem);
@@ -115,6 +129,18 @@ namespace Files.App.Data.Factories
 				propertiesNavigationItems.Remove(compatibilityItem);
 				propertiesNavigationItems.Remove(signaturesItem);
 			}
+
+			if (!capabilities.SupportsLibraries)
+				propertiesNavigationItems.Remove(libraryItem);
+
+			if (!capabilities.SupportsAclSecurity)
+				propertiesNavigationItems.Remove(securityItem);
+
+			if (!capabilities.SupportsCompatibilityProperties)
+				propertiesNavigationItems.Remove(compatibilityItem);
+
+			if (!capabilities.SupportsDigitalSignatures)
+				propertiesNavigationItems.Remove(signaturesItem);
 
 			return propertiesNavigationItems;
 		}

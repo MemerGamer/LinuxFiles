@@ -12,6 +12,8 @@ namespace Files.App.Views.Properties
 	{
 		private readonly DispatcherQueueTimer _updateDateDisplayTimer;
 
+		private Visibility ClearButtonVisibility => OperatingSystem.IsLinux() ? Visibility.Collapsed : Visibility.Visible;
+
 		public DetailsPage()
 		{
 			InitializeComponent();

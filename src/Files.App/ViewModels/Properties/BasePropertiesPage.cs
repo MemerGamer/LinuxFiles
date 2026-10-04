@@ -50,6 +50,13 @@ namespace Files.App.ViewModels.Properties
 
 				ViewModel.CleanupVisibility = props.Drive.Type != DriveType.Network && props.Drive.Type != DriveType.CloudDrive;
 				ViewModel.FormatVisibility = !(props.Drive.Type == DriveType.Network || props.Drive.Type == DriveType.CloudDrive || string.Equals(props.Drive.Path, $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\", StringComparison.OrdinalIgnoreCase));
+				if (OperatingSystem.IsLinux())
+				{
+					// LINUX-TODO(props): drive cleanup and formatting have no Linux counterpart yet
+					ViewModel.CleanupVisibility = false;
+					ViewModel.FormatVisibility = false;
+				}
+
 				ViewModel.CleanupDriveCommand = new AsyncRelayCommand(() => StorageSenseHelper.OpenStorageSenseAsync(drivePath));
 				ViewModel.FormatDriveCommand = new RelayCommand(async () =>
 				{

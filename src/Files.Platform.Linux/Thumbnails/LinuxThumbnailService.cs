@@ -43,6 +43,16 @@ namespace Files.Platform.Linux.Thumbnails
 		public bool SandboxExternalThumbnailers { get; set; } = BubblewrapSandbox.IsAvailable();
 
 		/// <summary>
+		/// Gets or sets a function that reports whether the sandbox (bwrap) can be used. Exists as a test seam.
+		/// </summary>
+		public Func<bool> IsSandboxAvailable { get; set; } = BubblewrapSandbox.IsAvailable;
+
+		/// <summary>
+		/// Gets or sets a value indicating whether external thumbnailers may run without a sandbox when it is disabled or unavailable. Defaults to <see langword="false"/>.
+		/// </summary>
+		public bool AllowUnsandboxedExternalThumbnailers { get; set; }
+
+		/// <summary>
 		/// Gets or sets the maximum number of concurrent generations.
 		/// </summary>
 		public int MaxConcurrency { get; set; } = Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
@@ -321,8 +331,10 @@ namespace Files.Platform.Linux.Thumbnails
 					return null;
 
 				var (program, arguments) = command.Value;
-				if (_options.SandboxExternalThumbnailers && BubblewrapSandbox.IsAvailable())
-					(program, arguments) = BubblewrapSandbox.Wrap(program, arguments, Path.GetDirectoryName(cachePath)!);
+				if (_options.SandboxExternalThumbnailers && _options.IsSandboxAvailable())
+					(program, arguments) = BubblewrapSandbox.Wrap(program, arguments, Path.GetDirectoryName(cachePath)!, fullPath);
+				else if (!_options.AllowUnsandboxedExternalThumbnailers)
+					return null;
 
 				if (!await _options.ProcessRunner.RunAsync(program, arguments, cancellationToken).ConfigureAwait(false))
 					return null;

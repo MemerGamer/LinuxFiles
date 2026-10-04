@@ -8,6 +8,7 @@ using SkiaSharp;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -263,6 +264,7 @@ namespace Files.Platform.Tests.Thumbnails
 				o.MimeTypeResolver = p => p.EndsWith(".fake", StringComparison.Ordinal) ? "application/x-fake" : null;
 				o.ProcessRunner = runner;
 				o.SandboxExternalThumbnailers = false;
+				o.AllowUnsandboxedExternalThumbnailers = true;
 			});
 
 			var bytes = await service.GetThumbnailAsync(path, 256);
@@ -345,26 +347,78 @@ namespace Files.Platform.Tests.Thumbnails
 			Assert.IsNull(entry.BuildCommand("/x/a", "file:///x/a", "/out/o.png", 128));
 		}
 
-		[TestMethod]
-		public void Bubblewrap_BuildsReadOnlySandboxArguments()
+		private static (string, IReadOnlyList<string>) FakeWrap(string[]? symlinks = null)
 		{
-			var (fileName, args) = BubblewrapSandbox.Wrap("/usr/bin/thumb", ["-s", "128", "/x/a"], "/cache/normal");
-
-			Assert.AreEqual("bwrap", fileName);
-			CollectionAssert.AreEqual(new[]
-			{
-				"--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
-				"--bind", "/cache/normal", "/cache/normal", "--unshare-all", "--die-with-parent",
-				"--", "/usr/bin/thumb", "-s", "128", "/x/a",
-			}, new List<string>(args));
+			var links = new HashSet<string>(symlinks ?? ["/bin", "/sbin", "/lib", "/lib64"]);
+			return BubblewrapSandbox.Wrap("/usr/bin/thumb", ["-s", "128", "/x/a"], "/cache/normal", "/x/a",
+				p => links.Contains(p) ? "usr" + p : null,
+				p => p is "/lib32" or "/etc/fonts" or "/etc/ld.so.cache");
 		}
 
 		[TestMethod]
-		public async Task ExternalThumbnailer_IsWrappedWhenSandboxEnabledAndBwrapPresent()
+		public void Bubblewrap_BuildsMinimalSandboxArguments()
+		{
+			var (fileName, args) = FakeWrap();
+			var list = new List<string>(args);
+
+			Assert.AreEqual("bwrap", fileName);
+			CollectionAssert.AreEqual(new[] { "--ro-bind", "/usr", "/usr" }, list.GetRange(list.IndexOf("--ro-bind"), 3));
+			CollectionAssert.IsSubsetOf(new[] { "--unshare-all", "--die-with-parent", "--new-session", "--clearenv", "--proc", "--dev", "--tmpfs" }, list);
+			CollectionAssert.AreEqual(new[] { "--symlink", "usr/bin", "/bin" }, list.GetRange(list.IndexOf("--symlink"), 3));
+			Assert.IsTrue(ContainsSequence(list, "--ro-bind", "/lib32", "/lib32"));
+			Assert.IsTrue(ContainsSequence(list, "--ro-bind", "/etc/fonts", "/etc/fonts"));
+			Assert.IsTrue(ContainsSequence(list, "--ro-bind", "/x/a", "/x/a"));
+			Assert.IsTrue(ContainsSequence(list, "--bind", "/cache/normal", "/cache/normal"));
+			Assert.IsTrue(ContainsSequence(list, "--setenv", "PATH", "/usr/bin:/bin"));
+			Assert.IsTrue(ContainsSequence(list, "--chdir", "/", "--"));
+			CollectionAssert.AreEqual(new[] { "/usr/bin/thumb", "-s", "128", "/x/a" }, list.GetRange(list.Count - 4, 4));
+		}
+
+		[TestMethod]
+		public void Bubblewrap_NeverExposesRootHomeOrRun()
+		{
+			var (_, args) = FakeWrap();
+			var list = new List<string>(args);
+
+			Assert.IsFalse(ContainsSequence(list, "--ro-bind", "/", "/"));
+			Assert.IsFalse(ContainsSequence(list, "--bind", "/", "/"));
+			foreach (var arg in list)
+			{
+				Assert.IsFalse(arg == "/home" || arg.StartsWith("/home/", StringComparison.Ordinal), arg);
+				Assert.IsFalse(arg == "/run" || arg.StartsWith("/run/", StringComparison.Ordinal) || arg.StartsWith("/var/run", StringComparison.Ordinal), arg);
+			}
+		}
+
+		private static bool ContainsSequence(List<string> list, params string[] seq)
+		{
+			for (var i = 0; i + seq.Length <= list.Count; i++)
+			{
+				if (list.GetRange(i, seq.Length).SequenceEqual(seq))
+					return true;
+			}
+
+			return false;
+		}
+
+		[TestMethod]
+		public async Task Bubblewrap_Integration_RunDirIsNotVisible()
 		{
 			if (!BubblewrapSandbox.IsAvailable())
 				return;
 
+			var input = Path.Combine(_files, "in.txt");
+			File.WriteAllText(input, "x");
+			var runner = new ThumbnailerProcessRunner();
+
+			var (control, controlArgs) = BubblewrapSandbox.Wrap("ls", ["/usr"], _files, input);
+			var (probe, probeArgs) = BubblewrapSandbox.Wrap("ls", ["/run/user"], _files, input);
+
+			Assert.IsTrue(await runner.RunAsync(control, controlArgs, CancellationToken.None), "sandbox itself should work");
+			Assert.IsFalse(await runner.RunAsync(probe, probeArgs, CancellationToken.None));
+		}
+
+		private async Task<FakeRunner> RunExternalAsync(Action<LinuxThumbnailOptions> configure)
+		{
 			var dir = Path.Combine(_root, "thumbnailers");
 			Directory.CreateDirectory(dir);
 			File.WriteAllText(Path.Combine(dir, "fake.thumbnailer"), "[Thumbnailer Entry]\nExec=fake-thumb %i %o\nMimeType=application/x-fake;\n");
@@ -376,12 +430,39 @@ namespace Files.Platform.Tests.Thumbnails
 				o.ThumbnailerDirectories = [dir];
 				o.MimeTypeResolver = _ => "application/x-fake";
 				o.ProcessRunner = runner;
-				o.SandboxExternalThumbnailers = true;
+				configure(o);
 			});
 
 			await service.GetThumbnailAsync(path, 128);
+			return runner;
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_IsSandboxedWhenAvailable()
+		{
+			var runner = await RunExternalAsync(o => o.IsSandboxAvailable = () => true);
 
 			Assert.AreEqual("bwrap", runner.FileName);
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_IsSkippedWithoutSandboxByDefault()
+		{
+			var runner = await RunExternalAsync(o => o.IsSandboxAvailable = () => false);
+
+			Assert.IsNull(runner.FileName);
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_RunsUnsandboxedOnlyWhenExplicitlyAllowed()
+		{
+			var runner = await RunExternalAsync(o =>
+			{
+				o.IsSandboxAvailable = () => false;
+				o.AllowUnsandboxedExternalThumbnailers = true;
+			});
+
+			Assert.AreEqual("fake-thumb", runner.FileName);
 		}
 
 		private sealed class FakeRunner : IThumbnailerProcessRunner

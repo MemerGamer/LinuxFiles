@@ -27,5 +27,15 @@ namespace Files.App.Data.Enums
 		/// GZip archive format.
 		/// </summary>
 		GZip,
+
+		/// <summary>
+		/// Gzip compressed tar archive (.tar.gz).
+		/// </summary>
+		TarGz,
+
+		/// <summary>
+		/// Bzip2 compressed tar archive (.tar.bz2).
+		/// </summary>
+		TarBz2,
 	}
 }

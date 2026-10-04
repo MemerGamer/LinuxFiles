@@ -62,6 +62,14 @@ namespace Files.App.Data.Contracts
 		string GenerateArchiveNameFromItems(IReadOnlyList<ListedItem> items);
 
 		/// <summary>
+		/// Gets the value that indicates whether the archive has more than one top level entry (so "extract here" should use a child folder).
+		/// </summary>
+		/// <param name="archiveFilePath">The archive file path.</param>
+		/// <param name="password">The password, if the archive is encrypted.</param>
+		/// <returns>True if there are several top level entries, or if that cannot be determined.</returns>
+		Task<bool> HasMultipleTopLevelEntriesAsync(string archiveFilePath, string password = "");
+
+		/// <summary>
 		/// Gets the value that indicates whether the archive file is encrypted.
 		/// </summary>
 		/// <param name="archiveFilePath">The archive file path to check if the item is encrypted.</param>

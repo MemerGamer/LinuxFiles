@@ -4768,4 +4768,17 @@
   <data name="LinuxUntrustedLauncherText" xml:space="preserve">
     <value>This launcher is not trusted. Only run launchers from sources you trust.</value>
   </data>
+  <data name="ArchiveLimitExceededTitle" xml:space="preserve">
+    <value>This archive is unusually large</value>
+  </data>
+  <data name="ArchiveLimitExceededContent" xml:space="preserve">
+    <value>Extracting this archive would exceed the safety limit ({0}). It may be a decompression bomb that fills the disk. Do you want to continue anyway?</value>
+    <comment>{0} is the measured value and the limit</comment>
+  </data>
+  <data name="ArchiveLimitContinue" xml:space="preserve">
+    <value>Continue anyway</value>
+  </data>
+  <data name="ArchiveRefusedTitle" xml:space="preserve">
+    <value>The archive could not be extracted</value>
+  </data>
 </root>

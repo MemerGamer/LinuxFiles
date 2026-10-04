@@ -148,7 +148,7 @@ namespace Files.App.Dialogs
 
 			public FileFormatItem FileFormat
 			{
-				get => FileFormats.First(format => format.Key == GeneralSettingsService.ArchiveFormatsOption);
+				get => FileFormats.FirstOrDefault(format => format.Key == GeneralSettingsService.ArchiveFormatsOption) ?? FileFormats[0];
 				set
 				{
 					if (value.Key != GeneralSettingsService.ArchiveFormatsOption)
@@ -173,7 +173,16 @@ namespace Files.App.Dialogs
 				}
 			}
 
+#if HAS_UNO
+			// LINUX-TODO(archives): volume splitting and encryption need the 7-Zip binary with passwords on the command line, which leaks them
+			public bool CanSplit => false;
+
+			public bool CanEncrypt => false;
+#else
 			public bool CanSplit => FileFormat.Key is ArchiveFormats.SevenZip;
+
+			public bool CanEncrypt => true;
+#endif
 
 			public SplittingSizeItem SplittingSize
 			{
@@ -244,11 +253,25 @@ namespace Files.App.Dialogs
 				}
 			}
 
+#if HAS_UNO
+			public ImmutableList<FileFormatItem> FileFormats { get; } = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>()
+				.CreatableFormats
+				.Select(format => format switch
+				{
+					Files.Platform.Abstractions.Archives.ArchiveFormat.SevenZip => new FileFormatItem(ArchiveFormats.SevenZip, ".7z"),
+					Files.Platform.Abstractions.Archives.ArchiveFormat.Tar => new FileFormatItem(ArchiveFormats.Tar, ".tar"),
+					Files.Platform.Abstractions.Archives.ArchiveFormat.TarGz => new FileFormatItem(ArchiveFormats.TarGz, ".tar.gz"),
+					Files.Platform.Abstractions.Archives.ArchiveFormat.TarBz2 => new FileFormatItem(ArchiveFormats.TarBz2, ".tar.bz2"),
+					_ => new FileFormatItem(ArchiveFormats.Zip, ".zip"),
+				})
+				.ToImmutableList();
+#else
 			public ImmutableList<FileFormatItem> FileFormats { get; } =
 			[
 				new(ArchiveFormats.Zip, ".zip"),
 				new(ArchiveFormats.SevenZip, ".7z"),
 			];
+#endif
 
 			public ImmutableList<CompressionLevelItem> CompressionLevels { get; } =
 			[

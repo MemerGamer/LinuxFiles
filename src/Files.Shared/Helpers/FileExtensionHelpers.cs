@@ -128,11 +128,20 @@ namespace Files.Shared.Helpers
 		/// <returns><c>true</c> if the fileExtensionToCheck is a zip bundle file; otherwise, <c>false</c>.</returns>
 		public static bool IsZipFile(string? fileExtensionToCheck)
 		{
-			return HasExtension(fileExtensionToCheck, ".zip", ".msix", ".appx", ".msixbundle", ".appxbundle", ".7z", ".rar", ".tar", ".mcpack", ".mcworld", ".mrpack", ".jar", ".gz", ".lzh");
+			return HasExtension(fileExtensionToCheck, ".zip", ".msix", ".appx", ".msixbundle", ".appxbundle", ".7z", ".rar", ".tar", ".mcpack", ".mcworld", ".mrpack", ".jar", ".gz", ".lzh", ".tgz", ".bz2", ".xz", ".zst", ".tbz2", ".txz", ".tzst");
 		}
 
 		public static bool IsBrowsableZipFile(string? filePath, [NotNullWhen(true)] out string? ext)
 		{
+			// LINUX-TODO(archives): browsing archives as folders (ZipStorageFolder) is built on 7z.dll and '\\' paths; on Linux archives are
+			// plain files that the Extract actions (IArchiveService) handle.
+			if (!OperatingSystem.IsWindows())
+			{
+				ext = null;
+
+				return false;
+			}
+
 			if (string.IsNullOrWhiteSpace(filePath))
 			{
 				ext = null;

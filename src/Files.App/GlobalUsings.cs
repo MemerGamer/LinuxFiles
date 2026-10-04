@@ -72,6 +72,11 @@ global using global::Files.Core.Storage.EventArguments;
 global using global::Files.Core.Storage.Extensions;
 global using global::OwlCore.Storage;
 
+// Files.Platform
+
+global using global::Files.Platform.Abstractions;
+global using global::Files.Platform.Windows;
+
 // Files.App.Storage
 
 global using global::Files.App.Storage;

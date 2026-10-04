@@ -315,6 +315,8 @@ namespace Files.App.Helpers
 					.SetMinimumLevel(LogLevel.Information));
 
 			services
+					// Platform services
+					.AddWindowsPlatform()
 					// Settings services
 					.AddSingleton<IUserSettingsService, UserSettingsService>()
 					.AddSingleton<IAppearanceSettingsService, AppearanceSettingsService>(sp => new AppearanceSettingsService(((UserSettingsService)sp.GetRequiredService<IUserSettingsService>()).GetSharingContext()))

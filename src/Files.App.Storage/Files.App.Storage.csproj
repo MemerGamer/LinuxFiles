@@ -34,6 +34,11 @@
         </Reference>
     </ItemGroup>
 
+    <Target Name="BuildCsWin32ForCompat" BeforeTargets="ResolveAssemblyReferences" Condition="'$(FilesWin32Compat)' == 'true' And !$(TargetFramework.Contains('-windows'))">
+        <MSBuild Projects="..\Files.App.CsWin32\Files.App.CsWin32.csproj" Targets="Restore" Properties="Configuration=$(Configuration);Platform=x64;EnableWindowsTargeting=true;_FilesCompatRestore=true" RemoveProperties="TargetFramework;RuntimeIdentifier" />
+        <MSBuild Projects="..\Files.App.CsWin32\Files.App.CsWin32.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=x64;EnableWindowsTargeting=true" RemoveProperties="TargetFramework;RuntimeIdentifier" />
+    </Target>
+
     <!--  Uno.Sdk drops a root-level Windows/ folder from Compile on non-Windows targets; add it back late in compat mode  -->
     <Target Name="AddWin32CompatSources" BeforeTargets="BeforeCompile;CoreCompile" Condition="'$(FilesWin32Compat)' == 'true'">
         <ItemGroup>

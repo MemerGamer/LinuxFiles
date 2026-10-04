@@ -257,6 +257,12 @@
         <AdditionalFiles Include="Strings\en-US\Resources.resw" />
     </ItemGroup>
 
+    <!--  Compat mode needs the CsWin32 assembly built for the Windows TFM (works on Linux with Platform=x64).  -->
+    <Target Name="BuildCsWin32ForCompat" BeforeTargets="ResolveAssemblyReferences" Condition="'$(FilesWin32Compat)' == 'true' And '$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <MSBuild Projects="..\Files.App.CsWin32\Files.App.CsWin32.csproj" Targets="Restore" Properties="Configuration=$(Configuration);Platform=x64;EnableWindowsTargeting=true;_FilesCompatRestore=true" RemoveProperties="TargetFramework;RuntimeIdentifier" />
+        <MSBuild Projects="..\Files.App.CsWin32\Files.App.CsWin32.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=x64;EnableWindowsTargeting=true" RemoveProperties="TargetFramework;RuntimeIdentifier" />
+    </Target>
+
     <!--  Files.App.Server is an out-of-process COM server, not a project reference.
          Build it before we resolve assemblies so its .winmd is available for CsWinRT.  -->
     <Target Name="BuildFilesAppServer" BeforeTargets="ResolveAssemblyReferences" Condition="$(TargetFramework.Contains('-windows'))">

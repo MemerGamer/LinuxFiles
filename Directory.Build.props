@@ -9,6 +9,8 @@
     <WindowsSdkPackageVersion>10.0.26100.67-preview</WindowsSdkPackageVersion>
     <WindowsTargetFramework>$(BaseTargetFramework)-windows$(TargetWindowsVersion)</WindowsTargetFramework>
     <DesktopTargetFramework>$(BaseTargetFramework)-desktop</DesktopTargetFramework>
+    <!-- Linux bring-up: compile existing Win32 code against CsWin32 types until it is replaced by Files.Platform services. -->
+    <FilesWin32Compat Condition="'$(FilesWin32Compat)' == ''">true</FilesWin32Compat>
     <LangVersion>preview</LangVersion>
     <WarningsAsErrors>nullable</WarningsAsErrors>
 

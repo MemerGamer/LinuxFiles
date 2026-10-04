@@ -220,24 +220,73 @@ namespace Files.Platform.Linux.Thumbnails
 		}
 
 		/// <summary>
-		/// Wraps a command so it runs with a read-only root and write access only to <paramref name="writableDirectory"/>.
+		/// Wraps a command in a minimal sandbox modelled on gnome-desktop's thumbnail sandbox: only system directories,
+		/// the input file (read-only) and the output directory are visible, with no network, no /home, no /run and a cleared environment.
 		/// </summary>
-		public static (string FileName, IReadOnlyList<string> Arguments) Wrap(string fileName, IReadOnlyList<string> arguments, string writableDirectory)
+		/// <param name="fileName">The program to run.</param>
+		/// <param name="arguments">The program arguments.</param>
+		/// <param name="writableDirectory">The only writable directory (holds the output file).</param>
+		/// <param name="inputPath">The absolute path of the input file, bound read-only at the same path.</param>
+		/// <param name="linkTarget">Returns the symlink target of a path, or <see langword="null"/> when it is not a symlink; defaults to the file system.</param>
+		/// <param name="exists">Returns whether a path exists; defaults to the file system.</param>
+		public static (string FileName, IReadOnlyList<string> Arguments) Wrap(
+			string fileName,
+			IReadOnlyList<string> arguments,
+			string writableDirectory,
+			string inputPath,
+			Func<string, string?>? linkTarget = null,
+			Func<string, bool>? exists = null)
 		{
+			linkTarget ??= GetLinkTarget;
+			exists ??= static p => File.Exists(p) || Directory.Exists(p);
+
 			var args = new List<string>
 			{
-				"--ro-bind", "/", "/",
-				"--dev", "/dev",
-				"--proc", "/proc",
-				"--tmpfs", "/tmp",
-				"--bind", writableDirectory, writableDirectory,
 				"--unshare-all",
 				"--die-with-parent",
-				"--",
-				fileName,
+				"--new-session",
+				"--clearenv",
+				"--setenv", "PATH", "/usr/bin:/bin",
+				"--setenv", "HOME", "/tmp",
+				"--setenv", "LANG", "C.UTF-8",
+				"--proc", "/proc",
+				"--dev", "/dev",
+				"--tmpfs", "/tmp",
+				"--ro-bind", "/usr", "/usr",
 			};
+
+			foreach (var dir in new[] { "/bin", "/sbin", "/lib", "/lib64", "/lib32" })
+			{
+				var target = linkTarget(dir);
+				if (target is not null)
+					args.AddRange(["--symlink", target, dir]);
+				else if (exists(dir))
+					args.AddRange(["--ro-bind", dir, dir]);
+			}
+
+			foreach (var path in new[] { "/etc/ld.so.cache", "/etc/ld.so.conf", "/etc/ld.so.conf.d", "/etc/alternatives", "/etc/fonts", "/var/cache/fontconfig" })
+			{
+				if (exists(path))
+					args.AddRange(["--ro-bind", path, path]);
+			}
+
+			args.AddRange(["--ro-bind", inputPath, inputPath]);
+			args.AddRange(["--bind", writableDirectory, writableDirectory]);
+			args.AddRange(["--chdir", "/", "--", fileName]);
 			args.AddRange(arguments);
 			return ("bwrap", args);
+		}
+
+		private static string? GetLinkTarget(string path)
+		{
+			try
+			{
+				return new DirectoryInfo(path).LinkTarget;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return null;
+			}
 		}
 	}
 

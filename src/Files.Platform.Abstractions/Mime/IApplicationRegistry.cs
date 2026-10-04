@@ -18,6 +18,11 @@ namespace Files.Platform.Abstractions.Mime
 		Task<IReadOnlyList<DesktopApplication>> GetApplicationsForMimeTypeAsync(string mimeType, CancellationToken cancellationToken = default);
 
 		/// <summary>
+		/// Lists every visible installed application, sorted by name.
+		/// </summary>
+		Task<IReadOnlyList<DesktopApplication>> GetAllApplicationsAsync(CancellationToken cancellationToken = default);
+
+		/// <summary>
 		/// Gets the default application for a MIME type, or null when none is associated.
 		/// </summary>
 		Task<DesktopApplication?> GetDefaultApplicationAsync(string mimeType, CancellationToken cancellationToken = default);

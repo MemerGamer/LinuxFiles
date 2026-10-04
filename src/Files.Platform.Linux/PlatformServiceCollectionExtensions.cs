@@ -3,6 +3,7 @@
 
 using Files.Platform.Abstractions;
 using Files.Platform.Linux.Archives;
+using Files.Platform.Linux.Clipboard;
 using Files.Platform.Linux.Enumeration;
 using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Icons;
@@ -38,7 +39,8 @@ namespace Files.Platform.Linux
 				.AddLinuxLaunching()
 				.AddLinuxFileOperations()
 				.AddLinuxArchives()
-				.AddLinuxPermissions();
+				.AddLinuxPermissions()
+				.AddLinuxClipboard();
 		}
 	}
 }

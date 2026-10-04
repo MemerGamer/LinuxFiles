@@ -17,6 +17,19 @@ namespace Files.App.Helpers
 	{
 		public static async Task PasteItemAsync(string destinationPath, IShellPage associatedInstance)
 		{
+			if (OperatingSystem.IsLinux() && FileClipboard.HasItems)
+			{
+				// LINUX-TODO(clipboard): W-CLIP replaces the in-app FileClipboard with the system clipboard
+				var operation = FileClipboard.Operation;
+				await associatedInstance.FilesystemHelpers.PerformOperationTypeAsync(FileClipboard.Items, operation, destinationPath, false, true);
+				if (operation.HasFlag(DataPackageOperation.Move))
+					FileClipboard.Clear();
+
+				associatedInstance.SlimContentPage?.ItemManipulationModel?.RefreshItemsOpacity();
+				await associatedInstance.RefreshIfNoWatcherExistsAsync();
+				return;
+			}
+
 			FilesystemResult<DataPackageView> packageView = await FilesystemTasks.Wrap(() => Task.FromResult(Clipboard.GetContent()));
 			if (packageView && packageView.Result is { } content)
 			{
@@ -139,7 +152,7 @@ namespace Files.App.Helpers
 				case AddItemDialogItemType.File:
 					userInput = !string.IsNullOrWhiteSpace(userInput) ? userInput : itemInfo?.Name ?? Strings.NewFile.GetLocalizedResource();
 					created = await associatedInstance.FilesystemHelpers.CreateAsync(
-						StorageHelpers.FromPathAndType(PathNormalization.Combine(currentPath ?? string.Empty, userInput + itemInfo?.Extension), FilesystemItemType.File),
+						StorageHelpers.FromPathAndType(PathNormalization.Combine(currentPath ?? string.Empty, userInput + (itemInfo?.Extension ?? (OperatingSystem.IsLinux() ? ".txt" : null))), FilesystemItemType.File),
 						true);
 					break;
 			}

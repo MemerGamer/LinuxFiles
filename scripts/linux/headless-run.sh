@@ -35,7 +35,9 @@ Xvfb ":$display" -screen 0 "${size}x24" -nolisten tcp >"$outdir/xvfb.log" 2>&1 &
 xvfb_pid=$!
 app_pid=""
 cleanup() {
-	[[ -n "$app_pid" ]] && kill "$app_pid" 2>/dev/null || true
+	# The app runs in its own process group (setsid), so this also stops dbus-run-session and its daemon.
+	[[ -n "$app_pid" ]] && kill -- "-$app_pid" 2>/dev/null || true
+	sleep 1
 	kill "$xvfb_pid" 2>/dev/null || true
 }
 trap cleanup EXIT
@@ -62,11 +64,12 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache")
 fi
 
-(
-	cd "$bin"
-	exec env -u WAYLAND_DISPLAY "${sandbox_env[@]}" DISPLAY=":$display" LIBGL_ALWAYS_SOFTWARE=1 \
-		nice -n 19 dotnet Files.dll "$@"
-) >"$outdir/app.log" 2>&1 &
+# Private D-Bus session: notifications, portals and app launches never reach the real desktop session.
+# shellcheck disable=SC2016
+setsid bash -c 'cd "$0" && exec "$@"' "$bin" \
+	env -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS "${sandbox_env[@]}" DISPLAY=":$display" LIBGL_ALWAYS_SOFTWARE=1 \
+	FILES_LAUNCH_DRYRUN="${FILES_LAUNCH_DRYRUN:-1}" nice -n 19 dbus-run-session -- dotnet Files.dll "$@" \
+	>"$outdir/app.log" 2>&1 &
 app_pid=$!
 
 sleep "$seconds"

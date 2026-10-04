@@ -15,11 +15,18 @@ namespace Files.App.Data.Models
 		public AppModel()
 		{
 			Clipboard.ContentChanged += Clipboard_ContentChanged;
+			FileClipboard.Changed += (s, e) => Clipboard_ContentChanged(s, e);
 		}
 
 		// TODO: Refactor this method
 		public void Clipboard_ContentChanged(object? sender, object e)
 		{
+			if (OperatingSystem.IsLinux() && FileClipboard.HasItems)
+			{
+				IsPasteEnabled = true;
+				return;
+			}
+
 			try
 			{
 				DataPackageView packageView = Clipboard.GetContent();

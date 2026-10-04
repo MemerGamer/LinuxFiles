@@ -2,6 +2,8 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions;
+using Files.Platform.Linux.Enumeration;
+using Files.Platform.Linux.Watching;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Files.Platform.Linux
@@ -18,7 +20,9 @@ namespace Files.Platform.Linux
 		{
 			return services
 				.AddSingleton<IPlatformCapabilities, LinuxPlatformCapabilities>()
-				.AddLinuxAppData();
+				.AddLinuxAppData()
+				.AddLinuxEnumeration()
+				.AddLinuxWatching();
 		}
 	}
 }

@@ -74,6 +74,7 @@ namespace Files.App.UserControls
 			if (paths.Length is 0)
 				return;
 
+#if WINDOWS
 			var items = new List<ShellItem>(paths.Length);
 			try
 			{
@@ -91,6 +92,10 @@ namespace Files.App.UserControls
 				foreach (ShellItem item in items)
 					item.Dispose();
 			}
+#else
+			// LINUX-TODO(dnd): shell data object drag from the shelf; use Uno DataPackage storage items / text/uri-list instead
+			e.Data.Properties["Files_ActionBinder"] = "Files_ShelfBinder";
+#endif
 		}
 
 		private void ShelfItemsList_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)

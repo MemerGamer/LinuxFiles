@@ -466,9 +466,9 @@ namespace Files.App.Utils.Storage
 					return;
 				}
 
-				using var hDestFile = fileToReplace.CreateSafeFileHandle(FileAccess.ReadWrite);
-				await using (var outStream = new FileStream(hDestFile, FileAccess.Write))
+				await using (var outStream = await fileToReplace.OpenStreamForWriteAsync())
 				{
+					outStream.SetLength(0);
 					await zipFile.ExtractFileAsync(entry.Index, outStream);
 				}
 			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
@@ -494,10 +494,10 @@ namespace Files.App.Utils.Storage
 
 					if (string.Equals(entry.Name.Replace('\\', '/'), targetName, StringComparison.OrdinalIgnoreCase))
 					{
-						using var hDestFile = fileToReplace.CreateSafeFileHandle(FileAccess.ReadWrite);
-						await using (var outStream = new FileStream(hDestFile, FileAccess.Write))
+						await using (var outStream = await fileToReplace.OpenStreamForWriteAsync())
 						using (var zipStream = zipFile.GetInputStream(entry))
 						{
+							outStream.SetLength(0);
 							zipStream.CopyTo(outStream);
 						}
 						return;

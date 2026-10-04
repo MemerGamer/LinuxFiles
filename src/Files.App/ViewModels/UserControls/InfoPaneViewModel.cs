@@ -317,6 +317,8 @@ namespace Files.App.ViewModels.UserControls
 				return new MediaPreview(model);
 			}
 
+			// LINUX-TODO(preview): Markdown/Code/Shell previews are excluded on desktop; falls back to the text preview
+#if WINDOWS
 			if (FileExtensionHelpers.IsMarkdownFile(ext))
 			{
 				var model = new MarkdownPreviewViewModel(item);
@@ -325,6 +327,7 @@ namespace Files.App.ViewModels.UserControls
 				return new MarkdownPreview(model);
 			}
 
+#endif
 			if (FileExtensionHelpers.IsImagePreviewFile(ext))
 			{
 				var model = new ImagePreviewViewModel(item);
@@ -365,6 +368,7 @@ namespace Files.App.ViewModels.UserControls
 				return new RichTextPreview(model);
 			}
 
+#if WINDOWS
 			if (CodePreviewViewModel.IsCodeFile(ext))
 			{
 				var model = new CodePreviewViewModel(item);
@@ -373,6 +377,8 @@ namespace Files.App.ViewModels.UserControls
 				return new CodePreview(model);
 			}
 
+#endif
+#if WINDOWS
 			if (ShellPreviewViewModel.FindPreviewHandlerFor(item.FileExtension, 0) is not null &&
 				!FileExtensionHelpers.IsFontFile(item.FileExtension) &&
 				!FileExtensionHelpers.IsExecutableFile(item.FileExtension))
@@ -383,6 +389,7 @@ namespace Files.App.ViewModels.UserControls
 				return new ShellPreview(model);
 			}
 
+#endif
 			var control = await TextPreviewViewModel.TryLoadAsTextAsync(item);
 
 			return control ?? null;
@@ -554,8 +561,10 @@ namespace Files.App.ViewModels.UserControls
 			CancelPreviewLoad();
 
 			// Tear the preview host down here since the control's Unloaded event won't reliably fire while we're closing to background
+#if WINDOWS
 			if (previewPaneContent is ShellPreview shellPreview)
 				shellPreview.UnloadPreview();
+#endif
 
 			PreviewPaneContent = null;
 		}

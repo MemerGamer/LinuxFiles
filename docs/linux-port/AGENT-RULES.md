@@ -6,9 +6,10 @@ Read this first, then `PLAN.md` §0, then `CLAUDE.md`.
 - Never run the app on the real display. Don't use `DISPLAY=:0` or `WAYLAND_DISPLAY`, and don't run xdotool, screenshots or input against it. Run the app only through `scripts/linux/headless-run.sh`, which uses a private Xvfb display, a sandboxed throwaway HOME and cleans up after itself. Its `-a` actions file sends xdotool input and takes screenshots on the private display.
 - Never change desktop or system settings (gsettings, kwriteconfig, portal writes, xdg-mime defaults, ~/.config of the real user).
 - Build at low priority without leftover MSBuild nodes:
-  `MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet build src/Files.App -f net10.0-desktop -nodeReuse:false`
-- Tests: `MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet build tests/Files.Platform.Tests -nodeReuse:false -warnaserror` then `nice -n 19 dotnet test --project tests/Files.Platform.Tests/Files.Platform.Tests.csproj --no-build`.
+  `MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet build src/Files.App -f net10.0-desktop -nodeReuse:false -m:2`
+- Tests: `MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet build tests/Files.Platform.Tests -nodeReuse:false -m:2 -warnaserror` then `nice -n 19 dotnet test --project tests/Files.Platform.Tests/Files.Platform.Tests.csproj --no-build`.
 - Kill every process you start. Leave nothing running.
+- At most one app build or test run at a time per agent (`-m:2` caps CPU). Avoid needless full rebuilds.
 
 ## Privacy
 - Only commit screenshots made with the sandboxed HOME. Crop or avoid the sidebar Drives section, because real drive labels leak into it.

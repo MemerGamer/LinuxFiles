@@ -1,0 +1,406 @@
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
+
+using Files.Platform.Abstractions.Mime;
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Xml.Linq;
+
+namespace Files.Platform.Linux.Mime
+{
+	/// <summary>
+	/// Resolves MIME types using the shared-mime-info database (globs2 and mime XML) with a small magic-number fallback.
+	/// </summary>
+	public sealed class LinuxMimeTypeService : IMimeTypeService
+	{
+		private const string DirectoryType = "inode/directory";
+		private const string SymlinkType = "inode/symlink";
+		private const string ZeroSizeType = "application/x-zerosize";
+		private const string OctetStreamType = "application/octet-stream";
+		private const string TextType = "text/plain";
+		private const int SniffLength = 512;
+
+		private static readonly XNamespace MimeNs = "http://www.freedesktop.org/standards/shared-mime-info";
+		private static readonly XNamespace XmlNs = XNamespace.Xml;
+
+		private readonly XdgDirectories xdg;
+		private readonly CultureInfo culture;
+		private readonly Lazy<GlobEntry[]> globs;
+
+		private sealed record GlobEntry(int Weight, string MimeType, string Pattern, bool CaseSensitive, bool IsLiteral);
+
+		/// <summary>
+		/// Creates the service for the process environment and current UI culture.
+		/// </summary>
+		public LinuxMimeTypeService() : this(XdgDirectories.FromEnvironment(), CultureInfo.CurrentUICulture)
+		{
+		}
+
+		/// <summary>
+		/// Creates the service for explicit XDG directories and culture.
+		/// </summary>
+		public LinuxMimeTypeService(XdgDirectories xdg, CultureInfo culture)
+		{
+			this.xdg = xdg;
+			this.culture = culture;
+			globs = new(LoadGlobs);
+		}
+
+		/// <inheritdoc/>
+		public async Task<string> GetMimeTypeAsync(string path, CancellationToken cancellationToken = default)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+
+			if (Directory.Exists(path))
+				return DirectoryType;
+
+			var byName = MatchGlobs(Path.GetFileName(path.TrimEnd('/')));
+			if (IsDanglingSymbolicLink(path))
+				return SymlinkType;
+
+			if (!File.Exists(path))
+				return byName ?? OctetStreamType;
+
+			if (byName is not null)
+				return byName;
+
+			return await SniffAsync(path, cancellationToken).ConfigureAwait(false);
+		}
+
+		/// <inheritdoc/>
+		public Task<string?> GetDescriptionAsync(string mimeType, CancellationToken cancellationToken = default)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+
+			var root = LoadMimeXml(mimeType);
+			if (root is null)
+				return Task.FromResult<string?>(null);
+
+			var comments = root.Elements(MimeNs + "comment").ToList();
+			var tag = culture.Name.Replace('-', '_');
+			string? lang = tag.Contains('_') ? tag[..tag.IndexOf('_')] : tag;
+
+			string? Find(string? wanted) => comments
+				.FirstOrDefault(c => (string?)c.Attribute(XmlNs + "lang") == wanted)?.Value.Trim();
+
+			var result = (tag.Length > 0 ? Find(tag) : null) ?? (lang.Length > 0 ? Find(lang) : null) ?? Find(null);
+			return Task.FromResult(result);
+		}
+
+		/// <inheritdoc/>
+		public Task<string> GetIconNameAsync(string mimeType, CancellationToken cancellationToken = default)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+
+			var explicitIcon = (string?)LoadMimeXml(mimeType)?.Element(MimeNs + "icon")?.Attribute("name");
+			return Task.FromResult(explicitIcon ?? mimeType.Replace('/', '-'));
+		}
+
+		/// <inheritdoc/>
+		public Task<string> GetGenericIconNameAsync(string mimeType, CancellationToken cancellationToken = default)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+
+			var explicitIcon = (string?)LoadMimeXml(mimeType)?.Element(MimeNs + "generic-icon")?.Attribute("name");
+			if (explicitIcon is not null)
+				return Task.FromResult(explicitIcon);
+
+			var slash = mimeType.IndexOf('/');
+			var media = slash > 0 ? mimeType[..slash] : mimeType;
+			return Task.FromResult(media == "inode" && mimeType == DirectoryType ? "folder" : $"{media}-x-generic");
+		}
+
+		/// <summary>
+		/// Matches a file name against the glob database. Returns null when nothing matches.
+		/// Highest weight wins; ties are broken by the longest pattern.
+		/// </summary>
+		private string? MatchGlobs(string fileName)
+		{
+			if (fileName.Length == 0)
+				return null;
+
+			var lower = fileName.ToLowerInvariant();
+			GlobEntry? best = null;
+
+			foreach (var glob in globs.Value)
+			{
+				var name = glob.CaseSensitive ? fileName : lower;
+				var pattern = glob.CaseSensitive ? glob.Pattern : glob.Pattern.ToLowerInvariant();
+				var matches = glob.IsLiteral ? name == pattern : GlobMatch(pattern, name);
+				if (!matches)
+					continue;
+
+				if (best is null
+					|| glob.Weight > best.Weight
+					|| (glob.Weight == best.Weight && glob.Pattern.Length > best.Pattern.Length))
+				{
+					best = glob;
+				}
+			}
+
+			return best?.MimeType;
+		}
+
+		/// <summary>
+		/// Matches a name against a glob supporting <c>*</c>, <c>?</c> and <c>[...]</c>.
+		/// </summary>
+		public static bool GlobMatch(string pattern, string name)
+		{
+			int p = 0, n = 0, starP = -1, starN = 0;
+			while (n < name.Length)
+			{
+				if (p < pattern.Length && pattern[p] == '*')
+				{
+					starP = p++;
+					starN = n;
+				}
+				else if (p < pattern.Length && TryMatchSingle(pattern, ref p, name[n]))
+				{
+					n++;
+				}
+				else if (starP >= 0)
+				{
+					p = starP + 1;
+					n = ++starN;
+				}
+				else
+				{
+					return false;
+				}
+			}
+
+			while (p < pattern.Length && pattern[p] == '*')
+				p++;
+
+			return p == pattern.Length;
+		}
+
+		private static bool TryMatchSingle(string pattern, ref int p, char c)
+		{
+			switch (pattern[p])
+			{
+				case '?':
+					p++;
+					return true;
+				case '[':
+				{
+					var end = pattern.IndexOf(']', p + 2 <= pattern.Length ? p + 2 : p + 1);
+					if (end < 0)
+					{
+						// Unterminated class matches a literal '['
+						if (c != '[')
+							return false;
+						p++;
+						return true;
+					}
+
+					var set = pattern.AsSpan(p + 1, end - p - 1);
+					var negate = set.Length > 0 && set[0] is '!' or '^';
+					if (negate)
+						set = set[1..];
+
+					var matched = false;
+					for (var i = 0; i < set.Length; i++)
+					{
+						if (i + 2 < set.Length && set[i + 1] == '-')
+						{
+							matched |= c >= set[i] && c <= set[i + 2];
+							i += 2;
+						}
+						else
+						{
+							matched |= set[i] == c;
+						}
+					}
+
+					if (matched == negate)
+						return false;
+
+					p = end + 1;
+					return true;
+				}
+				case '\\' when p + 1 < pattern.Length:
+					if (pattern[p + 1] != c)
+						return false;
+					p += 2;
+					return true;
+				default:
+					if (pattern[p] != c)
+						return false;
+					p++;
+					return true;
+			}
+		}
+
+		private GlobEntry[] LoadGlobs()
+		{
+			var entries = new List<GlobEntry>();
+			foreach (var dir in xdg.AllDataDirs)
+			{
+				var globs2 = Path.Combine(dir, "mime", "globs2");
+				if (TryReadLines(globs2, out var lines))
+				{
+					foreach (var line in lines)
+					{
+						if (line.Length == 0 || line[0] == '#')
+							continue;
+
+						// weight:mime:glob[:flags]
+						var parts = line.Split(':', 4);
+						if (parts.Length < 3 || !int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var weight))
+							continue;
+
+						var flags = parts.Length > 3 ? parts[3].Split(',') : [];
+						entries.Add(MakeEntry(weight, parts[1], parts[2], flags.Contains("cs")));
+					}
+				}
+				else if (TryReadLines(Path.Combine(dir, "mime", "globs"), out lines))
+				{
+					foreach (var line in lines)
+					{
+						if (line.Length == 0 || line[0] == '#')
+							continue;
+
+						var parts = line.Split(':', 2);
+						if (parts.Length == 2)
+							entries.Add(MakeEntry(50, parts[0], parts[1], false));
+					}
+				}
+			}
+
+			return [.. entries];
+		}
+
+		private static GlobEntry MakeEntry(int weight, string mime, string pattern, bool caseSensitive) =>
+			new(weight, mime, pattern, caseSensitive, pattern.IndexOfAny(['*', '?', '[']) < 0);
+
+		private static bool TryReadLines(string path, out string[] lines)
+		{
+			try
+			{
+				lines = File.ReadAllLines(path);
+				return true;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				lines = [];
+				return false;
+			}
+		}
+
+		private XElement? LoadMimeXml(string mimeType)
+		{
+			if (mimeType.Contains("..", StringComparison.Ordinal) || mimeType.Split('/').Length != 2)
+				return null;
+
+			foreach (var dir in xdg.AllDataDirs)
+			{
+				var file = Path.Combine(dir, "mime", mimeType + ".xml");
+				if (!File.Exists(file))
+					continue;
+
+				try
+				{
+					return XDocument.Load(file).Root;
+				}
+				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Xml.XmlException)
+				{
+				}
+			}
+
+			return null;
+		}
+
+		private static bool IsDanglingSymbolicLink(string path)
+		{
+			try
+			{
+				var info = new FileInfo(path);
+				return info.LinkTarget is not null && info.ResolveLinkTarget(true)?.Exists != true;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return false;
+			}
+		}
+
+		private static async Task<string> SniffAsync(string path, CancellationToken cancellationToken)
+		{
+			byte[] buffer = new byte[SniffLength];
+			int read;
+			try
+			{
+				if (new FileInfo(path).Length == 0)
+					return ZeroSizeType;
+
+				await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 1, FileOptions.Asynchronous);
+				read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return OctetStreamType;
+			}
+
+			return SniffBuffer(buffer.AsSpan(0, read));
+		}
+
+		/// <summary>
+		/// Detects a few common types from the leading bytes of a file.
+		/// </summary>
+		public static string SniffBuffer(ReadOnlySpan<byte> data)
+		{
+			if (data.Length == 0)
+				return ZeroSizeType;
+
+			if (data.StartsWith((ReadOnlySpan<byte>)[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))
+				return "image/png";
+			if (data.StartsWith((ReadOnlySpan<byte>)[0xFF, 0xD8, 0xFF]))
+				return "image/jpeg";
+			if (data.StartsWith("GIF87a"u8) || data.StartsWith("GIF89a"u8))
+				return "image/gif";
+			if (data.StartsWith("%PDF-"u8))
+				return "application/pdf";
+			if (data.StartsWith((ReadOnlySpan<byte>)[0x50, 0x4B, 0x03, 0x04]))
+				return "application/zip";
+			if (data.StartsWith((ReadOnlySpan<byte>)[0x1F, 0x8B]))
+				return "application/gzip";
+			if (data.StartsWith("BZh"u8))
+				return "application/x-bzip2";
+			if (data.StartsWith((ReadOnlySpan<byte>)[0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00]))
+				return "application/x-xz";
+			if (data.StartsWith((ReadOnlySpan<byte>)[0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C]))
+				return "application/x-7z-compressed";
+			if (data.StartsWith((ReadOnlySpan<byte>)[0x7F, 0x45, 0x4C, 0x46]))
+				return "application/x-executable";
+			if (data.StartsWith("#!"u8))
+				return "text/x-shellscript";
+
+			return LooksLikeText(data) ? TextType : OctetStreamType;
+		}
+
+		private static bool LooksLikeText(ReadOnlySpan<byte> data)
+		{
+			foreach (var b in data)
+			{
+				if (b == 0 || (b < 0x20 && b is not (byte)'\t' and not (byte)'\n' and not (byte)'\r' and not (byte)'\f' and not 0x1b))
+					return false;
+			}
+
+			// A truncated final multi-byte sequence is acceptable
+			var text = data;
+			for (var trim = 0; trim < 4 && trim < data.Length; trim++)
+			{
+				text = data[..(data.Length - trim)];
+				if (System.Text.Unicode.Utf8.IsValid(text))
+					return true;
+			}
+
+			return false;
+		}
+	}
+}

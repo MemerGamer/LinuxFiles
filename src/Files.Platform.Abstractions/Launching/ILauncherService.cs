@@ -1,0 +1,42 @@
+﻿// Copyright (c) Files Community
+// Licensed under the MIT License.
+
+using Files.Platform.Abstractions.Mime;
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Files.Platform.Abstractions.Launching
+{
+	/// <summary>
+	/// Launches files, URIs, terminals and executables as detached processes.
+	/// </summary>
+	public interface ILauncherService
+	{
+		/// <summary>
+		/// Opens paths with their default applications. Returns false if any could not be launched.
+		/// </summary>
+		Task<bool> OpenAsync(IEnumerable<string> paths, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Opens paths with a specific application.
+		/// </summary>
+		Task<bool> OpenWithAsync(DesktopApplication application, IEnumerable<string> paths, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Opens a URI with the system handler (xdg-open).
+		/// </summary>
+		Task<bool> LaunchUriAsync(Uri uri, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Opens a terminal emulator in a folder. Returns false if no terminal was found.
+		/// </summary>
+		Task<bool> OpenTerminalAsync(string folderPath, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Starts an executable detached from this process.
+		/// </summary>
+		Task<bool> RunExecutableAsync(string path, IReadOnlyList<string>? arguments = null, string? workingDirectory = null, CancellationToken cancellationToken = default);
+	}
+}

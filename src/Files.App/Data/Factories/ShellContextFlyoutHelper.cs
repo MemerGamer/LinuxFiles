@@ -1,4 +1,4 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using CommunityToolkit.WinUI;
@@ -17,7 +17,7 @@ using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Files.App.Helpers
 {
-	public static class ShellContextFlyoutFactory
+	public static partial class ShellContextFlyoutFactory
 	{
 		public static IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
@@ -74,6 +74,10 @@ namespace Files.App.Helpers
 
 		public static async Task<List<ContextMenuFlyoutItemViewModel>> GetShellContextmenuAsync(bool showOpenMenu, bool shiftPressed, string? workingDirectory, List<ListedItem>? selectedItems, CancellationToken cancellationToken)
 		{
+#if !WINDOWS
+			// No shell extensions on Linux: skip the Win32 shell menu entirely (no COM, no delay)
+			return await GetLinuxContextMenuAsync(selectedItems, cancellationToken);
+#else
 			var menuItemsList = new List<ContextMenuFlyoutItemViewModel>();
 			var filePaths = selectedItems is { Count: > 0 }
 				? selectedItems.Select(x => x.ItemPath!).ToArray()
@@ -113,6 +117,7 @@ namespace Files.App.Helpers
 				menuItemsList.Clear();
 
 			return menuItemsList;
+#endif
 		}
 
 		private static async Task LoadMenuFlyoutItemAsync(

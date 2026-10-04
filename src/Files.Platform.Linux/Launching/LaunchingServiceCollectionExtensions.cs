@@ -3,6 +3,7 @@
 
 using Files.Platform.Abstractions.Launching;
 using Microsoft.Extensions.DependencyInjection;
+using System;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Files.Platform.Linux.Launching
@@ -18,7 +19,9 @@ namespace Files.Platform.Linux.Launching
 		public static IServiceCollection AddLinuxLaunching(this IServiceCollection services)
 		{
 			services.TryAddSingleton<IExecutableLocator, PathExecutableLocator>();
-			services.TryAddSingleton<IProcessStarter, DetachedProcessStarter>();
+			services.TryAddSingleton<IProcessStarter>(_ => Environment.GetEnvironmentVariable("FILES_LAUNCH_DRYRUN") is "1" or "true"
+				? new DryRunProcessStarter()
+				: new DetachedProcessStarter());
 			services.TryAddSingleton<TerminalResolver>();
 			services.TryAddSingleton<ILauncherService, LinuxLauncherService>();
 			services.TryAddSingleton<ITemplatesService, LinuxTemplatesService>();

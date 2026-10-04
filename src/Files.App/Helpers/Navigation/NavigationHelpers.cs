@@ -1,4 +1,4 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Files.Shared.Helpers;
@@ -14,7 +14,7 @@ using Windows.Win32;
 
 namespace Files.App.Helpers
 {
-	public static class NavigationHelpers
+	public static partial class NavigationHelpers
 	{
 		private static readonly IGeneralSettingsService GeneralSettingsService = Ioc.Default.GetRequiredService<IGeneralSettingsService>();
 
@@ -439,7 +439,11 @@ namespace Files.App.Helpers
 				selectedItems.Count > 1 &&
 				selectedItems.All(x => x.PrimaryItemAttribute == StorageItemTypes.File && !x.IsExecutable && !x.IsShortcut))
 			{
+#if !WINDOWS
+				opened = await OpenFilesLinuxAsync(selectedItems.Select(x => x.GetRequiredPath()));
+#else
 				opened = await Win32Helper.InvokeWin32ComponentAsync(string.Join('|', selectedItems.Select(x => x.ItemPath)), associatedInstance);
+#endif
 			}
 
 			if (opened)
@@ -512,6 +516,9 @@ namespace Files.App.Helpers
 				return true;
 			}
 
+#if !WINDOWS
+			return await OpenPathLinuxAsync(path, associatedInstance, openViaApplicationPicker, selectItems, forceOpenInNewTab);
+#else
 			string? previousDir = associatedInstance.ShellViewModel.WorkingDirectory;
 
 			var fileAttributes = Win32Helper.GetFileAttributes(path);
@@ -587,6 +594,7 @@ namespace Files.App.Helpers
 			}
 
 			return opened;
+#endif
 		}
 
 		private static async Task<FilesystemResult> OpenLibrary(string path, IShellPage associatedInstance, IEnumerable<string>? selectItems, bool forceOpenInNewTab)

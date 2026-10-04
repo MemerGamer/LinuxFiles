@@ -52,6 +52,11 @@ The owner decided to focus on Linux first. Windows support is revisited only aft
 The Phase 2 workstreams in §7.3 still define folder ownership. Their goal is now "compiles and works on Linux",
 not "Windows code wrapped without behaviour change".
 
+### Phase 2 build decisions (2026-10-04)
+- **Win32 compat mode is the default** (`FilesWin32Compat=true` in `Directory.Build.props`). Existing Win32/Shell code compiles on Linux against the CsWin32 assembly, which is built automatically for Platform=x64. It cannot run on Linux, so any call that is reached at runtime must be replaced by a `Files.Platform` service. Phase 2 exit criterion: compat mode switched off.
+- **Nullable diagnostics are warnings on `-desktop`**, because Uno's annotations differ from WinUI's. Re-enable once the build is clean.
+- Stubbed behaviour is tagged `// LINUX-TODO(<area>)`. Use `rg -n LINUX-TODO src` to find the backlog.
+
 ### Security backlog (from Phase 3 reviews; fix in Phase 7 unless promoted)
 - File operations: same-device move (`rename`) and cross-device move recursion are still path-based. Use `renameat`/`unlinkat` on directory handles. Destination-side folders are also addressed by path.
 - Trash: a small TOCTOU window between the restore containment check and the move. Fix with `openat`/`renameat` on directory handles.

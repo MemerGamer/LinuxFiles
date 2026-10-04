@@ -61,6 +61,8 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	printf '#!/bin/sh\necho hi\n' >"$home/Downloads/script.sh"
 	head -c 2048 /dev/urandom >"$home/Downloads/archive.bin"
 	ln -sf "$home/Documents" "$home/Desktop/Documents link"
+	# Optional: FILES_SANDBOX_SETUP=/path/script.sh runs with HOME pointing at the sandbox (e.g. to create a repository)
+	[[ -n "${FILES_SANDBOX_SETUP:-}" ]] && HOME="$home" bash "$FILES_SANDBOX_SETUP"
 	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache")
 fi
 

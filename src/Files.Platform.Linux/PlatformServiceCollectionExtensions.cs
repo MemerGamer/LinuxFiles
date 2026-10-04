@@ -3,6 +3,8 @@
 
 using Files.Platform.Abstractions;
 using Files.Platform.Linux.Enumeration;
+using Files.Platform.Linux.Icons;
+using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Watching;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,7 +24,9 @@ namespace Files.Platform.Linux
 				.AddSingleton<IPlatformCapabilities, LinuxPlatformCapabilities>()
 				.AddLinuxAppData()
 				.AddLinuxEnumeration()
-				.AddLinuxWatching();
+				.AddLinuxWatching()
+				.AddLinuxThumbnails()
+				.AddLinuxIcons();
 		}
 	}
 }

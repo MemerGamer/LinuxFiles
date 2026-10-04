@@ -417,7 +417,7 @@ namespace Files.Platform.Tests.Thumbnails
 			Assert.IsFalse(await runner.RunAsync(probe, probeArgs, CancellationToken.None));
 		}
 
-		private async Task<FakeRunner> RunExternalAsync(Action<LinuxThumbnailOptions> configure)
+		private async Task<FakeRunner> RunExternalAsync(Action<LinuxThumbnailOptions> configure, Action<string>? writer = null, Action<byte[]?>? result = null)
 		{
 			var dir = Path.Combine(_root, "thumbnailers");
 			Directory.CreateDirectory(dir);
@@ -425,15 +425,19 @@ namespace Files.Platform.Tests.Thumbnails
 			var path = Path.Combine(_files, "doc.fake");
 			File.WriteAllText(path, "data");
 			var runner = new FakeRunner();
+			if (writer is not null)
+				runner.OutputWriter = writer;
 			using var service = CreateService(o =>
 			{
 				o.ThumbnailerDirectories = [dir];
 				o.MimeTypeResolver = _ => "application/x-fake";
 				o.ProcessRunner = runner;
+				o.ThumbnailerTempRoot = Path.Combine(_root, "tmp-root");
 				configure(o);
 			});
 
-			await service.GetThumbnailAsync(path, 128);
+			var generated = await service.GetThumbnailAsync(path, 128);
+			result?.Invoke(generated);
 			return runner;
 		}
 
@@ -465,9 +469,63 @@ namespace Files.Platform.Tests.Thumbnails
 			Assert.AreEqual("fake-thumb", runner.FileName);
 		}
 
+		private static readonly Action<LinuxThumbnailOptions> Unsandboxed = o =>
+		{
+			o.IsSandboxAvailable = () => false;
+			o.AllowUnsandboxedExternalThumbnailers = true;
+		};
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_OutputDirIsPrivateTempDirNotCacheAndIsCleanedUp()
+		{
+			var runner = await RunExternalAsync(o => o.IsSandboxAvailable = () => true, result: b => Assert.IsNotNull(b));
+
+			Assert.AreEqual("bwrap", runner.FileName);
+			var bound = runner.Arguments[runner.Arguments.ToList().IndexOf("--bind") + 1];
+			Assert.AreEqual(runner.OutputDirectory, bound);
+			Assert.IsFalse(bound.StartsWith(Path.Combine(_cacheHome, "thumbnails"), StringComparison.Ordinal));
+			Assert.IsTrue(bound.StartsWith(Path.Combine(_root, "tmp-root"), StringComparison.Ordinal));
+			Assert.IsFalse(Directory.Exists(bound));
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_RejectsOversizedDimensions()
+		{
+			await RunExternalAsync(Unsandboxed, p => File.WriteAllBytes(p, TestImages.CreatePng(300, 10)), b => Assert.IsNull(b));
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_RejectsNonPngOutput()
+		{
+			await RunExternalAsync(Unsandboxed, p => File.WriteAllText(p, "this is definitely not a png at all, just text padding"), b => Assert.IsNull(b));
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_RejectsSymlinkOutput()
+		{
+			var real = Path.Combine(_files, "real.png");
+			File.WriteAllBytes(real, TestImages.CreatePng(8, 8));
+			var runner = await RunExternalAsync(Unsandboxed, p => File.CreateSymbolicLink(p, real), b => Assert.IsNull(b));
+
+			Assert.IsTrue(File.Exists(real), "link target must survive cleanup");
+			Assert.IsFalse(Directory.Exists(runner.OutputDirectory));
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_AcceptsValidOutputAndCleansUp()
+		{
+			var runner = await RunExternalAsync(Unsandboxed, result: b => Assert.IsNotNull(b));
+
+			Assert.IsFalse(Directory.Exists(runner.OutputDirectory));
+		}
+
 		private sealed class FakeRunner : IThumbnailerProcessRunner
 		{
 			public string? FileName { get; private set; }
+
+			public string? OutputDirectory { get; private set; }
+
+			public Action<string> OutputWriter { get; set; } = p => File.WriteAllBytes(p, TestImages.CreatePng(8, 8));
 
 			public IReadOnlyList<string> Arguments { get; private set; } = [];
 
@@ -475,7 +533,8 @@ namespace Files.Platform.Tests.Thumbnails
 			{
 				FileName = fileName;
 				Arguments = arguments;
-				File.WriteAllBytes(arguments[^1], TestImages.CreatePng(8, 8));
+				OutputDirectory = Path.GetDirectoryName(arguments[^1]);
+				OutputWriter(arguments[^1]);
 				return Task.FromResult(true);
 			}
 		}

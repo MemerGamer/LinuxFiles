@@ -53,6 +53,11 @@ namespace Files.Platform.Linux.Thumbnails
 		public bool AllowUnsandboxedExternalThumbnailers { get; set; }
 
 		/// <summary>
+		/// Gets or sets the directory under which per-run private thumbnailer directories are created. Defaults to a folder in <c>$XDG_RUNTIME_DIR</c>, else in the cache home.
+		/// </summary>
+		public string? ThumbnailerTempRoot { get; set; }
+
+		/// <summary>
 		/// Gets or sets the maximum number of concurrent generations.
 		/// </summary>
 		public int MaxConcurrency { get; set; } = Math.Clamp(Environment.ProcessorCount / 2, 1, 4);
@@ -322,28 +327,26 @@ namespace Files.Platform.Linux.Thumbnails
 			if (entry is null || (entry.TryExec is not null && !ExecutableExists(entry.TryExec)))
 				return null;
 
-			var tempOutput = cachePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+			// Each run gets a private directory; the sandbox sees only this directory, never the shared cache.
+			var tempDir = Path.Combine(GetThumbnailerTempRoot(), "thumb-" + Guid.NewGuid().ToString("N"));
 			try
 			{
-				EnsureCacheDirectory(Path.GetDirectoryName(cachePath)!);
+				EnsureCacheDirectory(tempDir);
+				var tempOutput = Path.Combine(tempDir, "out.png");
 				var command = entry.BuildCommand(fullPath, uri, tempOutput, (uint)maxSize);
 				if (command is null)
 					return null;
 
 				var (program, arguments) = command.Value;
 				if (_options.SandboxExternalThumbnailers && _options.IsSandboxAvailable())
-					(program, arguments) = BubblewrapSandbox.Wrap(program, arguments, Path.GetDirectoryName(cachePath)!, fullPath);
+					(program, arguments) = BubblewrapSandbox.Wrap(program, arguments, tempDir, fullPath);
 				else if (!_options.AllowUnsandboxedExternalThumbnailers)
 					return null;
 
 				if (!await _options.ProcessRunner.RunAsync(program, arguments, cancellationToken).ConfigureAwait(false))
 					return null;
 
-				if (new FileInfo(tempOutput).Length > _options.MaxCacheEntryBytes)
-					return null;
-
-				var bytes = File.ReadAllBytes(tempOutput);
-				return bytes.Length > 33 && bytes[1] == (byte)'P' ? bytes : null;
+				return ValidateAndReencode(tempOutput, maxSize);
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
@@ -351,8 +354,51 @@ namespace Files.Platform.Linux.Thumbnails
 			}
 			finally
 			{
-				TryDelete(tempOutput);
+				try
+				{
+					// Recursive delete removes symlinks themselves and does not follow them.
+					Directory.Delete(tempDir, true);
+				}
+				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+				{
+				}
 			}
+		}
+
+		private string GetThumbnailerTempRoot()
+		{
+			if (!string.IsNullOrEmpty(_options.ThumbnailerTempRoot))
+				return _options.ThumbnailerTempRoot;
+
+			var runtime = Environment.GetEnvironmentVariable("XDG_RUNTIME_DIR");
+			return !string.IsNullOrEmpty(runtime) && Path.IsPathRooted(runtime) && Directory.Exists(runtime)
+				? Path.Combine(runtime, "files-thumbnailer")
+				: Path.Combine(_options.CacheHome, "files", "thumbnailer-tmp");
+		}
+
+		/// <summary>
+		/// Accepts only a regular, size-capped PNG within the bucket dimensions and returns a freshly encoded copy.
+		/// </summary>
+		private byte[]? ValidateAndReencode(string outputPath, int maxSize)
+		{
+			var info = new FileInfo(outputPath);
+			if (!info.Exists || info.LinkTarget is not null || (info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+				return null;
+
+			if (info.Length > _options.MaxCacheEntryBytes || info.Length < 33)
+				return null;
+
+			var bytes = File.ReadAllBytes(outputPath);
+			if (!PngTextChunks.TryReadDimensions(bytes, out var width, out var height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize)
+				return null;
+
+			using var bitmap = SKBitmap.Decode(bytes);
+			if (bitmap is null || bitmap.Width != width || bitmap.Height != height)
+				return null;
+
+			using var image = SKImage.FromBitmap(bitmap);
+			using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
+			return encoded?.ToArray();
 		}
 
 		private static bool ExecutableExists(string tryExec)

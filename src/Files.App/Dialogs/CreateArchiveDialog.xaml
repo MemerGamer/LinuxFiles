@@ -191,6 +191,7 @@
 			<Expander
 				HorizontalAlignment="Stretch"
 				Header="{helpers:ResourceString Key=Encryption}"
+				Visibility="{x:Bind ViewModel.CanEncrypt}"
 				IsExpanded="{x:Bind ViewModel.UseEncryption, Mode=TwoWay}">
 				<Expander.Content>
 					<Grid Width="400">

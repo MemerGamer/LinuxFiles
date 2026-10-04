@@ -530,6 +530,105 @@ namespace Files.Platform.Tests.Archives
 			Assert.IsFalse(Directory.Exists(destination));
 		}
 
+		// ---- review hardening: links in the destination, prefix confusion, modes, actual byte counting ----
+
+		[TestMethod]
+		public async Task PreExistingSymlinkInDestinationIsNeverWrittenThrough()
+		{
+			var outside = Path.Combine(root, "outside");
+			Directory.CreateDirectory(outside);
+			File.CreateSymbolicLink(Path.Combine(Out, "dir"), outside);
+			var zip = ZipWith(Path.Combine(Work, "s.zip"), ("dir/evil.txt", Bytes("pwned")), ("ok.txt", Bytes("ok")));
+
+			// Default: conflict is skipped, nothing is written through the link
+			var result = await service.ExtractAsync(zip, Out);
+			Assert.IsTrue(result.Succeeded, result.Error);
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(outside).Length);
+			Assert.IsNotNull(new FileInfo(Path.Combine(Out, "dir")).LinkTarget);
+
+			// Even when the user chooses to overwrite, only the link is replaced, never its target
+			await service.ExtractAsync(zip, Out, new ArchiveExtractOptions { ResolveConflict = (_, _) => Task.FromResult(new ConflictResolution(ConflictAction.Overwrite)) });
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(outside).Length);
+			Assert.IsTrue(Directory.Exists(outside));
+			Assert.AreEqual("pwned", File.ReadAllText(Path.Combine(Out, "dir", "evil.txt")));
+		}
+
+		[TestMethod]
+		public async Task SiblingPrefixDestinationIsNotConfused()
+		{
+			var evil = Out + "-evil";
+			Directory.CreateDirectory(evil);
+			var zip = ZipWith(Path.Combine(Work, "p.zip"), ("../out-evil/x.txt", Bytes("x")));
+			var result = await service.ExtractAsync(zip, Out);
+			Assert.IsFalse(result.Succeeded);
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(evil).Length);
+			Assert.ThrowsExactly<ArchiveSecurityException>(() => ArchivePathValidator.ResolveInside(Out, "../out-evil/x.txt"));
+		}
+
+		[TestMethod]
+		public async Task ArchiveSuppliedModesAreMasked()
+		{
+			var path = Path.Combine(Work, "modes.zip");
+			using (var stream = File.Create(path))
+			using (var zip = new ZipArchive(stream, ZipArchiveMode.Create))
+			{
+				var setuid = zip.CreateEntry("setuid.sh");
+				setuid.ExternalAttributes = (0x8000 | Convert.ToInt32("4777", 8)) << 16;
+				using (var w = setuid.Open()) w.Write(Bytes("#!/bin/sh"));
+				var plain = zip.CreateEntry("plain.txt");
+				plain.ExternalAttributes = (0x8000 | Convert.ToInt32("666", 8)) << 16;
+				using (var w = plain.Open()) w.Write(Bytes("x"));
+			}
+
+			var result = await service.ExtractAsync(path, Out);
+			Assert.IsTrue(result.Succeeded, result.Error);
+			Assert.AreEqual((UnixFileMode)Convert.ToInt32("755", 8), File.GetUnixFileMode(Path.Combine(Out, "setuid.sh")));
+			var plainMode = File.GetUnixFileMode(Path.Combine(Out, "plain.txt"));
+			Assert.AreEqual((UnixFileMode)Convert.ToInt32("644", 8), plainMode);
+		}
+
+		[TestMethod]
+		public async Task CreatedArchivesAreNotWorldWritableAndTempIsPrivate()
+		{
+			var tree = MakeTree();
+			var archive = Path.Combine(Work, "perm.zip");
+			var result = await service.CreateAsync([tree], archive);
+			Assert.IsTrue(result.Succeeded, result.Error);
+			var mode = File.GetUnixFileMode(archive);
+			Assert.AreEqual(UnixFileMode.None, mode & (UnixFileMode.GroupWrite | UnixFileMode.OtherWrite | UnixFileMode.SetUser | UnixFileMode.SetGroup));
+		}
+
+		[TestMethod]
+		public async Task LimitsCountActualBytesNotDeclaredSizes()
+		{
+			// A gzip stream has no usable declared size, only the real output counts
+			var gz = Path.Combine(Work, "bomb.gz");
+			using (var stream = File.Create(gz))
+			using (var gzip = new GZipStream(stream, CompressionLevel.SmallestSize))
+			{
+				var chunk = new byte[1024 * 1024];
+				for (var i = 0; i < 16; i++)
+					gzip.Write(chunk);
+			}
+
+			var result = await service.ExtractAsync(gz, Out, new ArchiveExtractOptions { Limits = new ArchiveLimits(MaxTotalBytes: 2 * 1024 * 1024, MaxEntries: 0, MaxRatio: 0) });
+			Assert.IsFalse(result.Succeeded);
+			StringAssert.Contains(result.Error, "bytes");
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(Out).Length);
+
+			var tested = await service.TestAsync(gz, null, new ArchiveLimits(MaxTotalBytes: 2 * 1024 * 1024, MaxEntries: 0, MaxRatio: 0));
+			Assert.IsFalse(tested.Succeeded);
+		}
+
+		[TestMethod]
+		public async Task ExtractionDoesNotRunOutsideStaging()
+		{
+			// Hidden staging folders never survive, even after a refused archive
+			var zip = ZipWith(Path.Combine(Work, "x.zip"), ("fine.txt", Bytes("x")), ("a/../../evil.txt", Bytes("y")));
+			await service.ExtractAsync(zip, Out);
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(Out, ".*").Length);
+		}
+
 		// ---- passwords, integrity, cancellation ----
 
 		[TestMethod]

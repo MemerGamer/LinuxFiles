@@ -3,7 +3,6 @@
 
 using Files.App.Dialogs;
 using Microsoft.UI.Xaml.Controls;
-using SevenZip;
 using System.Text;
 using Windows.Foundation.Metadata;
 using Windows.Storage;
@@ -90,51 +89,7 @@ namespace Files.App.Actions
 
 				BaseStorageFolder? destinationFolder = null;
 
-				var isMultipleItems = await FilesystemTasks.Wrap(async () =>
-				{
-					using SevenZipExtractor? zipFile = await StorageArchiveService.GetSevenZipExtractorAsync(archive.Path);
-					if (zipFile is null)
-						return true;
-
-					static ReadOnlySpan<char> GetFirstMeaningfulSegment(ReadOnlySpan<char> path)
-					{
-						while (!path.IsEmpty)
-						{
-							while (!path.IsEmpty && (path[0] == '/' || path[0] == '\\'))
-								path = path[1..];
-
-							if (path.IsEmpty)
-								break;
-
-							int sep = path.IndexOfAny('/', '\\');
-							ReadOnlySpan<char> seg = sep < 0 ? path : path[..sep];
-
-							path = sep < 0 ? ReadOnlySpan<char>.Empty : path[(sep + 1)..];
-
-							if (seg.SequenceEqual(".") || seg.SequenceEqual(".."))
-								continue;
-
-							return seg;
-						}
-
-						return default;
-					}
-
-					string? firstTopLevel = null;
-					foreach (var file in zipFile.ArchiveFileData)
-					{
-						var segment = GetFirstMeaningfulSegment(file.FileName);
-						if (segment.IsEmpty)
-							continue;
-
-						if (firstTopLevel is null)
-							firstTopLevel = segment.ToString();
-						else if (!segment.SequenceEqual(firstTopLevel))
-							return true;
-					}
-
-					return false;
-				});
+				var isMultipleItems = await StorageArchiveService.HasMultipleTopLevelEntriesAsync(archive.Path, password);
 
 				if (smart && currentFolder is not null && isMultipleItems)
 				{

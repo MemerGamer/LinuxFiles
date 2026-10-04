@@ -79,11 +79,12 @@ namespace Files.Platform.Linux.Archives
 
 				// Pass 2: stream the entries
 				var buffer = new byte[81920];
-				long bytesDone = 0;
+				long bytesDone = 0, streamedEntries = 0;
 				{
 					foreach (var (entry, openEntry) in archive.Entries())
 					{
 						ct.ThrowIfCancellationRequested();
+						guard.CheckEntryCount(++streamedEntries);
 						var relative = ArchivePathValidator.NormalizeEntryName(entry.Key ?? fallbackName);
 
 						if (entry.IsEncrypted && string.IsNullOrEmpty(options.Password))

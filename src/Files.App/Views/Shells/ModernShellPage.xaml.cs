@@ -16,7 +16,7 @@ namespace Files.App.Views.Shells
 		protected override Frame ItemDisplay
 			=> ItemDisplayFrame;
 
-		private NavigationInteractionTracker _navigationInteractionTracker;
+		private NavigationInteractionTracker? _navigationInteractionTracker;
 
 		private NavigationParams? _NavParams;
 		public NavigationParams? NavParams
@@ -52,8 +52,11 @@ namespace Files.App.Views.Shells
 
 			ContentChanged += ModernShellPage_ContentChanged;
 
+#if WINDOWS
 			_navigationInteractionTracker = new NavigationInteractionTracker(this, BackIcon, ForwardIcon);
 			_navigationInteractionTracker.NavigationRequested += OverscrollNavigationRequested;
+#endif
+			// LINUX-TODO(overscroll): touchpad overscroll navigation needs InteractionTracker, which Uno does not implement
 		}
 
 		private async void ShellViewModel_FocusFilterHeader(object? sender, EventArgs e)
@@ -183,8 +186,11 @@ namespace Files.App.Views.Shells
 			if (parameters.IsSearchResultPage == false)
 				ShellViewModel!.IsSearchResults = false;
 
-			_navigationInteractionTracker.CanNavigateBackward = CanNavigateBackward;
-			_navigationInteractionTracker.CanNavigateForward = CanNavigateForward;
+			if (_navigationInteractionTracker is not null)
+			{
+				_navigationInteractionTracker.CanNavigateBackward = CanNavigateBackward;
+				_navigationInteractionTracker.CanNavigateForward = CanNavigateForward;
+			}
 		}
 
 		private void OverscrollNavigationRequested(object? sender, OverscrollNavigationEventArgs e)
@@ -272,8 +278,11 @@ namespace Files.App.Views.Shells
 			if (ShellViewModel is not null)
 				ShellViewModel.FocusFilterHeader -= ShellViewModel_FocusFilterHeader;
 			ItemDisplayFrame.Navigated -= ItemDisplayFrame_Navigated;
-			_navigationInteractionTracker.NavigationRequested -= OverscrollNavigationRequested;
-			_navigationInteractionTracker.Dispose();
+			if (_navigationInteractionTracker is not null)
+			{
+				_navigationInteractionTracker.NavigationRequested -= OverscrollNavigationRequested;
+				_navigationInteractionTracker.Dispose();
+			}
 
 			base.Dispose();
 		}

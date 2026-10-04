@@ -223,8 +223,10 @@ namespace Files.App
 				Win32Helper.BringToForegroundEx(new(WindowHandle));
 			}
 
+#if WINDOWS
 			if (Windows.Win32.PInvoke.IsIconic(new(WindowHandle)) && appWindow?.Presenter is OverlappedPresenter overlapped)
 				overlapped.Restore();
+#endif
 		}
 
 		private async Task EnsureContentHasKeyboardFocusAsync()

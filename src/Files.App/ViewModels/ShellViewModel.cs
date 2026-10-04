@@ -2211,6 +2211,13 @@ namespace Files.App.ViewModels
 						WatchForWin32FolderChanges(path);
 					break;
 
+				// Enumerated through IFileSystemEnumerator (Linux)
+				case 3:
+					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs() { IsTypeCloudDrive = false, IsTypeGitRepository = IsValidGitDirectory });
+					if (!HasNoWatcher)
+						WatchForLinuxFolderChanges(path);
+					break;
+
 				// Enumeration failed
 				case -1:
 				default:
@@ -2234,6 +2241,9 @@ namespace Files.App.ViewModels
 
 			watcher?.Dispose();
 			watcher = null;
+#if !WINDOWS
+			CloseLinuxWatcher();
+#endif
 
 			aProcessQueueAction = null;
 			gitProcessQueueAction = null;
@@ -2259,6 +2269,10 @@ namespace Files.App.ViewModels
 		private async Task<int> EnumerateItemsFromStandardFolderAsync(string path, CancellationToken cancellationToken, LibraryItem? library = null)
 		{
 			enumeratedCloudSyncStatus = null;
+
+#if !WINDOWS
+			return await EnumerateLinuxFolderAsync(path, cancellationToken, library);
+#endif
 
 			// Flag to use FindFirstFileExFromApp or StorageFolder enumeration - Use storage folder for Box Drive (#4629)
 			var isBoxFolder = CloudDrivesManager.Drives.FirstOrDefault(x => x.Text == "Box")?.Path?.TrimEnd('\\') is string boxFolder && path.StartsWith(boxFolder);

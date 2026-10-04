@@ -3,7 +3,6 @@
 
 using Jeffijoe.MessageFormat;
 using Microsoft.Extensions.Logging;
-using Microsoft.Windows.ApplicationModel.Resources;
 using System.Globalization;
 
 namespace Files.App.Extensions
@@ -17,7 +16,6 @@ namespace Files.App.Extensions
 		/// Resource map for accessing localized strings.
 		/// It is initialized with the main resource map of the application's resources and the subtree "Resources".
 		/// </summary>
-		private static readonly ResourceMap _resourcesTree = new ResourceManager().MainResourceMap.TryGetSubtree("Resources");
 
 		/// <summary>
 		/// CultureInfo based on the application's primary language override.
@@ -77,7 +75,7 @@ namespace Files.App.Extensions
 		/// <returns>The formatted localized resource string.</returns>
 		public static string GetLocalizedFormatResource(this string resourceKey, IReadOnlyDictionary<string, object?> pairs)
 		{
-			var value = _resourcesTree?.TryGetValue(resourceKey)?.ValueAsString;
+			var value = ResourceLookup.TryGet(resourceKey);
 
 			if (value is null)
 				return string.Empty;

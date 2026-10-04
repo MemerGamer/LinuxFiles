@@ -152,7 +152,7 @@ namespace Files.App.Data.Items
 		// Dummy-path trick (matches IconCacheService) makes the shell return the generic folder icon, not anything path-specific. Cached process-wide so every sidebar expansion reuses the same bytes.
 		private static byte[]? cachedGenericSmallFolderIconBytes;
 		private static readonly SemaphoreSlim genericSmallFolderIconLock = new(1, 1);
-		private static readonly string genericFolderProbePath = System.IO.Path.Combine(System.IO.Path.GetPathRoot(Environment.SystemDirectory)!, "x46696c6573");
+		private static readonly string genericFolderProbePath = System.IO.Path.Combine(System.IO.Path.GetPathRoot(Environment.SystemDirectory) ?? "/", "x46696c6573");
 
 		internal static async Task<byte[]?> GetGenericSmallFolderIconBytesAsync()
 		{

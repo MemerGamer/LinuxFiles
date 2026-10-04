@@ -25,6 +25,10 @@ namespace Files.App.Helpers
 		/// <param name="hWnd">The window handle to bring.</param>
 		public static unsafe void BringToForegroundEx(Windows.Win32.Foundation.HWND hWnd)
 		{
+			// LINUX-TODO(window): X11/Wayland activation is done through Window.Activate()
+			if (!OperatingSystem.IsWindows())
+				return;
+
 			var hCurWnd = PInvoke.GetForegroundWindow();
 
 			// Nothing to do if we already are the foreground window. Running the rest

@@ -17,6 +17,10 @@ namespace Files.App.Storage
 
 		public TaskbarManager()
 		{
+			// LINUX-TODO(taskbar): no taskbar progress on Linux (could map to the Unity LauncherEntry D-Bus API)
+			if (!OperatingSystem.IsWindows())
+				return;
+
 			Guid CLSID_TaskbarList = typeof(TaskbarList).GUID;
 			HRESULT hr = PInvoke.CoCreateInstance(CLSID_TaskbarList, null, CLSCTX.CLSCTX_INPROC_SERVER, out ITaskbarList3? pTaskbarList);
 

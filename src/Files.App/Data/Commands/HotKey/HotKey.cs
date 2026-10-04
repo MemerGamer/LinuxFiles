@@ -373,12 +373,33 @@ namespace Files.App.Data.Commands
 
 		private static string GetKeyCharacter(Keys key)
 		{
+#if !WINDOWS
+			// LINUX-TODO(keyboard): US-layout approximation of MapVirtualKey(VK_TO_CHAR); query XKB for the active layout instead
+			var vk = (uint)key;
+			return vk switch
+			{
+				>= 0x30 and <= 0x39 or >= 0x41 and <= 0x5A => ((char)vk).ToString(),
+				0xBA => ";",
+				0xBB => "=",
+				0xBC => ",",
+				0xBD => "-",
+				0xBE => ".",
+				0xBF => "/",
+				0xC0 => "`",
+				0xDB => "[",
+				0xDC => "\\",
+				0xDD => "]",
+				0xDE => "'",
+				_ => string.Empty
+			};
+#else
 			char result = (char)PInvoke.MapVirtualKey((uint)key, MAP_VIRTUAL_KEY_TYPE.MAPVK_VK_TO_CHAR);
 
 			if (result > 0)
 				return result.ToString();
 
 			return string.Empty;
+#endif
 		}
 	}
 }

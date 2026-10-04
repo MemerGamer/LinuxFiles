@@ -242,6 +242,10 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 		public bool CheckIsRecentItemsEnabled()
 		{
+#if !WINDOWS
+			// LINUX-TODO(recent): honour org.gnome.desktop.privacy remember-recent-files
+			return true;
+#else
 			using var explorerSubKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer");
 			using var advSubkey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
 			using var userPolicySubkey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer");
@@ -254,6 +258,7 @@ namespace Files.App.ViewModels.UserControls.Widgets
 				return true;
 
 			return false;
+#endif
 		}
 
 		// Event methods

@@ -21,6 +21,10 @@ namespace Files.App.Utils.Storage
 			if (string.IsNullOrEmpty(extension))
 				return string.Empty;
 
+			// LINUX-TODO(filetype): use IMimeTypeService.GetDescriptionAsync (shared-mime-info) for localized type names
+			if (!OperatingSystem.IsWindows())
+				return string.Empty;
+
 			if (typeNameCache.TryGetValue(extension, out var cached))
 				return cached;
 

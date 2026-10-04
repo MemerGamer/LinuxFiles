@@ -24,7 +24,9 @@ namespace Files.App
 			// Constructed on the UI thread: the ctor subscribes the UI-thread-only Clipboard.ContentChanged
 			AppModel = new AppModel();
 
-			_ = ActivateAsync();
+			ActivateAsync().ContinueWith(
+				t => Console.Error.WriteLine($"[Files] Startup failed: {t.Exception?.GetBaseException()}"),
+				TaskContinuationOptions.OnlyOnFaulted);
 
 			async Task ActivateAsync()
 			{

@@ -38,7 +38,9 @@ namespace Files.App.Utils.Library
 
 		public LibraryManager()
 		{
+#if WINDOWS
 			InitializeWatcher();
+#endif
 		}
 
 		private void InitializeWatcher()
@@ -68,6 +70,10 @@ namespace Files.App.Utils.Library
 		/// <returns>List of library items</returns>
 		public static async Task<List<LibraryLocationItem>> ListUserLibraries()
 		{
+#if !WINDOWS
+			// LINUX-TODO(libraries): no shell libraries on Linux
+			return await Task.FromResult<List<LibraryLocationItem>>([]);
+#else
 			var libraries = await STATask.Run(() =>
 			{
 				try
@@ -92,6 +98,7 @@ namespace Files.App.Utils.Library
 			}, App.Logger);
 
 			return libraries.Select(lib => new LibraryLocationItem(lib)).ToList();
+#endif
 		}
 
 		public async Task UpdateLibrariesAsync()

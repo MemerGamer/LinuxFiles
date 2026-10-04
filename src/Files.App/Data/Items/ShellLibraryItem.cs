@@ -7,7 +7,12 @@ namespace Files.App.Data.Items
 	{
 		public const string EXTENSION = ".library-ms";
 
+#if WINDOWS
 		public static readonly string LibrariesPath = Win32Helper.GetFolderFromKnownFolderGUID(new Guid("1B3EA5DC-B587-4786-B4EF-BD1DC332AEAE"));
+#else
+		// LINUX-TODO(libraries): Windows libraries (.library-ms) have no Linux equivalent
+		public static readonly string LibrariesPath = string.Empty;
+#endif
 
 		/// <summary>
 		/// Full path of library file.<br/>

@@ -93,7 +93,12 @@ namespace Files.App.Services.Settings
 			var settingsSerializer = new DefaultSettingsSerializer();
 			SettingsSerializer = settingsSerializer;
 
+			#if WINDOWS
 			Initialize(Path.Combine(ApplicationData.Current.LocalFolder.Path, Constants.LocalSettings.SettingsFolderName, Constants.LocalSettings.UserSettingsFileName));
+#else
+			// XDG location (~/.config/Files/settings/user_settings.json)
+			Initialize(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IAppDataPaths>().UserSettingsFilePath);
+#endif
 
 			var jsonSettingsSerializer = new DefaultJsonSettingsSerializer();
 			JsonSettingsSerializer = jsonSettingsSerializer;

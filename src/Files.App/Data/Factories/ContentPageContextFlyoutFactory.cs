@@ -1,4 +1,4 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Files.App.Helpers.ContextFlyouts;
@@ -14,7 +14,7 @@ namespace Files.App.Data.Factories
 	/// <summary>
 	/// Represents a factory to generate a list for layout pages.
 	/// </summary>
-	public static class ContentPageContextFlyoutFactory
+	public static partial class ContentPageContextFlyoutFactory
 	{
 		// Dependency injections
 
@@ -97,7 +97,12 @@ namespace Files.App.Data.Factories
 				Path.GetFileName(selectedItems.Count is 1 ? selectedItems[0].ItemPath : Path.GetDirectoryName(selectedItems[0].ItemPath))
 				?? string.Empty;
 
-			bool isDriveRoot = itemViewModel?.CurrentFolder is not null && (itemViewModel.CurrentFolder.ItemPath == Path.GetPathRoot(itemViewModel.CurrentFolder.ItemPath));
+#if !WINDOWS
+			bool isLinux = true;
+#else
+			bool isLinux = false;
+#endif
+			bool isDriveRoot = !isLinux && itemViewModel?.CurrentFolder is not null && (itemViewModel.CurrentFolder.ItemPath == Path.GetPathRoot(itemViewModel.CurrentFolder.ItemPath));
 
 			return new List<ContextMenuFlyoutItemViewModel>()
 			{
@@ -515,14 +520,15 @@ namespace Files.App.Data.Factories
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.CreateShortcut)
 				{
-					IsVisible = UserSettingsService.GeneralSettingsService.ShowCreateShortcut
+					// LINUX-TODO(create-shortcut): create a symlink instead of a .lnk, then show this on Linux
+					IsVisible = !isLinux && UserSettingsService.GeneralSettingsService.ShowCreateShortcut
 						&& itemsSelected
 						&& (!selectedItems.FirstOrDefault()?.IsShortcut ?? false)
 						&& !currentInstanceViewModel.IsPageTypeRecycleBin,
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.CreateAlternateDataStream)
 				{
-					IsVisible = UserSettingsService.GeneralSettingsService.ShowCreateAlternateDataStream &&
+					IsVisible = !isLinux && UserSettingsService.GeneralSettingsService.ShowCreateAlternateDataStream &&
 						Commands.CreateAlternateDataStream.IsExecutable,
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.Rename)
@@ -532,6 +538,7 @@ namespace Files.App.Data.Factories
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.ShareItem)
 				{
+					IsVisible = !isLinux && Commands.ShareItem.IsExecutable,
 					IsPrimary = true,
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(ModifiableCommands.DeleteItem)
@@ -555,12 +562,12 @@ namespace Files.App.Data.Factories
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.PinToStart)
 				{
-					IsVisible = selectedItems.All(x => (x.PrimaryItemAttribute == StorageItemTypes.Folder || x.IsExecutable || (x is IShortcutItem shortcutItem && FileExtensionHelpers.IsExecutableFile(shortcutItem.TargetPath))) && !x.IsItemPinnedToStart) && UserSettingsService.GeneralSettingsService.ShowPinToStart,
+					IsVisible = !isLinux && selectedItems.All(x => (x.PrimaryItemAttribute == StorageItemTypes.Folder || x.IsExecutable || (x is IShortcutItem shortcutItem && FileExtensionHelpers.IsExecutableFile(shortcutItem.TargetPath))) && !x.IsItemPinnedToStart) && UserSettingsService.GeneralSettingsService.ShowPinToStart,
 					ShowOnShift = true,
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.UnpinFromStart)
 				{
-					IsVisible = selectedItems.All(x => (x.PrimaryItemAttribute == StorageItemTypes.Folder || x.IsExecutable|| (x is IShortcutItem shortcutItem && FileExtensionHelpers.IsExecutableFile(shortcutItem.TargetPath))) && x.IsItemPinnedToStart) && UserSettingsService.GeneralSettingsService.ShowPinToStart,
+					IsVisible = !isLinux && selectedItems.All(x => (x.PrimaryItemAttribute == StorageItemTypes.Folder || x.IsExecutable|| (x is IShortcutItem shortcutItem && FileExtensionHelpers.IsExecutableFile(shortcutItem.TargetPath))) && x.IsItemPinnedToStart) && UserSettingsService.GeneralSettingsService.ShowPinToStart,
 					ShowOnShift = true,
 				}.Build(),
 				new ContextMenuFlyoutItemViewModel
@@ -603,7 +610,7 @@ namespace Files.App.Data.Factories
 					Tag = "SendTo",
 					CollapseLabel = true,
 					ShowInSearchPage = true,
-					ShowItem = itemsSelected && UserSettingsService.GeneralSettingsService.ShowSendToMenu
+					ShowItem = !isLinux && itemsSelected && UserSettingsService.GeneralSettingsService.ShowSendToMenu
 				},
 				new ContextMenuFlyoutItemViewModel()
 				{
@@ -619,7 +626,7 @@ namespace Files.App.Data.Factories
 						}
 					],
 					ShowInSearchPage = true,
-					ShowItem = itemsSelected && UserSettingsService.GeneralSettingsService.ShowSendToMenu
+					ShowItem = !isLinux && itemsSelected && UserSettingsService.GeneralSettingsService.ShowSendToMenu
 				},
 				new ContextMenuFlyoutItemViewModel()
 				{
@@ -637,14 +644,17 @@ namespace Files.App.Data.Factories
 					ShowItem = isDriveRoot,
 					IsEnabled = false
 				},
-				new ContextMenuFlyoutItemViewModelBuilder(Commands.EditInNotepad).Build(),
+				new ContextMenuFlyoutItemViewModelBuilder(Commands.EditInNotepad)
+				{
+					IsVisible = !isLinux && Commands.EditInNotepad.IsExecutable,
+				}.Build(),
 				new ContextMenuFlyoutItemViewModel()
 				{
 					ItemType = ContextMenuFlyoutItemType.Separator,
 					ShowItem = (!itemsSelected && Commands.OpenTerminal.IsExecutable && UserSettingsService.GeneralSettingsService.ShowOpenTerminal) ||
 						(areAllItemsFolders && Commands.OpenTerminal.IsExecutable && UserSettingsService.GeneralSettingsService.ShowOpenTerminal) ||
-						Commands.OpenStorageSense.IsExecutable ||
-						Commands.FormatDrive.IsExecutable
+						(!isLinux && Commands.OpenStorageSense.IsExecutable) ||
+						(!isLinux && Commands.FormatDrive.IsExecutable)
 				},
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.OpenTerminal)
 				{
@@ -652,8 +662,8 @@ namespace Files.App.Data.Factories
 						Commands.OpenTerminal.IsExecutable &&
 						UserSettingsService.GeneralSettingsService.ShowOpenTerminal
 				}.Build(),
-				new ContextMenuFlyoutItemViewModelBuilder(Commands.OpenStorageSense).Build(),
-				new ContextMenuFlyoutItemViewModelBuilder(Commands.FormatDrive).Build(),
+				new ContextMenuFlyoutItemViewModelBuilder(Commands.OpenStorageSense) { IsVisible = !isLinux && Commands.OpenStorageSense.IsExecutable }.Build(),
+				new ContextMenuFlyoutItemViewModelBuilder(Commands.FormatDrive) { IsVisible = !isLinux && Commands.FormatDrive.IsExecutable }.Build(),
 				// Shell extensions are not available on the FTP server or in the archive,
 				// but following items are intentionally added because icons in the context menu will not appear
 				// unless there is at least one menu item with an icon that is not an ThemedIconModel. (#12943)
@@ -684,6 +694,9 @@ namespace Files.App.Data.Factories
 
 		public static List<ContextMenuFlyoutItemViewModel> GetNewItemItems(BaseLayoutViewModel commandsViewModel, bool canCreateFileInPage)
 		{
+#if !WINDOWS
+			return GetLinuxNewItemItems(canCreateFileInPage);
+#else
 			var list = new List<ContextMenuFlyoutItemViewModel>()
 			{
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.CreateFolder).Build(),
@@ -737,6 +750,7 @@ namespace Files.App.Data.Factories
 			}
 
 			return list;
+#endif
 		}
 	}
 }

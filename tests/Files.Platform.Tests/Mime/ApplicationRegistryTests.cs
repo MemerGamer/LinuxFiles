@@ -39,6 +39,20 @@ namespace Files.Platform.Tests.Mime
 		}
 
 		[TestMethod]
+		public async Task GetAllApplications_ListsVisibleAppsSortedAndUserOverridesSystem()
+		{
+			using var fx = new XdgFixture();
+			fx.WriteDesktop("usr-share", "zed.desktop", "Zed", "zed %f");
+			fx.WriteDesktop("usr-share", "alpha.desktop", "Alpha", "alpha %f");
+			fx.WriteDesktop("usr-share", "nodisplay.desktop", "Hidden Helper", "h", "NoDisplay=true\n");
+			fx.WriteDesktop("data", "alpha.desktop", "Alpha User", "alpha-user %f");
+
+			var apps = await Create(fx).GetAllApplicationsAsync();
+
+			CollectionAssert.AreEqual(new[] { "Alpha User", "Zed" }, apps.Select(a => a.Name).ToArray());
+		}
+
+		[TestMethod]
 		public async Task Hidden_TryExecMissing_AndNonApplication_AreRejected()
 		{
 			using var fx = new XdgFixture();

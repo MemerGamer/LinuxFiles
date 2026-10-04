@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -4743,5 +4743,29 @@
   <data name="VolumeSizeName" xml:space="preserve">
     <value>{0} Volume</value>
     <comment>Name of a drive without a label. {0} is the size, e.g. "128 GiB Volume"</comment>
+  </data>
+  <data name="TextDocument" xml:space="preserve">
+    <value>Text document</value>
+  </data>
+  <data name="NewTextDocument" xml:space="preserve">
+    <value>New text document</value>
+  </data>
+  <data name="LinuxAlwaysUseApp" xml:space="preserve">
+    <value>Always use this app for this file type</value>
+  </data>
+  <data name="LinuxRunExecutableTitle" xml:space="preserve">
+    <value>Run "{0}"?</value>
+  </data>
+  <data name="LinuxRunExecutableText" xml:space="preserve">
+    <value>This is an executable text file. Do you want to run it or display its contents?</value>
+  </data>
+  <data name="LinuxDisplayFile" xml:space="preserve">
+    <value>Display</value>
+  </data>
+  <data name="LinuxUntrustedLauncherTitle" xml:space="preserve">
+    <value>Launch "{0}"?</value>
+  </data>
+  <data name="LinuxUntrustedLauncherText" xml:space="preserve">
+    <value>This launcher is not trusted. Only run launchers from sources you trust.</value>
   </data>
 </root>

@@ -66,6 +66,33 @@ namespace Files.Platform.Linux.Mime
 		}
 
 		/// <inheritdoc/>
+		public Task<IReadOnlyList<DesktopApplication>> GetAllApplicationsAsync(CancellationToken cancellationToken = default)
+		{
+			var apps = new List<DesktopApplication>();
+			var seen = new HashSet<string>(StringComparer.Ordinal);
+			foreach (var dir in xdg.AllDataDirs)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				var applications = Path.Combine(dir, "applications");
+				if (!Directory.Exists(applications))
+					continue;
+
+				foreach (var (id, _) in EnumerateDesktopFiles(applications))
+				{
+					if (!seen.Add(id))
+						continue;
+
+					var app = Load(id);
+					if (app is not null && !app.NoDisplay)
+						apps.Add(app);
+				}
+			}
+
+			apps.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
+			return Task.FromResult<IReadOnlyList<DesktopApplication>>(apps);
+		}
+
+		/// <inheritdoc/>
 		public Task<DesktopApplication?> GetDefaultApplicationAsync(string mimeType, CancellationToken cancellationToken = default)
 		{
 			cancellationToken.ThrowIfCancellationRequested();

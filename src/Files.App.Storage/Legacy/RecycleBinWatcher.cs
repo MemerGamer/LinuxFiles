@@ -37,6 +37,10 @@ namespace Files.App.Storage.Watchers
 		/// <inheritdoc/>
 		public void StartWatcher()
 		{
+			// LINUX-TODO(trash): Windows recycle bin watcher; Linux uses ITrashService.Watcher
+			if (!OperatingSystem.IsWindows())
+				return;
+
 			// NOTE: SHChangeNotifyRegister only works if recycle bin is open in File Explorer.
 
 			// Listen changes only on the Recycle Bin that the current logon user has

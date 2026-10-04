@@ -124,8 +124,10 @@ namespace Files.App.Helpers
 
 				//Start the tasks separately to reduce resource contention
 				await Task.WhenAll(
-					addItemService.InitializeAsync(),
-					ContextMenu.WarmUpQueryContextMenuAsync()
+					addItemService.InitializeAsync()
+#if WINDOWS
+					, ContextMenu.WarmUpQueryContextMenuAsync()
+#endif
 				);
 			});
 
@@ -353,6 +355,13 @@ namespace Files.App.Helpers
 					.AddSingleton<IWindowsIniService, WindowsIniService>()
 					.AddSingleton<IWindowsWallpaperService, WindowsWallpaperService>()
 					.AddSingleton<IWindowsSecurityService, WindowsSecurityService>()
+#else
+					.AddSingleton<IWindowsRecentItemsService, Files.App.Services.Desktop.DesktopRecentItemsService>()
+					.AddSingleton<IWindowsIniService, Files.App.Services.Desktop.DesktopIniService>()
+					.AddSingleton<IWindowsWallpaperService, Files.App.Services.Desktop.DesktopWallpaperService>()
+					.AddSingleton<IWindowsSecurityService, Files.App.Services.Desktop.DesktopSecurityService>()
+					.AddSingleton<IWindowsCompatibilityService, Files.App.Services.Desktop.DesktopCompatibilityService>()
+					.AddSingleton<IWindowsJumpListService, Files.App.Services.Desktop.DesktopJumpListService>()
 #endif
 					.AddSingleton<IAppThemeModeService, AppThemeModeService>()
 					.AddSingleton<IDialogService, DialogService>()
@@ -366,17 +375,29 @@ namespace Files.App.Helpers
 					.AddSingleton<IModifiableCommandManager, ModifiableCommandManager>()
 					.AddSingleton<IStorageService, NativeStorageLegacyService>()
 					.AddSingleton<IFtpStorageService, FtpStorageService>()
+#if WINDOWS
 					.AddSingleton<IAddItemService, AddItemService>()
+#else
+					.AddSingleton<IAddItemService, Files.App.Services.Desktop.DesktopAddItemService>()
+#endif
 					.AddSingleton<IPreviewPopupService, PreviewPopupService>()
 					.AddSingleton<IDateTimeFormatterFactory, DateTimeFormatterFactory>()
 					.AddSingleton<IDateTimeFormatter, UserDateTimeFormatter>()
 					.AddSingleton<ISizeProvider, UserSizeProvider>()
+#if WINDOWS
 					.AddSingleton<IQuickAccessService, QuickAccessService>()
+#else
+					.AddSingleton<IQuickAccessService, Files.App.Services.Desktop.DesktopQuickAccessService>()
+#endif
 					.AddSingleton<IResourcesService, ResourcesService>()
 #if WINDOWS
 					.AddSingleton<IWindowsJumpListService, WindowsJumpListService>()
 #endif
+#if WINDOWS
 					.AddSingleton<IStorageTrashBinService, StorageTrashBinService>()
+#else
+					.AddSingleton<IStorageTrashBinService, Files.App.Services.Desktop.DesktopStorageTrashBinService>()
+#endif
 					.AddSingleton<IRemovableDrivesService, RemovableDrivesService>()
 					.AddSingleton<INetworkService, NetworkService>()
 					.AddSingleton<IStartMenuService, StartMenuService>()

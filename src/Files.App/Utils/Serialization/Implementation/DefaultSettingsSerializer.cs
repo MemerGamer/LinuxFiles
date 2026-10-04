@@ -15,6 +15,22 @@ namespace Files.App.Utils.Serialization.Implementation
 
 		public bool CreateFile(string path)
 		{
+#if !WINDOWS
+			try
+			{
+				Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+				using (new FileStream(path, FileMode.OpenOrCreate, FileAccess.Read, FileShare.ReadWrite))
+				{
+				}
+
+				_filePath = path;
+				return true;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return false;
+			}
+#else
 			PInvoke.CreateDirectoryFromApp(Path.GetDirectoryName(path), null);
 
 			var hFile = CreateFileFromApp(path, (uint)FILE_ACCESS_RIGHTS.FILE_GENERIC_READ, FILE_SHARE_READ, IntPtr.Zero, OPEN_ALWAYS, (uint)File_Attributes.BackupSemantics, IntPtr.Zero);
@@ -27,6 +43,7 @@ namespace Files.App.Utils.Serialization.Implementation
 
 			_filePath = path;
 			return true;
+#endif
 		}
 
 		/// <summary>
@@ -38,14 +55,40 @@ namespace Files.App.Utils.Serialization.Implementation
 		{
 			ArgumentNullException.ThrowIfNull(_filePath);
 
+#if !WINDOWS
+			try
+			{
+				return File.ReadAllText(_filePath);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return string.Empty;
+			}
+#else
 			return ReadStringFromFile(_filePath) ?? string.Empty;
+#endif
 		}
 
 		public bool WriteToFile(string text)
 		{
 			ArgumentNullException.ThrowIfNull(_filePath);
 
+#if !WINDOWS
+			try
+			{
+				// Write to a temp file and rename so a crash never leaves a truncated settings file
+				var tmp = _filePath + ".tmp";
+				File.WriteAllText(tmp, text);
+				File.Move(tmp, _filePath, true);
+				return true;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return false;
+			}
+#else
 			return WriteStringToFile(_filePath, text);
+#endif
 		}
 	}
 }

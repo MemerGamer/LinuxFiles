@@ -13,11 +13,32 @@ namespace Files.App.Utils.Storage
 	{
 		public static unsafe bool CheckFolderAccessWithWin32(string path)
 		{
+#if !WINDOWS
+			return SafeEnumerates(path);
+#else
 			WIN32_FIND_DATAW findData = default;
 			using FindCloseSafeHandle hFile = PInvoke.FindFirstFileEx($"{path}{Path.DirectorySeparatorChar}*.*", FINDEX_INFO_LEVELS.FindExInfoBasic,
 				&findData, FINDEX_SEARCH_OPS.FindExSearchNameMatch, FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
 			return !hFile.IsInvalid;
+#endif
 		}
+
+#if !WINDOWS
+		// Opening the directory for listing is the access test (an empty readable folder is accessible)
+		private static bool SafeEnumerates(string path)
+		{
+			try
+			{
+				using var e = Directory.EnumerateFileSystemEntries(path).GetEnumerator();
+				e.MoveNext();
+				return true;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return false;
+			}
+		}
+#endif
 
 		public static async Task<bool> CheckBitlockerStatusAsync(BaseStorageFolder? rootFolder, string path)
 		{
@@ -41,6 +62,17 @@ namespace Files.App.Utils.Storage
 		///
 		public static unsafe bool CheckForFilesFolders(string targetPath)
 		{
+#if !WINDOWS
+			try
+			{
+				using var e = Directory.EnumerateFileSystemEntries(targetPath).GetEnumerator();
+				return e.MoveNext();
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return false;
+			}
+#else
 			WIN32_FIND_DATAW findData = default;
 			using FindCloseSafeHandle hFile = PInvoke.FindFirstFileEx($"{targetPath}{Path.DirectorySeparatorChar}*.*", FINDEX_INFO_LEVELS.FindExInfoBasic,
 				&findData, FINDEX_SEARCH_OPS.FindExSearchNameMatch, FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
@@ -56,11 +88,37 @@ namespace Files.App.Utils.Storage
 			while (PInvoke.FindNextFile(hFile, out findData));
 
 			return false;
+#endif
 		}
 
 		public static unsafe List<SubfolderEntry> EnumerateSubfolders(string path, bool showHidden, bool showProtected, bool showDot, int limit = 1000)
 		{
 			var results = new List<SubfolderEntry>();
+#if !WINDOWS
+			try
+			{
+				foreach (var dir in new DirectoryInfo(path).EnumerateDirectories())
+				{
+					var isHidden = dir.Name.StartsWith('.');
+					if (isHidden && !showDot)
+						continue;
+					if (isHidden && !showHidden)
+						continue;
+
+					results.Add(new SubfolderEntry(dir.FullName, dir.Name, HasSubfolders(dir.FullName), isHidden));
+
+					if (results.Count == limit)
+						break;
+				}
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+			}
+
+			var comparer = NaturalStringComparer.GetForProcessor();
+			results.Sort((a, b) => comparer.Compare(a.Name, b.Name));
+			return results;
+#else
 			WIN32_FIND_DATAW findData = default;
 			using FindCloseSafeHandle hFind = PInvoke.FindFirstFileEx(
 				path + "\\*.*",
@@ -102,10 +160,22 @@ namespace Files.App.Utils.Storage
 			var naturalComparer = NaturalStringComparer.GetForProcessor();
 			results.Sort((a, b) => naturalComparer.Compare(a.Name, b.Name));
 			return results;
+#endif
 		}
 
 		public static unsafe bool HasSubfolders(string path)
 		{
+#if !WINDOWS
+			try
+			{
+				using var e = Directory.EnumerateDirectories(path).GetEnumerator();
+				return e.MoveNext();
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return false;
+			}
+#else
 			WIN32_FIND_DATAW findData = default;
 			using FindCloseSafeHandle hFind = PInvoke.FindFirstFileEx(
 				path + "\\*.*",
@@ -126,6 +196,7 @@ namespace Files.App.Utils.Storage
 			}
 			while (PInvoke.FindNextFile(hFind, out findData));
 			return false;
+#endif
 		}
 	}
 }

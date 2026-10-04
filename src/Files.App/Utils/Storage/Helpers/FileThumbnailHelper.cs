@@ -25,6 +25,9 @@ namespace Files.App.Utils.Storage
 				? Math.Max(1u, (uint)Math.Round(scaledSize))
 				: _standardSizes.FirstOrDefault(s => s >= scaledSize, _standardSizes[^1]);
 
+#if !WINDOWS
+			return await LinuxIconHelper.GetIconAsync(path, size, isFolder, iconOptions);
+#else
 			if (!isFolder && !iconOptions.HasFlag(IconOptions.ReturnIconOnly) && !iconOptions.HasFlag(IconOptions.ReturnOnlyIfCached))
 			{
 				var extension = Path.GetExtension(path);
@@ -50,6 +53,7 @@ namespace Files.App.Utils.Storage
 				: path;
 
 			return await STATask.RunPooled(() => Win32Helper.GetIcon(resolvedPath, (int)size, isFolder, iconOptions), App.Logger);
+#endif
 		}
 
 		/// <summary>
@@ -61,8 +65,14 @@ namespace Files.App.Utils.Storage
 		public static async Task<byte[]?> GetIconOverlayAsync(string? path, uint requestedSize, bool isFolder)
 		{
 			// Overlays render at 32px in thumbnail layouts and 16px in details/columns; scale by DPI so the badge isn't upscaled at fractional scaling
+#if !WINDOWS
+			// LINUX-TODO(icons): overlays (cloud/sync status, link arrow) have no Linux source yet
+			await Task.CompletedTask;
+			return null;
+#else
 			var overlaySize = (requestedSize >= 48 ? 32u : 16u) * App.AppModel.AppWindowDPI;
 			return await STATask.RunPooled(() => Win32Helper.GetIconOverlay(path, (int)overlaySize, isFolder), App.Logger);
+#endif
 		}
 
 		[Obsolete]

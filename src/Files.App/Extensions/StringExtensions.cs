@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-using Microsoft.Windows.ApplicationModel.Resources;
 using System.Collections.Concurrent;
 using System.IO;
 using ByteSize = ByteSizeLib.ByteSize;
@@ -55,8 +54,6 @@ namespace Files.App.Extensions
 			return result;
 		}
 
-		private static readonly ResourceMap resourcesTree = new ResourceManager().MainResourceMap.TryGetSubtree("Resources");
-
 		private static readonly ConcurrentDictionary<string, string> cachedResources = new();
 
 		private static readonly Dictionary<string, string> abbreviations = new()
@@ -102,7 +99,7 @@ namespace Files.App.Extensions
 				return value;
 			}
 
-			value = resourcesTree?.TryGetValue(resourceKey)?.ValueAsString;
+			value = ResourceLookup.TryGet(resourceKey);
 
 			return cachedResources[resourceKey] = value ?? string.Empty;
 		}

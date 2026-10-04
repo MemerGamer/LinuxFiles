@@ -318,6 +318,10 @@ namespace Files.App.Helpers
 		{
 			var iconsList = new List<IconFileInfo>();
 
+			// LINUX-TODO(icons): no PE resource icons on Linux; callers fall back to theme icons via IIconThemeProvider
+			if (!OperatingSystem.IsWindows())
+				return iconsList;
+
 			foreach (int index in indexes)
 			{
 				if (_iconCache.TryGetValue((file, index, iconSize), out var iconInfo))
@@ -952,6 +956,10 @@ namespace Files.App.Helpers
 
 		public static string? ReadStringFromFile(string filePath)
 		{
+#if !WINDOWS
+			// LINUX-TODO(ads): only NTFS alternate data streams ("file:stream") used this on Windows; settings use System.IO directly.
+			return null;
+#else
 			try
 			{
 				using SafeFileHandle hFile = OpenFileForRead(filePath);
@@ -966,10 +974,15 @@ namespace Files.App.Helpers
 			{
 				return null;
 			}
+#endif
 		}
 
 		public static bool WriteStringToFile(string filePath, string str, FILE_FLAGS_AND_ATTRIBUTES flags = 0)
 		{
+#if !WINDOWS
+			// LINUX-TODO(ads): alternate data streams do not exist on Linux (could map to xattrs)
+			return false;
+#else
 			try
 			{
 				using SafeFileHandle hStream = PInvoke.CreateFile(filePath,
@@ -985,6 +998,7 @@ namespace Files.App.Helpers
 			{
 				return false;
 			}
+#endif
 		}
 
 		// https://www.pinvoke.net/default.aspx/kernel32/GetFileInformationByHandleEx.html

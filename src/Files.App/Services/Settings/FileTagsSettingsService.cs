@@ -38,8 +38,12 @@ namespace Files.App.Services.Settings
 			var settingsSerializer = new DefaultSettingsSerializer();
 			SettingsSerializer = settingsSerializer;
 
+			#if WINDOWS
 			Initialize(Path.Combine(ApplicationData.Current.LocalFolder.Path,
 				Constants.LocalSettings.SettingsFolderName, Constants.LocalSettings.FileTagSettingsFileName));
+#else
+			Initialize(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IAppDataPaths>().FileTagsSettingsFilePath);
+#endif
 
 			var jsonSettingsSerializer = new DefaultJsonSettingsSerializer();
 			JsonSettingsSerializer = jsonSettingsSerializer;

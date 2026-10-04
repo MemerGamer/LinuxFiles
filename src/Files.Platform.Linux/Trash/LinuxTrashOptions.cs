@@ -4,6 +4,8 @@
 using System;
 using System.IO;
 
+using Files.Platform.Linux.Native;
+
 namespace Files.Platform.Linux.Trash
 {
 	/// <summary>

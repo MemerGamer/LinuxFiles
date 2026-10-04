@@ -19,11 +19,14 @@ namespace Files.Platform.Linux.FileOperations
 		private long _itemsTotal;
 		private long _bytesTotal;
 
-		public FileOperationContext(FileOperationOptions? options, CancellationToken cancellationToken)
+		public FileOperationContext(FileOperationOptions? options, CancellationToken cancellationToken, LinuxFileOperationsHooks? hooks = null)
 		{
+			Hooks = hooks;
 			_options = options ?? new FileOperationOptions();
 			CancellationToken = cancellationToken;
 		}
+
+		public LinuxFileOperationsHooks? Hooks { get; }
 
 		public CancellationToken CancellationToken { get; }
 

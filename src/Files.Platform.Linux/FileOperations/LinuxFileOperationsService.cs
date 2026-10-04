@@ -17,6 +17,7 @@ namespace Files.Platform.Linux.FileOperations
 	public sealed partial class LinuxFileOperationsService : IFileOperationsService
 	{
 		private readonly Func<string, string, bool>? _isSameDevice;
+		private readonly LinuxFileOperationsHooks? _hooks;
 
 		/// <summary>
 		/// Creates the service, detecting mount boundaries from /proc/self/mountinfo.
@@ -32,6 +33,15 @@ namespace Files.Platform.Linux.FileOperations
 		public LinuxFileOperationsService(Func<string, string, bool> isSameDevice)
 		{
 			_isSameDevice = isSameDevice ?? throw new ArgumentNullException(nameof(isSameDevice));
+		}
+
+		/// <summary>
+		/// Creates the service with optional diagnostic hooks (used by tests to observe or interfere between steps).
+		/// </summary>
+		public LinuxFileOperationsService(Func<string, string, bool>? isSameDevice, LinuxFileOperationsHooks? hooks)
+		{
+			_isSameDevice = isSameDevice;
+			_hooks = hooks;
 		}
 
 		/// <inheritdoc/>
@@ -106,7 +116,7 @@ namespace Files.Platform.Linux.FileOperations
 			ArgumentNullException.ThrowIfNull(path);
 			ArgumentNullException.ThrowIfNull(newName);
 
-			var context = new FileOperationContext(options, cancellationToken);
+			var context = new FileOperationContext(options, cancellationToken, _hooks);
 			Outcome outcome;
 			try
 			{
@@ -161,7 +171,7 @@ namespace Files.Platform.Linux.FileOperations
 			CancellationToken cancellationToken,
 			Func<string, FileOperationContext, Task<Outcome>> operation)
 		{
-			var context = new FileOperationContext(options, cancellationToken);
+			var context = new FileOperationContext(options, cancellationToken, _hooks);
 			var results = new List<FileOperationItemResult>(sources.Count);
 			var normalized = new string?[sources.Count];
 			var scans = new (long Items, long Bytes)[sources.Count];

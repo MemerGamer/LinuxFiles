@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.FileOperations;
+using Files.Platform.Linux.Native;
 
 namespace Files.Platform.Linux.FileOperations
 {
@@ -66,8 +67,11 @@ namespace Files.Platform.Linux.FileOperations
 						return Outcome.Success(destination);
 					}
 
+					if (sourceKind == EntryKind.Special)
+						throw new FileOperationException(FileOperationErrorKind.UnsupportedFileType, "FIFOs, sockets and device files cannot be moved across file systems.", source);
+
 					var copy = sourceKind == EntryKind.Symlink
-						? CopyLink(source, destination, resolved.Replace, context)
+						? CopyLink(source, destination, resolved.Replace, context, null)
 						: await CopyFileAsync(source, destination, resolved.Replace, context, verifySource: true).ConfigureAwait(false);
 
 					if (copy.Status == FileOperationStatus.Succeeded)
@@ -108,7 +112,10 @@ namespace Files.Platform.Linux.FileOperations
 			var created = FileSystemEntry.GetKind(destination) == EntryKind.None;
 			var metadata = DirectoryMetadata.Capture(source);
 			if (created)
-				Directory.CreateDirectory(destination);
+			{
+				UnixMode.CreatePrivateDirectory(destination);
+				context.Hooks?.DirectoryCreated?.Invoke(destination);
+			}
 
 			var result = Outcome.Success(destination);
 			foreach (var child in Directory.EnumerateFileSystemEntries(source, "*", FileSystemEntry.AllEntries).ToList())
@@ -151,43 +158,62 @@ namespace Files.Platform.Linux.FileOperations
 			MoveFile(source, destination, replace);
 		}
 
-		private Task<Outcome> DeleteEntryAsync(string path, FileOperationContext context)
-			=> Task.FromResult(DeleteEntry(path, context));
+		private static Task<Outcome> DeleteEntryAsync(string path, FileOperationContext context)
+			=> Task.FromResult(DeleteTopLevel(path, context));
 
-		private static Outcome DeleteEntry(string path, FileOperationContext context)
+		private static Outcome DeleteTopLevel(string path, FileOperationContext context)
 		{
 			context.CancellationToken.ThrowIfCancellationRequested();
 
+			// The folder holding the item is opened following links (the user navigated there); everything below is handle-relative
+			var parentPath = Path.GetDirectoryName(path)!;
+			using var parent = DirectoryHandle.TryOpen(PosixNative.AtFdCwd, parentPath, parentPath, false, out var errno);
+			if (parent is null)
+				return Outcome.FromException(PosixNative.CreateException(errno, parentPath), path);
+
+			return DeleteChild(parent, Path.GetFileName(path), path, context);
+		}
+
+		/// <summary>
+		/// Deletes <paramref name="name"/> inside <paramref name="parent"/> using descriptor-relative calls with O_NOFOLLOW, so a folder replaced
+		/// by a symbolic link while the operation runs is unlinked itself instead of being followed.
+		/// </summary>
+		private static Outcome DeleteChild(DirectoryHandle parent, string name, string fullPath, FileOperationContext context)
+		{
+			context.CancellationToken.ThrowIfCancellationRequested();
 			try
 			{
-				switch (FileSystemEntry.GetKind(path))
+				if (!PosixNative.TryStat(parent.Descriptor, name, PosixNative.AtSymlinkNofollow, out var stat, out var statErrno))
+					return Outcome.FromException(PosixNative.CreateException(statErrno, fullPath), fullPath);
+
+				context.Hooks?.BeforeDeleteEntry?.Invoke(fullPath);
+
+				if (stat.IsDirectory)
 				{
-					case EntryKind.None:
-						return Outcome.Fail(FileOperationErrorKind.NotFound, "The item does not exist.", path);
+					using var directory = DirectoryHandle.TryOpen(parent.Descriptor, name, fullPath, true, out var openErrno);
+					if (directory is not null)
+					{
+						var result = Outcome.Success(null);
+						foreach (var childName in directory.ListNames())
+							result = result.Combine(DeleteChild(directory, childName, Path.Combine(fullPath, childName), context), null);
 
-					case EntryKind.Directory:
-						{
-							var result = Outcome.Success(null);
-							foreach (var child in Directory.EnumerateFileSystemEntries(path, "*", FileSystemEntry.AllEntries).ToList())
-								result = result.Combine(DeleteEntry(child, context), null);
+						if (result.Status == FileOperationStatus.Succeeded)
+							PosixNative.UnlinkAt(parent.Descriptor, name, PosixNative.AtRemoveDir, fullPath);
 
-							if (result.Status == FileOperationStatus.Succeeded)
-								Directory.Delete(path, false);
+						context.ItemDone(fullPath);
+						return result;
+					}
 
-							context.ItemDone(path);
-							return result;
-						}
+					if (!PosixNative.IsNotFollowedError(openErrno))
+						return Outcome.FromException(PosixNative.CreateException(openErrno, fullPath), fullPath);
 
-					default:
-						{
-							// Links are unlinked, never followed
-							var length = FileSystemEntry.GetKind(path) == EntryKind.File ? new FileInfo(path).Length : 0;
-							File.Delete(path);
-							context.AddBytes(length, path);
-							context.ItemDone(path);
-							return Outcome.Success(null);
-						}
+					// Swapped for a link after the stat: fall through and remove the link itself
 				}
+
+				PosixNative.UnlinkAt(parent.Descriptor, name, 0, fullPath);
+				context.AddBytes(stat.IsRegularFile ? (long)stat.Size : 0, fullPath);
+				context.ItemDone(fullPath);
+				return Outcome.Success(null);
 			}
 			catch (OperationCanceledException)
 			{
@@ -195,7 +221,7 @@ namespace Files.Platform.Linux.FileOperations
 			}
 			catch (Exception ex) when (ex is not OutOfMemoryException)
 			{
-				return Outcome.FromException(ex, path);
+				return Outcome.FromException(ex, fullPath);
 			}
 		}
 

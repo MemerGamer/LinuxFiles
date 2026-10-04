@@ -79,7 +79,7 @@
 			<TextBlock
 				Margin="12,8"
 				CharacterSpacing="150"
-				FontFamily="Cascadia Mono,Consolas,Segoe UI Variable"
+				FontFamily="Cascadia Mono,Consolas,DejaVu Sans Mono,Liberation Mono"
 				FontSize="32"
 				FontWeight="Normal"
 				Text="{x:Bind ViewModel.UserCode}" />

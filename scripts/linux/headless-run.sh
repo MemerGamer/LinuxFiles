@@ -61,7 +61,10 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	printf '#!/bin/sh\necho hi\n' >"$home/Downloads/script.sh"
 	head -c 2048 /dev/urandom >"$home/Downloads/archive.bin"
 	ln -sf "$home/Documents" "$home/Desktop/Documents link"
-	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache")
+	mkdir -p -m 0700 "$home/.runtime"
+	# Never reach the real system bus (UDisks2 could mount/unmount real disks) or the real gvfs/runtime dir.
+	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache" \
+		XDG_RUNTIME_DIR="$home/.runtime" DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent" GIO_USE_VFS=local GVFS_DISABLE_FUSE=1)
 fi
 
 # Private D-Bus session: notifications, portals and app launches never reach the real desktop session.

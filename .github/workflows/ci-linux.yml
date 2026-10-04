@@ -72,8 +72,7 @@ jobs:
       run: dotnet build src/Files.App.Storage/Files.App.Storage.csproj -c Release -f net10.0-desktop
 
     # Informational until the Phase 2 error inventory (docs/linux-port/phase2-errors.md) reaches zero.
-    - name: Build Files.App (Uno desktop, errors expected)
-      continue-on-error: true
+    - name: Build Files.App (Uno desktop)
       run: dotnet build src/Files.App/Files.App.csproj -c Release -f net10.0-desktop
 
     - name: Build and test platform test projects (if any)

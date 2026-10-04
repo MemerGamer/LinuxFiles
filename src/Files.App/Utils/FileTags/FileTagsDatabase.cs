@@ -11,8 +11,9 @@ using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace Files.App.Utils.FileTags
 {
-	public sealed class FileTagsDatabase
+	public sealed partial class FileTagsDatabase
 	{
+#if WINDOWS
 		private static string? _FileTagsKey;
 		private string? FileTagsKey => _FileTagsKey ??= SafetyExtensions.IgnoreExceptions(() => @$"Software\Files Community\{Package.Current.Id.Name}\v1\FileTags");
 
@@ -255,5 +256,6 @@ namespace Files.App.Utils.FileTags
 				IterateKeys(list, CombineKeys(path, subKey), depth + 1);
 			}
 		}
+#endif
 	}
 }

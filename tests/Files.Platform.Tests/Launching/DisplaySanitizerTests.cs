@@ -42,15 +42,23 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
-		public void Arguments_CapsCountAndEscapesEach()
+		public void FullArguments_ShowsEverythingEscapedWithoutTruncation()
 		{
-			var argv = Enumerable.Range(0, 20).Select(i => i == 0 ? "/bin/x\u202E" : "a" + i).ToArray();
+			var argv = Enumerable.Range(0, 100).Select(i => i == 0 ? "/bin/x\u202E" : new string('a', 300)).ToArray();
 
-			var lines = DisplaySanitizer.Arguments(argv);
+			var lines = DisplaySanitizer.FullArguments(argv)!;
 
-			Assert.AreEqual(DisplaySanitizer.MaxArguments + 1, lines.Count);
+			Assert.AreEqual(100, lines.Count);
 			Assert.AreEqual("/bin/x\\u202E", lines[0]);
-			Assert.AreEqual("\u2026 8 more", lines[^1]);
+			Assert.AreEqual(300, lines[1].Length);
+		}
+
+		[TestMethod]
+		public void FullArguments_RefusesWhatCannotBeShownInFull()
+		{
+			Assert.IsNull(DisplaySanitizer.FullArguments(Enumerable.Repeat("a", DisplaySanitizer.MaxExecutedArguments + 1).ToArray()));
+			Assert.IsNull(DisplaySanitizer.FullArguments(["/bin/x", new string('a', DisplaySanitizer.MaxExecutedCharacters)]));
+			Assert.IsNotNull(DisplaySanitizer.FullArguments(Enumerable.Repeat("a", DisplaySanitizer.MaxExecutedArguments).ToArray()));
 		}
 	}
 }

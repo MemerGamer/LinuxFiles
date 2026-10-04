@@ -12,7 +12,8 @@
     <!-- Linux bring-up: compile existing Win32 code against CsWin32 types until it is replaced by Files.Platform services. -->
     <FilesWin32Compat Condition="'$(FilesWin32Compat)' == ''">true</FilesWin32Compat>
     <LangVersion>preview</LangVersion>
-    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <!-- Uno's nullability annotations differ from WinUI's; keep nullable diagnostics as warnings on the Linux desktop build for now. -->
+    <WarningsAsErrors Condition="!$(TargetFramework.EndsWith('-desktop'))">nullable</WarningsAsErrors>
 
     <!--  Use Microsoft.Testing.Platform  -->
     <EnableMSTestRunner>true</EnableMSTestRunner>

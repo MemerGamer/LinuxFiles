@@ -4,6 +4,8 @@
 using Files.Platform.Abstractions;
 using Files.Platform.Linux.Enumeration;
 using Files.Platform.Linux.Icons;
+using Files.Platform.Linux.Launching;
+using Files.Platform.Linux.Mime;
 using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Trash;
 using Files.Platform.Linux.Watching;
@@ -28,7 +30,9 @@ namespace Files.Platform.Linux
 				.AddLinuxWatching()
 				.AddLinuxThumbnails()
 				.AddLinuxIcons()
-				.AddLinuxTrash();
+				.AddLinuxTrash()
+				.AddLinuxMime()
+				.AddLinuxLaunching();
 		}
 	}
 }

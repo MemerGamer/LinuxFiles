@@ -57,6 +57,7 @@ namespace Files.App.Views.Shells
 			_navigationInteractionTracker.NavigationRequested += OverscrollNavigationRequested;
 #else
 			// Without the tracker nothing hides the swipe indicators, so they would float over the content
+			ItemDisplayFrame.NavigationFailed += (s, e) => Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, e.Exception, "Navigation to {T} failed", e.SourcePageType?.Name);
 			BackIcon.Visibility = Visibility.Collapsed;
 			ForwardIcon.Visibility = Visibility.Collapsed;
 #endif

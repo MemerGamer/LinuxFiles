@@ -179,6 +179,7 @@ namespace Files.App.Views.Layouts
 			InitializeComponent();
 #if !WINDOWS
 			HoistSemanticZoomContent(RootGridZoom);
+			// LINUX-TODO(listing): the ItemsReorderAnimation.Duration (350ms) was dropped from the XAML; Uno lacks CreateImplicitAnimationCollection
 #endif
 			DataContext = this;
 

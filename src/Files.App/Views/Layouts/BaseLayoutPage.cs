@@ -466,6 +466,12 @@ namespace Files.App.Views.Layouts
 
 		protected virtual void BaseFolderSettings_LayoutModeChangeRequested(object? sender, LayoutModeEventArgs e)
 		{
+			try { BaseFolderSettings_LayoutModeChangeRequestedCore(sender, e); }
+			catch (Exception ex) { Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, ex, "LINUXDBG layout switch failed"); }
+		}
+
+		private void BaseFolderSettings_LayoutModeChangeRequestedCore(object? sender, LayoutModeEventArgs e)
+		{
 			if (ParentShellPageInstance is { SlimContentPage: not null } parentShellPage)
 			{
 				var shellViewModel = parentShellPage.GetRequiredShellViewModel();

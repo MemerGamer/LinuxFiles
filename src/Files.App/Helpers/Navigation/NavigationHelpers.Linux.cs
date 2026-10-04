@@ -43,7 +43,7 @@ namespace Files.App.Helpers
 
 				var opened = await OpenFileLinuxAsync(path, openViaApplicationPicker);
 				if (!opened)
-					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(path));
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
 
 				return opened;
 			}
@@ -196,21 +196,21 @@ namespace Files.App.Helpers
 			async Task<bool> ChangedAsync()
 			{
 				App.Logger.LogWarning("File changed before it was opened: {Path}", target);
-				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxFileChangedTitle.GetLocalizedResource(), Strings.LinuxFileChangedText.GetLocalizedFormatResource(target));
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxFileChangedTitle.GetLocalizedResource(), Strings.LinuxFileChangedText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)));
 				return false;
 			}
 
 			switch (plan.Action)
 			{
 				case OpenAction.Refuse:
-					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(target));
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)));
 					return false;
 
 				case OpenAction.RunBinaryWithConfirm:
 				{
 					var confirmed = await DialogDisplayHelper.ShowDialogAsync(
-						Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(Path.GetFileName(target)),
-						Strings.LinuxRunBinaryText.GetLocalizedFormatResource(target),
+						Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+						Strings.LinuxRunBinaryText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)),
 						Strings.Run.GetLocalizedResource(),
 						Strings.Cancel.GetLocalizedResource());
 
@@ -224,8 +224,8 @@ namespace Files.App.Helpers
 				{
 					var dialog = new DynamicDialog(new DynamicDialogViewModel()
 					{
-						TitleText = Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(Path.GetFileName(target)),
-						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedFormatResource(target),
+						TitleText = Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)),
 						PrimaryButtonText = Strings.Run.GetLocalizedResource(),
 						SecondaryButtonText = Strings.LinuxDisplayFile.GetLocalizedResource(),
 						CloseButtonText = Strings.Cancel.GetLocalizedResource(),
@@ -257,13 +257,8 @@ namespace Files.App.Helpers
 					var argv = plan.Argv!;
 					if (plan.Action == OpenAction.LaunchDesktopConfirm)
 					{
-						// Show the exact argv the launcher will receive (control characters made visible)
-						var command = string.Join(' ', argv.Select(a => DesktopExecExpander.ShellQuote(MakeVisible(a)))) + (application.RunInTerminal ? " (in a terminal)" : string.Empty);
-						var confirmed = await DialogDisplayHelper.ShowDialogAsync(
-							Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(MakeVisible(application.Name)),
-							Strings.LinuxUntrustedLauncherText.GetLocalizedFormatResource(command),
-							Strings.Run.GetLocalizedResource(),
-							Strings.Cancel.GetLocalizedResource());
+						// The real file is the identity; the .desktop Name is only a claim. Argv is shown one item per line.
+						var confirmed = await ShowLauncherConfirmationAsync(target, application.Name, argv, application.RunInTerminal);
 
 						if (OpenDecision.Resolve(plan.Action, confirmed ? ConfirmChoice.Run : ConfirmChoice.Cancel) != FollowUp.RunExact)
 							return true;
@@ -286,15 +281,39 @@ namespace Files.App.Helpers
 			var editor = await registry.GetDefaultApplicationAsync("text/plain") ?? (await registry.GetApplicationsForMimeTypeAsync("text/plain")).FirstOrDefault();
 			if (editor is null)
 			{
-				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(target));
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)));
 				return false;
 			}
 
 			return await LinuxLauncher.OpenWithAsync(editor, [target]);
 		}
 
-		private static string MakeVisible(string value)
-			=> string.Concat(value.Select(c => char.IsControl(c) ? $"\\x{(int)c:X2}" : c.ToString()));
+		private static async Task<bool> ShowLauncherConfirmationAsync(string target, string claimedName, IReadOnlyList<string> argv, bool inTerminal)
+		{
+			var panel = new Microsoft.UI.Xaml.Controls.StackPanel { Spacing = 8 };
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxFileLabel.GetLocalizedResource() + " " + DisplaySanitizer.Field(target), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap, IsTextSelectionEnabled = true });
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxClaimsToBe.GetLocalizedResource() + " " + DisplaySanitizer.Field(claimedName), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap });
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxWouldRun.GetLocalizedResource() + (inTerminal ? " (" + Strings.LinuxInTerminal.GetLocalizedResource() + ")" : string.Empty) });
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock
+			{
+				Text = string.Join('\n', DisplaySanitizer.Arguments(argv)),
+				FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("monospace"),
+				TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
+				IsTextSelectionEnabled = true,
+			});
+
+			var dialog = new DynamicDialog(new DynamicDialogViewModel()
+			{
+				TitleText = Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+				SubtitleText = Strings.LinuxUntrustedLauncherText.GetLocalizedResource(),
+				DisplayControl = panel,
+				PrimaryButtonText = Strings.Run.GetLocalizedResource(),
+				CloseButtonText = Strings.Cancel.GetLocalizedResource(),
+				DynamicButtons = DynamicDialogButtons.Primary | DynamicDialogButtons.Cancel
+			});
+
+			return await DialogDisplayHelper.ShowDialogAsync(dialog) == DynamicDialogResult.Primary;
+		}
 
 		private static bool IsInApplicationsDirectory(string path)
 		{

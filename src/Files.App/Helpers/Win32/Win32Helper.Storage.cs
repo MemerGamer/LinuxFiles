@@ -1007,6 +1007,10 @@ namespace Files.App.Helpers
 			if (string.IsNullOrEmpty(folderPath))
 				return null;
 
+			// LINUX-TODO(frn): NTFS file reference numbers; could use st_ino/st_dev
+			if (!OperatingSystem.IsWindows())
+				return null;
+
 			using var handle = OpenFileForRead(folderPath);
 			if (!handle.IsInvalid)
 			{
@@ -1019,6 +1023,9 @@ namespace Files.App.Helpers
 
 		public static unsafe ulong? GetFileFRN(string filePath)
 		{
+			if (!OperatingSystem.IsWindows())
+				return null;
+
 			using var handle = OpenFileForRead(filePath);
 			if (!handle.IsInvalid)
 			{
@@ -1035,6 +1042,9 @@ namespace Files.App.Helpers
 
 		public static long? GetFileSizeOnDisk(string filePath)
 		{
+			if (!OperatingSystem.IsWindows())
+				return null;
+
 			using var handle = OpenFileForRead(filePath);
 			if (!handle.IsInvalid)
 			{

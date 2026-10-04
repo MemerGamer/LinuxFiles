@@ -68,6 +68,10 @@ namespace Files.App.Services
 		/// <inheritdoc/>
 		public async Task<IEnumerable<IFolder>> GetComputersAsync()
 		{
+#if !WINDOWS
+			// LINUX-TODO(network): enumerate network locations via GVfs/Avahi
+			return await Task.FromResult<IEnumerable<IFolder>>([]);
+#else
 			var result = await Win32Helper.GetShellFolderAsync(guid, false, true, 0, int.MaxValue);
 
 			return result.Enumerate.Where(item => item.IsFolder).Select(item =>
@@ -91,11 +95,15 @@ namespace Files.App.Services
 
 				return networkItem;
 			});
+#endif
 		}
 
 		/// <inheritdoc/>
 		public async Task<IEnumerable<IFolder>> GetShortcutsAsync()
 		{
+#if !WINDOWS
+			return await Task.FromResult<IEnumerable<IFolder>>([]);
+#else
 			var networkLocations = await STATask.Run(() =>
 			{
 				var locations = new List<ShellLinkItem>();
@@ -142,6 +150,7 @@ namespace Files.App.Services
 				};
 				return networkItem;
 			});
+#endif
 		}
 
 		/// <inheritdoc/>

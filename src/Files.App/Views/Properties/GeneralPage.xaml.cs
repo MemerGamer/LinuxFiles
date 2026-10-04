@@ -115,6 +115,10 @@ namespace Files.App.Views.Properties
 
 			bool SaveDrive(DriveItem drive)
 			{
+				// LINUX-TODO(props): relabeling a volume needs udisks2; the label is read-only for now
+				if (OperatingSystem.IsLinux())
+					return false;
+
 				var fsVM = AppInstance.ShellViewModel;
 				if (!GetNewName(out var newName) || fsVM is null)
 					return false;
@@ -183,7 +187,7 @@ namespace Files.App.Views.Properties
 			{
 				// Handle the visibility attribute for multiple files
 				var itemMM = AppInstance?.SlimContentPage?.ItemManipulationModel;
-				if (itemMM is not null) // null on homepage
+				if (itemMM is not null && !OperatingSystem.IsLinux()) // null on homepage
 				{
 					ViewModel.IsContentCompressed = ViewModel.IsContentCompressedEditedValue;
 
@@ -219,14 +223,14 @@ namespace Files.App.Views.Properties
 				var itemPath = item.GetRequiredPath();
 				// Handle the visibility attribute for a single file
 				var itemMM = AppInstance?.SlimContentPage?.ItemManipulationModel;
-				if (itemMM is not null && ViewModel.IsHiddenEditedValue is not null) // null on homepage
+				if (itemMM is not null && ViewModel.IsHiddenEditedValue is not null && !OperatingSystem.IsLinux()) // null on homepage
 				{
 					await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
 						UIFilesystemHelpers.SetHiddenAttributeItem(item, (bool)ViewModel.IsHiddenEditedValue, itemMM)
 					);
 				}
 
-				if (ViewModel.IsUnblockFileSelected)
+				if (ViewModel.IsUnblockFileSelected && !OperatingSystem.IsLinux())
 					PInvoke.DeleteFileFromApp($"{itemPath}:Zone.Identifier");
 
 				if (ViewModel.IsAblumCoverModified)
@@ -239,9 +243,12 @@ namespace Files.App.Views.Properties
 					});
 				}
 
-				ViewModel.IsReadOnly = ViewModel.IsReadOnlyEditedValue;
-				ViewModel.IsHidden = ViewModel.IsHiddenEditedValue;
-				ViewModel.IsContentCompressed = ViewModel.IsContentCompressedEditedValue;
+				if (!OperatingSystem.IsLinux())
+				{
+					ViewModel.IsReadOnly = ViewModel.IsReadOnlyEditedValue;
+					ViewModel.IsHidden = ViewModel.IsHiddenEditedValue;
+					ViewModel.IsContentCompressed = ViewModel.IsContentCompressedEditedValue;
+				}
 
 				if (!GetNewName(out var newName))
 					return true;

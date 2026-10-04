@@ -1,6 +1,8 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Mime;
+using Files.Platform.Abstractions.Permissions;
 using Microsoft.UI.Dispatching;
 using System.IO;
 using Windows.Storage.FileProperties;
@@ -69,6 +71,9 @@ namespace Files.App.ViewModels.Properties
 
 		public async Task<(long size, long sizeOnDisk)> CalculateFolderSizeAsync(string path, CancellationToken token)
 		{
+			if (OperatingSystem.IsLinux())
+				return await CalculateFolderSizeLinuxAsync(path, token);
+
 			if (string.IsNullOrEmpty(path))
 			{
 				// In MTP devices calculating folder size would be too slow
@@ -133,6 +138,95 @@ namespace Files.App.ViewModels.Properties
 			else
 			{
 				return (0, 0);
+			}
+		}
+
+		private async Task<(long size, long sizeOnDisk)> CalculateFolderSizeLinuxAsync(string path, CancellationToken token)
+		{
+			if (string.IsNullOrEmpty(path))
+				return (0, 0);
+
+			int reportedFiles = 0, reportedFolders = 0;
+
+			void Report(FolderScanTotals totals)
+			{
+				ViewModel.FilesCount += totals.Files - reportedFiles;
+				ViewModel.FoldersCount += totals.Folders - reportedFolders;
+				reportedFiles = totals.Files;
+				reportedFolders = totals.Folders;
+
+				if (totals.Size > ViewModel.ItemSizeBytes || totals.SizeOnDisk > ViewModel.ItemSizeOnDiskBytes)
+				{
+					ViewModel.ItemSizeBytes = totals.Size;
+					ViewModel.ItemSize = totals.Size.ToSizeString();
+					ViewModel.ItemSizeOnDiskBytes = totals.SizeOnDisk;
+					ViewModel.ItemSizeOnDisk = totals.SizeOnDisk.ToSizeString();
+				}
+
+				SetItemsCountString();
+			}
+
+			var progress = new DispatcherProgress(Dispatcher, Report);
+			var result = await Ioc.Default.GetRequiredService<IFileStatService>().ScanFolderAsync(path, progress, token);
+			await Dispatcher.EnqueueOrInvokeAsync(() => Report(result), DispatcherQueuePriority.Low);
+
+			return (result.Size, result.SizeOnDisk);
+		}
+
+		private sealed class DispatcherProgress(DispatcherQueue dispatcher, Action<FolderScanTotals> handler) : IProgress<FolderScanTotals>
+		{
+			public void Report(FolderScanTotals value)
+				=> _ = dispatcher.EnqueueOrInvokeAsync(() => handler(value), DispatcherQueuePriority.Low);
+		}
+
+		/// <summary>
+		/// Fills the stat-derived fields (sizes, timestamps, link target) of the General page on Linux and hides the Windows attributes.
+		/// </summary>
+		protected void ApplyLinuxStat(string path)
+		{
+			ViewModel.ItemAttributesVisibility = false;
+			ViewModel.IsDownloadedFile = false;
+			ViewModel.CanCompressContent = false;
+
+			if (!Ioc.Default.GetRequiredService<IFileStatService>().TryGetStat(path, out var stat))
+				return;
+
+			ViewModel.ItemModifiedTimestampReal = stat.Modified;
+			ViewModel.ItemAccessedTimestampReal = stat.Accessed;
+			if (stat.Created is { } created)
+				ViewModel.ItemCreatedTimestampReal = created;
+			else
+				ViewModel.ItemCreatedTimestampVisibility = false;
+
+			if (!stat.IsDirectory)
+			{
+				ViewModel.ItemSizeVisibility = true;
+				ViewModel.ItemSizeBytes = stat.Size;
+				ViewModel.ItemSize = stat.Size.ToLongSizeString();
+				ViewModel.ItemSizeOnDisk = stat.SizeOnDisk.ToLongSizeString();
+			}
+
+			if (stat.IsSymbolicLink)
+				ViewModel.LinkTarget = stat.LinkTarget;
+		}
+
+		/// <summary>
+		/// Sets the type description from the MIME database.
+		/// </summary>
+		protected async Task ApplyLinuxTypeAsync(string path)
+		{
+			try
+			{
+				var mime = Ioc.Default.GetRequiredService<IMimeTypeService>();
+				var mimeType = await mime.GetMimeTypeAsync(path, TokenSource.Token);
+				var description = await mime.GetDescriptionAsync(mimeType, TokenSource.Token);
+				if (!string.IsNullOrEmpty(description))
+					ViewModel.ItemType = description;
+				else if (string.IsNullOrEmpty(ViewModel.ItemType))
+					ViewModel.ItemType = mimeType;
+			}
+			catch (Exception ex) when (ex is IOException or OperationCanceledException or UnauthorizedAccessException)
+			{
 			}
 		}
 

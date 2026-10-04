@@ -8,6 +8,7 @@ using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
+using Files.Platform.Linux.Permissions;
 using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Trash;
 using Files.Platform.Linux.Watching;
@@ -36,7 +37,8 @@ namespace Files.Platform.Linux
 				.AddLinuxMime()
 				.AddLinuxLaunching()
 				.AddLinuxFileOperations()
-				.AddLinuxArchives();
+				.AddLinuxArchives()
+				.AddLinuxPermissions();
 		}
 	}
 }

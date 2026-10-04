@@ -23,7 +23,7 @@ namespace Files.App.Utils.Storage
 
 		private IShellPage associatedInstance;
 		private readonly IWindowsJumpListService jumpListService;
-		private ShellFilesystemOperations filesystemOperations;
+		private IFilesystemOperations filesystemOperations;
 
 		private ItemManipulationModel? itemManipulationModel => associatedInstance.SlimContentPage?.ItemManipulationModel;
 
@@ -32,6 +32,10 @@ namespace Files.App.Utils.Storage
 		{
 			get
 			{
+				// Only the path separator is reserved on Linux
+				if (OperatingSystem.IsLinux())
+					return ['/', '\0'];
+
 				var userSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 				return userSettingsService.FoldersSettingsService.AreAlternateStreamsVisible
 					? ['\\', '/', '*', '?', '"', '<', '>', '|'] // Allow ":" char
@@ -56,7 +60,9 @@ namespace Files.App.Utils.Storage
 			this.associatedInstance = associatedInstance;
 			this.cancellationToken = cancellationToken;
 			jumpListService = Ioc.Default.GetRequiredService<IWindowsJumpListService>();
-			filesystemOperations = new ShellFilesystemOperations(this.associatedInstance);
+			filesystemOperations = OperatingSystem.IsLinux()
+				? new LinuxFilesystemOperations(this.associatedInstance)
+				: new ShellFilesystemOperations(this.associatedInstance);
 		}
 		public async Task<(ReturnResult, IStorageItem?)> CreateAsync(IStorageItemWithPath source, bool registerHistory)
 		{
@@ -291,6 +297,39 @@ namespace Files.App.Utils.Storage
 				{
 				}
 			}
+		}
+
+		public async Task<ReturnResult> PerformOperationTypeAsync(
+			IReadOnlyList<string> sourcePaths,
+			DataPackageOperation operation,
+			string destination,
+			bool showDialog,
+			bool registerHistory)
+		{
+			var items = new List<IStorageItemWithPath>();
+			foreach (var path in sourcePaths)
+			{
+				if (string.IsNullOrEmpty(path))
+					continue;
+
+				var isDirectory = System.IO.Directory.Exists(path);
+				if (!isDirectory && !System.IO.File.Exists(path))
+					continue;
+
+				items.Add(StorageHelpers.FromPathAndType(path, isDirectory ? FilesystemItemType.Directory : FilesystemItemType.File));
+			}
+
+			if (items.Count == 0)
+				return ReturnResult.BadArgumentException;
+
+			var destinations = items.Select(item => PathNormalization.Combine(destination, item.Name)).ToList();
+
+			if (destination.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal))
+				return await DeleteItemsAsync(items.Where(x => !StorageTrashBinService.IsUnderTrashBin(x.Path)), UserSettingsService.FoldersSettingsService.DeleteConfirmationPolicy, false, registerHistory);
+
+			return operation.HasFlag(DataPackageOperation.Move)
+				? await MoveItemsAsync(items, destinations, showDialog, registerHistory)
+				: await CopyItemsAsync(items, destinations, showDialog, registerHistory);
 		}
 
 		public Task<ReturnResult> CopyItemsAsync(IEnumerable<IStorageItem> source, IEnumerable<string> destination, bool showDialog, bool registerHistory)
@@ -897,6 +936,9 @@ namespace Files.App.Utils.Storage
 
 		public static bool ContainsRestrictedFileName(string input)
 		{
+			if (OperatingSystem.IsLinux())
+				return input is "." or "..";
+
 			foreach (string name in RestrictedFileNames)
 			{
 				if (input.StartsWith(name, StringComparison.OrdinalIgnoreCase) && (input.Length == name.Length || input[name.Length] == '.'))
@@ -912,6 +954,9 @@ namespace Files.App.Utils.Storage
 		/// </summary>
 		public static string GetShortcutNamingPreference(string? itemName)
 		{
+			if (OperatingSystem.IsLinux())
+				return string.Format(Strings.ShortcutCreateNewSuffix.GetLocalizedResource(), itemName);
+
 			var keyName = @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\NamingTemplates";
 			var value = Registry.GetValue(keyName, "ShortcutNameTemplate", null);
 

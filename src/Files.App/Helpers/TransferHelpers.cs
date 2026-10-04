@@ -12,6 +12,13 @@ namespace Files.App.Helpers
 		[DynamicWindowsRuntimeCast(typeof(StorageFolder))]
 		public static async Task ExecuteTransferAsync(IReadOnlyList<IStorable> itemsToTransfer, ShellViewModel shellViewModel, StatusCenterViewModel statusViewModel, DataPackageOperation type = DataPackageOperation.Copy)
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				// LINUX-TODO(clipboard): W-CLIP replaces the in-app FileClipboard with the system clipboard
+				FileClipboard.Set(itemsToTransfer.Select(x => x.Id), type);
+				return;
+			}
+
 			ConcurrentBag<IStorageItem> items = [];
 			var itemsCount = itemsToTransfer.Count;
 			var statusCenterItem = itemsCount > 50 ? StatusCenterHelper.AddCard_Prepare() : null;
@@ -89,6 +96,23 @@ namespace Files.App.Helpers
 
 			// Reset cut mode
 			contentPage.ItemManipulationModel.RefreshItemsOpacity();
+
+			if (OperatingSystem.IsLinux())
+			{
+				// LINUX-TODO(clipboard): W-CLIP replaces the in-app FileClipboard with the system clipboard
+				var selected = context.SelectedItems.ToList();
+				FileClipboard.Set(selected.Select(x => x.ItemPath), type);
+				if (type is DataPackageOperation.Move)
+				{
+					await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
+					{
+						foreach (var item in selected)
+							item.Opacity = Constants.UI.DimItemOpacity;
+					});
+				}
+
+				return;
+			}
 
 			ConcurrentBag<IStorageItem> items = [];
 			var itemsCount = context.SelectedItems.Count;

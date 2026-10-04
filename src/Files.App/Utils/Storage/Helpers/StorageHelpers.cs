@@ -163,6 +163,9 @@ namespace Files.App.Helpers
 
 		public static bool Exists(string path)
 		{
+			if (OperatingSystem.IsLinux())
+				return System.IO.Directory.Exists(path) || System.IO.File.Exists(path);
+
 			return PInvoke.GetFileAttributes(path) != PInvoke.INVALID_FILE_ATTRIBUTES;
 		}
 

@@ -116,6 +116,11 @@ namespace Files.App.Utils.Storage
 		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
 		Task<ReturnResult> PerformOperationTypeAsync(DataPackageOperation operation, DataPackageView packageView, string destination, bool showDialog, bool registerHistory, bool isDestinationExecutable = false, bool isDestinationScript = false);
 
+		/// <summary>
+		/// Copies or moves the items at <paramref name="sourcePaths"/> into <paramref name="destination"/> (the in-app clipboard path used on Linux).
+		/// </summary>
+		Task<ReturnResult> PerformOperationTypeAsync(IReadOnlyList<string> sourcePaths, DataPackageOperation operation, string destination, bool showDialog, bool registerHistory);
+
 		#region Copy
 
 		/// <summary>

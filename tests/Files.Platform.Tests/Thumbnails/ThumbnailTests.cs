@@ -262,6 +262,7 @@ namespace Files.Platform.Tests.Thumbnails
 				o.ThumbnailerDirectories = [dir];
 				o.MimeTypeResolver = p => p.EndsWith(".fake", StringComparison.Ordinal) ? "application/x-fake" : null;
 				o.ProcessRunner = runner;
+				o.SandboxExternalThumbnailers = false;
 			});
 
 			var bytes = await service.GetThumbnailAsync(path, 256);
@@ -271,6 +272,116 @@ namespace Files.Platform.Tests.Thumbnails
 			CollectionAssert.AreEqual(new[] { "-s", "256", path }, new List<string>(runner.Arguments).GetRange(0, 3));
 			Assert.IsTrue(File.Exists(CachePath(path, "large")));
 			Assert.AreEqual(XdgThumbnailNaming.ToFileUri(path), PngTextChunks.Read(bytes)["Thumb::URI"]);
+		}
+
+		[TestMethod]
+		public async Task Generate_RefusesImagesOverPixelLimitAndRecordsFailure()
+		{
+			var path = CreateImage("huge.png", 20, 20);
+			using var service = CreateService(o => o.MaxImagePixels = 100);
+
+			Assert.IsNull(await service.GetThumbnailAsync(path, 128));
+
+			var hash = XdgThumbnailNaming.GetHash(XdgThumbnailNaming.ToFileUri(path));
+			Assert.IsTrue(File.Exists(Path.Combine(_cacheHome, "thumbnails", "fail", "files-1.0", hash + ".png")));
+			Assert.IsFalse(File.Exists(CachePath(path, "normal")));
+		}
+
+		[TestMethod]
+		public async Task Generate_RefusesForgedHugeHeaderWithoutThrowing()
+		{
+			var png = TestImages.CreatePng(4, 4);
+			// Forge IHDR width/height (bytes 16..23) to 50000x50000.
+			var forged = new byte[] { 0, 0, 0xC3, 0x50, 0, 0, 0xC3, 0x50 };
+			Array.Copy(forged, 0, png, 16, 8);
+			var path = Path.Combine(_files, "bomb.png");
+			File.WriteAllBytes(path, png);
+			using var service = CreateService();
+
+			Assert.IsNull(await service.GetThumbnailAsync(path, 128));
+		}
+
+		[TestMethod]
+		public async Task Generate_RefusesSourceFilesOverSizeLimit()
+		{
+			var path = CreateImage("a.png", 50, 50);
+			using var service = CreateService(o => o.MaxSourceFileBytes = 10);
+
+			Assert.IsNull(await service.GetThumbnailAsync(path, 128));
+		}
+
+		[TestMethod]
+		public async Task Cache_IgnoresEntriesOverSizeLimit()
+		{
+			var path = CreateImage("a.png", 300, 300);
+			using (var writer = CreateService())
+				Assert.IsNotNull(await writer.GetThumbnailAsync(path, 128));
+
+			using var service = CreateService(o => o.MaxCacheEntryBytes = 10);
+
+			Assert.IsNull(await service.GetThumbnailAsync(path, 128, ThumbnailOptions.ReturnOnlyIfCached));
+		}
+
+		[TestMethod]
+		public void BuildCommand_DashPrefixedRelativeNameBecomesAbsolutePath()
+		{
+			var entry = ThumbnailerEntry.Parse("[Thumbnailer Entry]\nExec=thumb %i %u %o\nMimeType=a/b;\n")!;
+
+			var command = entry.BuildCommand("-rf", "file:///x/-rf", "/out/o.png", 128)!.Value;
+
+			Assert.IsTrue(command.Arguments[0].StartsWith('/'));
+			Assert.IsTrue(command.Arguments[0].EndsWith("/-rf", StringComparison.Ordinal));
+			Assert.IsNull(entry.BuildCommand("/x/a", "http://x/a", "/out/o.png", 128));
+		}
+
+		[TestMethod]
+		[DataRow("./thumb %i")]
+		[DataRow("bin/thumb %i")]
+		[DataRow("\"\" %i")]
+		public void BuildCommand_RejectsEmptyOrRelativePathPrograms(string exec)
+		{
+			var entry = ThumbnailerEntry.Parse("[Thumbnailer Entry]\nExec=" + exec + "\nMimeType=a/b;\n")!;
+
+			Assert.IsNull(entry.BuildCommand("/x/a", "file:///x/a", "/out/o.png", 128));
+		}
+
+		[TestMethod]
+		public void Bubblewrap_BuildsReadOnlySandboxArguments()
+		{
+			var (fileName, args) = BubblewrapSandbox.Wrap("/usr/bin/thumb", ["-s", "128", "/x/a"], "/cache/normal");
+
+			Assert.AreEqual("bwrap", fileName);
+			CollectionAssert.AreEqual(new[]
+			{
+				"--ro-bind", "/", "/", "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+				"--bind", "/cache/normal", "/cache/normal", "--unshare-all", "--die-with-parent",
+				"--", "/usr/bin/thumb", "-s", "128", "/x/a",
+			}, new List<string>(args));
+		}
+
+		[TestMethod]
+		public async Task ExternalThumbnailer_IsWrappedWhenSandboxEnabledAndBwrapPresent()
+		{
+			if (!BubblewrapSandbox.IsAvailable())
+				return;
+
+			var dir = Path.Combine(_root, "thumbnailers");
+			Directory.CreateDirectory(dir);
+			File.WriteAllText(Path.Combine(dir, "fake.thumbnailer"), "[Thumbnailer Entry]\nExec=fake-thumb %i %o\nMimeType=application/x-fake;\n");
+			var path = Path.Combine(_files, "doc.fake");
+			File.WriteAllText(path, "data");
+			var runner = new FakeRunner();
+			using var service = CreateService(o =>
+			{
+				o.ThumbnailerDirectories = [dir];
+				o.MimeTypeResolver = _ => "application/x-fake";
+				o.ProcessRunner = runner;
+				o.SandboxExternalThumbnailers = true;
+			});
+
+			await service.GetThumbnailAsync(path, 128);
+
+			Assert.AreEqual("bwrap", runner.FileName);
 		}
 
 		private sealed class FakeRunner : IThumbnailerProcessRunner

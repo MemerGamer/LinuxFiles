@@ -45,9 +45,15 @@ namespace Files.Platform.Linux.Gvfs
 		/// <inheritdoc/>
 		public bool CanConnect => gio.IsAvailable;
 
-		/// <summary>Returns <c>$XDG_RUNTIME_DIR/gvfs</c>, falling back to <c>/run/user/&lt;uid&gt;/gvfs</c>.</summary>
+		/// <summary>
+		/// Returns <c>$XDG_RUNTIME_DIR/gvfs</c>, falling back to <c>/run/user/&lt;uid&gt;/gvfs</c>.
+		/// <c>$FILES_GVFS_DIR</c> overrides it (headless test runs point it at a fake directory).
+		/// </summary>
 		public static string DefaultDirectory(Func<string, string?> getEnvironmentVariable)
 		{
+			if (getEnvironmentVariable("FILES_GVFS_DIR") is { Length: > 0 } overridden && Path.IsPathRooted(overridden))
+				return overridden;
+
 			var runtime = getEnvironmentVariable("XDG_RUNTIME_DIR");
 			if (string.IsNullOrEmpty(runtime) || !Path.IsPathRooted(runtime))
 				runtime = "/run/user/" + CurrentUid();

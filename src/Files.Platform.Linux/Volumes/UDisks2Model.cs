@@ -156,6 +156,7 @@ namespace Files.Platform.Linux.Volumes
 				if (!path.StartsWith(BlockPrefix, StringComparison.Ordinal))
 					continue;
 
+				// LINUX-TODO(udisks2-luks): encrypted volumes (org.freedesktop.UDisks2.Encrypted) are not offered; unlocking needs a passphrase prompt
 				if (!interfaces.TryGetValue(BlockInterface, out var block) || !interfaces.TryGetValue(FilesystemInterface, out var fs))
 					continue;
 

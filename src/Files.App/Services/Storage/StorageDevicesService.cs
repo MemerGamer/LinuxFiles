@@ -21,13 +21,19 @@ namespace Files.App.Services
 
 		public async IAsyncEnumerable<IFolder> GetDrivesAsync()
 		{
-			var pCloudDrivePath = App.AppModel.PCloudDrivePath;
-#if WINDOWS
-			var drives = await Task.Run(DriveInfo.GetDrives).ConfigureAwait(false);
+#if !WINDOWS
+			// Mounted drives (mountinfo + UDisks2 labels), volumes that are not mounted yet and MTP devices (GVfs)
+			var entries = await LinuxDriveCatalog.EnumerateAsync().ConfigureAwait(false);
+			var linuxPending = entries.Select(entry => entry.CreateAsync()).ToList();
+
+			await foreach (var completed in Task.WhenEach(linuxPending))
+			{
+				if (await completed is { } linuxItem)
+					yield return linuxItem;
+			}
 #else
-			// Only real mounts (pseudo file systems such as proc/tmpfs are filtered out)
-			var drives = await Task.Run(() => DriveHelpers.GetMounts().Select(m => new DriveInfo(m.MountPoint)).ToArray()).ConfigureAwait(false);
-#endif
+			var pCloudDrivePath = App.AppModel.PCloudDrivePath;
+			var drives = await Task.Run(DriveInfo.GetDrives).ConfigureAwait(false);
 
 			// Probe drives in parallel so one slow drive doesn't delay the rest
 			var pending = drives.Select(drive => GetDriveItemAsync(drive, pCloudDrivePath)).ToList();
@@ -37,6 +43,7 @@ namespace Files.App.Services
 				if (await completed is { } driveItem)
 					yield return driveItem;
 			}
+#endif
 		}
 
 		private static async Task<IFolder?> GetDriveItemAsync(DriveInfo drive, string pCloudDrivePath)

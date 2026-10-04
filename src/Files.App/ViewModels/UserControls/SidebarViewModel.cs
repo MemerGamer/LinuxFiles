@@ -331,6 +331,8 @@ namespace Files.App.ViewModels.UserControls
 			UnpinItemCommand = new RelayCommand(UnpinItem);
 			PinItemCommand = new RelayCommand(PinItem);
 			EjectDeviceCommand = new RelayCommand(EjectDevice);
+			MountDeviceCommand = new RelayCommand(MountDevice);
+			UnmountDeviceCommand = new RelayCommand(UnmountDevice);
 			OpenPropertiesCommand = new RelayCommand<FlyoutBase>(OpenProperties);
 			ReorderItemsCommand = new AsyncRelayCommand(ReorderItemsAsync);
 		}
@@ -828,6 +830,9 @@ namespace Files.App.ViewModels.UserControls
 			if (item is not INavigationControlItem navigationControlItem) return;
 			var navigationPath = item as string;
 
+#if !WINDOWS
+			navigationPath ??= (item as DriveItem)?.Path;
+#endif
 			if (await DriveHelpers.CheckEmptyDrive(navigationPath))
 				return;
 
@@ -917,6 +922,10 @@ namespace Files.App.ViewModels.UserControls
 		private ICommand UnpinItemCommand { get; }
 
 		private ICommand EjectDeviceCommand { get; }
+
+		private ICommand MountDeviceCommand { get; }
+
+		private ICommand UnmountDeviceCommand { get; }
 
 		private ICommand OpenPropertiesCommand { get; }
 
@@ -1033,6 +1042,27 @@ namespace Files.App.ViewModels.UserControls
 			DriveHelpers.EjectDeviceAsync(path);
 		}
 
+		private void MountDevice()
+		{
+#if !WINDOWS
+			_ = DriveHelpers.MountVolumeAsync(rightClickedItem.GetRequiredPath());
+#endif
+		}
+
+		private void UnmountDevice()
+		{
+#if !WINDOWS
+			_ = DriveHelpers.UnmountVolumeAsync(rightClickedItem.GetRequiredPath());
+#endif
+		}
+
+		private static bool IsUnmountedDrive(INavigationControlItem item)
+#if !WINDOWS
+			=> DriveHelpers.IsUnmountedPath(item.Path);
+#else
+			=> false;
+#endif
+
 		private List<ContextMenuFlyoutItemViewModel> GetLocationItemMenuItems(INavigationControlItem item, FlyoutBase menu)
 		{
 			var options = item.MenuOptions
@@ -1138,7 +1168,7 @@ namespace Files.App.ViewModels.UserControls
 						ThemedIconStyle = "App.ThemedIcons.FavoritePin",
 					},
 					Command = PinItemCommand,
-					ShowItem = isDriveItem && !isDriveItemPinned
+					ShowItem = isDriveItem && !isDriveItemPinned && !IsUnmountedDrive(item)
 				},
 				new ContextMenuFlyoutItemViewModel()
 				{
@@ -1169,6 +1199,24 @@ namespace Files.App.ViewModels.UserControls
 					Text = Strings.Eject.GetLocalizedResource(),
 					Command = EjectDeviceCommand,
 					ShowItem = options.ShowEjectDevice
+				},
+				new ContextMenuFlyoutItemViewModel()
+				{
+					Text = Strings.LinuxMountDrive.GetLocalizedResource(),
+					Command = MountDeviceCommand,
+					ShowItem = options.ShowMountDevice
+				},
+				new ContextMenuFlyoutItemViewModel()
+				{
+					Text = Strings.LinuxUnmountDrive.GetLocalizedResource(),
+					Command = UnmountDeviceCommand,
+					ShowItem = options.ShowUnmountDevice
+				},
+				new ContextMenuFlyoutItemViewModel()
+				{
+					Text = Strings.LinuxDisconnectLocation.GetLocalizedResource(),
+					Command = EjectDeviceCommand,
+					ShowItem = options.ShowDisconnectLocation
 				},
 				new ContextMenuFlyoutItemViewModel()
 				{

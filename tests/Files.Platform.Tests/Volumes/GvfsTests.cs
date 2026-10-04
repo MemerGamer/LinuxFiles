@@ -157,6 +157,8 @@ namespace Files.Platform.Tests.Volumes
 		public void DefaultDirectoryUsesXdgRuntimeDir()
 		{
 			Assert.AreEqual("/run/user/1000/gvfs", GvfsNetworkLocationService.DefaultDirectory(k => k == "XDG_RUNTIME_DIR" ? "/run/user/1000" : null));
+			Assert.AreEqual("/tmp/fake", GvfsNetworkLocationService.DefaultDirectory(k => k switch { "FILES_GVFS_DIR" => "/tmp/fake", "XDG_RUNTIME_DIR" => "/run/user/1000", _ => null }));
+			Assert.AreEqual("/run/user/1000/gvfs", GvfsNetworkLocationService.DefaultDirectory(k => k switch { "FILES_GVFS_DIR" => "relative", "XDG_RUNTIME_DIR" => "/run/user/1000", _ => null }));
 		}
 	}
 }

@@ -182,6 +182,9 @@ namespace Files.App.Data.Items
 		public string Id
 			=> Path ?? throw new InvalidOperationException("The drive path has not been initialized.");
 		public string Name => Root?.DisplayName
+#if !WINDOWS
+			?? Text // volumes that are not mounted yet have no root folder
+#endif
 			?? throw new InvalidOperationException("The drive root has not been initialized.");
 
 		public object? Children => IsExpandableFolder ? (childItems ??= []) : null;
@@ -287,6 +290,12 @@ namespace Files.App.Data.Items
 
 		public async Task UpdatePropertiesAsync()
 		{
+#if !WINDOWS
+			// Not mounted: there is nothing to measure, the size is known from UDisks2
+			if (DriveHelpers.IsUnmountedPath(Path))
+				return;
+#endif
+
 			try
 			{
 				// For cloud drives, try to get quota from the sync root provider first

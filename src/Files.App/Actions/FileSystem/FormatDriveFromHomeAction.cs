@@ -17,14 +17,15 @@ namespace Files.App.Actions
 			drivesViewModel.Drives
 				.Cast<DriveItem>()
 				.FirstOrDefault(x => string.Equals(x.Path, HomePageContext.RightClickedItem.Path)) is DriveItem driveItem &&
-				!(driveItem.Type == DriveType.Network || string.Equals(HomePageContext.RightClickedItem.Path, $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\", StringComparison.OrdinalIgnoreCase));
+				!(driveItem.Type == DriveType.Network || string.Equals(HomePageContext.RightClickedItem.Path, $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\", StringComparison.OrdinalIgnoreCase)) &&
+				IsFormatAvailable(driveItem.Path);
 
 		public override bool IsAccessibleGlobally
 			=> false;
 
 		public override Task ExecuteAsync(object? parameter = null)
 		{
-			return Win32Helper.OpenFormatDriveDialog(HomePageContext?.RightClickedItem?.Path ?? string.Empty);
+			return FormatDrive(HomePageContext?.RightClickedItem?.Path);
 		}
 	}
 }

@@ -1,26 +1,38 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Gvfs;
+using Files.Platform.Abstractions.Volumes;
 using Microsoft.Extensions.Logging;
-using System.IO;
-using Windows.Storage;
 
 namespace Files.App.Utils
 {
 	/// <summary>
-	/// Polls /proc/self/mountinfo (procfs does not support FileSystemWatcher) and raises device events when mounts appear or disappear.
+	/// Raises device events when drives appear, change or disappear.
+	/// With UDisks2 (system bus) and GVfs available it is event driven: the volume and mount notifications trigger a re-scan.
+	/// Without UDisks2 it falls back to polling /proc/self/mountinfo (procfs does not support FileSystemWatcher).
 	/// </summary>
 	public sealed class LinuxStorageDeviceWatcher : IStorageDeviceWatcher
 	{
-		private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(2);
+		// Without UDisks2 notifications mountinfo is the only source
+		private static readonly TimeSpan FallbackPollInterval = TimeSpan.FromSeconds(2);
+
+		// With notifications this only catches mounts neither UDisks2 nor GVfs announce (cifs/nfs mounted by hand)
+		private static readonly TimeSpan SafetyNetInterval = TimeSpan.FromSeconds(30);
+
+		private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(250);
 
 		public event EventHandler<IFolder>? DeviceAdded;
 		public event EventHandler<string>? DeviceRemoved;
 		public event EventHandler? EnumerationCompleted;
 		public event EventHandler<string>? DeviceModified;
 
+		private readonly SemaphoreSlim _scanGate = new(1, 1);
 		private CancellationTokenSource? _cts;
-		private Dictionary<string, LinuxMount> _known = new(StringComparer.Ordinal);
+		private Dictionary<string, string> _known = new(StringComparer.Ordinal);
+		private IVolumeService? _volumes;
+		private INetworkLocationService? _gvfs;
+		private int _scanRequested;
 
 		public bool CanBeStarted => _cts is null;
 
@@ -31,7 +43,7 @@ namespace Files.App.Utils
 
 			_cts = new CancellationTokenSource();
 			var token = _cts.Token;
-			_ = Task.Run(() => PollAsync(token), token);
+			_ = Task.Run(() => RunAsync(token), token);
 		}
 
 		public void Stop()
@@ -39,65 +51,133 @@ namespace Files.App.Utils
 			_cts?.Cancel();
 			_cts?.Dispose();
 			_cts = null;
+
+			if (_volumes is not null)
+			{
+				_volumes.VolumesChanged -= OnVolumesChanged;
+				_volumes.StopWatching();
+				_volumes = null;
+			}
+
+			if (_gvfs is not null)
+			{
+				_gvfs.MountsChanged -= OnMountsChanged;
+				_gvfs.StopWatching();
+				_gvfs = null;
+			}
 		}
 
-		private async Task PollAsync(CancellationToken token)
+		private async Task RunAsync(CancellationToken token)
 		{
-			// Initial enumeration is reported through the service's GetDrivesAsync; only record the baseline here
-			_known = Snapshot();
-			EnumerationCompleted?.Invoke(this, EventArgs.Empty);
-
-			using var timer = new PeriodicTimer(PollInterval);
 			try
 			{
-				while (await timer.WaitForNextTickAsync(token))
+				// Initial enumeration is reported through the service's GetDrivesAsync; only record the baseline here
+				_known = (await LinuxDriveCatalog.EnumerateAsync().ConfigureAwait(false))
+					.ToDictionary(e => e.Path, e => e.Fingerprint, StringComparer.Ordinal);
+				EnumerationCompleted?.Invoke(this, EventArgs.Empty);
+
+				var eventDriven = false;
+				var volumes = Ioc.Default.GetService<IVolumeService>();
+				if (volumes is not null && await volumes.IsAvailableAsync(token).ConfigureAwait(false))
 				{
-					var current = Snapshot();
-
-					foreach (var (mountPoint, mount) in current)
+					volumes.VolumesChanged += OnVolumesChanged;
+					if (await volumes.StartWatchingAsync(token).ConfigureAwait(false))
 					{
-						if (!_known.TryGetValue(mountPoint, out var old))
-							await RaiseAddedAsync(mount);
-						else if (old.Source != mount.Source || old.FsType != mount.FsType)
-							DeviceModified?.Invoke(this, mountPoint);
+						_volumes = volumes;
+						eventDriven = true;
 					}
-
-					foreach (var mountPoint in _known.Keys.Where(k => !current.ContainsKey(k)))
-						DeviceRemoved?.Invoke(this, mountPoint);
-
-					_known = current;
+					else
+					{
+						volumes.VolumesChanged -= OnVolumesChanged;
+					}
 				}
+
+				if (Ioc.Default.GetService<INetworkLocationService>() is { } gvfs)
+				{
+					gvfs.MountsChanged += OnMountsChanged;
+					gvfs.StartWatching();
+					_gvfs = gvfs;
+				}
+
+				App.Logger.LogInformation(eventDriven
+					? "Drive list is driven by UDisks2 notifications"
+					: "UDisks2 is not available; polling /proc/self/mountinfo");
+
+				using var timer = new PeriodicTimer(eventDriven ? SafetyNetInterval : FallbackPollInterval);
+				while (await timer.WaitForNextTickAsync(token))
+					await ScanAsync(token);
 			}
 			catch (OperationCanceledException)
 			{
 			}
-		}
-
-		private static Dictionary<string, LinuxMount> Snapshot()
-			=> DriveHelpers.GetMounts().ToDictionary(m => m.MountPoint, StringComparer.Ordinal);
-
-		private async Task RaiseAddedAsync(LinuxMount mount)
-		{
-			try
-			{
-				var drive = new DriveInfo(mount.MountPoint);
-				var rootResult = await FilesystemTasks.Wrap(() => StorageFolder.GetFolderFromPathAsync(mount.MountPoint).AsTask());
-				if (rootResult.Result is not { } root)
-				{
-					App.Logger.LogWarning($"{rootResult.ErrorCode}: Attempting to add the device, {mount.MountPoint},"
-						+ " failed at the StorageFolder initialization step. This device will be ignored.");
-					return;
-				}
-
-				var type = DriveHelpers.GetDriveType(drive);
-				var label = DriveHelpers.GetExtendedDriveLabel(drive);
-				var driveItem = await DriveItem.CreateFromPropertiesAsync(root, mount.MountPoint, label, type);
-
-				DeviceAdded?.Invoke(this, driveItem);
-			}
 			catch (Exception ex)
 			{
-				App.Logger.LogWarning(ex, $"Failed to add the device {mount.MountPoint}");
+				App.Logger.LogWarning(ex, "The drive watcher stopped unexpectedly");
+			}
+		}
+
+		private void OnVolumesChanged(object? sender, VolumeChangedEventArgs e) => RequestScan();
+
+		private void OnMountsChanged(object? sender, EventArgs e) => RequestScan();
+
+		// Coalesces bursts (a USB stick adds the disk, the partitions and the mount within a few ms)
+		private void RequestScan()
+		{
+			if (_cts is not { } cts || Interlocked.Exchange(ref _scanRequested, 1) == 1)
+				return;
+
+			var token = cts.Token;
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					await Task.Delay(Debounce, token).ConfigureAwait(false);
+					Interlocked.Exchange(ref _scanRequested, 0);
+					await ScanAsync(token).ConfigureAwait(false);
+				}
+				catch (OperationCanceledException)
+				{
+				}
+			}, token);
+		}
+
+		private async Task ScanAsync(CancellationToken token)
+		{
+			await _scanGate.WaitAsync(token).ConfigureAwait(false);
+			try
+			{
+				var entries = await LinuxDriveCatalog.EnumerateAsync().ConfigureAwait(false);
+				var current = new Dictionary<string, string>(StringComparer.Ordinal);
+				var changed = new List<DriveEntry>();
+				foreach (var entry in entries)
+				{
+					current[entry.Path] = entry.Fingerprint;
+					if (!_known.TryGetValue(entry.Path, out var old) || old != entry.Fingerprint)
+						changed.Add(entry);
+				}
+
+				// Added (or changed) items replace an item with the same DeviceID, so mounted/unmounted transitions swap in place
+				foreach (var entry in changed)
+				{
+					if (token.IsCancellationRequested)
+						return;
+
+					if (await entry.CreateAsync().ConfigureAwait(false) is { } item)
+						DeviceAdded?.Invoke(this, item);
+				}
+
+				foreach (var path in _known.Keys.Where(k => !current.ContainsKey(k)))
+					DeviceRemoved?.Invoke(this, path);
+
+				_known = current;
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				App.Logger.LogWarning(ex, "Scanning the drives failed");
+			}
+			finally
+			{
+				_scanGate.Release();
 			}
 		}
 	}

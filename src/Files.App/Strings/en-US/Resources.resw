@@ -4808,4 +4808,37 @@
   <data name="LinuxOpenRefusedText" xml:space="preserve">
     <value>{0} is an executable-looking or invalid file that cannot be opened safely.</value>
   </data>
+  <data name="LinuxMountDrive" xml:space="preserve">
+    <value>Mount</value>
+  </data>
+  <data name="LinuxUnmountDrive" xml:space="preserve">
+    <value>Unmount</value>
+  </data>
+  <data name="LinuxDisconnectLocation" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
+  <data name="LinuxConnectToServerTitle" xml:space="preserve">
+    <value>Connect to server</value>
+  </data>
+  <data name="LinuxConnectToServerSubtitle" xml:space="preserve">
+    <value>Enter the address of a server, for example smb://server/share, sftp://user@host/, ftp://host/ or davs://host/path. Saved credentials from your desktop keyring are used; passwords cannot be typed here.</value>
+  </data>
+  <data name="LinuxConnectToServerPlaceholder" xml:space="preserve">
+    <value>smb://server/share</value>
+  </data>
+  <data name="LinuxConnectToServerButton" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="LinuxConnectToServerFailed" xml:space="preserve">
+    <value>Could not connect to {0}. Check the address, and make sure the gio tool and the GVfs services are installed.</value>
+  </data>
+  <data name="LinuxVolumeErrorTitle" xml:space="preserve">
+    <value>Problem with the device</value>
+  </data>
+  <data name="LinuxVolumeNotAuthorized" xml:space="preserve">
+    <value>You are not authorized to do this.</value>
+  </data>
+  <data name="LinuxVolumeNotMounted" xml:space="preserve">
+    <value>This drive is not mounted.</value>
+  </data>
 </root>

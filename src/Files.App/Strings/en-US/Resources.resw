@@ -4796,4 +4796,16 @@
   <data name="ArchiveRefusedTitle" xml:space="preserve">
     <value>The archive could not be extracted</value>
   </data>
+  <data name="LinuxFileChangedTitle" xml:space="preserve">
+    <value>File changed</value>
+  </data>
+  <data name="LinuxFileChangedText" xml:space="preserve">
+    <value>{0} changed after it was checked, so it was not opened.</value>
+  </data>
+  <data name="LinuxOpenRefusedTitle" xml:space="preserve">
+    <value>Cannot open file</value>
+  </data>
+  <data name="LinuxOpenRefusedText" xml:space="preserve">
+    <value>{0} is an executable-looking or invalid file that cannot be opened safely.</value>
+  </data>
 </root>

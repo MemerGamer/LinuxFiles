@@ -16,16 +16,30 @@ namespace Files.Platform.Linux.Launching
 	/// </summary>
 	public sealed class LinuxTemplatesService : ITemplatesService
 	{
-		private static readonly NewItemTemplate[] BuiltIns =
-		[
-			new("Folder", NewItemKind.Folder, "New Folder"),
-			new("Text Document", NewItemKind.EmptyFile, "New Text File.txt"),
-		];
+		private readonly Func<NewItemKind, string> displayName;
+
+		/// <summary>
+		/// Creates the service. <paramref name="displayNames"/> supplies the localized names of the built-in
+		/// <see cref="NewItemKind.Folder"/> and <see cref="NewItemKind.EmptyFile"/> entries (default: English).
+		/// </summary>
+		public LinuxTemplatesService(Func<NewItemKind, string>? displayNames = null)
+		{
+			displayName = displayNames ?? DefaultDisplayName;
+		}
+
+		/// <summary>
+		/// The English display names of the built-in entries.
+		/// </summary>
+		public static string DefaultDisplayName(NewItemKind kind) => kind == NewItemKind.Folder ? "Folder" : "Text Document";
 
 		/// <inheritdoc/>
 		public Task<IReadOnlyList<NewItemTemplate>> GetTemplatesAsync(string? templatesDirectory, CancellationToken cancellationToken = default)
 		{
-			var result = new List<NewItemTemplate>(BuiltIns);
+			var result = new List<NewItemTemplate>
+			{
+				new(displayName(NewItemKind.Folder), NewItemKind.Folder, "New Folder"),
+				new(displayName(NewItemKind.EmptyFile), NewItemKind.EmptyFile, "New Text File.txt"),
+			};
 
 			if (!string.IsNullOrEmpty(templatesDirectory) && Directory.Exists(templatesDirectory))
 			{

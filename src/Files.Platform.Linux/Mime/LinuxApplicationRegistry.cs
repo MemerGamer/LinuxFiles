@@ -21,6 +21,7 @@ namespace Files.Platform.Linux.Mime
 		private readonly XdgDirectories xdg;
 		private readonly CultureInfo culture;
 		private readonly IExecutableLocator locator;
+		private readonly MimeHierarchy hierarchy;
 
 		/// <summary>
 		/// Creates the registry for the process environment.
@@ -37,6 +38,7 @@ namespace Files.Platform.Linux.Mime
 			this.xdg = xdg;
 			this.culture = culture;
 			this.locator = locator;
+			hierarchy = new MimeHierarchy(xdg);
 		}
 
 		/// <inheritdoc/>
@@ -44,13 +46,20 @@ namespace Files.Platform.Linux.Mime
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 
-			var (_, all) = BuildCandidates(mimeType);
 			var apps = new List<DesktopApplication>();
-			foreach (var id in all)
+			var seen = new HashSet<string>(StringComparer.Ordinal);
+			foreach (var type in hierarchy.GetChain(mimeType))
 			{
-				var app = Load(id);
-				if (app is not null && !app.NoDisplay)
-					apps.Add(app);
+				var (_, all) = BuildCandidates(type);
+				foreach (var id in all)
+				{
+					if (!seen.Add(id))
+						continue;
+
+					var app = Load(id);
+					if (app is not null && !app.NoDisplay)
+						apps.Add(app);
+				}
 			}
 
 			return Task.FromResult<IReadOnlyList<DesktopApplication>>(apps);
@@ -61,20 +70,23 @@ namespace Files.Platform.Linux.Mime
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 
-			var (defaults, all) = BuildCandidates(mimeType);
-			foreach (var id in defaults)
+			// Per type, nearest first: the explicit default, else the first visible association (like xdg-open)
+			foreach (var type in hierarchy.GetChain(mimeType))
 			{
-				var app = Load(id);
-				if (app is not null)
-					return Task.FromResult<DesktopApplication?>(app);
-			}
+				var (defaults, all) = BuildCandidates(type);
+				foreach (var id in defaults)
+				{
+					var app = Load(id);
+					if (app is not null)
+						return Task.FromResult<DesktopApplication?>(app);
+				}
 
-			// No explicit default: fall back to the first visible association, like xdg-open
-			foreach (var id in all)
-			{
-				var app = Load(id);
-				if (app is not null && !app.NoDisplay)
-					return Task.FromResult<DesktopApplication?>(app);
+				foreach (var id in all)
+				{
+					var app = Load(id);
+					if (app is not null && !app.NoDisplay)
+						return Task.FromResult<DesktopApplication?>(app);
+				}
 			}
 
 			return Task.FromResult<DesktopApplication?>(null);

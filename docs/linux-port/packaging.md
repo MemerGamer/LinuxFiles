@@ -11,13 +11,14 @@ App id (used everywhere): `io.github.memergamer.LinuxFiles`. Binary/launcher: `f
 | `packaging/linux/io.github.memergamer.LinuxFiles.metainfo.xml` | AppStream metadata. |
 | `packaging/linux/icons/hicolor/<N>x<N>/apps/` | Icons 16, 24, 32, 48, 64, 128, 256, 512 (PNG). |
 | `packaging/linux/files` | Launcher: finds `Files.dll` (`FILES_LIBDIR`, next to itself, `../share/linuxfiles`, `/usr/lib/linuxfiles`, ...) and execs the apphost if present, else `dotnet Files.dll`. |
-| `packaging/linux/flatpak/` | Flatpak manifest. |
-| `packaging/linux/aur/` | `PKGBUILD` + `.SRCINFO`. |
-| `packaging/linux/appimage/build-appimage.sh` | AppImage builder (needs `appimagetool`). |
+| `packaging/linux/flatpak/` | Flatpak manifest (repackages the publish tarball). |
+| `packaging/linux/aur/linuxfiles-bin/PKGBUILD` | AUR binary package (release tarball); `linuxfiles/PKGBUILD` is the unverified from-source variant. |
+| `packaging/linux/appimage/build-appimage.sh` | AppImage builder; downloads pinned `appimagetool` + type2 runtime into `.cache/tools`. |
+| `scripts/linux/build-flatpak.sh`, `gen-aur.sh` | Build the Flatpak bundle; render PKGBUILD + `.SRCINFO` with real checksums. |
 | `scripts/linux/publish.sh` | `dotnet publish` to `artifacts/linux-<rid>/`. |
 | `scripts/linux/install-local.sh`, `uninstall-local.sh` | User-local install into `~/.local`. |
 | `scripts/linux/gen-icons.sh` | Regenerates the icons. |
-| `.github/workflows/package-linux.yml` | Manual / `linux-v*` tag: publish linux-x64, upload tarball. |
+| `.github/workflows/package-linux.yml` | Manual / `linux-v*` tag: publish, AppImage, Flatpak, AUR recipe; tags also create a GitHub release. |
 
 ## Icons
 
@@ -53,35 +54,66 @@ Uno's X11 host calls `XSetClassHint` but the class value was not verified at run
 `StartupWMClass=Files` (assembly/process name). Verify on a real X11 session with `xprop WM_CLASS` (click the window)
 and adjust the `.desktop` if it differs; otherwise taskbar grouping and icon matching will fail.
 
-## Flatpak
+## Building the packages
 
-`packaging/linux/flatpak/io.github.memergamer.LinuxFiles.yml`, runtime `org.freedesktop.Platform//25.08` with the
-`org.freedesktop.Sdk.Extension.dotnet10` extension (the extension version availability is unverified). It is
-authored only; not built. Flathub needs an offline build, so a `nuget-sources.json` from `flatpak-dotnet-generator`
-must replace the `--share=network` build arg.
-
-`finish-args` rationale:
-
-- `--share=ipc`, `--socket=x11`, `--device=dri`: Uno Skia desktop is X11 only (XWayland on Wayland) and uses GL.
-- `--filesystem=host`, `--filesystem=xdg-run/gvfs`, `xdg-run/gvfs-fuse`: a file manager needs the whole filesystem
-  plus mounted network/MTP volumes.
-- `--own-name=org.freedesktop.FileManager1`: reserved for the Phase 6 D-Bus service.
-- `--talk-name=org.freedesktop.Notifications`: toasts.
-- `--talk-name=org.freedesktop.Flatpak`: allows `flatpak-spawn --host` to launch host applications (Open With,
-  terminals, `gnome-disks`). Trade-off: it gives the app arbitrary command execution on the host, effectively
-  voiding the sandbox. Alternative is the OpenURI/OpenWith portals, which cannot cover all cases; decide in Phase 6.
-
-## AUR
-
-`packaging/linux/aur/PKGBUILD` builds from the `linux-v<ver>` tag tarball with `dotnet-sdk`, installing to
-`/usr/lib/linuxfiles` with `/usr/bin/files`. `sha256sums` is `SKIP` until a release exists; regenerate `.SRCINFO` with
-`makepkg --printsrcinfo` after edits. Not built here (no Arch tooling).
+All three consume the output of `scripts/linux/publish.sh --tarball` (`artifacts/files-linux-x64.tar.gz`), and
+CI runs the same scripts (job `package-linux-x64`; on a `linux-v*` tag the `release` job attaches
+`files-linux-x64.tar.gz`, `files-packaging.tar.gz`, `Files-x86_64.AppImage` and `Files-x86_64.flatpak` to a GitHub
+release). Verified locally on Arch: all three build.
 
 ## AppImage
 
-`packaging/linux/appimage/build-appimage.sh` assembles an AppDir from the publish output (AppRun sets
-`FILES_LIBDIR`) and calls `appimagetool`. Because the build is self-contained, no extra bundling is needed beyond
-host libraries (fontconfig, X11, GL), which AppImage expects from the host. Authored only.
+`packaging/linux/appimage/build-appimage.sh [--arch x86_64|aarch64] [publish-dir]` assembles an AppDir (AppRun sets
+`FILES_LIBDIR`; the runtime is self-contained, host libs such as fontconfig/X11/GL come from the system) and runs
+`appimagetool`. The tool (1.9.1) and the type2 runtime (20251108) are downloaded into the git-ignored `.cache/tools`
+and verified against SHA-256 sums pinned in the script (they match the digests GitHub publishes for those release
+assets). Nothing is installed system-wide; without FUSE the tool runs via `APPIMAGE_EXTRACT_AND_RUN`. Output:
+`artifacts/Files-<arch>.AppImage` (about 61 MB). arm64 is wired (pinned sums) but only x86_64 was built.
+
+Smoke run on the private Xvfb display (the Home page renders):
+
+```
+FILES_EXEC=artifacts/Files-x86_64.AppImage scripts/linux/headless-run.sh -s 25 -o /tmp/files-appimage
+```
+
+`headless-run.sh` honours `FILES_EXEC` (any launcher, including `packaging/linux/files`) instead of `dotnet Files.dll`;
+for `*.AppImage` it sets `APPIMAGE_EXTRACT_AND_RUN=1` and `APPIMAGELAUNCHER_DISABLE=1` so a host AppImageLauncher
+cannot pop up an integration dialog.
+
+## Flatpak
+
+`packaging/linux/flatpak/io.github.memergamer.LinuxFiles.yml`, runtime `org.freedesktop.Platform//25.08`. The module
+unpacks the self-contained publish tarball, so there is no .NET SDK, NuGet restore or network access in the build
+(Flathub-friendly: for a release, point the `file` source at the release URL with its sha256).
+`scripts/linux/build-flatpak.sh [--bundle]` runs `flatpak-builder` (needs the 25.08 Platform and Sdk installed) into
+`artifacts/flatpak-repo` and optionally writes `artifacts/Files-x86_64.flatpak`; without `flatpak-builder` it only
+validates the manifest structure. Built locally; not yet installed or run inside the sandbox.
+
+`finish-args` rationale (each line is the minimum for a feature that exists in the code):
+
+- `--share=ipc`, `--socket=x11`, `--device=dri`: Uno Skia desktop is X11 only (XWayland on Wayland) and uses GL.
+- `--filesystem=host`: a file manager needs the whole filesystem. `--filesystem=xdg-run/gvfs`, `xdg-run/gvfs-fuse`
+  and `--talk-name=org.gtk.vfs.*`: mounted network/MTP locations through GVfs.
+- `--own-name=org.freedesktop.FileManager1`: the `ShowFolders`/`ShowItems`/`ShowItemProperties` service
+  (`Files.Platform.Linux/DBus/FileManagerService.cs`).
+- `--system-talk-name=org.freedesktop.UDisks2`: drive listing, mount, unmount, eject.
+- `--talk-name=org.freedesktop.secrets`: Secret Service credential store.
+- `--talk-name=org.freedesktop.Notifications`: toasts.
+- Not granted: `org.freedesktop.Flatpak` (`flatpak-spawn --host` would void the sandbox). The portal bus names
+  (`org.freedesktop.portal.*`, used for the appearance setting) are always reachable. Opening files with other apps
+  inside the sandbox therefore depends on the OpenURI/OpenFile portals; verify "Open with" behaviour when running
+  the Flatpak for real.
+
+## AUR
+
+`packaging/linux/aur/linuxfiles-bin/PKGBUILD` repackages the release tarballs (`files-linux-x64.tar.gz` plus
+`files-packaging.tar.gz`, which carries the desktop entry, metainfo, icons, launcher and `LICENSE-MIT`) into
+`/usr/lib/linuxfiles` + `/usr/bin/files`; x86_64 only. The checked-in `sha256sums` are `SKIP`:
+`scripts/linux/gen-aur.sh <version> <dir> [out]` renders a PKGBUILD with real sums and `.SRCINFO` (CI does this on
+tags and uploads both; push them to the AUR repo by hand). `AUR_BASE_URL=file:///dir` points the sources at local
+files, which is how the package was build-tested with `makepkg` here (resulting file list checked). `namcap` is not
+installed on the dev box, so the package is not linted. `aur/linuxfiles/PKGBUILD` (from source) is unchanged and
+unbuilt.
 
 ## Becoming the default file manager (Phase 6, not done yet)
 
@@ -99,5 +131,5 @@ host libraries (fontconfig, X11, GL), which AppImage expects from the host. Auth
 
 - Real `WM_CLASS` value on X11 (see above).
 - Whether an SVG logo can be supplied for `scalable/`.
-- Flatpak SDK extension availability for .NET 10 on the chosen runtime.
+- Runtime behaviour of the Flatpak (sandboxed run, portals) and a `namcap` lint of the AUR package.
 - arm64 publishing has not been tested.

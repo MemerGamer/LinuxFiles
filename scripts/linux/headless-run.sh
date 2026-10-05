@@ -8,6 +8,7 @@
 # Env: FILES_SANDBOX_DRIVES (fixture of synthetic drives, see scripts/linux/showcase-drives.txt),
 #      FILES_SANDBOX_SEED (optional script run as "script <sandbox-home>" after the default sample content is created),
 #      FILES_HEADLESS_WM (optional window manager command to run on the private display, e.g. "kwin_x11"; default none),
+#      FILES_EXEC (path to a packaged launcher, e.g. Files-x86_64.AppImage or packaging/linux/files; run instead of "dotnet Files.dll"),
 #      FILES_BIN (default src/Files.App/bin/Debug/net10.0-desktop), XVFB_SIZE (default 1600x1000).
 set -euo pipefail
 
@@ -100,11 +101,22 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	fi
 fi
 
+# FILES_EXEC runs a packaged build (AppImage, launcher) instead of dotnet Files.dll. AppImages are extracted and run
+# so no FUSE mount is needed.
+app_cmd=(dotnet Files.dll)
+if [[ -n "${FILES_EXEC:-}" ]]; then
+	FILES_EXEC="$(readlink -f "$FILES_EXEC")"
+	[[ -x "$FILES_EXEC" ]] || { echo "FILES_EXEC is not executable: $FILES_EXEC" >&2; exit 2; }
+	app_cmd=("$FILES_EXEC")
+	[[ "$FILES_EXEC" == *.AppImage ]] && export APPIMAGE_EXTRACT_AND_RUN=1 APPIMAGELAUNCHER_DISABLE=1
+	bin="$(dirname "$FILES_EXEC")"
+fi
+
 # Private D-Bus session: notifications, portals and app launches never reach the real desktop session.
 # shellcheck disable=SC2016
 setsid bash -c 'cd "$0" && exec "$@"' "$bin" \
 	env -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u FILES_GVFS_DIR "${sandbox_env[@]}" DISPLAY=":$display" LIBGL_ALWAYS_SOFTWARE=1 \
-	FILES_LAUNCH_DRYRUN="${FILES_LAUNCH_DRYRUN:-1}" nice -n 19 dbus-run-session -- dotnet Files.dll "$@" \
+	FILES_LAUNCH_DRYRUN="${FILES_LAUNCH_DRYRUN:-1}" nice -n 19 dbus-run-session -- "${app_cmd[@]}" "$@" \
 	>"$outdir/app.log" 2>&1 &
 app_pid=$!
 

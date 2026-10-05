@@ -86,8 +86,12 @@ namespace Files.App.Controls
 			_textBox.GotFocus += AutoSuggestBox_GotFocus;
 			_textBox.LosingFocus += AutoSuggestBox_LosingFocus;
 			_textBox.LostFocus += AutoSuggestBox_LostFocus;
+#if WINDOWS
+			_textBox.KeyDown += AutoSuggestBox_KeyDown;
+#else
 			// handledEventsToo: Uno's TextBox marks Enter as handled before this handler runs, which swallowed query submission.
 			_textBox.AddHandler(KeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler(AutoSuggestBox_KeyDown), true);
+#endif
 			_textBox.TextChanged += AutoSuggestBox_TextChanged;
 			_textBoxSuggestionsPopup.GettingFocus += AutoSuggestBoxSuggestionsPopup_GettingFocus;
 			_textBoxSuggestionsPopup.Opened += AutoSuggestBoxSuggestionsPopup_Opened;

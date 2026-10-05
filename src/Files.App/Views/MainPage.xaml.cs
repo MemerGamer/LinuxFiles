@@ -51,7 +51,12 @@ namespace Files.App.Views
 #if !WINDOWS
 			// Uno never invokes the Control.OnPreviewKeyDown/OnPreviewKeyUp/OnLostFocus virtuals, so none of the
 			// hotkeys (ctrl+l, ctrl+t, alt+left, ...) fired on Linux. The routed events are raised, so hook those.
-			PreviewKeyDown += async (_, e) => await OnPreviewKeyDownAsync(e);
+			PreviewKeyDown += async (_, e) =>
+			{
+				// async void boundary: an unhandled command failure would otherwise take down the app
+				try { await OnPreviewKeyDownAsync(e); }
+				catch (Exception ex) { App.Logger.LogWarning(ex, "Hotkey command failed"); }
+			};
 			PreviewKeyUp += (_, e) => OnPreviewKeyUp(e);
 			LostFocus += (_, e) => OnLostFocus(e);
 #endif

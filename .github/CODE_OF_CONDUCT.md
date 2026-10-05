@@ -57,6 +57,8 @@ If a community member engages in unacceptable behavior, the community organizers
 
 ## 7. Reporting Guidelines
 
+> LinuxFiles is an unofficial fork. For conduct concerns in this repository, contact the maintainers privately through a [GitHub Security Advisory](https://github.com/MemerGamer/LinuxFiles/security/advisories/new) or the contact address on the maintainer's GitHub profile. The address below belongs to the upstream Files Community and covers upstream spaces only.
+
 If you are subject to or witness unacceptable behavior, or have any other concerns, please notify a community organizer as soon as possible. filesapp@outlook.com.
 
 

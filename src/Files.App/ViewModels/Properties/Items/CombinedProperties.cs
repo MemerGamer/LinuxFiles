@@ -20,7 +20,9 @@ namespace Files.App.ViewModels.Properties
 		{
 			List = listedItems;
 			GetBaseProperties();
+#if WINDOWS
 			ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+#endif
 		}
 
 		public sealed override void GetBaseProperties()
@@ -60,6 +62,7 @@ namespace Files.App.ViewModels.Properties
 				return;
 			}
 
+#if WINDOWS
 			var itemsWithPaths = List.Select(item => (
 				Item: item,
 				Path: item.GetRequiredPath())).ToList();
@@ -155,6 +158,7 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.ItemSizeOnDisk = totalSizeOnDisk.ToLongSizeString();
 
 			SetItemsCountString();
+#endif
 		}
 
 		private async Task GetSpecialPropertiesLinuxAsync()
@@ -212,6 +216,7 @@ namespace Files.App.ViewModels.Properties
 			SetItemsCountString();
 		}
 
+#if WINDOWS
 		private async void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{
 			if (OperatingSystem.IsLinux())
@@ -271,5 +276,6 @@ namespace Files.App.ViewModels.Properties
 					break;
 			}
 		}
+#endif
 	}
 }

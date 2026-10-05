@@ -86,13 +86,15 @@ namespace Files.App.Helpers
 		/// <summary>
 		/// Gets application icon path.
 		/// </summary>
-		public static string AppIconPath { get; } =
-			SystemIO.Path.Combine(Package.Current.InstalledLocation.Path, AppEnvironment switch
+		public static string AppIconPath => _appIconPath.Value;
+
+		private static readonly Lazy<string> _appIconPath = new(() =>
+			SystemIO.Path.Combine(Package.Current.InstalledPath, AppEnvironment switch
 			{
 				AppEnvironment.Dev => Constants.AssetPaths.DevLogo,
 				AppEnvironment.SideloadPreview or AppEnvironment.StorePreview => Constants.AssetPaths.PreviewLogo,
 				_ => Constants.AssetPaths.StableLogo
-			});
+			}));
 
 		/// <summary>
 		/// Initializes the app components.
@@ -406,7 +408,9 @@ namespace Files.App.Helpers
 					.AddSingleton<IStorageCacheService, StorageCacheService>()
 					.AddSingleton<IIconCacheService, IconCacheService>()
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
+#if WINDOWS
 					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
+#endif
 #if WINDOWS
 					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
 #endif
@@ -436,6 +440,7 @@ namespace Files.App.Helpers
 
 			// Storable path resolution
 			services.AddStorables();
+			services.AddFtpStorables();
 
 			// Conditional DI
 #if WINDOWS

@@ -189,13 +189,18 @@ namespace Files.App.ViewModels.UserControls
 			}
 		}
 
+		/// <summary>Windows libraries and WSL only exist on Windows; their sidebar sections and toggles are hidden elsewhere.</summary>
+		public bool IsLibrarySectionSupported { get; } = Ioc.Default.GetRequiredService<IPlatformCapabilities>().SupportsLibraries;
+
+		public bool IsWslSectionSupported { get; } = OperatingSystem.IsWindows();
+
 		public bool AreSectionsHidden =>
 			!ShowPinnedFoldersSection &&
-			!ShowLibrarySection &&
+			(!ShowLibrarySection || !IsLibrarySectionSupported) &&
 			!ShowDrivesSection &&
 			!ShowCloudDrivesSection &&
 			!ShowNetworkSection &&
-			(!ShowWslSection || WSLDistroManager.Distros.Any() == false) &&
+			(!ShowWslSection || !IsWslSectionSupported || WSLDistroManager.Distros.Any() == false) &&
 			!ShowFileTagsSection &&
 			SidebarDisplayMode is not SidebarDisplayMode.Compact;
 
@@ -569,7 +574,7 @@ namespace Files.App.ViewModels.UserControls
 					break;
 
 				case SectionType.Library:
-					if (ShowLibrarySection == false)
+					if (ShowLibrarySection == false || !IsLibrarySectionSupported)
 						break;
 					section = BuildSection(Strings.SidebarLibraries.GetLocalizedResource(), sectionType, new ContextMenuOptions { IsLibrariesHeader = true, ShowHideSection = true }, false);
 					section.IsHeader = true;

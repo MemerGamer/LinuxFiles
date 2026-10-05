@@ -9,6 +9,7 @@ namespace Files.App.Utils.Serialization
 	[JsonSerializable(typeof(LayoutPreferencesDatabaseItem[]))]
 	[JsonSerializable(typeof(List<LayoutPreferencesDatabaseItem>))]
 	[JsonSerializable(typeof(LayoutPreferencesItem))]
+	[JsonSerializable(typeof(List<LayoutPreferencesFileEntry>))]
 	[JsonSerializable(typeof(List<ViewModels.Properties.FileProperty>))]
 	internal sealed partial class AppJsonSerializerContext : JsonSerializerContext
 	{

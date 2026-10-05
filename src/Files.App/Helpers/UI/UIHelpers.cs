@@ -19,6 +19,38 @@ namespace Files.App.Helpers
 	{
 		public static event PropertyChangedEventHandler? PropertyChanged;
 
+		public static void RunAfterNextRender(this FrameworkElement element, Action action)
+		{
+			if (!element.IsLoaded)
+				return;
+
+			var canceled = false;
+			element.Unloaded += OnUnloaded;
+			CompositionTarget.Rendered += OnRendered;
+
+			void OnUnloaded(object sender, RoutedEventArgs e)
+			{
+				canceled = true;
+				element.Unloaded -= OnUnloaded;
+				CompositionTarget.Rendered -= OnRendered;
+			}
+
+			void OnRendered(object? sender, RenderedEventArgs e)
+			{
+				CompositionTarget.Rendered -= OnRendered;
+				// Keep the deferred work outside the rendering callback itself.
+				if (!element.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+				{
+					element.Unloaded -= OnUnloaded;
+					if (!canceled && element.IsLoaded)
+						action();
+				}))
+				{
+					element.Unloaded -= OnUnloaded;
+				}
+			}
+		}
+
 		/// <summary>
 		/// True if a user-editable text input currently owns keyboard focus within the given XamlRoot.
 		/// Used to gate code that programmatically reassigns focus on a background-completion
@@ -181,6 +213,7 @@ namespace Files.App.Helpers
 
 		private static IEnumerable<IconFileInfo> LoadSidebarIconResources()
 		{
+#if WINDOWS
 			string imageres = Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "imageres.dll");
 			var imageResList = Win32Helper.ExtractSelectedIconsFromDLL(imageres, new List<int>() {
 					Constants.ImageRes.RecycleBin,
@@ -189,26 +222,65 @@ namespace Files.App.Helpers
 				}, 32);
 
 			return imageResList;
+#else
+			// LINUX-TODO(icons): imageres.dll icons do not exist on Linux
+			return [];
+#endif
 		}
 
 		private static IconFileInfo? LoadShieldIconResource()
 		{
+#if WINDOWS
 			string imageres = Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "imageres.dll");
 			var imageResList = Win32Helper.ExtractSelectedIconsFromDLL(imageres, new List<int>() {
 					Constants.ImageRes.ShieldIcon
 				}, 16);
 
 			return imageResList.FirstOrDefault();
+#else
+			return null;
+#endif
 		}
 
 		private static IconFileInfo? LoadSearchIconResource()
 		{
+#if WINDOWS
 			string imageres = Path.Combine(Constants.UserEnvironmentPaths.SystemRootPath, "System32", "imageres.dll");
 			var imageResList = Win32Helper.ExtractSelectedIconsFromDLL(imageres, new List<int>() {
 					Constants.ImageRes.SearchIcon
 				}, 48);
 
 			return imageResList.FirstOrDefault();
+#else
+			return null;
+#endif
+		}
+
+		/// <summary>
+		/// Gets the global cursor position in physical screen pixels. Always false off Windows.
+		/// </summary>
+		public static bool TryGetCursorPosition(out System.Drawing.Point point)
+		{
+#if WINDOWS
+			return Windows.Win32.PInvoke.GetCursorPos(out point);
+#else
+			// LINUX-TODO(cursor): Uno has no global cursor position
+			point = default;
+			return false;
+#endif
+		}
+
+		/// <summary>
+		/// Gets the screen position of the main window's client-area origin. Always false off Windows.
+		/// </summary>
+		public static bool TryGetMainWindowClientOrigin(out System.Drawing.Point origin)
+		{
+			origin = new System.Drawing.Point(0, 0);
+#if WINDOWS
+			return Windows.Win32.PInvoke.ClientToScreen(new(MainWindow.Instance.WindowHandle), ref origin);
+#else
+			return false;
+#endif
 		}
 	}
 }

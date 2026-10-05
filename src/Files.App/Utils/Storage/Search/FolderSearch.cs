@@ -2,7 +2,10 @@
 // Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Dispatching;
+using System.IO;
 using System.Text.RegularExpressions;
+using Windows.Storage;
 
 namespace Files.App.Utils.Storage
 {
@@ -30,7 +33,18 @@ namespace Files.App.Utils.Storage
 
 		private uint UsedMaxItemCount => MaxItemCount > 0 ? MaxItemCount : uint.MaxValue;
 
-		public EventHandler? SearchTick;
+		public DispatcherQueue DispatcherQueue { get; set; } = MainWindow.Instance.DispatcherQueue;
+
+		/// <summary>
+		/// Raised on a throttle with the results found since the previous tick, on a background thread during Win32 walks.
+		/// </summary>
+		public event EventHandler<IReadOnlyList<ListedItem>>? SearchTick;
+
+		private readonly IntervalSampler tickSampler = new(500);
+		private readonly HashSet<string> indexedResultPaths = new(StringComparer.OrdinalIgnoreCase);
+		private readonly List<ShortcutItem> shortcutResults = [];
+		private List<ListedItem> pendingResults = [];
+		private bool hasRaisedTick;
 
 		private bool IsAQSQuery => Query is not null && (Query.StartsWith('$') || Query.Contains(':', StringComparison.Ordinal));
 
@@ -95,6 +109,21 @@ namespace Files.App.Utils.Storage
 			{
 				App.Logger.LogWarning(e, "Search failure");
 			}
+
+			try
+			{
+				if (MaxItemCount > 0)
+					await LoadSuggestionIconsAsync(results, token);
+				else
+					await ResolveShortcutTargetsAsync(token);
+			}
+			catch (OperationCanceledException)
+			{
+			}
+			catch (Exception e)
+			{
+				App.Logger.LogWarning(e, "Failed to finalize search results");
+			}
 		}
 
 		private async Task AddItemsForHomeAsync(IList<ListedItem> results, CancellationToken token)
@@ -141,6 +170,85 @@ namespace Files.App.Utils.Storage
 			}
 
 			return results;
+		}
+
+		private void AddResult(IList<ListedItem> results, ListedItem item, CancellationToken token)
+		{
+			if (token.IsCancellationRequested)
+				return;
+
+			results.Add(item);
+			pendingResults.Add(item);
+			if (item is ShortcutItem shortcutItem)
+				shortcutResults.Add(shortcutItem);
+
+			RaiseSearchTickIfDue(token);
+		}
+
+		private void RaiseSearchTickIfDue(CancellationToken token)
+		{
+			if (pendingResults.Count == 0 || token.IsCancellationRequested || (hasRaisedTick && !tickSampler.CheckNow()))
+				return;
+
+			var batch = pendingResults;
+			pendingResults = [];
+			hasRaisedTick = true;
+
+			SearchTick?.Invoke(this, batch);
+		}
+
+		private uint GetRemainingItemCount(IList<ListedItem> results)
+			=> results.Count >= UsedMaxItemCount ? 0 : UsedMaxItemCount - (uint)results.Count;
+
+		// Awaited so the final sort treats folder shortcuts as folders
+		private async Task ResolveShortcutTargetsAsync(CancellationToken token)
+		{
+			if (shortcutResults.Count == 0)
+				return;
+
+			var links = new ShellLinkItem?[shortcutResults.Count];
+			await Parallel.ForEachAsync(
+				Enumerable.Range(0, links.Length),
+				new ParallelOptions { CancellationToken = token, MaxDegreeOfParallelism = 4 },
+				async (i, _) => links[i] = await FileOperationsHelpers.ParseLinkAsync(shortcutResults[i].GetRequiredPath(), resolveTarget: false));
+
+			await DispatcherQueue.EnqueueOrInvokeAsync(() =>
+			{
+				for (var i = 0; i < links.Length; i++)
+				{
+					if (links[i] is not { } link)
+						continue;
+
+					var shortcutItem = shortcutResults[i];
+					shortcutItem.TargetPath = link.TargetPath;
+					shortcutItem.Arguments = link.Arguments;
+					shortcutItem.WorkingDirectory = link.WorkingDirectory;
+					shortcutItem.RunAsAdmin = link.RunAsAdmin;
+					shortcutItem.ShowWindowCommand = link.ShowWindowCommand;
+					shortcutItem.PrimaryItemAttribute = link.IsFolder ? StorageItemTypes.Folder : StorageItemTypes.File;
+				}
+			});
+		}
+
+		private Task LoadSuggestionIconsAsync(IList<ListedItem> results, CancellationToken token)
+		{
+			return Task.WhenAll(results.Where(x => x.FileImage is null).Select(async item =>
+			{
+				var iconResult = await FileThumbnailHelper.GetIconAsync(
+					item.GetRequiredPath(),
+					Constants.ShellIconSizes.Small,
+					item.PrimaryItemAttribute == StorageItemTypes.Folder,
+					IconOptions.ReturnIconOnly);
+
+				if (iconResult is null || token.IsCancellationRequested)
+					return;
+
+				await DispatcherQueue.EnqueueOrInvokeAsync(async () =>
+				{
+					if (await iconResult.ToBitmapAsync() is { } bitmapImage)
+						item.FileImage = bitmapImage;
+				});
+			}));
 		}
 
 		private async Task AddItemsForLibraryAsync(LibraryLocationItem library, IList<ListedItem> results, CancellationToken token)

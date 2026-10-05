@@ -15,8 +15,10 @@ using System.Runtime.InteropServices;
 using Windows.Foundation.Metadata;
 using Windows.Graphics;
 using Windows.UI.Input;
+#if WINDOWS
 using Windows.Win32;
 using Windows.Win32.Foundation;
+#endif
 using WinRT;
 using GridSplitter = Files.App.Controls.GridSplitter;
 using VirtualKey = Windows.System.VirtualKey;
@@ -33,12 +35,16 @@ namespace Files.App.Views
 		public SidebarViewModel SidebarAdaptiveViewModel { get; }
 		public MainPageViewModel ViewModel { get; }
 
+#if WINDOWS
 		private const int HTCAPTION = 2;
+#endif
 
 		private bool keyReleased = true;
 
 		private DispatcherQueueTimer _updateDateDisplayTimer;
+#if WINDOWS
 		private WindowMessageMonitor? _titleBarMessageMonitor;
+#endif
 
 		private readonly Dictionary<TabBarItem, double> _sidebarScrollByTab = new();
 		private TabBarItem? _previousSidebarTab;
@@ -69,8 +75,10 @@ namespace Files.App.Views
 
 			if (AppLanguageHelper.IsPreferredLanguageRtl)
 			{
+#if WINDOWS
 				if (OperatingSystem.IsWindows())
 					Win32Helper.EnableRtlLayout(MainWindow.Instance.WindowHandle);
+#endif
 				FlowDirection = FlowDirection.RightToLeft;
 			}
 
@@ -84,6 +92,11 @@ namespace Files.App.Views
 			App.AppModel.PropertyChanged += AppModel_PropertyChanged;
 
 			ApplySidebarWidthState();
+
+			// Realize the navigation controls before the first measure pass.
+			FindName(nameof(InnerNavigationToolbar));
+			FindName(nameof(TabControl));
+			FindName(nameof(NavToolbar));
 		}
 
 		private void NumberedTabKeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
@@ -145,12 +158,18 @@ namespace Files.App.Views
 
 		private int SetTitleBarDragRegion(InputNonClientPointerSource source, SizeInt32 size, double scaleFactor, Func<UIElement, RectInt32?, RectInt32> getScaledRect)
 		{
+			if (TabControl is null)
+				return -1;
+
 			var height = (int)TabControl.ActualHeight;
 			source.SetRegionRects(NonClientRegionKind.Passthrough, [getScaledRect(this, new RectInt32 { X = 0, Y = 0, Width = (int)(TabControl.ActualWidth + TabControl.Margin.Left - TabControl.DragArea.ActualWidth), Height = height })]);
+#if WINDOWS
 			AttachTitleBarMessageMonitor();
+#endif
 			return height;
 		}
 
+#if WINDOWS
 		// Caption regions live in a dedicated child window
 		private void AttachTitleBarMessageMonitor()
 		{
@@ -177,6 +196,7 @@ namespace Files.App.Views
 			e.Result = 0;
 			e.Handled = true;
 		}
+#endif
 
 		public async void TabItemContent_ContentChanged(object? sender, TabBarItemParameter e)
 		{
@@ -342,10 +362,7 @@ namespace Files.App.Views
 
 			MainWindow.Instance.AppWindow.Changed += (_, _) => MainWindow.Instance.RaiseSetTitleBarDragRegion(SetTitleBarDragRegion);
 
-			// Defers loading until after the page has loaded to improve startup perf
-			FindName(nameof(InnerNavigationToolbar));
-			FindName(nameof(TabControl));
-			FindName(nameof(NavToolbar));
+			MainWindow.Instance.RaiseSetTitleBarDragRegion(SetTitleBarDragRegion);
 
 			// Notify user that drag and drop is disabled
 			// Prompt is disabled in the dev environment to prevent issues with the automation testing 

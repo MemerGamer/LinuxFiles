@@ -307,6 +307,7 @@ namespace Files.App.Views.Layouts
 			if (textBox is not null && textBox.Parent is not null)
 			{
 				ListViewItem? listViewItem = FileList.ContainerFromItem(RenamingItem) as ListViewItem;
+				SyncContainerTheme(listViewItem);
 				if (listViewItem is null)
 					return;
 

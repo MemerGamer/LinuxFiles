@@ -5,7 +5,9 @@ namespace Files.App.ViewModels.UserControls
 {
 	public sealed partial class StatusCenterViewModel : ObservableObject
 	{
+#if WINDOWS
 		private readonly Files.App.Storage.TaskbarManager _taskbar = Files.App.Storage.TaskbarManager.Default;
+#endif
 
 		public ObservableCollection<StatusCenterItem> StatusCenterItems { get; } = [];
 
@@ -165,6 +167,7 @@ namespace Files.App.ViewModels.UserControls
 
 		private void UpdateTaskbarProgress()
 		{
+#if WINDOWS
 			try
 			{
 				var hwnd = new Windows.Win32.Foundation.HWND(MainWindow.Instance.WindowHandle);
@@ -183,6 +186,7 @@ namespace Files.App.ViewModels.UserControls
 			{
 				// Ignore taskbar update failures to avoid interrupting status updates.
 			}
+#endif
 		}
 	}
 }

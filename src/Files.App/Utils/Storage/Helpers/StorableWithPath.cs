@@ -1,6 +1,8 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.App.Data.Enums;
+using OwlCore.Storage;
 using Windows.Storage;
 using IO = System.IO;
 
@@ -20,8 +22,10 @@ namespace Files.App.Utils.Storage
 		/// <inheritdoc/>
 		public IStorable? Storable { get; }
 
-		/// <inheritdoc/>
-		public string Name => IO.Path.GetFileName(IO.Path.TrimEndingDirectorySeparator(Path));
+		/// <summary>
+		/// Gets the display name: the storable's name if one is attached; otherwise, the last segment of <see cref="Path"/>.
+		/// </summary>
+		public string Name => Storable?.Name ?? IO.Path.GetFileName(IO.Path.TrimEndingDirectorySeparator(Path));
 
 		IStorageItem? IStorageItemWithPath.Item => null;
 

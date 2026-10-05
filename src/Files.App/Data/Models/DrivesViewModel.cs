@@ -112,6 +112,8 @@ namespace Files.App.Data.Models
 						InsertSorted(item);
 				}
 
+#if WINDOWS
+				// The broad file system access consent (ms-settings) only exists on Windows
 				var osDrive = await removableDrivesService.GetPrimaryDriveAsync();
 
 				// Show consent dialog if the OS drive could not be accessed
@@ -132,6 +134,7 @@ namespace Files.App.Data.Models
 					if (isOsDriveMissing)
 						ShowUserConsentOnInit = true;
 				}
+#endif
 
 				if (watcher.CanBeStarted)
 					watcher.Start();

@@ -36,6 +36,10 @@ namespace Files.App.Utils.Storage
 		/// </summary>
 		public static IReadOnlyList<LinuxMount> GetMounts()
 		{
+			// Synthetic drives of a sandboxed headless run (null in normal use)
+			if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Current is { } synthetic)
+				return synthetic.Select((d, i) => new LinuxMount(d.MountPoint, d.FileSystem, $"/dev/headless{i}", $"headless:{i}")).ToList();
+
 			var result = new List<LinuxMount>();
 			var seenDevices = new HashSet<string>(StringComparer.Ordinal);
 

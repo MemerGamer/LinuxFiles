@@ -1,0 +1,6 @@
+# Synthetic drives for headless showcase runs: label|filesystem|totalBytes|freeBytes|fixed or removable|mountDirName (under $HOME/mnt)
+# Labels are the first segment of random UUIDs; sizes are made up.
+80314EC5|ext4|999653638144|125627793408|fixed|disk1
+DB1F53A7|btrfs|511101108224|217969590272|fixed|disk2
+08D932C5|ntfs|127775277056|9663676416|fixed|disk3
+70E58F69|vfat|62277025792|44023414784|removable|usb

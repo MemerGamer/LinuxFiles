@@ -4928,4 +4928,7 @@
   <data name="SettingsLinuxDefaultFileManagerDescription" xml:space="preserve">
     <value>Let other applications reveal files in Files (org.freedesktop.FileManager1).</value>
   </data>
+  <data name="OpenTerminalLinux" xml:space="preserve">
+    <value>Open in terminal</value>
+  </data>
 </root>

@@ -1,3 +1,4 @@
+#if WINDOWS
 using Files.App.ViewModels.Previews;
 using Microsoft.UI.Xaml.Controls;
 
@@ -17,3 +18,4 @@ namespace Files.App.UserControls.FilePreviews
 		public TextPreviewViewModel ViewModel { get; set; }
 	}
 }
+#endif

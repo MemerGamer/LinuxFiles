@@ -319,11 +319,17 @@ namespace Files.Platform.Linux.Thumbnails
 
 		private async Task<byte[]?> GenerateExternalAsync(string fullPath, string uri, int maxSize, string cachePath, CancellationToken cancellationToken)
 		{
+			if (new FileInfo(fullPath).Length > _options.MaxSourceFileBytes)
+				return null;
+
 			var mime = _options.MimeTypeResolver?.Invoke(fullPath);
 			if (string.IsNullOrEmpty(mime))
 				return null;
 
 			var entry = _registry.Value.Find(mime);
+			var pdfFallback = entry is null && mime == "application/pdf";
+			if (pdfFallback)
+				entry = new ThumbnailerEntry("pdftoppm -f 1 -singlefile -scale-to %s -png %i %o", "pdftoppm", [mime]);
 			if (entry is null || (entry.TryExec is not null && !ExecutableExists(entry.TryExec)))
 				return null;
 
@@ -333,7 +339,7 @@ namespace Files.Platform.Linux.Thumbnails
 			{
 				EnsureCacheDirectory(tempDir);
 				var tempOutput = Path.Combine(tempDir, "out.png");
-				var command = entry.BuildCommand(fullPath, uri, tempOutput, (uint)maxSize);
+				var command = entry.BuildCommand(fullPath, uri, pdfFallback ? Path.Combine(tempDir, "out") : tempOutput, (uint)maxSize);
 				if (command is null)
 					return null;
 

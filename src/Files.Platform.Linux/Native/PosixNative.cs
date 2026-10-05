@@ -15,7 +15,7 @@ namespace Files.Platform.Linux.Native
 	/// <summary>Mount-related <c>statx</c> fields: attribute bits with their support mask, the mount id (when reported) and the device.</summary>
 	public readonly record struct MountInfo(ulong Attributes, ulong AttributesMask, bool MountIdValid, ulong MountId, uint DevMajor, uint DevMinor);
 
-	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0)
+	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0, ulong? MountId = null)
 	{
 		public uint FileType => Mode & 0xF000;
 
@@ -49,9 +49,10 @@ namespace Files.Platform.Linux.Native
 		private const uint StatxMtime = 0x40;
 		private const uint StatxIno = 0x100;
 		private const uint StatxSize = 0x200;
+		private const uint StatxMountId = 0x1000;
 		private const int StatxBufferSize = 256;
 
-		private const int ONonblock = 0x800;
+		public const int ONonblock = 0x800;
 		private const int OCloexec = 0x80000;
 
 		private const int ENOENT = 2;
@@ -90,7 +91,7 @@ namespace Files.Platform.Linux.Native
 				var buffer = new byte[StatxBufferSize];
 				fixed (byte* p = buffer)
 				{
-					const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize | StatxIno;
+					const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize | StatxIno | StatxMountId;
 					if (statx(dirfd, path, flags, mask, p) != 0)
 					{
 						errno = Marshal.GetLastPInvokeError();
@@ -108,7 +109,8 @@ namespace Files.Platform.Linux.Native
 				var nanos = (returned & StatxMtime) != 0 ? BitConverter.ToUInt32(buffer, 120) : 0;
 
 				stat = new PosixStat(BitConverter.ToUInt16(buffer, 28), size, BitConverter.ToUInt32(buffer, 20), seconds, nanos,
-					(returned & StatxIno) != 0 ? BitConverter.ToUInt64(buffer, 32) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140));
+					(returned & StatxIno) != 0 ? BitConverter.ToUInt64(buffer, 32) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140),
+					(returned & StatxMountId) != 0 ? BitConverter.ToUInt64(buffer, 144) : null);
 				return true;
 			}
 			catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
@@ -161,6 +163,18 @@ namespace Files.Platform.Linux.Native
 			var fd = openat(dirfd, name, flags, mode);
 			errno = fd < 0 ? Marshal.GetLastPInvokeError() : 0;
 			return fd;
+		}
+
+		/// <summary>Checks the type of an open descriptor using statx.</summary>
+		public static bool IsRegularFile(int fd)
+			=> TryStat(fd, out var stat) && stat.IsRegularFile;
+
+		public static void ClearNonBlocking(int fd)
+		{
+			const int getFlags = 3, setFlags = 4;
+			var flags = fcntl(fd, getFlags, 0);
+			if (flags < 0 || fcntl(fd, setFlags, flags & ~ONonblock) < 0)
+				throw CreateException(Marshal.GetLastPInvokeError(), "preview descriptor");
 		}
 
 		public static void Close(int fd) => _ = close(fd);
@@ -248,6 +262,9 @@ namespace Files.Platform.Linux.Native
 				1 or 13 or 30 => new UnauthorizedAccessException($"Access to '{path}' is denied."),
 				_ => new IOException($"The operation on '{path}' failed with errno {errno}.", errno),
 			};
+
+		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]
+		private static partial int fcntl(int fd, int command, int argument);
 
 		[LibraryImport("libc", EntryPoint = "statx", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int statx(int dirfd, string pathname, int flags, uint mask, byte* statxbuf);

@@ -39,6 +39,18 @@ namespace Files.App.Actions
 		{
 			var workingDirectory = _context.ShellPage?.ShellViewModel?.WorkingDirectory;
 
+			if (OperatingSystem.IsLinux())
+			{
+				if (!SystemIO.Path.IsPathRooted(workingDirectory))
+					return;
+
+				var launched = await Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>()
+					.StartAsync(_devToolsSettingsService.IDEPath, [workingDirectory]);
+				if (!launched)
+					await DynamicDialogFactory.ShowFor_IDEErrorDialog(_devToolsSettingsService.IDEName);
+				return;
+			}
+
 			var res = await Win32Helper.RunPowershellCommandAsync(
 				$"& {Win32Helper.ToPowerShellStringLiteral(_devToolsSettingsService.IDEPath)} {Win32Helper.ToPowerShellStringLiteral(workingDirectory)}",
 				PowerShellExecutionOptions.Hidden

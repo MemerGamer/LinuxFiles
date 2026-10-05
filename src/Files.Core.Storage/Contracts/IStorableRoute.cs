@@ -1,6 +1,8 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Core.Storage.Enums;
+
 namespace Files.Core.Storage.Contracts
 {
 	/// <summary>
@@ -17,26 +19,20 @@ namespace Files.Core.Storage.Contracts
 		int Order { get; }
 
 		/// <summary>
-		/// Determines whether this route handles <paramref name="path"/>.
+		/// Resolves <paramref name="path"/>.
 		/// </summary>
 		/// <remarks>
-		/// Implementations must only inspect the string and must not perform any I/O.
-		/// A route that claims a path is authoritative for it.
+		/// Return <see cref="StorableResult.NotMine"/> as cheaply as possible for paths this route does not handle, so that the
+		/// resolver tries the next route. A route may inspect the file system to decide (for example, to tell an archive from a
+		/// directory named <c>x.zip</c>). Any other result is final.
 		/// </remarks>
-		/// <param name="path">The path to inspect.</param>
-		/// <returns><see langword="true"/> if this route handles <paramref name="path"/>; otherwise, <see langword="false"/>.</returns>
-		bool CanResolve(string path);
-
-		/// <summary>
-		/// Gets the storable at <paramref name="path"/>.
-		/// </summary>
-		/// <param name="path">A path for which <see cref="CanResolve(string)"/> returned <see langword="true"/>.</param>
+		/// <param name="path">The path to resolve.</param>
 		/// <param name="cancellationToken">A token that cancels the operation.</param>
 		/// <returns>
-		/// An <see cref="IFile"/> or <see cref="IFolder"/>, or <see langword="null"/> if the path is not handled by this route,
-		/// does not exist or cannot be accessed.
+		/// <see cref="StorableStatus.Success"/> with an <see cref="IFile"/> or <see cref="IFolder"/>; <see cref="StorableStatus.NotMine"/>
+		/// if this route does not handle the path; otherwise, the reason the handled path could not be resolved.
 		/// </returns>
 		/// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was canceled.</exception>
-		Task<IStorable?> TryGetAsync(string path, CancellationToken cancellationToken = default);
+		Task<StorableResult> TryGetAsync(string path, CancellationToken cancellationToken = default);
 	}
 }

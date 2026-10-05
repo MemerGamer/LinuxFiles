@@ -23,6 +23,7 @@ namespace Files.App.Actions
 			=> ActionCategory.Install;
 
 		public bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			context.SelectedItems.Count == 1 &&
 			FileExtensionHelpers.IsInfFile(context.SelectedItems[0].FileExtension) &&
 			context.PageType != ContentPageTypes.RecycleBin &&

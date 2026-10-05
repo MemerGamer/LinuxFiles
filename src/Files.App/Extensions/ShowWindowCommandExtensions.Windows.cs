@@ -27,7 +27,8 @@ namespace Files.App.Extensions
 		}
 
 		/// <summary>
-		/// Converts a <see cref="ShowWindowCommand"/> to the Win32 show command stored in shortcuts.
+		/// Converts a <see cref="ShowWindowCommand"/> to the Win32 show command stored in shortcuts;
+		/// <see cref="ShowWindowCommand.Default"/> maps to <see cref="SHOW_WINDOW_CMD.SW_NORMAL"/>.
 		/// </summary>
 		public static SHOW_WINDOW_CMD ToWin32(this ShowWindowCommand command)
 		{

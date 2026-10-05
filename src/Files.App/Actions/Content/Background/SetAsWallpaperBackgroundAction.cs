@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Wallpaper;
+
 namespace Files.App.Actions
 {
 	[GeneratedRichCommand]
@@ -22,6 +24,7 @@ namespace Files.App.Actions
 			=> new("\uE91B");
 
 		public override bool IsExecutable =>
+			(OperatingSystem.IsWindows() || IsWallpaperPortalAvailable) &&
 			base.IsExecutable &&
 			ContentPageContext.SelectedItem is not null;
 
@@ -29,6 +32,9 @@ namespace Files.App.Actions
 		{
 			if (!IsExecutable || ContentPageContext.SelectedItem is not ListedItem selectedItem)
 				return Task.CompletedTask;
+
+			if (!OperatingSystem.IsWindows())
+				return SetThroughPortalAsync(selectedItem.ItemPath!, WallpaperTarget.Background);
 
 			try
 			{

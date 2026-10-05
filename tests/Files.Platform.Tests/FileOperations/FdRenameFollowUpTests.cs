@@ -115,6 +115,50 @@ namespace Files.Platform.Tests.FileOperations
 		}
 
 		[TestMethod]
+		[DataRow("enoent")]
+		[DataRow("replaced")]
+		public async Task SourceUnlinkFailure_SourceGoneOrChanged_SkipsRollback(string mode)
+		{
+			var source = Write(Path.Combine(Src, "entry"), "data");
+			var destination = Path.Combine(Src, "renamed");
+			var service = new LinuxFileOperationsService(null, new LinuxFileOperationsHooks
+			{
+				RenameError = (_, _, _) => 38,
+				RenameUnlinkError = name =>
+				{
+					if (name == "entry")
+					{
+						if (mode == "enoent")
+						{
+							File.Delete(source);
+							return 2; // ENOENT
+						}
+						else if (mode == "replaced")
+						{
+							File.Delete(source);
+							Write(source, "new-data");
+							return 13; // Error, e.g. EACCES
+						}
+					}
+					return 13; // For unexpected calls
+				},
+			});
+
+			var result = await service.RenameAsync(source, "renamed");
+
+			Assert.IsFalse(result.Succeeded);
+			
+			// Rollback is skipped, so destination remains
+			Assert.IsTrue(File.Exists(destination));
+			Assert.AreEqual("data", File.ReadAllText(destination));
+
+			if (mode == "enoent")
+				Assert.IsFalse(File.Exists(source));
+			else
+				Assert.AreEqual("new-data", File.ReadAllText(source));
+		}
+
+		[TestMethod]
 		public async Task SourceUnlinkPermissionDenied_RollsBackDestination()
 		{
 			if (RunningAsRoot())

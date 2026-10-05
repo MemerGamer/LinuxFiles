@@ -837,7 +837,14 @@ namespace Files.App.ViewModels.UserControls
 		{
 			// POSIX paths are already normalized; the Windows separator rewrite would corrupt them.
 			if (!OperatingSystem.IsWindows())
-				return currentInput;
+			{
+				// A trailing separator (e.g. "/etc/") is not part of the folder path
+				if (isFtp || !currentInput.EndsWith('/') || currentInput.Length == 1)
+					return currentInput;
+
+				var trimmed = currentInput.TrimEnd('/');
+				return trimmed.Length == 0 ? "/" : trimmed;
+			}
 
 			if (currentInput.Contains('/') && !isFtp)
 				currentInput = currentInput.Replace('/', '\\');

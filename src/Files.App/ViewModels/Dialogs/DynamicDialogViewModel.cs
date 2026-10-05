@@ -360,7 +360,9 @@ namespace Files.App.ViewModels.Dialogs
 						var action = KeyDownAction
 							?? throw new InvalidOperationException("The key-down action has not been configured.");
 						var eventArgs = e ?? throw new ArgumentNullException(nameof(e));
-						DynamicResult = DynamicDialogResult.Cancel;
+						// Only Escape cancels; resetting on other keys (e.g. Enter) would override a Primary result
+						if (eventArgs.Key == VirtualKey.Escape)
+							DynamicResult = DynamicDialogResult.Cancel;
 						action(this, eventArgs);
 					});
 				}

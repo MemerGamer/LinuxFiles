@@ -36,16 +36,33 @@ namespace Files.Platform.Linux.Icons
 		/// </summary>
 		public static string NormalizeTransforms(string svg) => TransformAttribute.Replace(svg, ",");
 
+		/// <summary>
+		/// Renders SVG content the caller already read (not cached), so the file is never opened a second time.
+		/// </summary>
+		public static byte[]? RenderToPng(byte[] svgData, int pixelSize)
+		{
+			pixelSize = Math.Clamp(pixelSize, 8, 1024);
+			if (svgData.Length > MaxSvgBytes)
+				return null;
+
+			return Render(svg => svg.FromSvg(NormalizeTransforms(System.Text.Encoding.UTF8.GetString(svgData))), pixelSize);
+		}
+
 		private static byte[]? Render(string path, int pixelSize)
+		{
+			var fileInfo = new FileInfo(path);
+			if (!fileInfo.Exists || fileInfo.Length > MaxSvgBytes)
+				return null;
+
+			return Render(svg => svg.FromSvg(NormalizeTransforms(File.ReadAllText(path))), pixelSize);
+		}
+
+		private static byte[]? Render(Func<SKSvg, SKPicture?> load, int pixelSize)
 		{
 			try
 			{
 				using var svg = new SKSvg();
-				var fileInfo = new FileInfo(path);
-				if (!fileInfo.Exists || fileInfo.Length > MaxSvgBytes)
-					return null;
-
-				if (svg.FromSvg(NormalizeTransforms(File.ReadAllText(path))) is not { } picture)
+				if (load(svg) is not { } picture)
 					return null;
 
 				var bounds = picture.CullRect;

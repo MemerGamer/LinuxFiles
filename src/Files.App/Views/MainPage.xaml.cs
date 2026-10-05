@@ -69,7 +69,8 @@ namespace Files.App.Views
 
 			if (AppLanguageHelper.IsPreferredLanguageRtl)
 			{
-				Win32Helper.EnableRtlLayout(MainWindow.Instance.WindowHandle);
+				if (OperatingSystem.IsWindows())
+					Win32Helper.EnableRtlLayout(MainWindow.Instance.WindowHandle);
 				FlowDirection = FlowDirection.RightToLeft;
 			}
 
@@ -153,7 +154,7 @@ namespace Files.App.Views
 		// Caption regions live in a dedicated child window
 		private void AttachTitleBarMessageMonitor()
 		{
-			if (_titleBarMessageMonitor is not null)
+			if (!OperatingSystem.IsWindows() || _titleBarMessageMonitor is not null)
 				return;
 
 			var titleBarHwnd = PInvoke.FindWindowEx(new(MainWindow.Instance.WindowHandle), HWND.Null, "InputNonClientPointerSource", null);

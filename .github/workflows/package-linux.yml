@@ -2,8 +2,9 @@
 # Licensed under the MIT License.
 
 # Abstract:
-#   Publishes a self-contained linux-x64 build of Files and uploads it as a tarball artifact.
-#   Triggered manually or by pushing a linux-v* tag. Uses no secrets.
+#   Publishes a self-contained linux-x64 build of Files and packages it as a tarball, AppImage, Flatpak
+#   bundle and AUR (linuxfiles-bin) recipe. Triggered manually or by pushing a linux-v* tag, which also
+#   creates a GitHub release with the artifacts. Uses no secrets beyond the workflow token.
 
 name: Package Linux
 
@@ -49,13 +50,59 @@ jobs:
 
     - name: Bundle packaging files
       run: |
-        tar -C packaging -czf artifacts/files-packaging.tar.gz linux
+        cp LICENSE-MIT packaging/LICENSE-MIT
+        tar -C packaging -czf artifacts/files-packaging.tar.gz linux LICENSE-MIT
 
-    - name: Upload tarball
+    - name: Build AppImage
+      run: packaging/linux/appimage/build-appimage.sh
+
+    - name: Install Flatpak tooling
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y flatpak flatpak-builder
+        sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+        sudo flatpak install -y --noninteractive flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
+
+    - name: Build Flatpak bundle
+      run: scripts/linux/build-flatpak.sh --bundle
+
+    - name: Render AUR recipe
+      if: startsWith(github.ref, 'refs/tags/linux-v')
+      run: scripts/linux/gen-aur.sh "${GITHUB_REF_NAME#linux-v}" artifacts artifacts/aur
+
+    - name: Upload packages
       uses: actions/upload-artifact@v4
       with:
         name: files-linux-x64
         path: |
           artifacts/files-linux-x64.tar.gz
           artifacts/files-packaging.tar.gz
+          artifacts/Files-x86_64.AppImage
+          artifacts/Files-x86_64.flatpak
+          artifacts/aur/PKGBUILD
+          artifacts/aur/.SRCINFO
+        include-hidden-files: true
         if-no-files-found: error
+
+  release:
+
+    if: startsWith(github.ref, 'refs/tags/linux-v')
+    needs: package-linux-x64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+
+    - name: Download packages
+      uses: actions/download-artifact@v4
+      with:
+        name: files-linux-x64
+        path: dist
+
+    - name: Create GitHub release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes \
+          dist/files-linux-x64.tar.gz dist/files-packaging.tar.gz dist/Files-x86_64.AppImage dist/Files-x86_64.flatpak

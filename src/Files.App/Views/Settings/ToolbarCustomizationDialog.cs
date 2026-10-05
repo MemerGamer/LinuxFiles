@@ -28,7 +28,15 @@ namespace Files.App.Views.Settings
 			themeService.SetAppThemeMode(window, window.AppWindow.TitleBar, themeService.AppThemeMode, callThemeModeChangedEvent: false);
 
 			// Move window to cursor position, matching properties window behavior
-			PInvoke.GetCursorPos(out var pointerPosition);
+			var pointerPosition = default(System.Drawing.Point);
+			var hasCursor = OperatingSystem.IsWindows() && PInvoke.GetCursorPos(out pointerPosition);
+			if (!hasCursor)
+			{
+				window.AppWindow.Show();
+				window.Activate();
+				return;
+			}
+
 			var displayArea = DisplayArea.GetFromPoint(new PointInt32 { X = pointerPosition.X, Y = pointerPosition.Y }, DisplayAreaFallback.Nearest);
 			var appWindow = window.AppWindow;
 			appWindow.Move(new PointInt32

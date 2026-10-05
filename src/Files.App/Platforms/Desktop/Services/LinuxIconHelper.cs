@@ -6,8 +6,10 @@ using Files.Platform.Abstractions.Icons;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Abstractions.Thumbnails;
 using Files.Platform.Linux.Icons;
+using Files.Platform.Linux.Mime;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
 
 namespace Files.App.Utils.Storage
@@ -29,6 +31,13 @@ namespace Files.App.Utils.Storage
 		{
 			try
 			{
+				if (!isFolder && DesktopEntryDisplay.IsDesktopFile(path) && !options.HasFlag(IconOptions.ReturnOnlyIfCached))
+				{
+					var desktopIcon = await GetDesktopEntryIconAsync(path!, size);
+					if (desktopIcon is not null)
+						return desktopIcon;
+				}
+
 				if (!string.IsNullOrEmpty(path) && !isFolder && !options.HasFlag(IconOptions.ReturnIconOnly))
 				{
 					var thumbnail = await Thumbnails.GetThumbnailAsync(
@@ -88,6 +97,46 @@ namespace Files.App.Utils.Storage
 			catch (Exception ex) when (ex is not OperationCanceledException)
 			{
 				App.Logger?.LogDebug(ex, "Icon overlay lookup failed");
+				return null;
+			}
+		}
+
+		private const int MaxIconFileSize = 4 * 1024 * 1024;
+
+		// Display only. The Icon value is untrusted: only theme names, or image files under the standard icon directories
+		// that are regular files within the size budget, are rendered; anything else falls back to the generic icon.
+		private static async Task<byte[]?> GetDesktopEntryIconAsync(string path, uint size)
+		{
+			var icon = await Task.Run(() => DesktopEntryDisplay.TryRead(path, CultureInfo.CurrentUICulture)?.Icon);
+
+			if (DesktopEntryDisplay.IsSafeIconName(icon))
+				return await LoadThemeIconAsync([icon!], size);
+
+			if (DesktopEntryDisplay.IsAllowedIconPath(icon, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), out var iconPath))
+				return await Task.Run(() => LoadIconFile(iconPath, size));
+
+			return null;
+		}
+
+		private static byte[]? LoadIconFile(string iconPath, uint size)
+		{
+			try
+			{
+				byte[]? data;
+				using (var stream = Files.Platform.Linux.Previews.PreviewFile.OpenRead(iconPath))
+					data = DesktopEntryDisplay.ReadBounded(stream, MaxIconFileSize);
+
+				if (data is null)
+					return null;
+
+				if (iconPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+					return SvgRasterizer.RenderToPng(data, (int)size);
+
+				// PNG signature
+				return data.Length > 8 && data[0] == 0x89 && data[1] == (byte)'P' && data[2] == (byte)'N' && data[3] == (byte)'G' ? data : null;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
 				return null;
 			}
 		}

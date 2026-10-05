@@ -572,7 +572,7 @@
 				</VisualState>
 			</VisualStateGroup>
 			<VisualStateGroup>
-				<VisualState>
+				<VisualState x:Name="DetailsTab">
 					<VisualState.StateTriggers>
 						<triggers:IsEqualStateTrigger Value="{x:Bind ViewModel.SelectedTab, Mode=OneWay}" To="Details" />
 					</VisualState.StateTriggers>
@@ -582,7 +582,7 @@
 						<Setter Target="PropertiesColumn.Width" Value="3*" />
 					</VisualState.Setters>
 				</VisualState>
-				<VisualState>
+				<VisualState x:Name="PreviewTab">
 					<VisualState.StateTriggers>
 						<triggers:IsEqualStateTrigger Value="{x:Bind ViewModel.SelectedTab, Mode=OneWay}" To="Preview" />
 					</VisualState.StateTriggers>

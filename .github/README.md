@@ -15,6 +15,14 @@
 
 Files is a modern file manager that helps users organize their files and folders. Our mission with Files is to build the best file manager for Windows, and we’re proud to be building it out in the open so everyone can participate. User feedback helps shape the features we work on, & the bug reports on GitHub help to make Files more reliable. Built and maintained by the open-source community, Files features robust multitasking experiences, file tags, deep integrations, and an intuitive design.
 
+## Linux port: current state
+
+This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. Folder listings are the main missing piece. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.
+
+<p align="center">
+  <img alt="Files on Linux: Home page" src="../docs/linux-port/showcase/home.png" width="720" />
+</p>
+
 ## Installing and running Files
 
 Files is a community-driven project that depends on your support to grow and improve. Please consider purchasing Files through the Microsoft Store or supporting us on GitHub if you use the classic installer.

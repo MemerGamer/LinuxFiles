@@ -5,7 +5,8 @@
 # Usage: headless-run.sh [-s seconds] [-o outdir] [-a actions-file] [-- app args...]
 #   actions-file: one xdotool command per line (e.g. "mousemove 100 200 click 1", "key ctrl+l",
 #                 "type /etc", "sleep 2", "shot name", "run <cmd args>" = run a helper with DISPLAY set to the private display), run against the private display.
-# Env: FILES_BIN (default src/Files.App/bin/Debug/net10.0-desktop), XVFB_SIZE (default 1600x1000).
+# Env: FILES_SANDBOX_SEED (optional script run as "script <sandbox-home>" after the default sample content is created),
+#      FILES_BIN (default src/Files.App/bin/Debug/net10.0-desktop), XVFB_SIZE (default 1600x1000).
 set -euo pipefail
 
 seconds=25
@@ -61,10 +62,13 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	printf '#!/bin/sh\necho hi\n' >"$home/Downloads/script.sh"
 	head -c 2048 /dev/urandom >"$home/Downloads/archive.bin"
 	ln -sf "$home/Documents" "$home/Desktop/Documents link"
+	[[ -n "${FILES_SANDBOX_SEED:-}" ]] && "$FILES_SANDBOX_SEED" "$home"
 	mkdir -p -m 0700 "$home/.runtime"
+	# An empty mount table keeps the real machine's drive labels out of the sidebar and Home (honoured by DriveHelpers.GetMounts).
+	: >"$home/.mountinfo"
 	# Never reach the real system bus (UDisks2 could mount/unmount real disks) or the real gvfs/runtime dir.
 	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache" \
-		XDG_RUNTIME_DIR="$home/.runtime" DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent" GIO_USE_VFS=local GVFS_DISABLE_FUSE=1)
+		XDG_RUNTIME_DIR="$home/.runtime" DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent" GIO_USE_VFS=local GVFS_DISABLE_FUSE=1 FILES_HEADLESS_MOUNTINFO="$home/.mountinfo")
 fi
 
 # Private D-Bus session: notifications, portals and app launches never reach the real desktop session.

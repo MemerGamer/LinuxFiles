@@ -94,6 +94,15 @@ if [[ -n "$actions" ]]; then
 		case "$line" in
 			sleep\ *) sleep "${line#sleep }" ;;
 			shot\ *) shot "${line#shot }" ;;
+			exec\ *) # Runs ONE program (TAB-separated argv so arguments may contain spaces; no shell, no expansion) in the sandboxed HOME with a scrubbed
+				# environment, "exec " then the program and its arguments separated by TABs, e.g. exec touch<TAB>Documents/new report.txt. Never sees the caller's display, D-Bus or XDG variables.
+				[[ "${FILES_REAL_HOME:-0}" == "1" ]] && { echo "exec: refused with FILES_REAL_HOME=1" >&2; continue; }
+				IFS=$'\t' read -ra exec_argv <<<"${line#exec }"
+				[[ ${#exec_argv[@]} -eq 0 ]] && continue
+				(cd "$home" && env -i PATH="$PATH" HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" \
+					XDG_CACHE_HOME="$home/.cache" XDG_RUNTIME_DIR="$home/.runtime" DISPLAY=":$display" \
+					DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent" DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent" \
+					GIO_USE_VFS=local GVFS_DISABLE_FUSE=1 "${exec_argv[@]}") ;;
 			focus) focus_files ;;
 			run\ *) # a helper program on the private display (e.g. an X clipboard client); word-split on purpose
 				# shellcheck disable=SC2086

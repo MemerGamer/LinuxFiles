@@ -210,7 +210,7 @@
 					IsDoubleTapEnabled="True"
 					IsRightTapEnabled="True"
 					IsTabStop="True"
-					ItemsSource="{x:Bind CollectionViewSource.View, Mode=OneWay}"
+					ItemsSource="{x:Bind LayoutItemsSource, Mode=OneWay}"
 					Loaded="FileList_Loaded"
 					PointerPressed="FileList_PointerPressed"
 					PreviewKeyDown="FileList_PreviewKeyDown"

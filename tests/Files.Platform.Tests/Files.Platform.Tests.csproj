@@ -6,6 +6,7 @@
         <IsPackable>false</IsPackable>
         <Nullable>enable</Nullable>
         <Configurations>Debug;Release</Configurations>
+        <DefineConstants>$(DefineConstants);DESKTOP</DefineConstants>
         <Platforms>x86;x64;arm64</Platforms>
         <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
         <OutputType>Exe</OutputType>
@@ -13,6 +14,9 @@
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+        <PackageReference Include="UTF.Unknown" />
+        <PackageReference Include="ColorCode.Core" />
+        <PackageReference Include="TagLibSharp" />
         <PackageReference Include="MSTest.TestAdapter" />
         <PackageReference Include="MSTest.TestFramework" />
         <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
@@ -21,6 +25,13 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
         <ProjectReference Include="..\..\src\Files.Platform.Linux\Files.Platform.Linux.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewTextReader.cs" Link="Previews/PreviewTextReader.cs" />
+        <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/CodeLanguageMap.cs" Link="Previews/CodeLanguageMap.cs" />
+        <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewCodeTokenizer.cs" Link="Previews/PreviewCodeTokenizer.cs" />
+        <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewImageDecoder.cs" Link="Previews/PreviewImageDecoder.cs" />
     </ItemGroup>
 
 </Project>

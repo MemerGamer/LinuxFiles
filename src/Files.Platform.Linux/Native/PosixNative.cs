@@ -52,7 +52,7 @@ namespace Files.Platform.Linux.Native
 		private const uint StatxMountId = 0x1000;
 		private const int StatxBufferSize = 256;
 
-		private const int ONonblock = 0x800;
+		public const int ONonblock = 0x800;
 		private const int OCloexec = 0x80000;
 
 		private const int ENOENT = 2;
@@ -165,6 +165,18 @@ namespace Files.Platform.Linux.Native
 			return fd;
 		}
 
+		/// <summary>Checks the type of an open descriptor using statx.</summary>
+		public static bool IsRegularFile(int fd)
+			=> TryStat(fd, out var stat) && stat.IsRegularFile;
+
+		public static void ClearNonBlocking(int fd)
+		{
+			const int getFlags = 3, setFlags = 4;
+			var flags = fcntl(fd, getFlags, 0);
+			if (flags < 0 || fcntl(fd, setFlags, flags & ~ONonblock) < 0)
+				throw CreateException(Marshal.GetLastPInvokeError(), "preview descriptor");
+		}
+
 		public static void Close(int fd) => _ = close(fd);
 
 		/// <summary>Creates a directory with mode 0700 relative to <paramref name="dirfd"/>; false (errno set) on failure.</summary>
@@ -250,6 +262,9 @@ namespace Files.Platform.Linux.Native
 				1 or 13 or 30 => new UnauthorizedAccessException($"Access to '{path}' is denied."),
 				_ => new IOException($"The operation on '{path}' failed with errno {errno}.", errno),
 			};
+
+		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]
+		private static partial int fcntl(int fd, int command, int argument);
 
 		[LibraryImport("libc", EntryPoint = "statx", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int statx(int dirfd, string pathname, int flags, uint mask, byte* statxbuf);

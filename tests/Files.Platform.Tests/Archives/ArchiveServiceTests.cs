@@ -78,6 +78,41 @@ namespace Files.Platform.Tests.Archives
 			Assert.AreEqual(0, Directory.GetFileSystemEntries(Out, "*", SearchOption.AllDirectories).Length, "destination must stay empty, staging removed");
 		}
 
+		[TestMethod]
+		public async Task PreviewListsUntrustedNamesWithoutExtracting()
+		{
+			var archive = ZipWith(Path.Combine(Work, "preview.zip"), ("../evil.txt", Bytes("no extraction")), ("normal.txt", Bytes("text")));
+			var listing = await service.ListPreviewAsync(archive);
+			Assert.HasCount(2, listing.Entries);
+			Assert.IsTrue(listing.Entries.Any(e => e.Path == "../evil.txt"));
+			AssertNothingEscaped();
+			Assert.HasCount(1, Directory.GetFileSystemEntries(Work));
+		}
+
+		[TestMethod]
+		public async Task PreviewRejectsExcessiveEntryCount()
+		{
+			var path = Path.Combine(Work, "many.zip");
+			using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+				for (var i = 0; i <= 10000; i++)
+					zip.CreateEntry(i.ToString());
+			await Assert.ThrowsAsync<InvalidDataException>(() => service.ListPreviewAsync(path));
+			AssertNothingEscaped();
+		}
+
+		[TestMethod]
+		public async Task PreviewRejectsExpandedTarBomb()
+		{
+			var path = Path.Combine(Work, "bomb.tar.gz");
+			using (var file = File.Create(path))
+			using (var gzip = new GZipStream(file, CompressionLevel.Fastest))
+			using (var writer = new TarWriter(gzip, leaveOpen: true))
+			using (var data = new MemoryStream(new byte[65 * 1024 * 1024]))
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "large") { DataStream = data });
+			await Assert.ThrowsAsync<InvalidDataException>(() => service.ListPreviewAsync(path));
+			AssertNothingEscaped();
+		}
+
 		// ---- create and extract round trips ----
 
 		[TestMethod]

@@ -21,7 +21,8 @@ namespace Files.App.Utils.Storage
 	internal static class LinuxIconHelper
 	{
 		private static readonly ConcurrentDictionary<(string Name, uint Size), byte[]?> _themeCache = new();
-		private static readonly ConcurrentDictionary<string, string[]> _mimeIconNames = new(StringComparer.Ordinal);
+		private static readonly ConcurrentDictionary<string, (string[] Names, long At)> _mimeIconNames = new(StringComparer.Ordinal);
+		private const long MimeIconNamesTtlMs = 5000;
 
 		private static IThumbnailService Thumbnails => Ioc.Default.GetRequiredService<IThumbnailService>();
 		private static IIconThemeProvider Theme => Ioc.Default.GetRequiredService<IIconThemeProvider>();
@@ -118,12 +119,14 @@ namespace Files.App.Utils.Storage
 			}
 
 			var mimeType = await Mime.GetMimeTypeAsync(path);
-			if (_mimeIconNames.TryGetValue(mimeType, out var cached))
-				return cached;
+			if (_mimeIconNames.TryGetValue(mimeType, out var cached) && Environment.TickCount64 - cached.At < MimeIconNamesTtlMs)
+				return cached.Names;
 
 			var iconName = await Mime.GetIconNameAsync(mimeType);
 			var generic = await Mime.GetGenericIconNameAsync(mimeType);
-			return _mimeIconNames[mimeType] = [iconName, generic, "text-x-generic", "unknown"];
+			string[] names = [iconName, generic, "text-x-generic", "unknown"];
+			_mimeIconNames[mimeType] = (names, Environment.TickCount64);
+			return names;
 		}
 
 		private static string? GetSpecialFolderIconName(string? path)

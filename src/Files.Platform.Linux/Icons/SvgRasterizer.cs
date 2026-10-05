@@ -43,6 +43,7 @@ namespace Files.Platform.Linux.Icons
 			try
 			{
 				using var svg = new SKSvg();
+				svg.Settings.TypefaceProviders = [new CachingTypefaceProvider(svg.Settings.TypefaceProviders)];
 				if (load(svg) is not { } picture)
 					return null;
 

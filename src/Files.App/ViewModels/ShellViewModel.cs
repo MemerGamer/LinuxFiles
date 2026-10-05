@@ -1135,6 +1135,17 @@ namespace Files.App.ViewModels
 							if (addFilesCTS.IsCancellationRequested || FilesAndFoldersFilter != filter)
 								return;
 
+#if !WINDOWS
+							// A few watcher changes must not rebuild (and visibly blank) the whole list
+							if (TryApplyIncrementalDisplayChanges(displayedFilesAndFolders))
+							{
+								UpdateEmptyTextType();
+								UpdateNetworkAvailabilityInfoBar();
+								DirectoryInfoUpdated?.Invoke(this, EventArgs.Empty);
+								return;
+							}
+#endif
+
 							FilesAndFolders.BeginBulkOperation();
 							try
 							{

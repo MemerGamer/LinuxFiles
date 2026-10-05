@@ -457,6 +457,41 @@ namespace Files.App.ViewModels
 		}
 
 		/// <summary>
+		/// Brings <see cref="FilesAndFolders"/> to <paramref name="desired"/> with individual remove and insert notifications when only
+		/// a few items differ and the rest keep their order. Returns false when the caller must rebuild the list instead.
+		/// </summary>
+		private bool TryApplyIncrementalDisplayChanges(List<ListedItem> desired)
+		{
+			const int MaxIncrementalChanges = 64;
+
+			if (folderSettings.DirectoryGroupOption != GroupOption.None || FilesAndFolders.Count == 0)
+				return false;
+
+			var current = FilesAndFolders.ToList();
+			var currentSet = new HashSet<ListedItem>(current);
+			var desiredSet = new HashSet<ListedItem>(desired);
+			var removed = current.Where(i => !desiredSet.Contains(i)).ToList();
+			var added = desired.Count(i => !currentSet.Contains(i));
+			if (removed.Count + added > MaxIncrementalChanges)
+				return false;
+
+			// Items present on both sides must already be in the same relative order (no sort change)
+			if (!current.Where(desiredSet.Contains).SequenceEqual(desired.Where(currentSet.Contains)))
+				return false;
+
+			foreach (var item in removed)
+				FilesAndFolders.Remove(item);
+
+			for (var i = 0; i < desired.Count; i++)
+			{
+				if (!currentSet.Contains(desired[i]))
+					FilesAndFolders.Insert(i, desired[i]);
+			}
+
+			return true;
+		}
+
+		/// <summary>
 		/// Applies a burst of watcher events as add, remove, rename and update operations on the existing items. Falls back to a
 		/// full reload when events were lost or the burst was too large.
 		/// </summary>

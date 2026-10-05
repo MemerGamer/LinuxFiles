@@ -31,6 +31,21 @@ namespace Files.Platform.Tests.Mime
 		}
 
 		[TestMethod]
+		public async Task MimeXml_InstalledAfterFirstLookup_IsPickedUp()
+		{
+			using var fx = new XdgFixture();
+			fx.Write("usr-share/mime/globs2", Globs2);
+			var svc = new LinuxMimeTypeService(fx.Directories, CultureInfo.GetCultureInfo("en-US")) { RecheckInterval = System.TimeSpan.Zero };
+
+			Assert.AreEqual("application-x-newtype", await svc.GetIconNameAsync("application/x-newtype"));
+
+			fx.Write("usr-share/mime/application/x-newtype.xml",
+				"<mime-type xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\" type=\"application/x-newtype\"><icon name=\"custom-icon\"/></mime-type>");
+
+			Assert.AreEqual("custom-icon", await svc.GetIconNameAsync("application/x-newtype"));
+		}
+
+		[TestMethod]
 		public async Task Glob_SimpleExtension_CaseInsensitive()
 		{
 			using var fx = new XdgFixture();

@@ -32,7 +32,10 @@ namespace Files.Platform.Linux.Mime
 		private readonly XdgDirectories xdg;
 		private readonly CultureInfo culture;
 		private readonly Lazy<GlobIndex> globs;
-		private readonly ConcurrentDictionary<string, XElement?> mimeXmlCache = new(StringComparer.Ordinal);
+		private readonly ConcurrentDictionary<string, MimeXmlEntry> mimeXmlCache = new(StringComparer.Ordinal);
+
+
+		private sealed record MimeXmlEntry(XElement? Root, string? File, DateTime LastWriteUtc, long CheckedAt);
 
 		private sealed record GlobEntry(int Order, int Weight, string MimeType, string Pattern, string LowerPattern, bool CaseSensitive, bool IsLiteral)
 		{
@@ -133,6 +136,11 @@ namespace Files.Platform.Linux.Mime
 			this.culture = culture;
 			globs = new(() => new GlobIndex(LoadGlobs()));
 		}
+
+		/// <summary>
+		/// Gets how long a cached MIME XML (or a miss) is trusted before the file is checked again, so newly installed types appear without a restart.
+		/// </summary>
+		public TimeSpan RecheckInterval { get; init; } = TimeSpan.FromSeconds(5);
 
 		/// <inheritdoc/>
 		public async Task<string> GetMimeTypeAsync(string path, CancellationToken cancellationToken = default)
@@ -357,13 +365,43 @@ namespace Files.Platform.Linux.Mime
 			}
 		}
 
-		private XElement? LoadMimeXml(string mimeType) =>
-			mimeXmlCache.GetOrAdd(mimeType, static (type, self) => self.ReadMimeXml(type), this);
+		private XElement? LoadMimeXml(string mimeType)
+		{
+			var now = Environment.TickCount64 * TimeSpan.TicksPerMillisecond;
+			if (mimeXmlCache.TryGetValue(mimeType, out var entry))
+			{
+				if (now - entry.CheckedAt < RecheckInterval.Ticks)
+					return entry.Root;
 
-		private XElement? ReadMimeXml(string mimeType)
+				// Hit: keep it while the file is unchanged. Miss: probe again.
+				if (entry.File is not null && TryGetWriteTime(entry.File) == entry.LastWriteUtc)
+				{
+					mimeXmlCache[mimeType] = entry with { CheckedAt = now };
+					return entry.Root;
+				}
+			}
+
+			var (root, file) = ReadMimeXml(mimeType);
+			mimeXmlCache[mimeType] = new MimeXmlEntry(root, file, file is null ? default : TryGetWriteTime(file), now);
+			return root;
+		}
+
+		private static DateTime TryGetWriteTime(string file)
+		{
+			try
+			{
+				return File.GetLastWriteTimeUtc(file);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return default;
+			}
+		}
+
+		private (XElement? Root, string? File) ReadMimeXml(string mimeType)
 		{
 			if (mimeType.Contains("..", StringComparison.Ordinal) || mimeType.Split('/').Length != 2)
-				return null;
+				return (null, null);
 
 			foreach (var dir in xdg.AllDataDirs)
 			{
@@ -373,14 +411,14 @@ namespace Files.Platform.Linux.Mime
 
 				try
 				{
-					return XDocument.Load(file).Root;
+					return (XDocument.Load(file).Root, file);
 				}
 				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Xml.XmlException)
 				{
 				}
 			}
 
-			return null;
+			return (null, null);
 		}
 
 		private static bool IsDanglingSymbolicLink(string path)

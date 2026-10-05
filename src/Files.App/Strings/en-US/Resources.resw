@@ -4931,4 +4931,7 @@
   <data name="OpenTerminalLinux" xml:space="preserve">
     <value>Open in terminal</value>
   </data>
+  <data name="LinuxBrokenLink" xml:space="preserve">
+    <value>Broken link</value>
+  </data>
 </root>

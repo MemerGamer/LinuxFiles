@@ -6,8 +6,10 @@ using Files.Platform.Abstractions.Icons;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Abstractions.Thumbnails;
 using Files.Platform.Linux.Icons;
+using Files.Platform.Linux.Mime;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO;
 
 namespace Files.App.Utils.Storage
@@ -29,6 +31,13 @@ namespace Files.App.Utils.Storage
 		{
 			try
 			{
+				if (!isFolder && DesktopEntryDisplay.IsDesktopFile(path) && !options.HasFlag(IconOptions.ReturnOnlyIfCached))
+				{
+					var desktopIcon = await GetDesktopEntryIconAsync(path!, size);
+					if (desktopIcon is not null)
+						return desktopIcon;
+				}
+
 				if (!string.IsNullOrEmpty(path) && !isFolder && !options.HasFlag(IconOptions.ReturnIconOnly))
 				{
 					var thumbnail = await Thumbnails.GetThumbnailAsync(
@@ -57,6 +66,13 @@ namespace Files.App.Utils.Storage
 				App.Logger?.LogDebug(ex, "Icon lookup failed");
 				return null;
 			}
+		}
+
+		// Display only: the entry's Icon is looked up in the theme, nothing in the file is executed
+		private static async Task<byte[]?> GetDesktopEntryIconAsync(string path, uint size)
+		{
+			var icon = await Task.Run(() => DesktopEntryDisplay.TryRead(path, CultureInfo.CurrentUICulture)?.Icon);
+			return icon is null ? null : await LoadThemeIconAsync([icon], size);
 		}
 
 		private static async Task<IReadOnlyList<string>> GetIconNamesAsync(string? path, bool isFolder)

@@ -64,7 +64,7 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
-		public async Task BigTarGzListsWithinCapsButNotForBrowsing()
+		public async Task BigTarGzListsWithinCapsAndForBrowsing()
 		{
 			var path = Path.Combine(root, "big.tar.gz");
 			var tarPath = Path.Combine(root, "big.tar");
@@ -83,7 +83,38 @@ namespace Files.Platform.Tests.Archives
 			Assert.AreEqual(2, listing.Entries.Count);
 			Assert.IsFalse(await service.IsEncryptedAsync(path));
 			Assert.IsFalse(await service.HasMultipleTopLevelEntriesAsync(path));
-			await Assert.ThrowsAsync<ArchiveSecurityException>(() => service.ListForBrowsingAsync(path));
+			Assert.AreEqual(2, (await service.ListForBrowsingAsync(path)).Entries.Count);
+		}
+
+		[TestMethod]
+		public async Task GitArchiveStyleTarWithGlobalHeaderLists()
+		{
+			var path = Path.Combine(root, "src.tar.gz");
+			using (var file = File.Create(path))
+			using (var gzip = new GZipStream(file, CompressionLevel.Fastest))
+			using (var tar = new TarWriter(gzip, TarEntryFormat.Pax))
+			{
+				tar.WriteEntry(new PaxGlobalExtendedAttributesTarEntry(new Dictionary<string, string> { ["comment"] = "0123abcd" }));
+				tar.WriteEntry(new PaxTarEntry(TarEntryType.Directory, "proj/"));
+				tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "proj/a.txt") { DataStream = new MemoryStream([1, 2]) });
+			}
+			var listing = await service.ListForBrowsingAsync(path);
+			CollectionAssert.AreEquivalent(new[] { "proj/", "proj/a.txt" }, listing.Entries.Select(e => e.Path.TrimEnd('/') + (e.IsDirectory ? "/" : "")).ToArray());
+			Assert.IsFalse(await service.HasMultipleTopLevelEntriesAsync(path));
+		}
+
+		[TestMethod]
+		public async Task LargeDeclaredSizeZipIsBrowsable()
+		{
+			var path = Path.Combine(root, "large.zip");
+			using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+			{
+				using var stream = zip.CreateEntry("zeros.bin", CompressionLevel.SmallestSize).Open();
+				var block = new byte[1024 * 1024];
+				for (var i = 0; i < 80; i++)
+					stream.Write(block);
+			}
+			Assert.AreEqual(1, (await service.ListForBrowsingAsync(path)).Entries.Count);
 		}
 
 		private sealed class ZeroStream : Stream

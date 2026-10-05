@@ -91,6 +91,9 @@ namespace Files.App.Views.Layouts
 		{
 			InitializeComponent();
 #if !WINDOWS
+			HeaderGrid.Margin = new Thickness(0);
+			HeaderGrid.Padding = new Thickness(16, 0, 0, 0);
+			ActualThemeChanged += (_, _) => UpdateLinuxListTheme();
 			HoistSemanticZoomContent(RootGridZoom);
 #endif
 			DataContext = this;
@@ -791,6 +794,14 @@ namespace Files.App.Views.Layouts
 				itemContainer.ContextFlyout = ItemContextMenuFlyout;
 		}
 
+#if !WINDOWS
+		private void UpdateLinuxListTheme()
+		{
+			FileList.RequestedTheme = ActualTheme;
+			HeaderGrid.RequestedTheme = ActualTheme;
+		}
+#endif
+
 		private void Grid_PointerPressed(object sender, PointerRoutedEventArgs e)
 		{
 			// This prevents the drag selection rectangle from appearing when resizing the columns
@@ -1080,6 +1091,9 @@ namespace Files.App.Views.Layouts
 
 		private void FileList_Loaded(object sender, RoutedEventArgs e)
 		{
+#if !WINDOWS
+			UpdateLinuxListTheme();
+#endif
 			ContentScroller = FileList.FindDescendant<ScrollViewer>(x => x.Name == "ScrollViewer");
 			const double OffsetCorrection = 88; // HeaderGrid (40) + ListViewHeaderItem (44 + 4 margin)
 

@@ -87,7 +87,7 @@ namespace Files.Platform.Linux.Icons
 	public sealed class LinuxIconThemeProvider : IIconThemeProvider
 	{
 		private static readonly string[] FallbackThemes = ["Adwaita", "breeze", "gnome", "Papirus"];
-		private static readonly string[] Extensions = [".png", ".svg", ".xpm"];
+		private static readonly string[] Extensions = [".svg", ".png", ".xpm"];
 
 		private readonly LinuxIconThemeOptions _options;
 		private readonly Lazy<string> _themeName;
@@ -202,6 +202,17 @@ namespace Files.Platform.Linux.Icons
 
 		private string? LookupInTheme(string theme, IconThemeIndex index, string name, int size, int scale)
 		{
+			// Keep the selected theme, but prefer its scalable artwork over enlarging raster frames.
+			foreach (var directory in index.Directories.Where(d => d.Type == IconDirectoryType.Scalable))
+			{
+				foreach (var baseDir in _options.IconDirectories)
+				{
+					var svg = Path.Combine(baseDir, theme, directory.Path, name + ".svg");
+					if (File.Exists(svg))
+						return svg;
+				}
+			}
+
 			string? best = null;
 			var bestDistance = int.MaxValue;
 

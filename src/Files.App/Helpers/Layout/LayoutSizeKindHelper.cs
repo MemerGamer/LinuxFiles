@@ -14,6 +14,10 @@ namespace Files.App.Helpers
 		/// <returns></returns>
 		public static uint GetIconSize(FolderLayoutModes folderLayoutMode)
 		{
+#if !WINDOWS
+			if (folderLayoutMode == FolderLayoutModes.GridView)
+				return (uint)Math.Max(1, GetGridViewItemWidth(LayoutSettingsService.GridViewSize) - 24);
+#endif
 			return folderLayoutMode switch
 			{
 				// Details

@@ -26,6 +26,8 @@ namespace Files.App.Utils.Storage
 				: _standardSizes.FirstOrDefault(s => s >= scaledSize, _standardSizes[^1]);
 
 #if !WINDOWS
+			// Linux theme SVGs and thumbnailers accept the actual pixel size, including HiDPI cells above 256px.
+			size = Math.Clamp((uint)Math.Ceiling(scaledSize), 1u, 1024u);
 			return await LinuxIconHelper.GetIconAsync(path, size, isFolder, iconOptions, cancellationToken);
 #else
 			if (!isFolder && !iconOptions.HasFlag(IconOptions.ReturnIconOnly) && !iconOptions.HasFlag(IconOptions.ReturnOnlyIfCached))

@@ -112,6 +112,32 @@ namespace Files.Platform.Tests.Icons
 		}
 
 		[TestMethod]
+		public async Task Resolve_PrefersScalableArtworkAtLargeAndHiDpiSizes()
+		{
+			WriteTheme("Vector", "", ("48x48/places", 48, "Fixed"), ("scalable/places", 0, "Scalable"));
+			Touch("Vector", "48x48/places", "folder.png");
+			Touch("Vector", "scalable/places", "folder.svg");
+			var provider = CreateProvider("Vector");
+
+			foreach (var size in new uint[] { 196, 392, 600 })
+			{
+				var result = await provider.ResolveIconAsync("folder", size);
+				Assert.AreEqual(Path.Combine(_icons, "Vector", "scalable/places", "folder.svg"), result!.Value.Path);
+				Assert.IsTrue(result.Value.IsSvg);
+			}
+		}
+
+		[TestMethod]
+		public async Task Resolve_PrefersSvgOverRasterInSameDirectory()
+		{
+			Touch("Child", "48x48/places", "folder.svg");
+			var result = await CreateProvider().ResolveIconAsync("folder", 48);
+
+			Assert.AreEqual(Path.Combine(_icons, "Child", "48x48/places", "folder.svg"), result!.Value.Path);
+			Assert.IsTrue(result.Value.IsSvg);
+		}
+
+		[TestMethod]
 		public async Task Resolve_FollowsInheritsChain()
 		{
 			var provider = CreateProvider();

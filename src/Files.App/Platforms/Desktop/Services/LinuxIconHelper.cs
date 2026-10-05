@@ -166,6 +166,9 @@ namespace Files.App.Utils.Storage
 			if (string.IsNullOrEmpty(path))
 				return null;
 
+			if (string.Equals(path, Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.OrdinalIgnoreCase))
+				return "user-trash";
+
 			var trimmed = path.TrimEnd('/');
 			if (trimmed == Directories.Home.TrimEnd('/')) return "user-home";
 			if (trimmed == Directories.Desktop.TrimEnd('/')) return "user-desktop";

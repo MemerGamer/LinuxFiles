@@ -19,6 +19,7 @@ Attacker: controls a file's name, content, mode bits and symlinks (downloaded ar
 | 9 | Defense in depth inside the launcher: `OpenAsync` refuses executable MIME types (x-executable, x-pie-executable, x-sharedlib, appimage, x-desktop); no xdg-open fallback for files with an execute bit (also via symlink); `LaunchUriAsync` refuses `file:` URIs | `LinuxLauncherService` | `Open_ExecutableMimeTypes...`, `Open_ExecBit...`, `LaunchUri_RefusesFileUris` |
 | 10 | More than 5 files opened at once asks first; files needing a gate are processed one by one, never in the bulk default-app launch | `OpenFilesLinuxAsync` | (UI path, covered by 1-9) |
 | 11 | Dry-run seam (`FILES_LAUNCH_DRYRUN`) so automated runs spawn nothing | `DryRunProcessStarter` | n/a |
+| 12 | Drop items onto an executable: same plan as gates 1-2 (only confirmable binaries/scripts); the dialog shows the full argv (target plus every dropped path, `DisplaySanitizer.FullArguments`, refused if too large) and exactly that argv is run after the identity re-check | `NavigationHelpers.RunWithItemsLinuxAsync` | `OnlyConfirmedActionsMayRunAFile`, `DisplaySanitizerTests` |
 
 ## Review of default-open paths that could execute
 

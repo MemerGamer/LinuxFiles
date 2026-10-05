@@ -29,6 +29,7 @@ namespace Files.App.Actions
 			=> "H";
 
 		public bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			IsContextPageTypeAdaptedToCommand() &&
 			ShareItemHelpers.IsSupported() &&
 			context.SelectedItems.Any() &&
@@ -43,6 +44,9 @@ namespace Files.App.Actions
 
 		public Task ExecuteAsync(object? parameter = null)
 		{
+			if (!IsExecutable)
+				return Task.CompletedTask;
+
 			return ShareItemHelpers.ShareItemsAsync(context.SelectedItems);
 		}
 

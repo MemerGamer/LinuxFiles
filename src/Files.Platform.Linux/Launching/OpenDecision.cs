@@ -129,6 +129,11 @@ namespace Files.Platform.Linux.Launching
 		];
 
 		/// <summary>
+		/// True when running the file needs the user's explicit confirmation first (the only actions that may ever start a file's own code).
+		/// </summary>
+		public static bool NeedsRunConfirmation(OpenAction action) => action is OpenAction.RunBinaryWithConfirm or OpenAction.RunScriptWithConfirm;
+
+		/// <summary>
 		/// Maps the user's answer to the one follow-up the dialog described. Anything but an explicit Run or Display does nothing.
 		/// </summary>
 		public static FollowUp Resolve(OpenAction action, ConfirmChoice choice) => (action, choice) switch

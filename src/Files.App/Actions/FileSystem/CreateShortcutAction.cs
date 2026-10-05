@@ -24,6 +24,7 @@ namespace Files.App.Actions
 			=> new(themedIconStyle: "App.ThemedIcons.URL");
 
 		public override bool IsExecutable =>
+			Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IPlatformCapabilities>().SupportsShortcutFiles &&
 			context.HasSelection &&
 			context.CanCreateItem &&
 			UIHelpers.CanShowDialog;
@@ -37,6 +38,9 @@ namespace Files.App.Actions
 
 		public Task ExecuteAsync(object? parameter = null)
 		{
+			if (!IsExecutable)
+				return Task.CompletedTask;
+
 			return UIFilesystemHelpers.CreateShortcutAsync(context.ShellPage, context.SelectedItems);
 		}
 

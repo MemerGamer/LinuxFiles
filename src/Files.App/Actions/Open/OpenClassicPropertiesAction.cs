@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 using System.Runtime.InteropServices;
-using Windows.Win32;
-using Windows.Win32.UI.Shell;
 
 namespace Files.App.Actions
 {
@@ -43,31 +41,12 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
+#if !WINDOWS
+		// LINUX-TODO(properties): the Windows shell properties command is hidden on Linux.
 		public Task ExecuteAsync(object? parameter = null)
-		{
-			if (context.HasSelection && context?.SelectedItem?.ItemPath is not null)
-				ExecuteShellCommand(context.SelectedItem.ItemPath);
-			else if (context?.Folder?.ItemPath is not null)
-				ExecuteShellCommand(context.Folder.ItemPath);
+			=> Task.CompletedTask;
+#endif
 
-			return Task.CompletedTask;
-		}
-
-		private unsafe void ExecuteShellCommand(string itemPath)
-		{
-			SHELLEXECUTEINFOW info = default;
-			info.cbSize = (uint)Marshal.SizeOf(info);
-			info.nShow = 5; // SW_SHOW
-			info.fMask = 0x0000000C; // SEE_MASK_INVOKEIDLIST
-
-			fixed (char* cVerb = "properties", lpFile = itemPath)
-			{
-				info.lpVerb = cVerb;
-				info.lpFile = lpFile;
-
-				PInvoke.ShellExecuteEx(ref info);
-			}
-		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

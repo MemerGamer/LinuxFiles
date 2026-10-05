@@ -238,6 +238,9 @@
         <Compile Remove="Utils\Global\LinuxDriveCatalog.cs" />
         <Compile Remove="Services\Storage\StorageNetworkService.Linux.cs" />
         <Compile Remove="Helpers\Application\AppToastNotificationHelper.Linux.cs" />
+        <Compile Remove="Helpers\Layout\LayoutPreferencesDatabase.Linux.cs" />
+        <Compile Remove="Services\SizeProvider\CachedSizeProvider.Linux.cs" />
+        <Compile Remove="Utils\Storage\Operations\FileSizeCalculator.Linux.cs" />
     </ItemGroup>
 
     <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->

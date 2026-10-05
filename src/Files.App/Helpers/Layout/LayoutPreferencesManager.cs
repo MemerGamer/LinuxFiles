@@ -1,7 +1,9 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if WINDOWS
 using Windows.Win32;
+#endif
 
 namespace Files.App.Helpers
 {
@@ -259,7 +261,7 @@ namespace Files.App.Helpers
 		{
 			return UserSettingsService.LayoutSettingsService.SyncFolderPreferencesAcrossDirectories ||
 				string.IsNullOrEmpty(path) ||
-				GetLayoutPreferencesFromDatabase(path, Win32Helper.GetFolderFRN(path)) is null;
+				GetLayoutPreferencesFromDatabase(path, GetFolderFRN(path)) is null;
 		}
 
 		public void ToggleLayoutModeColumnView(bool manuallySet)
@@ -389,7 +391,7 @@ namespace Files.App.Helpers
 		{
 			if (!UserSettingsService.LayoutSettingsService.SyncFolderPreferencesAcrossDirectories)
 			{
-				var folderFRN = Win32Helper.GetFolderFRN(path);
+				var folderFRN = GetFolderFRN(path);
 				var trimmedFolderPath = path.TrimPath();
 				if (trimmedFolderPath is not null)
 					SetLayoutPreferencesToDatabase(trimmedFolderPath, folderFRN, preferencesItem);
@@ -512,7 +514,7 @@ namespace Files.App.Helpers
 
 				var recycleBinPreference = SafetyExtensions.IgnoreExceptions(() =>
 				{
-					var folderFRN = Win32Helper.GetFolderFRN(trimmedPath);
+					var folderFRN = GetFolderFRN(trimmedPath);
 
 					return GetLayoutPreferencesFromDatabase(trimmedPath, folderFRN)
 						?? GetLayoutPreferencesFromAds(trimmedPath, folderFRN);
@@ -549,7 +551,7 @@ namespace Files.App.Helpers
 					if (path.StartsWith("tag:", StringComparison.Ordinal))
 						return GetLayoutPreferencesFromDatabase("Home", null);
 
-					var folderFRN = Win32Helper.GetFolderFRN(path);
+					var folderFRN = GetFolderFRN(path);
 
 					var preferences = GetLayoutPreferencesFromDatabase(path, folderFRN);
 					if (preferences is not null)
@@ -574,8 +576,19 @@ namespace Files.App.Helpers
 			return new LayoutPreferencesItem();
 		}
 
+		// The Windows file reference number; on Linux the layout database tracks folders by dev:ino itself (IFileStatService).
+		private static ulong? GetFolderFRN(string? path)
+		{
+#if WINDOWS
+			return Win32Helper.GetFolderFRN(path);
+#else
+			return null;
+#endif
+		}
+
 		private static LayoutPreferencesItem? GetLayoutPreferencesFromAds(string path, ulong? frn)
 		{
+#if WINDOWS
 			var str = Win32Helper.ReadStringFromFile($"{path}:files_layoutmode");
 
 			var layoutPreferences = SafetyExtensions.IgnoreExceptions(() => string.IsNullOrEmpty(str)
@@ -590,6 +603,10 @@ namespace Files.App.Helpers
 				PInvoke.DeleteFileFromApp($"{path}:files_layoutmode");
 
 			return layoutPreferences;
+#else
+			// Alternate data streams do not exist on Linux
+			return null;
+#endif
 		}
 
 		private static LayoutPreferencesItem? GetLayoutPreferencesFromDatabase(string path, ulong? frn)

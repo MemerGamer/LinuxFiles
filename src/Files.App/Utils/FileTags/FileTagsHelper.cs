@@ -6,7 +6,9 @@ using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation.Metadata;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
+#if WINDOWS
 using Windows.Win32;
+#endif
 using IO = System.IO;
 
 namespace Files.App.Utils.FileTags
@@ -162,6 +164,7 @@ namespace Files.App.Utils.FileTags
 		public static ulong? GetFileFRN(string filePath) => Win32Helper.GetFileFRN(filePath);
 #endif
 
+#if WINDOWS
 		public static Task<ulong?> GetFileFRN(IStorageItem? item)
 		{
 			return item switch
@@ -177,5 +180,9 @@ namespace Files.App.Utils.FileTags
 				return (ulong?)extra["System.FileFRN"];
 			}
 		}
+#else
+		// File reference numbers do not exist on Linux; tags are keyed by path.
+		public static Task<ulong?> GetFileFRN(IStorageItem? item) => Task.FromResult<ulong?>(null);
+#endif
 	}
 }

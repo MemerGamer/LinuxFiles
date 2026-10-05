@@ -233,6 +233,8 @@
         <Compile Remove="Utils\Storage\Helpers\DriveHelpers.Linux.cs" />
         <Compile Remove="Utils\Storage\Helpers\FontFileHelper.Linux.cs" />
         <Compile Remove="Utils\Global\LinuxStorageDeviceWatcher.cs" />
+        <Compile Remove="Utils\Global\LinuxDriveCatalog.cs" />
+        <Compile Remove="Services\Storage\StorageNetworkService.Linux.cs" />
         <Compile Remove="Helpers\Application\AppToastNotificationHelper.Linux.cs" />
     </ItemGroup>
 

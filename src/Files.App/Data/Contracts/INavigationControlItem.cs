@@ -62,6 +62,12 @@ namespace Files.App.Data.Contracts
 
 		public bool ShowEjectDevice { get; set; }
 
+		public bool ShowMountDevice { get; set; }
+
+		public bool ShowUnmountDevice { get; set; }
+
+		public bool ShowDisconnectLocation { get; set; }
+
 		public bool ShowShellItems { get; set; }
 	}
 }

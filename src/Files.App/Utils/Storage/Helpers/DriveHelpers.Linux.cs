@@ -1,6 +1,12 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Gvfs;
+using Files.Platform.Abstractions.Notifications;
+using Files.Platform.Abstractions.Volumes;
+using VolumeInfo = Files.Platform.Abstractions.Volumes.VolumeInfo;
+using Files.Platform.Linux.Launching;
+using Microsoft.Extensions.Logging;
 using Windows.Storage;
 using Windows.Storage.FileProperties;
 
@@ -186,16 +192,217 @@ namespace Files.App.Utils.Storage
 			return Data.Items.DriveType.Fixed;
 		}
 
+		/// <summary>
+		/// Prefix of the pseudo path of a volume that is not mounted yet; followed by the UDisks2 object path.
+		/// </summary>
+		public const string UnmountedPathPrefix = "udisks2:";
+
+		private static IVolumeService? VolumeService => Ioc.Default.GetService<IVolumeService>();
+
+		private static INetworkLocationService? NetworkLocations => Ioc.Default.GetService<INetworkLocationService>();
+
+		public static bool IsUnmountedPath(string? path)
+			=> path is not null && path.StartsWith(UnmountedPathPrefix, StringComparison.Ordinal);
+
+		public static string ToUnmountedPath(string volumeId)
+			=> UnmountedPathPrefix + volumeId;
+
+		/// <summary>
+		/// Finds the UDisks2 volume for a mount point, a path inside a mount, or the pseudo path of an unmounted volume.
+		/// </summary>
+		public static async Task<VolumeInfo?> FindVolumeAsync(string? path)
+		{
+			if (string.IsNullOrEmpty(path) || VolumeService is not { } service)
+				return null;
+
+			try
+			{
+				var volumes = await service.GetVolumesAsync().ConfigureAwait(false);
+				if (IsUnmountedPath(path))
+				{
+					var id = path[UnmountedPathPrefix.Length..];
+					return volumes.FirstOrDefault(v => v.Id == id);
+				}
+
+				var full = path.Length > 1 ? path.TrimEnd('/') : path;
+				return volumes
+					.SelectMany(v => v.MountPoints.Select(m => (Volume: v, Mount: m)))
+					.Where(x => x.Mount == "/" || full == x.Mount || full.StartsWith(x.Mount + "/", StringComparison.Ordinal))
+					.OrderByDescending(x => x.Mount.Length)
+					.Select(x => x.Volume)
+					.FirstOrDefault();
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not look up the volume of {Path}", path);
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Finds the GVfs mount (<c>$XDG_RUNTIME_DIR/gvfs/*</c>) that contains <paramref name="path"/>.
+		/// </summary>
+		public static GvfsMount? FindGvfsMount(string? path)
+		{
+			if (string.IsNullOrEmpty(path) || NetworkLocations is not { } locations)
+				return null;
+
+			return locations.GetMounts().FirstOrDefault(m => path == m.Path || path.StartsWith(m.Path + "/", StringComparison.Ordinal));
+		}
+
+		/// <summary>
+		/// Safely removes a device: unmounts and ejects UDisks2 volumes, disconnects GVfs mounts (MTP, network).
+		/// </summary>
 		public static async void EjectDeviceAsync(string path)
 		{
-			// LINUX-TODO(udisks2): eject via org.freedesktop.UDisks2 (udisksctl unmount/power-off); currently a no-op
-			await Task.CompletedTask;
+			try
+			{
+				if (await FindVolumeAsync(path) is { } volume && VolumeService is { } volumes)
+				{
+					await volumes.EjectAsync(volume.Id);
+					if (volume.CanEject || volume.CanPowerOff)
+					{
+						await (Ioc.Default.GetService<INotificationService>()?.NotifyAsync(
+							Strings.EjectNotificationHeader.GetLocalizedResource(),
+							Strings.EjectNotificationBody.GetLocalizedResource()) ?? Task.FromResult(false));
+					}
+
+					return;
+				}
+
+				if (FindGvfsMount(path) is { } mount && NetworkLocations is { } locations)
+				{
+					await locations.DisconnectAsync(mount);
+					return;
+				}
+
+				// Kernel mounts that UDisks2 does not manage (cifs, nfs, bind mounts, ...) are left alone
+			}
+			catch (VolumeOperationException ex)
+			{
+				await ShowVolumeErrorAsync(ex);
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Ejecting {Path} failed", path);
+			}
+		}
+
+		/// <summary>
+		/// Unmounts a volume without ejecting the drive.
+		/// </summary>
+		public static async Task UnmountVolumeAsync(string path)
+		{
+			try
+			{
+				if (await FindVolumeAsync(path) is { } volume && VolumeService is { } volumes)
+					await volumes.UnmountAsync(volume.Id);
+			}
+			catch (VolumeOperationException ex)
+			{
+				await ShowVolumeErrorAsync(ex);
+			}
+		}
+
+		/// <summary>
+		/// Mounts an unmounted volume (polkit may ask the user to authenticate) and returns where it is mounted.
+		/// </summary>
+		public static async Task<string?> MountVolumeAsync(string path)
+		{
+			try
+			{
+				if (VolumeService is not { } volumes || await FindVolumeAsync(path) is not { } volume)
+					return null;
+
+				return volume.MountPoint ?? await volumes.MountAsync(volume.Id);
+			}
+			catch (VolumeOperationException ex)
+			{
+				await ShowVolumeErrorAsync(ex);
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Mounts an unmounted volume and opens it in the active pane.
+		/// </summary>
+		public static async Task MountAndOpenAsync(string path)
+		{
+			if (await MountVolumeAsync(path) is not { } mountPoint)
+				return;
+
+			if (Ioc.Default.GetService<IContentPageContext>()?.ShellPage is { } shellPage)
+				shellPage.NavigateToPath(mountPoint);
+		}
+
+		private static async Task ShowVolumeErrorAsync(VolumeOperationException ex)
+		{
+			// A dismissed polkit prompt is the user's own decision, not an error worth a dialog
+			if (ex.Error == VolumeError.NotAuthorized && ex.InnerException?.Message.Contains("Dismissed", StringComparison.Ordinal) == true)
+				return;
+
+			var message = ex.Error switch
+			{
+				VolumeError.NotAuthorized => Strings.LinuxVolumeNotAuthorized.GetLocalizedResource(),
+				VolumeError.Busy => Strings.EjectNotificationErrorDialogBody.GetLocalizedResource(),
+				_ => ex.Message,
+			};
+
+			var title = ex.Error == VolumeError.Busy
+				? Strings.EjectNotificationErrorDialogHeader.GetLocalizedResource()
+				: Strings.LinuxVolumeErrorTitle.GetLocalizedResource();
+
+			await DialogDisplayHelper.ShowDialogAsync(title, message);
+		}
+
+		private static readonly string[] FormatTools = ["gnome-disks", "partitionmanager"];
+
+		private static string? FindFormatTool()
+		{
+			var locator = Ioc.Default.GetService<IExecutableLocator>() ?? new PathExecutableLocator();
+			return FormatTools.FirstOrDefault(tool => locator.Locate(tool) is not null);
+		}
+
+		/// <summary>
+		/// Whether a disk utility (GNOME Disks or KDE Partition Manager) is installed to format a drive with; the format commands are hidden otherwise.
+		/// </summary>
+		public static bool CanFormat(string? path)
+			=> !string.IsNullOrEmpty(path) && path != "/" && FindFormatTool() is not null;
+
+		/// <summary>
+		/// Opens the installed disk utility on the volume.
+		/// </summary>
+		public static async Task OpenFormatDialogAsync(string? path)
+		{
+			if (FindFormatTool() is not { } tool)
+				return;
+
+			var arguments = new List<string>();
+			if (tool == "gnome-disks" && await FindVolumeAsync(path) is { } volume && volume.Device.StartsWith("/dev/", StringComparison.Ordinal))
+				arguments.Add("--block-device=" + volume.Device);
+
+			var starter = Ioc.Default.GetService<IProcessStarter>() ?? new DetachedProcessStarter();
+			try
+			{
+				await starter.StartDetachedAsync(new ProcessLaunch(tool, arguments));
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not start {Tool}", tool);
+			}
 		}
 
 		public static async Task<bool> CheckEmptyDrive(string? drivePath)
 		{
 			if (string.IsNullOrWhiteSpace(drivePath))
 				return false;
+
+			if (IsUnmountedPath(drivePath))
+			{
+				// Clicking a drive that is not mounted yet mounts it, then opens it
+				await MountAndOpenAsync(drivePath);
+				return true;
+			}
 
 			var drivesViewModel = Ioc.Default.GetRequiredService<DrivesViewModel>();
 
@@ -215,17 +422,23 @@ namespace Files.App.Utils.Storage
 
 		public static Task<StorageFolderWithPath?> GetRootFromPathAsync(string? devicePath)
 		{
-			// LINUX-TODO(mtp): MTP/gvfs and network share roots; on Linux normal paths work with StorageFolder.GetFolderFromPathAsync
+			// Linux paths (including GVfs FUSE paths) work with StorageFolder.GetFolderFromPathAsync, so there is no separate root type
 			return Task.FromResult<StorageFolderWithPath?>(null);
 		}
 
-		// LINUX-TODO(mtp): MTP devices (gvfs mtp://) are not recognised
-		public static bool IsMtpPath(string path) => false;
+		/// <summary>
+		/// Whether the path is inside a GVfs MTP or camera mount (<c>$XDG_RUNTIME_DIR/gvfs/mtp:host=...</c>).
+		/// </summary>
+		public static bool IsMtpPath(string path)
+			=> FindGvfsMount(path) is { Kind: GvfsMountKind.Mtp or GvfsMountKind.Gphoto };
 
 		public static bool IsNetworkPath(string path)
 		{
 			try
 			{
+				if (FindGvfsMount(path) is { } gvfs)
+					return gvfs.Kind is not (GvfsMountKind.Mtp or GvfsMountKind.Gphoto);
+
 				return FindMount(path) is { } mount && _networkFs.Contains(mount.FsType);
 			}
 			catch

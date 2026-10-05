@@ -4,6 +4,7 @@
 #
 # Usage: scripts/linux/showcase.sh [--no-build] [-s startup-seconds]
 #   --no-build   reuse the existing build in src/Files.App/bin/Debug/net10.0-desktop
+# Env: SHOWCASE_ICON_THEME=<name> renders with that installed icon theme (copied read-only into the sandbox).
 # A shot that is missing or identical to the previous frame is recorded as "not yet working".
 set -euo pipefail
 
@@ -29,7 +30,7 @@ fi
 work="${TMPDIR:-/tmp}/files-showcase"
 rm -rf "$work"
 mkdir -p "$work"
-trap 'rm -rf "$work"' EXIT
+trap 'chmod -R u+w "$work" 2>/dev/null; rm -rf "$work"' EXIT
 shots="$work/shots"
 mkdir -p "$shots"
 
@@ -83,6 +84,23 @@ printf '[Trash Info]\nPath=%s\nDeletionDate=2026-01-15T09:30:00\n' "$d/old-draft
 # Fixed timestamps keep the Date modified column stable
 find "$d" "$pics" -exec touch -d '2026-01-10 12:00:00' {} +
 SEED
+# Optional: SHOWCASE_ICON_THEME=<name> copies that installed icon theme into the sandbox HOME and selects it
+# through the same settings the app reads on a real desktop (kdeglobals, gtk-3.0/gtk-4.0 settings.ini).
+if [[ -n "${SHOWCASE_ICON_THEME:-}" ]]; then
+	[[ "$SHOWCASE_ICON_THEME" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "invalid SHOWCASE_ICON_THEME" >&2; exit 2; }
+	theme_src=""
+	for base in "$HOME/.local/share/icons" "$HOME/.icons" /usr/local/share/icons /usr/share/icons; do
+		[[ -d "$base/$SHOWCASE_ICON_THEME" ]] && { theme_src="$base/$SHOWCASE_ICON_THEME"; break; }
+	done
+	[[ -n "$theme_src" ]] || { echo "icon theme not found: $SHOWCASE_ICON_THEME" >&2; exit 2; }
+	cat >>"$seed" <<THEME
+mkdir -p "\$home/.local/share/icons" "\$home/.config/gtk-3.0" "\$home/.config/gtk-4.0"
+cp -rP "$theme_src" "\$home/.local/share/icons/$SHOWCASE_ICON_THEME"
+find "\$home/.local/share/icons/$SHOWCASE_ICON_THEME" -type f -exec chmod a-w {} +
+printf '[Icons]\nTheme=%s\n' "$SHOWCASE_ICON_THEME" >"\$home/.config/kdeglobals"
+printf '[Settings]\ngtk-icon-theme-name=%s\n' "$SHOWCASE_ICON_THEME" | tee "\$home/.config/gtk-3.0/settings.ini" >"\$home/.config/gtk-4.0/settings.ini"
+THEME
+fi
 chmod +x "$seed"
 
 home="$shots/home"

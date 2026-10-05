@@ -22,6 +22,7 @@ namespace Files.App.Actions
 		public override bool IsExecutable
 			=> OperatingSystem.IsWindows() && base.IsExecutable;
 
+#if WINDOWS
 		protected override ProcessStartInfo? GetProcessStartInfo(string[] paths)
 		{
 			var startInfo = base.GetProcessStartInfo(paths);
@@ -33,5 +34,6 @@ namespace Files.App.Actions
 
 			return startInfo;
 		}
+#endif
 	}
 }

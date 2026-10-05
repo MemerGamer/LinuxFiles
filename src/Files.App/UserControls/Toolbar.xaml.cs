@@ -9,7 +9,6 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.IO;
-using Windows.Win32.UI.WindowsAndMessaging;
 using WinRT;
 using DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue;
 using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
@@ -26,7 +25,6 @@ namespace Files.App.UserControls
 		private readonly DispatcherQueueTimer toolbarRefreshTimer;
 		private readonly IContentPageContext PageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
 		private UserControls.Menus.FileTagsContextMenu? editTagsMenu;
-		private OpenWithMenu? openWithMenu;
 		private int openWithFlyoutRequestId;
 		private readonly List<Action> toggleButtonDetachActions = new();
 
@@ -61,7 +59,10 @@ namespace Files.App.UserControls
 			UserSettingsService.AppearanceSettingsService.PropertyChanged -= AppearanceSettings_PropertyChanged;
 			if (editTagsMenu is not null)
 				editTagsMenu.TagsChanged -= EditTagsMenu_TagsChanged;
+#if WINDOWS
 			openWithMenu?.Dispose();
+#endif
+			++openWithFlyoutRequestId;
 		}
 
 		private void AppModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -512,7 +513,7 @@ namespace Files.App.UserControls
 #endif
 
 			foreach (var code in group.Commands)
-				if (Commands[code] is { Code: not CommandCodes.None } cmd)
+				if (Commands[code] is { Code: not CommandCodes.None, IsExecutable: true } cmd)
 					flyout.Items.Add(CreateGroupMenuItem(cmd));
 
 			if (group is NewItemCommandGroup && ViewModel?.InstanceViewModel.CanCreateFileInPage == true
@@ -531,63 +532,42 @@ namespace Files.App.UserControls
 			}
 		}
 
+
+
+#if !WINDOWS
 		private async Task PopulateOpenWithFlyoutAsync(MenuFlyout flyout)
 		{
 			var requestId = ++openWithFlyoutRequestId;
-
 			flyout.Items.Add(new MenuFlyoutItem
 			{
 				Text = Strings.Loading.GetLocalizedResource(),
 				IsEnabled = false,
 			});
 
-			openWithMenu?.Dispose();
-			openWithMenu = null;
-
-			OpenWithMenu? loadedOpenWithMenu = null;
-			if (PageContext.SelectedItems.Count is 1 && PageContext.SelectedItem?.ItemPath is string path)
-				loadedOpenWithMenu = await OpenWithMenu.GetForFileAsync(path);
+			var menus = await ShellContextFlyoutFactory.GetShellContextmenuAsync(true, false, null, PageContext.SelectedItems.ToList(), CancellationToken.None);
+			var openWith = menus.FirstOrDefault();
+			if (openWith?.LoadSubMenuAction is { } load)
+				await load();
 
 			if (requestId != openWithFlyoutRequestId)
-			{
-				loadedOpenWithMenu?.Dispose();
 				return;
-			}
-
-			openWithMenu = loadedOpenWithMenu;
 
 			flyout.Items.Clear();
-
-			if (openWithMenu is not null)
+			if (openWith?.Items is { } items)
 			{
-				foreach (var item in openWithMenu.Items.Where(x => x.Type is MENU_ITEM_TYPE.MFT_STRING && !string.IsNullOrWhiteSpace(x.Label)))
-					flyout.Items.Add(await CreateOpenWithMenuItemAsync(openWithMenu, item));
+				foreach (var entry in items)
+				{
+					if (entry.ItemType is ContextMenuFlyoutItemType.Separator)
+						flyout.Items.Add(new MenuFlyoutSeparator());
+					else
+						flyout.Items.Add(new MenuFlyoutItemWithImage { Text = entry.Text, Command = entry.Command, BitmapIcon = entry.BitmapIcon });
+				}
 			}
 
 			if (flyout.Items.Count == 0)
 				flyout.Items.Add(CreateChooseAnotherAppMenuItem());
 		}
-
-		private static async Task<MenuFlyoutItem> CreateOpenWithMenuItemAsync(OpenWithMenu menu, Win32ContextMenuItem entry)
-		{
-			MenuFlyoutItem item;
-			if (entry.Icon is { Length: > 0 })
-			{
-				using var ms = new MemoryStream(entry.Icon);
-				var image = new BitmapImage();
-				await image.SetSourceAsync(ms.AsRandomAccessStream());
-				item = new MenuFlyoutItemWithImage { BitmapIcon = image };
-			}
-			else
-			{
-				item = new MenuFlyoutItem();
-			}
-
-			item.Text = entry.Label;
-			item.Command = new AsyncRelayCommand(async () => await menu.InvokeItem(entry.ID));
-
-			return item;
-		}
+#endif
 
 		private MenuFlyoutItem CreateChooseAnotherAppMenuItem()
 		{

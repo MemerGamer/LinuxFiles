@@ -185,7 +185,7 @@ namespace Files.App.Helpers
 					{
 						if (tabs.All(t => t == tab || d >= hints[t].Length || hints[t][d] != hints[tab][d]))
 						{
-							tab.Header = $"{hints[tab][d]}\\{tab.Description}";
+							tab.Header = $"{hints[tab][d]}{Path.DirectorySeparatorChar}{tab.Description}";
 							break;
 						}
 					}
@@ -202,13 +202,13 @@ namespace Files.App.Helpers
 				var root = (PathNormalization.GetPathRoot(path) ?? "").TrimEnd('\\', '/');
 				var prefix = root.Length >= 2 && root[1] == ':'
 					? $"{char.ToUpperInvariant(root[0])}:\\..."
-					: root.Length > 0 ? $"{root}\\..." : "...";
+					: root.Length > 0 ? $"{root}{Path.DirectorySeparatorChar}..." : "...";
 
 				var dir = path?.TrimEnd('\\', '/');
 				while ((dir = Path.GetDirectoryName(dir)) is not null
 					&& Path.GetFileName(dir) is { Length: > 0 } seg)
 				{
-					result.Add($"{prefix}\\{seg}");
+					result.Add($"{prefix}{Path.DirectorySeparatorChar}{seg}");
 				}
 			}
 			catch (ArgumentException) { }

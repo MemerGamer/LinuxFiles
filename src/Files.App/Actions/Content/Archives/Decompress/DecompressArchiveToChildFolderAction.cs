@@ -93,6 +93,12 @@ namespace Files.App.Actions
 		}
 
 		private string ComputeLabel()
+			=> ToPlatformSeparator(ComputeLabelCore());
+
+		private static string ToPlatformSeparator(string label)
+			=> SystemIO.Path.DirectorySeparatorChar == '\\' ? label : label.Replace('\\', SystemIO.Path.DirectorySeparatorChar);
+
+		private string ComputeLabelCore()
 		{
 			if (context.SelectedItems == null || context.SelectedItems.Count == 0)
 				return string.Format(Strings.BaseLayoutItemContextFlyoutExtractToChildFolder.GetLocalizedResource(), string.Empty);

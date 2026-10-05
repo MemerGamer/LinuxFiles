@@ -10,6 +10,8 @@ using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
 using Files.Platform.Linux.Permissions;
+using Files.Platform.Linux.Search;
+using Files.Platform.Linux.Secrets;
 using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Trash;
 using Files.Platform.Linux.Volumes;
@@ -41,6 +43,8 @@ namespace Files.Platform.Linux
 				.AddLinuxFileOperations()
 				.AddLinuxArchives()
 				.AddLinuxPermissions()
+				.AddLinuxSearch()
+				.AddLinuxSecrets()
 				.AddLinuxClipboard()
 				.AddLinuxVolumes();
 		}

@@ -624,7 +624,11 @@ namespace Files.App.ViewModels.UserControls
 					{
 						var storageFile = resFile.Result
 							?? throw new InvalidOperationException("A successful file lookup did not return a storage file.");
+#if !WINDOWS
+						await NavigationHelpers.OpenPath(storageFile.Path, shellPage, FilesystemItemType.File);
+#else
 						await Win32Helper.InvokeWin32ComponentAsync(storageFile.Path, shellPage);
+#endif
 					}
 					else // Not a file or not accessible
 					{
@@ -831,6 +835,10 @@ namespace Files.App.ViewModels.UserControls
 
 		private static string NormalizePathInput(string currentInput, bool isFtp)
 		{
+			// POSIX paths are already normalized; the Windows separator rewrite would corrupt them.
+			if (!OperatingSystem.IsWindows())
+				return currentInput;
+
 			if (currentInput.Contains('/') && !isFtp)
 				currentInput = currentInput.Replace('/', '\\');
 
@@ -927,7 +935,11 @@ namespace Files.App.ViewModels.UserControls
 						{
 							var storageFile = resFile.Result
 								?? throw new InvalidOperationException("A successful file lookup did not return a storage file.");
+#if !WINDOWS
+							await NavigationHelpers.OpenPath(storageFile.Path, shellPage, FilesystemItemType.File);
+#else
 							await Win32Helper.InvokeWin32ComponentAsync(storageFile.Path, shellPage);
+#endif
 						}
 						else // Not a file or not accessible
 						{

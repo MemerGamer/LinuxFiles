@@ -5,6 +5,7 @@
 #pragma warning disable CA1416
 
 using Files.Platform.Abstractions.Trash;
+using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Native;
 using Files.Platform.Linux.Trash;
 using Microsoft.Extensions.DependencyInjection;
@@ -61,7 +62,7 @@ namespace Files.Platform.Tests.Trash
 			}
 		}
 
-		private LinuxTrashService CreateService(uint uid, Func<DateTime>? now = null)
+		private LinuxTrashService CreateService(uint uid, Func<DateTime>? now = null, Action<string, string>? beforeRestore = null, LinuxFileOperationsHooks? fileOperationsHooks = null)
 		{
 			var mounts = new FakeMountResolver(_root, _home, _usb);
 			_inspector = new FakeOwnershipInspector(uid);
@@ -72,6 +73,8 @@ namespace Files.Platform.Tests.Trash
 				MountResolver = mounts,
 				OwnershipInspector = _inspector,
 				LocalNow = now ?? (() => new DateTime(2026, 10, 4, 13, 5, 9, DateTimeKind.Local)),
+				BeforeRestoreMove = beforeRestore,
+				FileOperationsHooks = fileOperationsHooks,
 			});
 		}
 

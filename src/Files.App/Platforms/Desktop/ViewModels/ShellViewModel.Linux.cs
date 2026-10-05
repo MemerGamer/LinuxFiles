@@ -19,7 +19,9 @@ namespace Files.App.ViewModels
 	{
 		private Files.Platform.Abstractions.Watching.IFolderWatcher? _linuxWatcher;
 		private CancellationTokenSource? _linuxRefreshDebounce;
+		private readonly List<Files.Platform.Abstractions.Watching.IFolderWatcher> _linuxRepositoryWatchers = [];
 		private Action? _linuxTrashUnsubscribe;
+		private CancellationTokenSource? _linuxGitDebounce;
 
 		/// <summary>
 		/// Lists <paramref name="path"/> into <c>filesAndFolders</c>. Returns 3 on success and -1 on failure.
@@ -120,6 +122,9 @@ namespace Files.App.ViewModels
 				await OrderFilesAndFoldersAsync();
 				await ApplyFilesAndFoldersChangesAsync();
 
+				// Uno does not raise the container update callbacks that normally trigger this, so the status columns are filled in here
+				_ = LoadLinuxRepositoryPropertiesAsync(cancellationToken);
+
 				// desktop.ini based customization has no Linux equivalent; the Windows services are stubs
 				_ = dispatcherQueue.EnqueueOrInvokeAsync(CheckForSolutionFile, Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 				desktopIniUpdateTask = dispatcherQueue.EnqueueOrInvokeAsync(() =>
@@ -135,6 +140,29 @@ namespace Files.App.ViewModels
 			IsLocationUnavailable = false;
 			return 3;
 		}
+
+		private async Task LoadLinuxRepositoryPropertiesAsync(CancellationToken cancellationToken)
+		{
+			if (!IsValidGitDirectory || EnabledGitProperties is GitProperties.None)
+				return;
+
+			try
+			{
+				// The first screens only; the rest loads when selected or when the layout reloads its items
+				var items = filesAndFolders.OfType<IGitItem>().Take(300).ToList();
+				foreach (var gitItem in items)
+				{
+					cancellationToken.ThrowIfCancellationRequested();
+					await LoadGitPropertiesAsync(gitItem);
+				}
+			}
+			catch (OperationCanceledException)
+			{
+			}
+		}
+
+		// Items inside a repository use the Git item type so the status/commit columns can be filled in on demand
+		private ListedItem NewLinuxItem() => IsValidGitDirectory ? new GitItem() : new ListedItem(null);
 
 		/// <summary>
 		/// Lists the freedesktop.org trash (<c>trash:///</c>) through <see cref="IStorageTrashBinService"/>. Returns 4 on success.
@@ -257,21 +285,20 @@ namespace Files.App.ViewModels
 
 			if (entry.IsDirectory)
 			{
-				return new ListedItem(null)
-				{
-					PrimaryItemAttribute = StorageItemTypes.Folder,
-					ItemNameRaw = entry.Name,
-					ItemDateModifiedReal = modified,
-					ItemDateCreatedReal = created,
-					ItemType = folderTypeTextLocalized,
-					FileImage = null,
-					IsHiddenItem = entry.IsHidden,
-					Opacity = opacity,
-					LoadFileIcon = false,
-					ItemPath = entry.FullPath,
-					FileSize = null,
-					FileSizeBytes = 0,
-				};
+				var folder = NewLinuxItem();
+				folder.PrimaryItemAttribute = StorageItemTypes.Folder;
+				folder.ItemNameRaw = entry.Name;
+				folder.ItemDateModifiedReal = modified;
+				folder.ItemDateCreatedReal = created;
+				folder.ItemType = folderTypeTextLocalized;
+				folder.FileImage = null;
+				folder.IsHiddenItem = entry.IsHidden;
+				folder.Opacity = opacity;
+				folder.LoadFileIcon = false;
+				folder.ItemPath = entry.FullPath;
+				folder.FileSize = null;
+				folder.FileSizeBytes = 0;
+				return folder;
 			}
 
 			// LINUX-TODO(shortcuts): symlinks and .desktop files are listed as plain files
@@ -284,23 +311,22 @@ namespace Files.App.ViewModels
 				itemType = !string.IsNullOrEmpty(localizedType) ? localizedType : extension.Trim('.') + " " + itemType;
 			}
 
-			return new ListedItem(null)
-			{
-				PrimaryItemAttribute = StorageItemTypes.File,
-				FileExtension = extension,
-				IsHiddenItem = entry.IsHidden,
-				Opacity = opacity,
-				FileImage = null,
-				LoadFileIcon = false,
-				ItemNameRaw = entry.Name,
-				ItemDateModifiedReal = modified,
-				ItemDateAccessedReal = accessed,
-				ItemDateCreatedReal = created,
-				ItemType = itemType,
-				ItemPath = entry.FullPath,
-				FileSize = entry.Length.ToSizeString(),
-				FileSizeBytes = entry.Length,
-			};
+			var item = NewLinuxItem();
+			item.PrimaryItemAttribute = StorageItemTypes.File;
+			item.FileExtension = extension;
+			item.IsHiddenItem = entry.IsHidden;
+			item.Opacity = opacity;
+			item.FileImage = null;
+			item.LoadFileIcon = false;
+			item.ItemNameRaw = entry.Name;
+			item.ItemDateModifiedReal = modified;
+			item.ItemDateAccessedReal = accessed;
+			item.ItemDateCreatedReal = created;
+			item.ItemType = itemType;
+			item.ItemPath = entry.FullPath;
+			item.FileSize = entry.Length.ToSizeString();
+			item.FileSizeBytes = entry.Length;
+			return item;
 		}
 
 		private void WatchForLinuxFolderChanges(string path)
@@ -347,8 +373,116 @@ namespace Files.App.ViewModels
 			}
 		}
 
+		// Raises GitDirectoryUpdated when the repository metadata changes (commit, checkout, stage, fetch) so the status columns refresh
+		private void WatchForLinuxRepositoryChanges()
+		{
+			if (isDisposed || string.IsNullOrEmpty(GitDirectory))
+				return;
+
+			DisposeLinuxRepositoryWatchers();
+
+			// .git may be a gitfile (linked worktree, submodule); HEAD and the index live in the git dir, refs in the common dir
+			if (Files.Platform.Linux.Search.GitDirectoryResolver.Resolve(GitDirectory) is not var (gitDir, commonDir))
+				return;
+
+			try
+			{
+				var factory = Ioc.Default.GetRequiredService<IFolderWatcherFactory>();
+
+				// HEAD/index/packed-refs live directly in the git and common dirs; branch tips and their reflogs are nested in
+				// refs/** and logs/**. objects/ is deliberately not watched.
+				var targets = new List<(string Path, bool Recursive)>
+				{
+					(gitDir, false),
+					(Path.Combine(gitDir, "logs"), true),
+					(commonDir, false),
+					(Path.Combine(commonDir, "refs"), true),
+					(Path.Combine(commonDir, "logs"), true),
+				};
+
+				void OnChanged(string root, FolderChangeEventArgs e)
+				{
+					// Lock files appear and vanish around every Git write; the final rename is what matters. The objects filter is
+					// relative to the watched folder so a repository that lives under a folder named "objects" still works.
+					var relative = Path.GetRelativePath(root, e.FullPath).Replace('\\', '/');
+					if (e.Name.EndsWith(".lock", StringComparison.Ordinal) || relative.StartsWith("objects/", StringComparison.Ordinal) || relative.Contains("/objects/", StringComparison.Ordinal))
+						return;
+
+					ScheduleLinuxGitRefresh();
+				}
+
+				foreach (var (path, recursive) in targets.DistinctBy(t => t.Path))
+				{
+					if (!Directory.Exists(path))
+						continue;
+
+					var watcherInstance = factory.Create(path, new FolderWatcherOptions { IncludeSubdirectories = recursive, Debounce = TimeSpan.FromMilliseconds(200) });
+					var root = path;
+					watcherInstance.Created += (_, e) => OnChanged(root, e);
+					watcherInstance.Deleted += (_, e) => OnChanged(root, e);
+					watcherInstance.Changed += (_, e) => OnChanged(root, e);
+					watcherInstance.Renamed += (_, e) => OnChanged(root, e);
+					watcherInstance.Start();
+					_linuxRepositoryWatchers.Add(watcherInstance);
+				}
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not watch the repository metadata of {Path}", GitDirectory);
+			}
+		}
+
+		// Several watchers fire for one Git command; coalesce them into one reload
+		private void ScheduleLinuxGitRefresh()
+		{
+			var cts = new CancellationTokenSource();
+			Interlocked.Exchange(ref _linuxGitDebounce, cts)?.Cancel();
+
+			_ = Task.Delay(TimeSpan.FromMilliseconds(400), cts.Token).ContinueWith(
+				_ => dispatcherQueue.EnqueueOrInvokeAsync(async () =>
+				{
+					await ReloadLinuxGitPropertiesAsync();
+					GitDirectoryUpdated?.Invoke(null, null!);
+				}),
+				cts.Token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+		}
+
+		// The Git columns are loaded once per item; after the repository changed they are stale, so reset the flags and reload
+		private async Task ReloadLinuxGitPropertiesAsync()
+		{
+			if (isDisposed || !IsValidGitDirectory)
+				return;
+
+			var items = filesAndFolders.OfType<GitItem>().ToList();
+			foreach (var item in items)
+				item.ResetGitProperties();
+
+			try
+			{
+				// The first screens reload now; the rest reload when scrolled into view because ItemPropertiesInitialized was reset
+				foreach (var item in items.Take(300))
+				{
+					item.ItemPropertiesInitialized = true;
+					await LoadGitPropertiesAsync(item);
+				}
+			}
+			catch (Exception ex) when (ex is not OutOfMemoryException)
+			{
+				App.Logger.LogWarning(ex, "Could not reload the Git columns of {Path}", GitDirectory);
+			}
+		}
+
+		private void DisposeLinuxRepositoryWatchers()
+		{
+			foreach (var w in _linuxRepositoryWatchers)
+				w.Dispose();
+			_linuxRepositoryWatchers.Clear();
+		}
+
 		private void CloseLinuxWatcher()
 		{
+			DisposeLinuxRepositoryWatchers();
+			Interlocked.Exchange(ref _linuxGitDebounce, null)?.Cancel();
 			_linuxRefreshDebounce?.Cancel();
 			_linuxWatcher?.Dispose();
 			_linuxWatcher = null;

@@ -32,8 +32,11 @@ namespace Files.Platform.Linux.FileOperations
 		/// "name (N).ext" with N starting at 2. Folders and extensionless or dot-only names get the suffix appended.
 		/// </summary>
 		public static string GenerateUniqueName(string directory, string name, bool isDirectory)
+			=> GenerateUniqueName(name, isDirectory, candidate => Exists(Path.Combine(directory, candidate)));
+
+		internal static string GenerateUniqueName(string name, bool isDirectory, Func<string, bool> exists)
 		{
-			if (!Exists(Path.Combine(directory, name)))
+			if (!exists(name))
 				return name;
 
 			var dot = isDirectory ? -1 : name.LastIndexOf('.');
@@ -50,7 +53,7 @@ namespace Files.Platform.Linux.FileOperations
 					candidateStem = candidateStem[..^1];
 
 				var candidate = candidateStem + suffix;
-				if (!Exists(Path.Combine(directory, candidate)))
+				if (!exists(candidate))
 					return candidate;
 			}
 		}

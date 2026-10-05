@@ -496,6 +496,21 @@ namespace Files.App.UserControls
 				return;
 			}
 
+#if !WINDOWS
+			if (group is NewItemCommandGroup)
+			{
+				// Same items as the context menu's New submenu
+				foreach (var entry in Files.App.Data.Factories.ContentPageContextFlyoutFactory.GetLinuxNewItemItems(ViewModel?.InstanceViewModel.CanCreateFileInPage == true))
+				{
+					if (entry.ItemType is ContextMenuFlyoutItemType.Separator)
+						flyout.Items.Add(new MenuFlyoutSeparator());
+					else
+						flyout.Items.Add(new MenuFlyoutItem { Text = entry.Text, Command = entry.Command, Icon = new FontIcon { Glyph = flyout.Items.Count is 0 ? "\xE8B7" : "\xE7C3" } });
+				}
+				return;
+			}
+#endif
+
 			foreach (var code in group.Commands)
 				if (Commands[code] is { Code: not CommandCodes.None } cmd)
 					flyout.Items.Add(CreateGroupMenuItem(cmd));

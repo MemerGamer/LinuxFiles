@@ -104,7 +104,8 @@
 				AutomationProperties.Name="ToggleSidebarPane"
 				Background="Transparent"
 				BorderBrush="Transparent"
-				IsChecked="{x:Bind MainPageViewModel.IsSidebarPaneOpen, Mode=TwoWay}"
+				Click="SidebarPaneToggleButton_Click"
+				IsChecked="{x:Bind MainPageViewModel.IsSidebarPaneOpen, Mode=OneWay}"
 				ToolTipService.ToolTip="{helpers:ResourceString Key=ToggleSidebar}">
 				<AnimatedIcon Width="14">
 					<AnimatedIcon.Source>

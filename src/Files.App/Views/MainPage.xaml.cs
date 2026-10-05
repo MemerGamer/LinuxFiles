@@ -444,6 +444,15 @@ namespace Files.App.Views
 			SidebarAdaptiveViewModel.ActualDisplayMode = SidebarControl.DisplayMode;
 			SidebarControl.RegisterPropertyChangedCallback(SidebarView.DisplayModeProperty, (_, _) =>
 				SidebarAdaptiveViewModel.ActualDisplayMode = SidebarControl.DisplayMode);
+
+			// Uno drops the DisplayMode binding once the adaptive visual state sets a local value, so mirror the preference by hand
+			SidebarAdaptiveViewModel.PropertyChanged += (_, e) =>
+			{
+				if (e.PropertyName == nameof(SidebarViewModel.SidebarDisplayMode) &&
+					SidebarControl.DisplayMode != SidebarDisplayMode.Minimal &&
+					SidebarControl.DisplayMode != SidebarAdaptiveViewModel.SidebarDisplayMode)
+					SidebarControl.DisplayMode = SidebarAdaptiveViewModel.SidebarDisplayMode;
+			};
 		}
 
 		private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e) => LoadPaneChanged();

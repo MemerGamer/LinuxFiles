@@ -1,16 +1,19 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if WINDOWS
 using System.Text;
 using Windows.Win32;
 using Windows.Win32.Foundation;
 using Windows.Win32.NetworkManagement.WNet;
 using Windows.Win32.Security.Credentials;
+#endif
 
 namespace Files.App.Services
 {
 	public sealed partial class NetworkService : ObservableObject, INetworkService
 	{
+#if WINDOWS
 		private ICommonDialogService CommonDialogService { get; } = Ioc.Default.GetRequiredService<ICommonDialogService>();
 
 		private readonly static string guid = "::{f02c1a0d-be21-4350-88b0-7367fc96ef3c}";
@@ -22,6 +25,7 @@ namespace Files.App.Services
 			@"\\cryptomator-vault\",
 			@"\\EgnyteDrive\"
 		];
+#endif
 
 
 		private ObservableCollection<IFolder> _Computers = [];
@@ -49,7 +53,11 @@ namespace Files.App.Services
 			{
 				DeviceID = "network-folder",
 				Text = Strings.Network.GetLocalizedResource(),
+#if WINDOWS
 				Path = Constants.UserEnvironmentPaths.NetworkFolderPath,
+#else
+				Path = NetworkRootPath,
+#endif
 				Type = DriveType.Network,
 				ItemType = NavigationControlItemType.Drive,
 			};
@@ -63,14 +71,18 @@ namespace Files.App.Services
 			};
 			lock (_Computers)
 				_Computers.Add(networkItem);
+
+#if !WINDOWS
+			StartLinuxWatching();
+#endif
 		}
 
 		/// <inheritdoc/>
 		public async Task<IEnumerable<IFolder>> GetComputersAsync()
 		{
 #if !WINDOWS
-			// LINUX-TODO(network): enumerate network locations via GVfs/Avahi
-			return await Task.FromResult<IEnumerable<IFolder>>([]);
+			// Connected GVfs locations (smb, sftp, ftp, dav, nfs...); LINUX-TODO(network-discovery): browse the LAN with Avahi
+			return await Task.FromResult(GetLinuxNetworkItems());
 #else
 			var result = await Win32Helper.GetShellFolderAsync(guid, false, true, 0, int.MaxValue);
 
@@ -102,7 +114,7 @@ namespace Files.App.Services
 		public async Task<IEnumerable<IFolder>> GetShortcutsAsync()
 		{
 #if !WINDOWS
-			return await Task.FromResult<IEnumerable<IFolder>>([]);
+			return await Task.FromResult(GetLinuxNetworkItems());
 #else
 			var networkLocations = await STATask.Run(() =>
 			{
@@ -193,6 +205,7 @@ namespace Files.App.Services
 				Shortcuts.AddIfNotPresent(item);
 		}
 
+#if WINDOWS
 		/// <inheritdoc/>
 		public Task<NetworkAvailability?> GetNetworkAvailabilityAsync()
 		{
@@ -352,5 +365,6 @@ namespace Files.App.Services
 			// SMB redirector — proceed and let the enumeration itself surface any failure.
 			return true;
 		}
+#endif
 	}
 }

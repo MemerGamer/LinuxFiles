@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Enumeration;
+using Files.Platform.Abstractions.Trash;
 using Files.Platform.Abstractions.Watching;
 using Microsoft.Extensions.Logging;
 using System.IO;
@@ -19,12 +20,16 @@ namespace Files.App.ViewModels
 		private Files.Platform.Abstractions.Watching.IFolderWatcher? _linuxWatcher;
 		private CancellationTokenSource? _linuxRefreshDebounce;
 		private readonly List<Files.Platform.Abstractions.Watching.IFolderWatcher> _linuxRepositoryWatchers = [];
+		private Action? _linuxTrashUnsubscribe;
 
 		/// <summary>
 		/// Lists <paramref name="path"/> into <c>filesAndFolders</c>. Returns 3 on success and -1 on failure.
 		/// </summary>
 		private async Task<int> EnumerateLinuxFolderAsync(string path, CancellationToken cancellationToken, LibraryItem? library)
 		{
+			if (path.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal))
+				return await EnumerateLinuxTrashAsync(path, cancellationToken);
+
 			if (!Directory.Exists(path))
 			{
 				ShowLocationInaccessibleOrMissing(path);
@@ -107,6 +112,10 @@ namespace Files.App.ViewModels
 					}
 				}
 
+				// A superseded navigation must not publish a partial listing
+				if (cancellationToken.IsCancellationRequested)
+					return;
+
 				filesAndFolders.AddRange(pending);
 
 				await OrderFilesAndFoldersAsync();
@@ -123,6 +132,9 @@ namespace Files.App.ViewModels
 					CheckForBackgroundImage();
 				}, Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 			}, cancellationToken);
+
+			if (cancellationToken.IsCancellationRequested)
+				return -1;
 
 			IsLocationUnavailable = false;
 			return 3;
@@ -150,6 +162,118 @@ namespace Files.App.ViewModels
 
 		// Items inside a repository use the Git item type so the status/commit columns can be filled in on demand
 		private ListedItem NewLinuxItem() => IsValidGitDirectory ? new GitItem() : new ListedItem(null);
+
+		/// <summary>
+		/// Lists the freedesktop.org trash (<c>trash:///</c>) through <see cref="IStorageTrashBinService"/>. Returns 4 on success.
+		/// </summary>
+		private async Task<int> EnumerateLinuxTrashAsync(string path, CancellationToken cancellationToken)
+		{
+			currentStorageFolder = null;
+			HasNoWatcher = false;
+
+			CurrentFolder = new ListedItem(null)
+			{
+				PrimaryItemAttribute = StorageItemTypes.Folder,
+				ItemPropertiesInitialized = true,
+				ItemNameRaw = Strings.RecycleBin.GetLocalizedResource(),
+				ItemType = folderTypeTextLocalized,
+				FileImage = null,
+				LoadFileIcon = false,
+				ItemPath = Constants.UserEnvironmentPaths.RecycleBinPath,
+				FileSize = null,
+				FileSizeBytes = 0,
+			};
+
+			var trashed = await StorageTrashBinService.GetAllRecycleBinFoldersAsync();
+			var iconCache = Ioc.Default.GetRequiredService<IIconCacheService>();
+			var iconSize = GetPreloadIconSize();
+			var items = new List<ListedItem>(trashed.Count);
+
+			foreach (var entry in trashed)
+			{
+				if (cancellationToken.IsCancellationRequested)
+					break;
+
+				var name = entry.FileName ?? Path.GetFileName(entry.RecyclePath) ?? string.Empty;
+				var extension = entry.IsFolder || !name.Contains('.') ? null : Path.GetExtension(name);
+				var itemType = entry.IsFolder ? folderTypeTextLocalized : Strings.File.GetLocalizedResource();
+				if (extension is not null)
+				{
+					var localizedType = FileTypesHelper.GetLocalizedTypeName(extension);
+					itemType = !string.IsNullOrEmpty(localizedType) ? localizedType : extension.Trim('.') + " " + itemType;
+				}
+
+				var item = new RecycleBinItem(null)
+				{
+					PrimaryItemAttribute = entry.IsFolder ? StorageItemTypes.Folder : StorageItemTypes.File,
+					FileExtension = extension,
+					ItemNameRaw = name,
+					ItemPath = entry.RecyclePath ?? string.Empty,
+					ItemOriginalPath = entry.FilePath,
+					ItemDateDeletedReal = entry.RecycleDate,
+					ItemDateModifiedReal = entry.ModifiedDate,
+					ItemDateCreatedReal = entry.CreatedDate,
+					ItemType = itemType,
+					FileImage = null,
+					LoadFileIcon = false,
+					Opacity = 1d,
+					FileSize = entry.IsFolder ? null : entry.FileSize,
+					FileSizeBytes = (long)entry.FileSizeBytes,
+				};
+
+				try { item.PreloadedIconData = await iconCache.GetIconAsync(item.ItemPath, item.FileExtension, entry.IsFolder, iconSize); }
+				catch (Exception ex) { App.Logger.LogWarning(ex, "Could not load icon for {Path}", item.ItemPath); }
+
+				items.Add(item);
+			}
+
+			if (cancellationToken.IsCancellationRequested)
+				return -1;
+
+			filesAndFolders.Clear();
+			filesAndFolders.AddRange(items);
+
+			await OrderFilesAndFoldersAsync();
+			await ApplyFilesAndFoldersChangesAsync();
+
+			IsLocationUnavailable = false;
+			return 4;
+		}
+
+		// Trash changes are pushed by ITrashService.Watcher rather than by a folder watcher on trash:///
+		private void WatchForLinuxTrashChanges()
+		{
+			if (isDisposed)
+				return;
+
+			CloseLinuxWatcher();
+
+			try
+			{
+				var notifier = Ioc.Default.GetRequiredService<ITrashService>().Watcher;
+				void OnChanged(object? s, EventArgs e) => _ = RefreshAfterLinuxChangeAsync();
+
+				notifier.ItemAdded += OnChanged;
+				notifier.ItemDeleted += OnChanged;
+				notifier.ItemChanged += OnChanged;
+				notifier.ItemRenamed += OnChanged;
+				notifier.RefreshRequested += OnChanged;
+				notifier.StartWatcher();
+
+				_linuxTrashUnsubscribe = () =>
+				{
+					notifier.ItemAdded -= OnChanged;
+					notifier.ItemDeleted -= OnChanged;
+					notifier.ItemChanged -= OnChanged;
+					notifier.ItemRenamed -= OnChanged;
+					notifier.RefreshRequested -= OnChanged;
+				};
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not watch the trash");
+			}
+		}
 
 		private ListedItem CreateLinuxListedItem(FileSystemEntryInfo entry)
 		{
@@ -325,6 +449,7 @@ namespace Files.App.ViewModels
 			_linuxRefreshDebounce?.Cancel();
 			_linuxWatcher?.Dispose();
 			_linuxWatcher = null;
+			Interlocked.Exchange(ref _linuxTrashUnsubscribe, null)?.Invoke();
 		}
 	}
 }

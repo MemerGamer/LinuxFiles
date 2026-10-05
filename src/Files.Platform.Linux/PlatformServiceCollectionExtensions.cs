@@ -14,6 +14,7 @@ using Files.Platform.Linux.Search;
 using Files.Platform.Linux.Secrets;
 using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Trash;
+using Files.Platform.Linux.Volumes;
 using Files.Platform.Linux.Watching;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -44,7 +45,8 @@ namespace Files.Platform.Linux
 				.AddLinuxPermissions()
 				.AddLinuxSearch()
 				.AddLinuxSecrets()
-				.AddLinuxClipboard();
+				.AddLinuxClipboard()
+				.AddLinuxVolumes();
 		}
 	}
 }

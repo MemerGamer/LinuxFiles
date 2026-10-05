@@ -63,6 +63,29 @@ namespace Files.App.Data.Items
 			MinHeight = minHeight;
 
 			ApplyDefaultSize();
+
+			// A compositor-driven resize (tiling, maximize) can leave the XAML tree laid out at the previous size
+			AppWindow.Changed += AppWindow_Changed;
+		}
+
+		private bool relayoutQueued;
+
+		private void AppWindow_Changed(AppWindow sender, AppWindowChangedEventArgs args)
+		{
+			if (!args.DidSizeChange || relayoutQueued)
+				return;
+
+			relayoutQueued = true;
+			DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+			{
+				relayoutQueued = false;
+				if (base.Content is FrameworkElement root)
+				{
+					root.InvalidateMeasure();
+					root.InvalidateArrange();
+					root.UpdateLayout();
+				}
+			});
 		}
 
 		/// <summary>
@@ -135,6 +158,7 @@ namespace Files.App.Data.Items
 
 		public void Dispose()
 		{
+			AppWindow.Changed -= AppWindow_Changed;
 		}
 	}
 }

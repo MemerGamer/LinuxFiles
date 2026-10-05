@@ -66,9 +66,9 @@ namespace Files.App.Utils.Storage
 		{
 			// Overlays render at 32px in thumbnail layouts and 16px in details/columns; scale by DPI so the badge isn't upscaled at fractional scaling
 #if !WINDOWS
-			// LINUX-TODO(icons): overlays (cloud/sync status, link arrow) have no Linux source yet
-			await Task.CompletedTask;
-			return null;
+			// Only the symlink emblem exists on Linux; cloud/sync status has no freedesktop equivalent
+			var overlaySize = (requestedSize >= 48 ? 32u : 16u) * App.AppModel.AppWindowDPI;
+			return await LinuxIconHelper.GetOverlayAsync(path, (uint)overlaySize);
 #else
 			var overlaySize = (requestedSize >= 48 ? 32u : 16u) * App.AppModel.AppWindowDPI;
 			return await STATask.RunPooled(() => Win32Helper.GetIconOverlay(path, (int)overlaySize, isFolder), App.Logger);

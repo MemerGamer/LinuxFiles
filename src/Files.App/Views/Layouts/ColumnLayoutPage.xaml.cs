@@ -161,7 +161,7 @@ namespace Files.App.Views.Layouts
 
 		protected override void ItemManipulationModel_ScrollToTopInvoked(object? sender, EventArgs e)
 		{
-			ContentScroller?.ChangeView(null, 0, null, true);
+			ResetScroll(ContentScroller, null, 0);
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(ListViewItem))]

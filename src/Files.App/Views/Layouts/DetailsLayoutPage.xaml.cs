@@ -126,7 +126,7 @@ namespace Files.App.Views.Layouts
 
 		protected override void ItemManipulationModel_ScrollToTopInvoked(object? sender, EventArgs e)
 		{
-			ContentScroller?.ChangeView(null, 0, null, true);
+			ResetScroll(ContentScroller, null, 0);
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(ListViewItem))]
@@ -534,6 +534,11 @@ namespace Files.App.Views.Layouts
 		{
 			if (ParentShellPageInstance is null || IsRenamingItem)
 				return;
+
+#if DESKTOP
+			if (TryHandleListJumpKey(e))
+				return;
+#endif
 
 			var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
 			var shiftPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);

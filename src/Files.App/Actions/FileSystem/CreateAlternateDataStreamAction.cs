@@ -27,6 +27,7 @@ namespace Files.App.Actions
 			=> new RichGlyph(themedIconStyle: "App.ThemedIcons.AltDataStream");
 
 		public override bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			context.HasSelection &&
 			context.CanCreateItem &&
 			UIHelpers.CanShowDialog;

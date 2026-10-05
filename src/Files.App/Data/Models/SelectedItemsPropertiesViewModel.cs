@@ -5,7 +5,6 @@ using Files.App.ViewModels.Properties;
 using Files.Shared.Helpers;
 using System.Windows.Input;
 using TagLib;
-using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Files.App.Data.Models
 {
@@ -518,6 +517,16 @@ namespace Files.App.Data.Models
 			set => SetProperty(ref itemAttributesVisibility, value);
 		}
 
+		private bool compressAttributeVisibility = true;
+		/// <summary>
+		/// Gets or sets whether the NTFS compression row of the Attributes section is shown.
+		/// </summary>
+		public bool CompressAttributeVisibility
+		{
+			get => compressAttributeVisibility;
+			set => SetProperty(ref compressAttributeVisibility, value);
+		}
+
 		private string? selectedItemsCountString;
 		public string? SelectedItemsCountString
 		{
@@ -827,17 +836,17 @@ namespace Files.App.Data.Models
 			set => SetProperty(ref runAsAdminEnabled, value);
 		}
 
-		private static readonly Dictionary<SHOW_WINDOW_CMD, string> showWindowCommandTypes = new()
+		private static readonly Dictionary<ShowWindowCommand, string> showWindowCommandTypes = new()
 		{
-			[SHOW_WINDOW_CMD.SW_NORMAL] = Strings.NormalWindow.GetLocalizedResource(),
-			[SHOW_WINDOW_CMD.SW_SHOWMINNOACTIVE] = Strings.Minimized.GetLocalizedResource(),
-			[SHOW_WINDOW_CMD.SW_MAXIMIZE] = Strings.Maximized.GetLocalizedResource()
+			[ShowWindowCommand.Normal] = Strings.NormalWindow.GetLocalizedResource(),
+			[ShowWindowCommand.Minimized] = Strings.Minimized.GetLocalizedResource(),
+			[ShowWindowCommand.Maximized] = Strings.Maximized.GetLocalizedResource()
 		};
 
 		/// <summary>
 		/// The available show window command types.
 		/// </summary>
-		public Dictionary<SHOW_WINDOW_CMD, string> ShowWindowCommandTypes { get => showWindowCommandTypes; }
+		public Dictionary<ShowWindowCommand, string> ShowWindowCommandTypes { get => showWindowCommandTypes; }
 
 		/// <summary>
 		/// The localized string of the currently selected ShowWindowCommand.
@@ -849,11 +858,11 @@ namespace Files.App.Data.Models
 			set => ShowWindowCommandEditedValue = ShowWindowCommandTypes.First(e => e.Value == value).Key;
 		}
 
-		private SHOW_WINDOW_CMD showWindowCommand;
+		private ShowWindowCommand showWindowCommand;
 		/// <summary>
-		/// The current <see cref="SHOW_WINDOW_CMD"/> property of the item.
+		/// The current <see cref="Files.App.Data.Enums.ShowWindowCommand"/> property of the item.
 		/// </summary>
-		public SHOW_WINDOW_CMD ShowWindowCommand
+		public ShowWindowCommand ShowWindowCommand
 		{
 			get => showWindowCommand;
 			set
@@ -863,11 +872,11 @@ namespace Files.App.Data.Models
 			}
 		}
 
-		private SHOW_WINDOW_CMD showWindowCommandEditedValue;
+		private ShowWindowCommand showWindowCommandEditedValue;
 		/// <summary>
-		/// The edited <see cref="SHOW_WINDOW_CMD"/> property of the item.
+		/// The edited <see cref="Files.App.Data.Enums.ShowWindowCommand"/> property of the item.
 		/// </summary>
-		public SHOW_WINDOW_CMD ShowWindowCommandEditedValue
+		public ShowWindowCommand ShowWindowCommandEditedValue
 		{
 			get => showWindowCommandEditedValue;
 			set

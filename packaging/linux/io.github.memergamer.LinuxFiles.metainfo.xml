@@ -3,10 +3,10 @@
   <id>io.github.memergamer.LinuxFiles</id>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
-  <name>Files</name>
-  <summary>A modern file manager</summary>
+  <name>LinuxFiles</name>
+  <summary>Files for Linux, a modern file manager</summary>
   <description>
-    <p>Files is a modern file manager with tabs, a dual-pane view, column and grid layouts, tags, previews and archive support. This is the Linux port built on the Uno Platform.</p>
+    <p>LinuxFiles, Files for Linux, is based on Files by the Files Community. It is a modern file manager with tabs, a dual-pane view, column and grid layouts, tags, previews and archive support. LinuxFiles is an unofficial, community-maintained Linux port of Files by the Files Community, built on the Uno Platform and not affiliated with or endorsed by the Files Community.</p>
     <p>This port is under active development and is not yet feature complete.</p>
   </description>
   <launchable type="desktop-id">io.github.memergamer.LinuxFiles.desktop</launchable>
@@ -16,7 +16,7 @@
   <url type="homepage">https://github.com/MemerGamer/LinuxFiles</url>
   <url type="bugtracker">https://github.com/MemerGamer/LinuxFiles/issues</url>
   <developer id="io.github.memergamer">
-    <name>Files Community and contributors</name>
+    <name>LinuxFiles contributors (fork of Files by Files Community)</name>
   </developer>
   <categories>
     <category>System</category>

@@ -131,6 +131,7 @@
 			x:Key="CompactItemContainerStyle"
 			BasedOn="{StaticResource DefaultListViewItemStyle}"
 			TargetType="ListViewItem">
+				<Setter Property="Template" Value="{StaticResource Files.ListViewItemTemplate}" />
 			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
 			<Setter Property="MinHeight" Value="1" />
 			<Setter Property="Margin" Value="-2" />
@@ -141,6 +142,7 @@
 			x:Key="RegularItemContainerStyle"
 			BasedOn="{StaticResource DefaultListViewItemStyle}"
 			TargetType="ListViewItem">
+				<Setter Property="Template" Value="{StaticResource Files.ListViewItemTemplate}" />
 			<Setter Property="HorizontalContentAlignment" Value="Stretch" />
 			<Setter Property="MinHeight" Value="1" />
 			<Setter Property="Margin" Value="0" />
@@ -313,7 +315,19 @@
 									TextWrapping="Wrap"
 									Visibility="Collapsed">
 									<TextBox.Resources>
-										<SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{ThemeResource SolidBackgroundFillColorSecondary}" />
+										<ResourceDictionary>
+											<ResourceDictionary.ThemeDictionaries>
+												<ResourceDictionary x:Key="Light">
+													<SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{StaticResource ControlFillColorInputActive}" />
+												</ResourceDictionary>
+												<ResourceDictionary x:Key="Dark">
+													<SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#1E1E1E" />
+												</ResourceDictionary>
+												<ResourceDictionary x:Key="HighContrast">
+													<SolidColorBrush x:Key="TextControlBackgroundFocused" Color="{StaticResource SystemColorButtonFaceColor}" />
+												</ResourceDictionary>
+											</ResourceDictionary.ThemeDictionaries>
+										</ResourceDictionary>
 									</TextBox.Resources>
 								</TextBox>
 

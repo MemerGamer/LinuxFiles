@@ -712,7 +712,7 @@ namespace Files.App.ViewModels.UserControls
 			var path = pathItem.Path
 				?? throw new InvalidOperationException("The path box item does not have a path.");
 
-			var childFolders = GetSubfolders(path);
+			var childFolders = OperatingSystem.IsWindows() ? GetSubfolders(path) : await GetSubfoldersAsync(path);
 
 			// Fall back to StorageFolder API for non-filesystem paths (e.g. FTP)
 			if (childFolders is null)
@@ -748,7 +748,7 @@ namespace Files.App.ViewModels.UserControls
 			var workingPath =
 				PathComponents[PathComponents.Count - 1].Path?.TrimEnd(Path.DirectorySeparatorChar);
 
-			foreach (var (name, childPath, isHidden) in childFolders)
+			foreach (var (name, childPath, isHidden) in childFolders.Take(OperatingSystem.IsWindows() ? int.MaxValue : MaxBreadcrumbSubfolders))
 			{
 				var flyoutItem = new MenuFlyoutItem
 				{
@@ -772,6 +772,58 @@ namespace Files.App.ViewModels.UserControls
 
 				// Start loading the thumbnail in the background
 				_ = LoadFlyoutItemIconAsync(flyoutItem, childPath);
+			}
+
+			if (!OperatingSystem.IsWindows() && childFolders.Count > MaxBreadcrumbSubfolders)
+			{
+				flyout.Items?.Add(new MenuFlyoutSeparator());
+				flyout.Items?.Add(new MenuFlyoutItem
+				{
+					Text = string.Format(Strings.BreadcrumbMoreFolders.GetLocalizedResource(), childFolders.Count - MaxBreadcrumbSubfolders),
+					IsEnabled = false,
+				});
+			}
+		}
+
+		private const int MaxBreadcrumbSubfolders = 500;
+
+		/// <summary>
+		/// Lists the subfolders of a folder through the platform enumerator, off the UI thread, honoring the hidden-item settings.
+		/// Returns null when the folder cannot be enumerated (e.g. a non-filesystem path).
+		/// </summary>
+		private async Task<List<(string Name, string Path, bool IsHidden)>?> GetSubfoldersAsync(string parentPath)
+		{
+			var folderSettings = UserSettingsService.FoldersSettingsService;
+			var includeHidden = folderSettings.ShowHiddenItems || folderSettings.ShowDotFiles;
+			var showDot = folderSettings.ShowDotFiles;
+			var showHidden = folderSettings.ShowHiddenItems;
+			var enumerator = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Enumeration.IFileSystemEnumerator>();
+
+			try
+			{
+				return await Task.Run(async () =>
+				{
+					var folders = new List<(string Name, string Path, bool IsHidden)>();
+					await foreach (var entry in enumerator.EnumerateAsync(parentPath, new Files.Platform.Abstractions.Enumeration.FileSystemEnumerationOptions { IncludeHidden = includeHidden }))
+					{
+						if (!entry.IsDirectory)
+							continue;
+
+						var isDot = entry.Name.StartsWith('.');
+						if (isDot ? !showDot : entry.IsHidden && !showHidden)
+							continue;
+
+						folders.Add((entry.Name, entry.FullPath, entry.IsHidden));
+					}
+
+					var naturalComparer = NaturalStringComparer.GetForProcessor();
+					folders.Sort((a, b) => naturalComparer.Compare(a.Name, b.Name));
+					return folders;
+				});
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return null;
 			}
 		}
 

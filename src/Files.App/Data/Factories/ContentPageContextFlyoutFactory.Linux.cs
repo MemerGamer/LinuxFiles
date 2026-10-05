@@ -73,8 +73,9 @@ namespace Files.App.Data.Factories
 					? Strings.NewTextDocument.GetLocalizedResource() + System.IO.Path.GetExtension(template.DefaultFileName)
 					: null;
 
-				await Ioc.Default.GetRequiredService<ITemplatesService>().CreateFromTemplateAsync(template, folder, name);
+				var createdPath = await Ioc.Default.GetRequiredService<ITemplatesService>().CreateFromTemplateAsync(template, folder, name);
 				await shellPage.RefreshIfNoWatcherExistsAsync();
+				await UIFilesystemHelpers.SelectAndRenameNewItemAsync(shellPage, createdPath);
 			}
 			catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or ArgumentException)
 			{

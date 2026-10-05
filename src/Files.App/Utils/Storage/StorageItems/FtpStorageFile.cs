@@ -261,13 +261,10 @@ namespace Files.App.Utils.Storage
 
 		private AsyncFtpClient GetFtpClient()
 		{
-			string host = FtpHelpers.GetFtpHost(Path);
-			ushort port = FtpHelpers.GetFtpPort(Path);
-			var credentials = Credentials is not null ?
-				new NetworkCredential(Credentials.UserName, Credentials.SecurePassword) :
-				FtpManager.Credentials.Get(host, FtpManager.Anonymous);
-
-			return new(host, credentials, port);
+			// Same URL parsing, credential scope and TLS policy as the OwlCore storables
+			return FtpClientFactory.Create(
+				FtpUrl.Parse(Path),
+				Credentials is null ? null : new NetworkCredential(Credentials.UserName, Credentials.SecurePassword));
 		}
 
 		private async void FtpDataStreamingHandlerAsync(StreamedFileDataRequest request)

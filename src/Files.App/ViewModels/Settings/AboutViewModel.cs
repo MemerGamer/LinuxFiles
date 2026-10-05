@@ -27,7 +27,7 @@ namespace Files.App.ViewModels.Settings
 			=> $"{Strings.SettingsAboutVersionTitle.GetLocalizedResource()} {GetAppVersion()}";
 
 		public string AppName
-			=> OperatingSystem.IsLinux() ? typeof(AboutViewModel).Assembly.GetName().Name ?? string.Empty : Package.Current.DisplayName;
+			=> OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : Package.Current.DisplayName;
 
 		public Microsoft.UI.Xaml.Visibility WindowsOnlyVisibility => OperatingSystem.IsWindows()
 			? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;

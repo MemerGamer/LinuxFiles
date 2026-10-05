@@ -86,7 +86,7 @@ namespace Files.Platform.Linux.Icons
 	/// </summary>
 	public sealed class LinuxIconThemeProvider : IIconThemeProvider
 	{
-		private static readonly string[] FallbackThemes = ["Adwaita", "breeze", "gnome", "Papirus"];
+		private static readonly string[] FallbackThemes = ["breeze", "Adwaita", "gnome", "Papirus"];
 		private static readonly string[] Extensions = [".png", ".svg", ".xpm"];
 
 		private readonly LinuxIconThemeOptions _options;
@@ -138,123 +138,124 @@ namespace Files.Platform.Linux.Icons
 			}, cancellationToken);
 		}
 
+		/// <inheritdoc/>
+		public Task<IReadOnlyList<IconLookupResult>> ResolveIconCandidatesAsync(IReadOnlyList<string> iconNames, uint size, int scale = 1, CancellationToken cancellationToken = default)
+		{
+			return Task.Run<IReadOnlyList<IconLookupResult>>(() =>
+			{
+				var results = new List<IconLookupResult>();
+				var paths = new HashSet<string>(StringComparer.Ordinal);
+				foreach (var name in iconNames)
+				{
+					foreach (var result in FindCandidates(name, (int)size, Math.Max(1, scale)))
+					{
+						cancellationToken.ThrowIfCancellationRequested();
+						if (paths.Add(result.Path))
+							results.Add(result);
+					}
+				}
+
+				return results;
+			}, cancellationToken);
+		}
+
 		private IconLookupResult? Resolve(string iconName, int size, int scale)
 		{
 			if (string.IsNullOrEmpty(iconName))
 				return null;
 
 			if (Path.IsPathRooted(iconName))
-				return File.Exists(iconName) ? ToResult(iconName) : null;
+				return IconExists(iconName) ? ToResult(iconName) : null;
 
 			return _cache.GetOrAdd((iconName, size, scale), key => FindWithFallbackNames(key.Name, key.Size, key.Scale));
 		}
 
 		private IconLookupResult? FindWithFallbackNames(string name, int size, int scale)
 		{
-			// "folder-documents" falls back to "folder" when the theme has no specific icon.
-			var current = name;
+			foreach (var result in FindCandidates(name, size, scale))
+				return result;
+
+			return null;
+		}
+
+		private IEnumerable<IconLookupResult> FindCandidates(string name, int size, int scale)
+		{
+			if (string.IsNullOrEmpty(name))
+				yield break;
+
+			if (Path.IsPathRooted(name))
+			{
+				if (IconExists(name))
+					yield return ToResult(name);
+				yield break;
+			}
+
 			while (true)
 			{
-				var result = FindIcon(current, size, scale);
-				if (result is not null)
-					return result;
+				var visited = new HashSet<string>(StringComparer.Ordinal);
+				foreach (var theme in new[] { CurrentThemeName, "hicolor" }.Concat(FallbackThemes))
+				{
+					foreach (var result in FindInTheme(theme, name, size, scale, visited))
+						yield return result;
+				}
 
-				var dash = current.LastIndexOf('-');
+				foreach (var dir in _options.IconDirectories.Concat(_options.PixmapDirectories))
+				{
+					foreach (var result in FindFiles(dir, name))
+						yield return result;
+				}
+
+				// "folder-documents" falls back to "folder" when the theme has no specific icon.
+				var dash = name.LastIndexOf('-');
 				if (dash <= 0)
-					return null;
+					yield break;
 
-				current = current[..dash];
+				name = name[..dash];
 			}
 		}
 
-		private IconLookupResult? FindIcon(string name, int size, int scale)
+		private IEnumerable<IconLookupResult> FindInTheme(string theme, string name, int size, int scale, HashSet<string> visited)
 		{
-			var visited = new HashSet<string>(StringComparer.Ordinal);
-			var result = FindInTheme(CurrentThemeName, name, size, scale, visited) ?? FindInTheme("hicolor", name, size, scale, visited);
-			foreach (var fallbackTheme in FallbackThemes)
-				result ??= FindInTheme(fallbackTheme, name, size, scale, visited);
+			if (!visited.Add(theme) || GetTheme(theme) is not { } index)
+				yield break;
 
-			return result ?? FindFallback(name);
-		}
-
-		private IconLookupResult? FindInTheme(string theme, string name, int size, int scale, HashSet<string> visited)
-		{
-			if (!visited.Add(theme))
-				return null;
-
-			var index = GetTheme(theme);
-			if (index is null)
-				return null;
-
-			var path = LookupInTheme(theme, index, name, size, scale);
-			if (path is not null)
-				return ToResult(path);
+			foreach (var directory in index.Directories.OrderBy(d => d.Matches(size, scale) ? 0 : 1).ThenBy(d => d.Distance(size, scale)))
+			{
+				foreach (var baseDir in _options.IconDirectories)
+				{
+					foreach (var result in FindFiles(Path.Combine(baseDir, theme, directory.Path), name))
+						yield return result;
+				}
+			}
 
 			foreach (var parent in index.Inherits)
 			{
-				var inherited = FindInTheme(parent, name, size, scale, visited);
-				if (inherited is not null)
-					return inherited;
+				foreach (var result in FindInTheme(parent, name, size, scale, visited))
+					yield return result;
 			}
-
-			return null;
 		}
 
-		private string? LookupInTheme(string theme, IconThemeIndex index, string name, int size, int scale)
+		private static IEnumerable<IconLookupResult> FindFiles(string directory, string name)
 		{
-			string? best = null;
-			var bestDistance = int.MaxValue;
-
-			foreach (var directory in index.Directories)
+			foreach (var ext in Extensions)
 			{
-				var matches = directory.Matches(size, scale);
-				var distance = matches ? 0 : directory.Distance(size, scale);
-				if (!matches && distance >= bestDistance)
-					continue;
-
-				var file = FindFile(theme, directory.Path, name);
-				if (file is null)
-					continue;
-
-				if (matches)
-					return file;
-
-				best = file;
-				bestDistance = distance;
+				var file = Path.Combine(directory, name + ext);
+				if (IconExists(file))
+					yield return ToResult(file);
 			}
-
-			return best;
 		}
 
-		private string? FindFile(string theme, string subDirectory, string name)
+		private static bool IconExists(string path)
 		{
-			foreach (var baseDir in _options.IconDirectories)
+			try
 			{
-				var dir = Path.Combine(baseDir, theme, subDirectory);
-				foreach (var ext in Extensions)
-				{
-					var file = Path.Combine(dir, name + ext);
-					if (File.Exists(file))
-						return file;
-				}
+				var file = new FileInfo(path);
+				return file.Exists && (file.LinkTarget is null || file.ResolveLinkTarget(true)?.Exists == true);
 			}
-
-			return null;
-		}
-
-		private IconLookupResult? FindFallback(string name)
-		{
-			foreach (var dir in _options.IconDirectories.Concat(_options.PixmapDirectories))
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
-				foreach (var ext in Extensions)
-				{
-					var file = Path.Combine(dir, name + ext);
-					if (File.Exists(file))
-						return ToResult(file);
-				}
+				return false;
 			}
-
-			return null;
 		}
 
 		private IconThemeIndex? GetTheme(string theme)

@@ -48,6 +48,68 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		public async Task ListingStopsAtEntryCapForHugeZip()
+		{
+			var path = Path.Combine(root, "many.zip");
+			using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+			{
+				for (var i = 0; i < 120_000; i++)
+					zip.CreateEntry("f" + i);
+			}
+			var listing = await service.ListAsync(path);
+			Assert.IsTrue(listing.IsTruncated);
+			Assert.AreEqual(100_000, listing.Entries.Count);
+			Assert.IsTrue(await service.HasMultipleTopLevelEntriesAsync(path));
+			Assert.IsFalse(await service.IsEncryptedAsync(path));
+		}
+
+		[TestMethod]
+		public async Task BigTarGzListsWithinCapsButNotForBrowsing()
+		{
+			var path = Path.Combine(root, "big.tar.gz");
+			var tarPath = Path.Combine(root, "big.tar");
+			using (var tarFile = File.Create(tarPath))
+			using (var tar = new TarWriter(tarFile))
+			{
+				tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "dir/big.bin") { DataStream = new ZeroStream(96L * 1024 * 1024) });
+				tar.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "dir/small.txt") { DataStream = new MemoryStream([1]) });
+			}
+			using (var input = File.OpenRead(tarPath))
+			using (var output = File.Create(path))
+			using (var gzip = new GZipStream(output, CompressionLevel.Fastest))
+				input.CopyTo(gzip);
+			var listing = await service.ListAsync(path);
+			Assert.IsFalse(listing.IsTruncated);
+			Assert.AreEqual(2, listing.Entries.Count);
+			Assert.IsFalse(await service.IsEncryptedAsync(path));
+			Assert.IsFalse(await service.HasMultipleTopLevelEntriesAsync(path));
+			await Assert.ThrowsAsync<ArchiveSecurityException>(() => service.ListForBrowsingAsync(path));
+		}
+
+		private sealed class ZeroStream : Stream
+		{
+			private readonly long length;
+			private long remaining;
+			public ZeroStream(long length) { this.length = length; remaining = length; }
+			public override bool CanRead => true;
+			public override bool CanSeek => false;
+			public override bool CanWrite => false;
+			public override long Length => length;
+			public override long Position { get => length - remaining; set => throw new NotSupportedException(); }
+			public override int Read(byte[] buffer, int offset, int count)
+			{
+				var n = (int)Math.Min(count, remaining);
+				Array.Clear(buffer, offset, n);
+				remaining -= n;
+				return n;
+			}
+			public override void Flush() { }
+			public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+			public override void SetLength(long value) => throw new NotSupportedException();
+			public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+		}
+
+		[TestMethod]
 		public async Task RealArchiveNamedDirectoriesFallThrough()
 		{
 			var folder = Directory.CreateDirectory(Path.Combine(root, "a.zip"));

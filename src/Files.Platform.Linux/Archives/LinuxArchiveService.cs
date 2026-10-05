@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.Archives;
+using Files.Platform.Linux.Previews;
 using SharpCompress.Common;
 using SharpCompress.Readers;
 
@@ -27,7 +28,11 @@ namespace Files.Platform.Linux.Archives
 			".zip", ".jar", ".mrpack", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".lz",
 		];
 
-		private const int MaxListedEntries = 5_000_000;
+		private sealed record ScanLimits(int Entries, long NameBytes, long HeaderBytes, long StreamBytes, TimeSpan Time);
+
+		// Header bytes bound zip/7z/rar directories; stream bytes bound the decompressed scan of tar and single-file formats
+		private static readonly ScanLimits ListScan = new(100_000, 16L * 1024 * 1024, 128L * 1024 * 1024, 16L * 1024 * 1024 * 1024, TimeSpan.FromSeconds(60));
+		private static readonly ScanLimits QuickScan = new(10_000, 2L * 1024 * 1024, 32L * 1024 * 1024, 1L * 1024 * 1024 * 1024, TimeSpan.FromSeconds(10));
 
 		private readonly ISevenZipRunner sevenZip;
 
@@ -84,26 +89,47 @@ namespace Files.Platform.Linux.Archives
 		}
 
 		/// <inheritdoc/>
-		public Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
+		public async Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
 		{
-			return Task.Run(() =>
+			var fallback = GetDefaultExtractFolderName(archivePath);
+			var entries = new List<ArchiveEntryInfo>();
+			var encrypted = false;
+			var (truncated, solid) = await ScanHeadersAsync(archivePath, password, fileNameEncoding, entry =>
 			{
-				using var archive = OpenArchive(archivePath, password, fileNameEncoding, null, cancellationToken);
-				var fallback = GetDefaultExtractFolderName(archivePath);
-				var entries = new List<ArchiveEntryInfo>();
-				var encrypted = false;
+				encrypted |= entry.IsEncrypted;
+				entries.Add(ToInfo(entry, fallback));
+				return true;
+			}, ListScan, cancellationToken).ConfigureAwait(false);
 
-				foreach (var (entry, _) in archive.Entries(headersOnly: true))
+			return new ArchiveListing(entries, encrypted, solid, truncated);
+		}
+
+		/// <inheritdoc/>
+		public async Task<bool> HasMultipleTopLevelEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
+		{
+			string? first = null;
+			var multiple = false;
+			try
+			{
+				var (truncated, _) = await ScanHeadersAsync(archivePath, password, null, entry =>
 				{
-					cancellationToken.ThrowIfCancellationRequested();
-					if (entries.Count >= MaxListedEntries)
-						throw new ArchiveSecurityException("The archive entry count limit was exceeded.");
-					encrypted |= entry.IsEncrypted;
-					entries.Add(ToInfo(entry, fallback));
-				}
+					var segment = (entry.Key ?? string.Empty).Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(s => s is not ".");
+					if (segment is null)
+						return true;
+					if (first is null)
+						first = segment;
+					else if (segment != first)
+						multiple = true;
+					return !multiple;
+				}, QuickScan, cancellationToken).ConfigureAwait(false);
 
-				return new ArchiveListing(entries, encrypted, archive.IsSolid);
-			}, cancellationToken);
+				// Too large to tell: extracting into a child folder is the safe choice
+				return multiple || truncated;
+			}
+			catch (ArchivePasswordException)
+			{
+				return true;
+			}
 		}
 
 		/// <inheritdoc/>
@@ -146,31 +172,62 @@ namespace Files.Platform.Linux.Archives
 			IsLink(entry) ? entry.LinkTarget ?? string.Empty : null);
 
 		/// <inheritdoc/>
-		public Task<bool> IsEncryptedAsync(string archivePath, CancellationToken cancellationToken = default)
+		public async Task<bool> IsEncryptedAsync(string archivePath, CancellationToken cancellationToken = default)
 		{
 			// Tar and single-file compression formats have no encryption
 			var name = Path.GetFileName(archivePath).ToLowerInvariant();
 			if (ArchiveSource.TarCodec(name) is not null || ArchiveSource.SingleFileCodec(name) is not null)
-				return Task.FromResult(false);
+				return false;
 
+			var found = false;
+			try
+			{
+				await ScanHeadersAsync(archivePath, null, null, entry => !(found = entry.IsEncrypted), QuickScan, cancellationToken).ConfigureAwait(false);
+				return found;
+			}
+			catch (ArchivePasswordException)
+			{
+				// Encrypted headers
+				return true;
+			}
+		}
+
+		/// <summary>Streams entry headers without buffering content. Hitting a cap ends the scan and reports it as truncated instead of failing.</summary>
+		private Task<(bool Truncated, bool Solid)> ScanHeadersAsync(string archivePath, string? password, Encoding? encoding, Func<EntryData, bool> visit, ScanLimits limits, CancellationToken cancellationToken)
+		{
 			return Task.Run(() =>
 			{
+				using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+				timeout.CancelAfter(limits.Time);
+				var solid = false;
 				try
 				{
-					using var archive = OpenArchive(archivePath, null, null, null, cancellationToken);
+					var name = Path.GetFileName(archivePath).ToLowerInvariant();
+					var inputCap = ArchiveSource.TarCodec(name) is not null || ArchiveSource.SingleFileCodec(name) is not null ? limits.StreamBytes : limits.HeaderBytes;
+					using var archive = OpenArchive(archivePath, password, encoding, inputCap, timeout.Token);
+					solid = archive.IsSolid;
+					var count = 0;
+					long nameBytes = 0;
 					foreach (var (entry, _) in archive.Entries(headersOnly: true))
 					{
-						cancellationToken.ThrowIfCancellationRequested();
-						if (entry.IsEncrypted)
-							return true;
+						timeout.Token.ThrowIfCancellationRequested();
+						nameBytes += Encoding.UTF8.GetByteCount(entry.Key ?? string.Empty);
+						if (count >= limits.Entries || nameBytes > limits.NameBytes)
+							return (true, solid);
+						count++;
+						if (!visit(entry))
+							break;
 					}
 
-					return false;
+					return (false, solid);
 				}
-				catch (ArchivePasswordException)
+				catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
 				{
-					// Encrypted headers
-					return true;
+					return (true, solid);
+				}
+				catch (InvalidDataException ex) when (ex.Message == PreviewReadStream.LimitMessage)
+				{
+					return (true, solid);
 				}
 			}, cancellationToken);
 		}

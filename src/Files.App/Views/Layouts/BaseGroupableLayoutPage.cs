@@ -356,38 +356,64 @@ namespace Files.App.Views.Layouts
 			if (textBlock is null || textBox is null)
 				throw new InvalidOperationException("The rename controls are not available for the selected item.");
 
-			string editText = ShouldShowExtensionInRename(renamingItem) ? renamingItem.ItemNameRaw! : textBlock.Text;
-			ApplyRenameBoxColors(textBox);
-			textBox.Text = editText;
-			OldItemName = editText;
-			textBlock.Visibility = Visibility.Collapsed;
-			textBox.Visibility = Visibility.Visible;
+			try
+			{
+				string editText = ShouldShowExtensionInRename(renamingItem) ? renamingItem.ItemNameRaw! : textBlock.Text;
+				ApplyRenameBoxColors(textBox);
+				textBox.Text = editText;
+				OldItemName = editText;
+				textBlock.Visibility = Visibility.Collapsed;
+				textBox.Visibility = Visibility.Visible;
 
-			var parentGrid = textBox.FindParent<Grid>();
-			if (parentGrid is null)
+				var parentGrid = textBox.FindParent<Grid>();
+				if (parentGrid is null)
+				{
+					textBlock.Visibility = Visibility.Visible;
+					textBox.Visibility = Visibility.Collapsed;
+					return;
+				}
+
+				Grid.SetColumnSpan(parentGrid, 8);
+
+				textBox.Focus(FocusState.Pointer);
+				textBox.LostFocus += RenameTextBox_LostFocus;
+				textBox.KeyDown += RenameTextBox_KeyDown;
+
+				int selectedTextLength = editText.Length;
+
+				if (!renamingItem.IsShortcut && (ShouldShowExtensionInRename(renamingItem) || UserSettingsService.FoldersSettingsService.ShowFileExtensions))
+					selectedTextLength -= extensionLength;
+
+				textBox.Select(0, selectedTextLength);
+				IsRenamingItem = true;
+
+				renameTextBox = textBox;
+				if (guardRenameFromDoubleClick)
+					DeferRenameTextBoxHitTesting(textBox);
+			}
+			catch
+			{
+				// A failure after the label was hidden must not leave the name blank
+				textBox.LostFocus -= RenameTextBox_LostFocus;
+				textBox.KeyDown -= RenameTextBox_KeyDown;
+				textBox.Visibility = Visibility.Collapsed;
+				textBlock.Visibility = Visibility.Visible;
+				IsRenamingItem = false;
+				throw;
+			}
+		}
+
+		protected override void RestoreItemNameDisplay(ListedItem? item)
+		{
+			if (item is null || IsRenamingItem)
+				return;
+
+			if (ListViewBase.ContainerFromItem(item) is DependencyObject container &&
+				container.FindDescendant("ItemName") is TextBlock textBlock)
 			{
 				textBlock.Visibility = Visibility.Visible;
-				textBox.Visibility = Visibility.Collapsed;
-				return;
+				textBlock.Opacity = item.Opacity;
 			}
-
-			Grid.SetColumnSpan(parentGrid, 8);
-
-			textBox.Focus(FocusState.Pointer);
-			textBox.LostFocus += RenameTextBox_LostFocus;
-			textBox.KeyDown += RenameTextBox_KeyDown;
-
-			int selectedTextLength = editText.Length;
-
-			if (!renamingItem.IsShortcut && (ShouldShowExtensionInRename(renamingItem) || UserSettingsService.FoldersSettingsService.ShowFileExtensions))
-				selectedTextLength -= extensionLength;
-
-			textBox.Select(0, selectedTextLength);
-			IsRenamingItem = true;
-
-			renameTextBox = textBox;
-			if (guardRenameFromDoubleClick)
-				DeferRenameTextBoxHitTesting(textBox);
 		}
 
 		protected async void DeferRenameTextBoxHitTesting(TextBox textBox)

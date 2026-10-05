@@ -477,7 +477,7 @@ namespace Files.App.Helpers
 			var arguments = string.Join(" ", items.Select(item => $"\"{item.Path}\""));
 			await Win32Helper.InvokeWin32ComponentAsync(executablePath, associatedInstance, arguments);
 #else
-			await LinuxLauncher.RunExecutableAsync(executablePath, items.Select(item => item.Path).ToArray(), workingDirectory);
+			await RunWithItemsLinuxAsync(executablePath, items.Select(item => item.Path).ToArray());
 #endif
 		}
 

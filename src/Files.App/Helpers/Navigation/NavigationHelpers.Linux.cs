@@ -186,7 +186,23 @@ namespace Files.App.Helpers
 			return await ExecutePlanAsync(path, await PlanAsync(path));
 		}
 
-		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan)
+		/// <summary>
+		/// Runs an executable with the dropped items as arguments. Goes through the same plan and confirmation as opening it;
+		/// anything that is not a confirmable executable is refused.
+		/// </summary>
+		internal static async Task<bool> RunWithItemsLinuxAsync(string executablePath, IReadOnlyList<string> arguments)
+		{
+			var plan = await PlanAsync(executablePath);
+			if (!OpenDecision.NeedsRunConfirmation(plan.Action))
+			{
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(DisplaySanitizer.Field(plan.Target)));
+				return false;
+			}
+
+			return await ExecutePlanAsync(executablePath, plan, arguments);
+		}
+
+		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan, IReadOnlyList<string>? arguments = null)
 		{
 			var target = plan.Target;
 			var workingDirectory = Path.GetDirectoryName(target);
@@ -217,7 +233,7 @@ namespace Files.App.Helpers
 					if (!confirmed)
 						return true;
 
-					return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory) : await ChangedAsync();
+					return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, arguments, workingDirectory) : await ChangedAsync();
 				}
 
 				case OpenAction.RunScriptWithConfirm:
@@ -242,7 +258,7 @@ namespace Files.App.Helpers
 					switch (OpenDecision.Resolve(plan.Action, choice))
 					{
 						case FollowUp.RunExact:
-							return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory) : await ChangedAsync();
+							return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, arguments, workingDirectory) : await ChangedAsync();
 						case FollowUp.DisplayAsText:
 							return plan.StillValid() ? await DisplayAsTextAsync(target) : await ChangedAsync();
 						default:

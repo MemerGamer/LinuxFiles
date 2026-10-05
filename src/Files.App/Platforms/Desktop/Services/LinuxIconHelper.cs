@@ -38,6 +38,14 @@ namespace Files.App.Utils.Storage
 
 					if (thumbnail is not null)
 						return thumbnail;
+
+					// No installed font thumbnailer produced one; render a sample glyph pair ourselves
+					if (FontFileHelper.IsFontFile(path) && !options.HasFlag(IconOptions.ReturnOnlyIfCached))
+					{
+						var fontThumbnail = await Task.Run(() => FontFileHelper.GenerateFontThumbnail(path, (int)size));
+						if (fontThumbnail is not null)
+							return fontThumbnail;
+					}
 				}
 
 				if (options.HasFlag(IconOptions.ReturnOnlyIfCached))
@@ -55,6 +63,31 @@ namespace Files.App.Utils.Storage
 			catch (Exception ex) when (ex is not OperationCanceledException)
 			{
 				App.Logger?.LogDebug(ex, "Icon lookup failed");
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Returns the link-arrow emblem for symbolic links; cloud/sync status badges have no Linux source.
+		/// </summary>
+		public static async Task<byte[]?> GetOverlayAsync(string? path, uint size)
+		{
+			try
+			{
+				if (string.IsNullOrEmpty(path) || new FileInfo(path).LinkTarget is null)
+					return null;
+
+				var key = ("emblem-symbolic-link", size);
+				if (_themeCache.TryGetValue(key, out var cached))
+					return cached;
+
+				var bytes = await LoadThemeIconAsync(["emblem-symbolic-link", "emblem-link", "emblem-symbolic-link-symbolic"], size);
+				_themeCache[key] = bytes;
+				return bytes;
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				App.Logger?.LogDebug(ex, "Icon overlay lookup failed");
 				return null;
 			}
 		}

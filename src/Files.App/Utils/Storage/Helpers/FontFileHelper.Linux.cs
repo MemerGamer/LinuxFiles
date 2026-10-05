@@ -17,15 +17,9 @@ namespace Files.App.Utils.Storage
 			=> !string.IsNullOrEmpty(path) && _fontExtensions.Contains(SystemIO.Path.GetExtension(path));
 
 		public static Task<byte[]?> GetWinRTThumbnailAsync(string fontPath, uint size)
-		{
-			// LINUX-TODO(thumbnails): font thumbnails (e.g. via SkiaSharp SKTypeface rendering)
-			return Task.FromResult<byte[]?>(null);
-		}
+			=> Task.Run(() => GenerateFontThumbnail(fontPath, (int)size));
 
 		public static byte[]? GenerateFontThumbnail(string fontPath, int size)
-		{
-			// LINUX-TODO(thumbnails): font thumbnails (e.g. via SkiaSharp SKTypeface rendering)
-			return null;
-		}
+			=> Files.Platform.Linux.Thumbnails.FontThumbnailRenderer.RenderToPng(fontPath, size);
 	}
 }

@@ -84,6 +84,11 @@ namespace Files.App.Views
 			App.AppModel.PropertyChanged += AppModel_PropertyChanged;
 
 			ApplySidebarWidthState();
+
+			// Realize the navigation controls before the first measure pass.
+			FindName(nameof(InnerNavigationToolbar));
+			FindName(nameof(TabControl));
+			FindName(nameof(NavToolbar));
 		}
 
 		private void NumberedTabKeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
@@ -145,6 +150,9 @@ namespace Files.App.Views
 
 		private int SetTitleBarDragRegion(InputNonClientPointerSource source, SizeInt32 size, double scaleFactor, Func<UIElement, RectInt32?, RectInt32> getScaledRect)
 		{
+			if (TabControl is null)
+				return -1;
+
 			var height = (int)TabControl.ActualHeight;
 			source.SetRegionRects(NonClientRegionKind.Passthrough, [getScaledRect(this, new RectInt32 { X = 0, Y = 0, Width = (int)(TabControl.ActualWidth + TabControl.Margin.Left - TabControl.DragArea.ActualWidth), Height = height })]);
 			AttachTitleBarMessageMonitor();
@@ -342,10 +350,7 @@ namespace Files.App.Views
 
 			MainWindow.Instance.AppWindow.Changed += (_, _) => MainWindow.Instance.RaiseSetTitleBarDragRegion(SetTitleBarDragRegion);
 
-			// Defers loading until after the page has loaded to improve startup perf
-			FindName(nameof(InnerNavigationToolbar));
-			FindName(nameof(TabControl));
-			FindName(nameof(NavToolbar));
+			MainWindow.Instance.RaiseSetTitleBarDragRegion(SetTitleBarDragRegion);
 
 			// Notify user that drag and drop is disabled
 			// Prompt is disabled in the dev environment to prevent issues with the automation testing 

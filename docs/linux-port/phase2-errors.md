@@ -1,5 +1,10 @@
 # Phase 2: Files.App on Uno (net10.0-desktop) build inventory
 
+> **Status (2026-10-05, P4-Z): resolved.** Win32 compat mode is off by default, and `dotnet build src/Files.App -f net10.0-desktop` reports
+> 0 errors without building CsWin32. The last iterations went 2 → 53 → 2 → 0 errors (declaration errors hid the body errors), plus one more
+> round after `IStorageItemWithPath.Item` became Windows-only (10 → 0). `-p:FilesWin32Compat=true` remains as an opt-in lens and still
+> builds. The inventory below is historical.
+
 Branch `linux/p2-head`. Generated from `dotnet build src/Files.App -f net10.0-desktop` (Uno.Sdk 6.7.30, Uno.WinUI 6.7.135).
 
 ## How the build is organised

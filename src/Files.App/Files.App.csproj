@@ -261,6 +261,7 @@
     <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(FilesWin32Compat)' != 'true'">
         <Compile Remove="Helpers\Win32\**" />
         <Compile Remove="Utils\Shell\**" />
+        <Compile Include="Utils\Shell\ShellHelpers.cs" />
         <Compile Remove="Utils\Taskbar\**" />
         <Compile Remove="Utils\Signatures\**" />
         <Compile Remove="Services\Windows\**" />
@@ -291,6 +292,9 @@
           the Windows TFM with Platform=x64, which works on Linux) so Win32-touching code gets past declaration binding and the compiler
           reports the remaining, Uno-specific errors. Nothing here runs on Linux; replace Win32 usage with Files.Platform interfaces,
           then drop this switch. Prerequisite: dotnet build src/Files.App.CsWin32 -p:EnableWindowsTargeting=true -p:Platform=x64  -->
+    <PropertyGroup Condition="'$(FilesWin32Compat)' == 'true' And '$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <DefineConstants>$(DefineConstants);FILES_WIN32_COMPAT</DefineConstants>
+    </PropertyGroup>
     <ItemGroup Condition="'$(FilesWin32Compat)' == 'true' And '$(TargetFramework)' == '$(DesktopTargetFramework)'">
         <Reference Include="Files.App.CsWin32">
             <HintPath>..\Files.App.CsWin32\bin\x64\$(Configuration)\$(WindowsTargetFramework)\Files.App.CsWin32.dll</HintPath>

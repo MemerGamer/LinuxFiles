@@ -44,7 +44,12 @@ namespace Files.App.ViewModels.Properties
 		public async override Task GetSpecialPropertiesAsync()
 		{
 			var libraryPath = Library.GetRequiredPath();
+#if WINDOWS
 			var fileAttributes = Win32Helper.GetFileAttributes(libraryPath);
+#else
+			// Windows libraries (.library-ms) don't exist on Linux
+			var fileAttributes = default(System.IO.FileAttributes);
+#endif
 			ViewModel.IsReadOnly = fileAttributes.HasFlag(System.IO.FileAttributes.ReadOnly);
 			ViewModel.IsHidden = fileAttributes.HasFlag(System.IO.FileAttributes.Hidden);
 			ViewModel.CanCompressContent = false;
@@ -141,6 +146,7 @@ namespace Files.App.ViewModels.Properties
 
 		private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{
+#if WINDOWS
 			var libraryPath = Library.GetRequiredPath();
 			switch (e.PropertyName)
 			{
@@ -166,6 +172,7 @@ namespace Files.App.ViewModels.Properties
 
 					break;
 			}
+#endif
 		}
 	}
 }

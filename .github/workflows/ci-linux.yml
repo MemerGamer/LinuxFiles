@@ -71,9 +71,17 @@ jobs:
     - name: Build Files.App.Storage (Uno desktop)
       run: dotnet build src/Files.App.Storage/Files.App.Storage.csproj -c Release -f net10.0-desktop
 
-    # Informational until the Phase 2 error inventory (docs/linux-port/phase2-errors.md) reaches zero.
-    - name: Build Files.App (Uno desktop)
-      run: dotnet build src/Files.App/Files.App.csproj -c Release -f net10.0-desktop
+    # Blocking: Win32 compat mode is off (the default since P4-Z), so no Win32/Shell code and no CsWin32 assembly may be needed.
+    - name: Build Files.App (Uno desktop, Win32 compat off)
+      run: dotnet build src/Files.App/Files.App.csproj -c Release -f net10.0-desktop -p:FilesWin32Compat=false
+
+    - name: Verify the desktop build did not build CsWin32
+      shell: bash
+      run: |
+        if [ -d src/Files.App.CsWin32/bin ] || [ -d src/Files.App.CsWin32/obj ]; then
+          echo "::error::Files.App.CsWin32 was built for the desktop target; something still depends on Win32 compat mode."
+          exit 1
+        fi
 
     - name: Build and test platform test projects (if any)
       shell: bash

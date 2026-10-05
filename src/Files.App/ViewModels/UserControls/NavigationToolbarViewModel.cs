@@ -491,9 +491,7 @@ namespace Files.App.ViewModels.UserControls
 			}
 
 			// Copy be default when dragging from zip
-			else if (storageItems.Any(x =>
-					x.Item is ZipStorageFile ||
-					x.Item is ZipStorageFolder) ||
+			else if (storageItems.Any(x => x.IsArchiveMember()) ||
 					ZipStorageFolder.IsZipPath(pathBoxItem.Path))
 			{
 				e.DragUIOverride.Caption = string.Format(Strings.CopyToFolderCaptionText.GetLocalizedResource(), pathBoxItem.Title);
@@ -1008,10 +1006,15 @@ namespace Files.App.ViewModels.UserControls
 
 		private static async Task<bool> LaunchApplicationFromPath(string currentInput, string workingDir)
 		{
+#if !WINDOWS
+			// LINUX-TODO(launch): running commands typed into the address bar; the input is reported as an invalid path
+			return await Task.FromResult(false);
+#else
 			var args = CommandLineParser.SplitArguments(currentInput);
 			return await LaunchHelper.LaunchAppAsync(
 				args.FirstOrDefault("").Trim('"'), string.Join(' ', args.Skip(1)), workingDir
 			);
+#endif
 		}
 
 		public async Task PopulateOmnibarSuggestionsForPathMode()

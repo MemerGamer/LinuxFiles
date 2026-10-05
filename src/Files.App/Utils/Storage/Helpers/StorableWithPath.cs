@@ -27,7 +27,9 @@ namespace Files.App.Utils.Storage
 		/// </summary>
 		public string Name => Storable?.Name ?? IO.Path.GetFileName(IO.Path.TrimEndingDirectorySeparator(Path));
 
+#if WINDOWS
 		IStorageItem? IStorageItemWithPath.Item => null;
+#endif
 
 		/// <summary>
 		/// Initializes a new instance of the <see cref="StorableWithPath"/> record.

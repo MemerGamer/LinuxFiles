@@ -46,6 +46,35 @@ When the pointer leaves the window Uno still calls `StartNativeDrag` and raises 
 `Application.UnhandledException`. `DesktopRuntimeGuards` marks exactly that exception as handled instead of letting Files' crash
 handler exit the app (that was the reported crash). Uno then ends its own drag when the button is released.
 
+## Dragging out to Wayland-native apps on KDE (XWayland bridge)
+
+Files runs under XWayland, so a Wayland-native target (Dolphin, Kate) is not a window on the X server and the XDND tree walk never
+finds it. KWin bridges X11 sources to Wayland (its XWayland `XToWlDrag`):
+
+1. KWin watches `XdndSelection` ownership through XFixes. When an X client takes it, KWin starts an X-to-Wayland drag and, once the
+   pointer is over a native Wayland surface, creates and maps a per-drag, `XdndAware`, 8192x8192 proxy window (a second one next to its
+   permanent, unmapped proxy). `FindXdndTarget` finds that window like any other XDND target and the normal XdndEnter, XdndPosition,
+   XdndStatus, XdndDrop handshake runs against it; KWin translates it to `wl_data_device`.
+2. KWin ignores an `XdndSelection` owner taken with `CurrentTime`. Qt and GTK pass the real server time. Files used `0`, so no proxy was
+   ever created and nothing could be dropped (dragging in worked, because that direction is KWin's source). **Fix**: take the selection
+   with a real X server time (zero-length property append on the own window, read the `PropertyNotify` time), and use that time in
+   `XdndPosition` (data3) and `XdndDrop` (data2).
+3. Nothing else differs from the protocol this file already described: `text/uri-list` offered in `XdndEnter`, `XdndStatus` and
+   `XdndFinished` are answered by KWin's proxy window, which is also the `Target` we match messages against.
+
+Verified on a nested KWin Wayland compositor (`kwin_wayland --x11-display <private Xvfb> --xwayland`, windowed on the private display) with
+the Files window and a Wayland-native Dolphin (`QT_QPA_PLATFORM=wayland`): before the change the proxy window never appears and the drop is
+lost; after it Dolphin shows the drop menu (Move/Copy/Link), and "Copy Here" creates the file. Not verified on the owner's real session:
+fractional scaling, real GPU, multi-monitor, `XdndActionAsk`, large selections, and Dolphin's Shift/Ctrl action keys (we still only
+send copy or move from the Shift state).
+
+Needs a real-desktop test: drag a file and a multi-selection from Files into Dolphin (folder view and onto a folder), Kate and the desktop;
+check copy by default, Shift for move, and that dropping back onto Files itself still works.
+
+Reproduction recipe (all private; never the user's display): start `Xvfb`, run `kwin_wayland --x11-display :N --xwayland --socket <short> `
+under `dbus-run-session` with a private `XDG_RUNTIME_DIR` (the socket path must be shorter than 108 bytes) and the app as its client, run
+`dolphin` with `WAYLAND_DISPLAY=<socket>`, and drive input with `xdotool` on the outer Xvfb.
+
 ## Verified (private Xvfb)
 
 - GTK3 reader sees all targets above, with the right bytes, for copy and cut; Files' reader reads `x-special/gnome-copied-files`

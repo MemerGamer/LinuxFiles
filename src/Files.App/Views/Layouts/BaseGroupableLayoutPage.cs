@@ -53,6 +53,24 @@ namespace Files.App.Views.Layouts
 		protected abstract void FileList_PreviewKeyDown(object sender, KeyRoutedEventArgs e);
 		protected abstract void EndRename(TextBox textBox);
 
+		/// <summary>
+		/// Resets the scroll offset. The scroller is resolved lazily (it may not exist at Loaded) and the reset is repeated after
+		/// the next layout pass, because the extent of the previous folder can still clamp the first request.
+		/// </summary>
+		protected void ResetScroll(ScrollViewer? knownScroller, double? horizontalOffset, double? verticalOffset)
+		{
+			var scroller = knownScroller ?? ListViewBase.FindDescendant<ScrollViewer>();
+			if (scroller is null)
+				return;
+
+			scroller.ChangeView(horizontalOffset, verticalOffset, null, true);
+			DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+			{
+				if ((verticalOffset is not null && scroller.VerticalOffset > 0) || (horizontalOffset is not null && scroller.HorizontalOffset > 0))
+					scroller.ChangeView(horizontalOffset, verticalOffset, null, true);
+			});
+		}
+
 		// Overridden methods
 
 		protected override void InitializeCommandsViewModel()
@@ -387,11 +405,55 @@ namespace Files.App.Views.Layouts
 
 		// Methods
 
+#if DESKTOP
+		/// <summary>
+		/// Home, End, Page Up and Page Down don't move the selection in Uno's list controls.
+		/// </summary>
+		protected bool TryHandleListJumpKey(KeyRoutedEventArgs e)
+		{
+			if (e.Key is not (VirtualKey.Home or VirtualKey.End or VirtualKey.PageUp or VirtualKey.PageDown) ||
+				ListViewBase.Items.Count == 0 ||
+				FocusManager.GetFocusedElement(MainWindow.Instance.Content.XamlRoot) is TextBox)
+				return false;
+
+			var count = ListViewBase.Items.Count;
+			var current = Math.Max(ListViewBase.SelectedIndex, 0);
+			var pageSize = 1;
+			if (ListViewBase.FindDescendant<ScrollViewer>() is { } scrollViewer &&
+				ListViewBase.ContainerFromIndex(current) is FrameworkElement container &&
+				container.ActualHeight > 0 && container.ActualWidth > 0)
+			{
+				pageSize = Math.Max(1, (int)(scrollViewer.ViewportHeight / container.ActualHeight)) *
+					Math.Max(1, (int)(scrollViewer.ViewportWidth / container.ActualWidth));
+			}
+
+			var target = e.Key switch
+			{
+				VirtualKey.Home => 0,
+				VirtualKey.End => count - 1,
+				VirtualKey.PageUp => Math.Max(current - pageSize, 0),
+				_ => Math.Min(current + pageSize, count - 1),
+			};
+
+			if (ListViewBase.Items[target] is ListedItem item)
+			{
+				ItemManipulationModel.SetSelectedItem(item);
+				ItemManipulationModel.ScrollIntoView(item);
+				ItemManipulationModel.FocusSelectedItems();
+			}
+
+			e.Handled = true;
+			return true;
+		}
+
+#endif
 		[DynamicWindowsRuntimeCast(typeof(TextBox))]
 		protected async void RenameTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
 		{
 			var textBox = (TextBox)sender;
-			var isShiftPressed = (PInvoke.GetKeyState((int)VirtualKey.Shift) & KEY_DOWN_MASK) != 0;
+			var isShiftPressed = OperatingSystem.IsWindows()
+				? (PInvoke.GetKeyState((int)VirtualKey.Shift) & KEY_DOWN_MASK) != 0
+				: Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 
 			switch (e.Key)
 			{

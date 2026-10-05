@@ -563,6 +563,13 @@ namespace Files.App.ViewModels.Settings
 			}
 		}
 
+		public string ShowOpenTerminalText
+#if WINDOWS
+			=> Strings.ShowOpenTerminal.GetLocalizedResource();
+#else
+			=> Strings.ShowOpenTerminalLinux.GetLocalizedResource();
+#endif
+
 		public bool ShowOpenTerminal
 		{
 			get => UserSettingsService.GeneralSettingsService.ShowOpenTerminal;

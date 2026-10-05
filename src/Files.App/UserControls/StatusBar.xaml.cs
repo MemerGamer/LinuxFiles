@@ -3,6 +3,7 @@
 
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using WinRT;
 
 namespace Files.App.UserControls
@@ -32,6 +33,9 @@ namespace Files.App.UserControls
 		private bool _remeasureQueued;
 
 		public ICommandManager Commands { get; } = Ioc.Default.GetRequiredService<ICommandManager>();
+
+		private Brush GetLayoutToggleBackground(bool isOn)
+			=> (Brush)Application.Current.Resources[isOn ? "SubtleFillColorSecondaryBrush" : "SubtleFillColorTransparentBrush"];
 
 		public StatusBarViewModel? StatusBarViewModel
 		{

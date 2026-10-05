@@ -2,28 +2,12 @@
 # Licensed under the MIT License.
 
 # Abstract:
-#   This CI is executed when a new commit is created on the main branch or
-#   on a PR whose head branch is the main branch.
-#   However, the CI will not be executed if files not directly related to
-#   source code maintenance are updated.
+#   Windows CI for the upstream WinUI build. Manual only: this fork is Linux-first (see ci-linux.yml).
 
 name: Files CI
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - 'assets/**'
-      - 'builds/**'
-      - 'docs/**'
-      - '*.md'
-  pull_request:
-    paths-ignore:
-      - 'assets/**'
-      - 'builds/**'
-      - 'docs/**'
-      - '*.md'
+  workflow_dispatch:
 
 run-name: ${{ github.event_name == 'pull_request' && 'Files PR Validation' || 'Files CI Validation' }}
 

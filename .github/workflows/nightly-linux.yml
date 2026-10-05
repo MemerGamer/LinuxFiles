@@ -28,7 +28,7 @@ jobs:
 
   build-linux-x64:
 
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
 
@@ -71,7 +71,7 @@ jobs:
 
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build-linux-x64
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 

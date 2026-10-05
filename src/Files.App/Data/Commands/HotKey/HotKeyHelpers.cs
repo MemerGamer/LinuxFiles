@@ -7,7 +7,7 @@ using Windows.UI.Core;
 
 namespace Files.App.Data.Commands
 {
-	internal static class HotKeyHelpers
+	internal static partial class HotKeyHelpers
 	{
 		public static KeyModifiers GetCurrentKeyModifiers()
 		{

@@ -113,8 +113,51 @@ namespace Files.App.Helpers
 
 		public static async Task CreateFileFromDialogResultTypeAsync(AddItemDialogItemType itemType, ShellNewEntry? itemInfo, IShellPage associatedInstance)
 		{
-			await CreateFileFromDialogResultTypeForResult(itemType, itemInfo, associatedInstance);
+			var created = await CreateFileFromDialogResultTypeForResult(itemType, itemInfo, associatedInstance);
 			await associatedInstance.RefreshIfNoWatcherExistsAsync();
+
+			if (OperatingSystem.IsLinux() && created?.Path is not null)
+				await SelectAndRenameNewItemAsync(associatedInstance, created.Path);
+		}
+
+		/// <summary>
+		/// Waits for a just-created item to be listed, then selects it, scrolls it into view and starts the inline rename.
+		/// </summary>
+		public static async Task SelectAndRenameNewItemAsync(IShellPage shellPage, string path)
+		{
+			try
+			{
+				var shellViewModel = shellPage.GetRequiredShellViewModel();
+				ListedItem? item = null;
+				var settledChecks = 0;
+
+				// The directory watcher lists the item after a short debounce, and a relist replaces the instances, so wait until it is stable
+				for (var i = 0; i < 40 && settledChecks < 2; i++)
+				{
+					await Task.Delay(150);
+					var found = shellViewModel.FilesAndFolders.ToList().FirstOrDefault(x => string.Equals(x.ItemPath, path, StringComparison.Ordinal));
+					settledChecks = found is not null && ReferenceEquals(found, item) ? settledChecks + 1 : 0;
+					item = found;
+				}
+
+				if (item is null || shellPage.SlimContentPage is not { } contentPage)
+					return;
+
+				contentPage.ItemManipulationModel.SetSelectedItem(item);
+				contentPage.ItemManipulationModel.ScrollIntoView(item);
+				contentPage.ItemManipulationModel.FocusSelectedItems();
+
+				// Let the list realize the container before the rename text box is looked up
+				await Task.Delay(100);
+				if (!ReferenceEquals(contentPage.SelectedItem, item))
+					return;
+
+				contentPage.ItemManipulationModel.StartRenameItem();
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not start renaming the new item");
+			}
 		}
 
 		private static async Task<IStorageItem?> CreateFileFromDialogResultTypeForResult(AddItemDialogItemType itemType, ShellNewEntry? itemInfo, IShellPage associatedInstance)
@@ -134,7 +177,8 @@ namespace Files.App.Helpers
 			}
 			// Skip rename dialog when ShellNewEntry has a Command (e.g. ".accdb", ".gdoc")
 			string? userInput = null;
-			if (itemType != AddItemDialogItemType.File || itemInfo?.Command is null)
+			// Linux creates the item with its default name and renames it inline, as File Explorer does
+			if (!OperatingSystem.IsLinux() && (itemType != AddItemDialogItemType.File || itemInfo?.Command is null))
 			{
 				DynamicDialog dialog = DynamicDialogFactory.GetFor_CreateItemDialog(itemType.ToString().GetLocalizedResource().ToLower(), itemInfo?.Name);
 				await dialog.TryShowAsync(); // Show rename dialog

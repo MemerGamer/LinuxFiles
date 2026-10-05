@@ -4937,4 +4937,7 @@
   <data name="OpenTerminalAsAdminLinux" xml:space="preserve">
     <value>Open in terminal as administrator</value>
   </data>
+  <data name="BreadcrumbMoreFolders" xml:space="preserve">
+    <value>{0} more folders…</value>
+  </data>
 </root>

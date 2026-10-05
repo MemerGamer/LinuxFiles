@@ -180,6 +180,93 @@ namespace Files.Platform.Tests.Thumbnails
 			Assert.AreEqual(128, regenerated.Width);
 		}
 
+		private void WriteForeignThumbnail(string path, string bucket, int size, string? uriOverride = null, long? mtimeOverride = null)
+		{
+			var mtime = mtimeOverride ?? new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds();
+			var entry = CachePath(path, bucket);
+			Directory.CreateDirectory(Path.GetDirectoryName(entry)!);
+			File.WriteAllBytes(entry, PngTextChunks.Insert(TestImages.CreatePng(size, size),
+				[new("Thumb::URI", uriOverride ?? XdgThumbnailNaming.ToFileUri(path)), new("Thumb::MTime", mtime.ToString())]));
+		}
+
+		[TestMethod]
+		public async Task Cache_BorrowsAndScalesDownLargerBucket()
+		{
+			var path = CreateImage("a.png", 900, 900);
+			WriteForeignThumbnail(path, "x-large", 512);
+			using var service = CreateService();
+
+			var bytes = await service.GetThumbnailAsync(path, 128, ThumbnailOptions.ReturnOnlyIfCached);
+
+			Assert.IsNotNull(bytes);
+			using var bitmap = SKBitmap.Decode(bytes);
+			Assert.AreEqual(128, bitmap.Width);
+			Assert.IsTrue(File.Exists(CachePath(path, "normal")));
+		}
+
+		[TestMethod]
+		public async Task Cache_PrefersLargerBucketAndNeverModifiesIt()
+		{
+			var path = CreateImage("a.png", 900, 900);
+			WriteForeignThumbnail(path, "large", 256);
+			WriteForeignThumbnail(path, "xx-large", 1000);
+			var largeBefore = File.ReadAllBytes(CachePath(path, "large"));
+			using var service = CreateService();
+
+			var bytes = await service.GetThumbnailAsync(path, 128, ThumbnailOptions.ReturnOnlyIfCached);
+
+			Assert.IsNotNull(bytes);
+			CollectionAssert.AreEqual(largeBefore, File.ReadAllBytes(CachePath(path, "large")));
+		}
+
+		[TestMethod]
+		public async Task Cache_DoesNotUpscaleSmallerBucket()
+		{
+			var path = CreateImage("a.png", 900, 900);
+			WriteForeignThumbnail(path, "normal", 128);
+			using var service = CreateService();
+
+			var bytes = await service.GetThumbnailAsync(path, 256, ThumbnailOptions.ReturnOnlyIfCached);
+
+			Assert.IsNotNull(bytes);
+			using var bitmap = SKBitmap.Decode(bytes);
+			Assert.AreEqual(128, bitmap.Width);
+		}
+
+		[TestMethod]
+		public async Task Cache_IgnoresOtherBucketWithStaleMtimeOrWrongUri()
+		{
+			var path = CreateImage("a.png", 900, 900);
+			WriteForeignThumbnail(path, "x-large", 512, mtimeOverride: 1);
+			WriteForeignThumbnail(path, "large", 256, uriOverride: "file:///other");
+			using var service = CreateService();
+
+			Assert.IsNull(await service.GetThumbnailAsync(path, 128, ThumbnailOptions.ReturnOnlyIfCached));
+		}
+
+		[TestMethod]
+		public async Task Cache_IgnoresOtherBucketEntryLargerThanItsBucket()
+		{
+			var path = CreateImage("a.png", 900, 900);
+			WriteForeignThumbnail(path, "large", 600);
+			using var service = CreateService();
+
+			Assert.IsNull(await service.GetThumbnailAsync(path, 128, ThumbnailOptions.ReturnOnlyIfCached));
+		}
+
+		[TestMethod]
+		public async Task Cache_ForceRegenerateIgnoresOtherBuckets()
+		{
+			var path = CreateImage("a.png", 900, 900);
+			WriteForeignThumbnail(path, "x-large", 512);
+			using var service = CreateService();
+
+			var bytes = await service.GetThumbnailAsync(path, 128, ThumbnailOptions.ForceRegenerate);
+
+			Assert.IsNotNull(bytes);
+			Assert.IsTrue(File.Exists(CachePath(path, "normal")));
+		}
+
 		[TestMethod]
 		public async Task Cache_RejectsEntryWithWrongUri()
 		{

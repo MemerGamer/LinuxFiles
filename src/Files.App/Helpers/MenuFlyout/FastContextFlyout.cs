@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 using CommunityToolkit.WinUI;
+using System.Diagnostics;
 using Files.App.UserControls.Menus;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -30,6 +31,7 @@ namespace Files.App.Helpers.ContextFlyouts
 		private double estimatedWidth;
 		private FrameworkElement? invocationAnchor;
 		private Point? invocationPosition;
+		private readonly Stopwatch openStopwatch = new();
 
 		// Supplies the live invocation point for framework-shown menus, whose ContextRequested can arrive after the
 		// pre-render guess; pulled in Flyout_Opened so the direction correction uses the finger, not the stale cursor.
@@ -46,7 +48,13 @@ namespace Files.App.Helpers.ContextFlyouts
 
 		public FastContextFlyout()
 		{
-			Flyout.Opening += (sender, e) => App.LastOpenedFlyout = Flyout;
+			Flyout.Opening += (sender, e) =>
+			{
+				App.LastOpenedFlyout = Flyout;
+				openStopwatch.Restart();
+			};
+			Flyout.Closing += Flyout_Closing;
+			Flyout.Opened += (s, e) => openStopwatch.Restart();
 			Flyout.Opened += Flyout_Opened;
 			Flyout.Closed += Flyout_Closed;
 		}
@@ -576,6 +584,17 @@ namespace Files.App.Helpers.ContextFlyouts
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(Panel))]
+		// A menu that dismisses itself right after it opened was not closed by the user: on X11 the button release,
+		// a stray pointer press or a focus change delivered while the menu is still being filled would otherwise
+		// light-dismiss it. Real choices take far longer than this and close through Hide() on item invoke.
+		private static readonly TimeSpan MinimumOpenDuration = TimeSpan.FromMilliseconds(350);
+
+		private void Flyout_Closing(FlyoutBase sender, FlyoutBaseClosingEventArgs e)
+		{
+			if (openStopwatch.IsRunning && openStopwatch.Elapsed < MinimumOpenDuration)
+				e.Cancel = true;
+		}
+
 		private void Flyout_Closed(object? sender, object e)
 		{
 			if (primaryRow?.Tag is not Panel row)

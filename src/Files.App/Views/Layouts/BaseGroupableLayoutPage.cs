@@ -295,6 +295,16 @@ namespace Files.App.Views.Layouts
 			ListViewBase.Focus(FocusState.Programmatic);
 		}
 
+		/// <summary>
+		/// Uno can leave a container (and the rename box inside it) with the application theme instead of the page's
+		/// theme after the rename box takes focus, which paints dark-theme text on a light row and vice versa.
+		/// </summary>
+		protected void SyncContainerTheme(FrameworkElement? container)
+		{
+			if (container is not null && container.ActualTheme != ActualTheme)
+				container.RequestedTheme = ActualTheme;
+		}
+
 		protected static bool ShouldShowExtensionInRename(ListedItem item) =>
 			(!item.IsFolder || item.IsArchive) && !item.IsShortcut && item is not AlternateStreamItem;
 
@@ -314,6 +324,7 @@ namespace Files.App.Views.Layouts
 			if (listViewItem is null)
 				return;
 
+			SyncContainerTheme(listViewItem);
 			TextBlock? textBlock = listViewItem.FindDescendant("ItemName") as TextBlock;
 			TextBox? textBox = listViewItem.FindDescendant(itemNameTextBox) as TextBox;
 			if (textBlock is null || textBox is null)

@@ -8,13 +8,7 @@ namespace Files.App.Storage
 	internal static class FtpHelpers
 	{
 		public static string GetFtpPath(string path)
-		{
-			// FTP paths are raw: URI query, fragment, and escape characters are valid file name characters.
-			path = path.Replace('\\', '/');
-			var authority = GetFtpAuthority(path);
-
-			return path.Length == authority.Length ? "/" : path.Substring(authority.Length);
-		}
+			=> FtpUrl.Parse(path).Path;
 
 		public static Task EnsureConnectedAsync(this AsyncFtpClient ftpClient, CancellationToken cancellationToken = default)
 		{
@@ -22,16 +16,10 @@ namespace Files.App.Storage
 		}
 
 		public static string GetFtpHost(string path)
-			=> new Uri(GetFtpAuthority(path), UriKind.Absolute).DnsSafeHost;
+			=> FtpUrl.Parse(path).Host;
 
 		public static ushort GetFtpPort(string path)
-		{
-			var uri = new Uri(GetFtpAuthority(path), UriKind.Absolute);
-			if (!uri.IsDefaultPort)
-				return checked((ushort)uri.Port);
-
-			return uri.Scheme.Equals("ftps", StringComparison.OrdinalIgnoreCase) ? (ushort)990 : (ushort)21;
-		}
+			=> FtpUrl.Parse(path).Port;
 
 		public static bool IsSameFtpPath(string firstPath, string secondPath)
 		{
@@ -43,22 +31,19 @@ namespace Files.App.Storage
 
 		public static AsyncFtpClient GetFtpClient(string ftpPath)
 		{
-			var host = GetFtpHost(ftpPath);
-			var port = GetFtpPort(ftpPath);
-			var credentials = FtpManager.Credentials.GetValueOrDefault(host) ?? FtpManager.Anonymous;
+			var url = FtpUrl.Parse(ftpPath);
+			var credentials = url.GetCredential()
+				?? FtpManager.Credentials.GetValueOrDefault(url.Host)
+				?? FtpManager.Anonymous;
 
-			return new(host, credentials, port);
-		}
+			var client = new AsyncFtpClient(url.Host, credentials, url.Port);
 
-		private static string GetFtpAuthority(string path)
-		{
-			path = path.Replace('\\', '/');
-			var schemeIndex = path.IndexOf(Uri.SchemeDelimiter, StringComparison.Ordinal);
-			if (schemeIndex < 0)
-				throw new UriFormatException("The FTP path does not contain a URI scheme.");
+			// Prefer TLS: ftps:// is implicit, ftpes:// requires explicit TLS, plain ftp:// upgrades when the server supports it.
+			client.Config.EncryptionMode = url.IsImplicitTls
+				? FtpEncryptionMode.Implicit
+				: url.IsExplicitTls ? FtpEncryptionMode.Explicit : FtpEncryptionMode.Auto;
 
-			var pathIndex = path.IndexOf('/', schemeIndex + Uri.SchemeDelimiter.Length);
-			return pathIndex < 0 ? path : path[..pathIndex];
+			return client;
 		}
 	}
 }

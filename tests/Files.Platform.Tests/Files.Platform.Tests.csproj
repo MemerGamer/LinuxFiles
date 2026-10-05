@@ -34,6 +34,7 @@
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewCodeTokenizer.cs" Link="Previews/PreviewCodeTokenizer.cs" />
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewImageDecoder.cs" Link="Previews/PreviewImageDecoder.cs" />
         <Compile Include="../../src/Files.App.Storage/Storables/Routes/*.cs" LinkBase="Storables/Routes" />
+        <Compile Include="../../src/Files.App.Storage/Ftp/FtpUrl.cs;../../src/Files.App.Storage/Ftp/FtpManager.cs;../../src/Files.App.Storage/Ftp/FtpStorableRoute.cs" LinkBase="Storables/Ftp" />
     </ItemGroup>
 
 </Project>

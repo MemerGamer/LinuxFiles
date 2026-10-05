@@ -4883,4 +4883,10 @@
   <data name="LinuxCommandTooLong" xml:space="preserve">
     <value>The command is too long to be shown in full, so it will not be run.</value>
   </data>
+  <data name="SettingsLinuxDefaultFileManager" xml:space="preserve">
+    <value>Use Files as default file manager</value>
+  </data>
+  <data name="SettingsLinuxDefaultFileManagerDescription" xml:space="preserve">
+    <value>Let other applications reveal files in Files (org.freedesktop.FileManager1).</value>
+  </data>
 </root>

@@ -25,6 +25,12 @@ namespace Files.Platform.Abstractions.Launching
 		Task<bool> OpenWithAsync(DesktopApplication application, IEnumerable<string> paths, CancellationToken cancellationToken = default);
 
 		/// <summary>
+		/// Starts exactly the given argument vector (program first), optionally inside a terminal emulator. Nothing is
+		/// re-derived or re-expanded, so what a confirmation dialog showed is what runs.
+		/// </summary>
+		Task<bool> RunCommandAsync(IReadOnlyList<string> argv, bool inTerminal, CancellationToken cancellationToken = default);
+
+		/// <summary>
 		/// Opens a URI with the system handler (xdg-open).
 		/// </summary>
 		Task<bool> LaunchUriAsync(Uri uri, CancellationToken cancellationToken = default);

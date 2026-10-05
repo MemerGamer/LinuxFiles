@@ -133,6 +133,7 @@
 					<Button
 						x:Name="ClearPropertiesButton"
 						Margin="0,4,0,0"
+						Visibility="{x:Bind ClearButtonVisibility}"
 						HorizontalAlignment="Stretch"
 						Content="{helpers:ResourceString Key=ClearPropertiesButton/Content}">
 						<Button.Flyout>

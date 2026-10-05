@@ -17,9 +17,16 @@ namespace Files.App.Helpers
 	{
 		public static async Task PasteItemAsync(string destinationPath, IShellPage associatedInstance)
 		{
+#if !WINDOWS
+			if (await Files.App.Services.Desktop.DesktopFileDragHelper.TryPasteFilesAsync(destinationPath, associatedInstance))
+			{
+				associatedInstance.SlimContentPage?.ItemManipulationModel?.RefreshItemsOpacity();
+				return;
+			}
+#endif
 			if (OperatingSystem.IsLinux() && FileClipboard.HasItems)
 			{
-				// LINUX-TODO(clipboard): W-CLIP replaces the in-app FileClipboard with the system clipboard
+				// Fallback when the system clipboard is unavailable (no X selection access)
 				var operation = FileClipboard.Operation;
 				await associatedInstance.FilesystemHelpers.PerformOperationTypeAsync(FileClipboard.Items, operation, destinationPath, false, true);
 				if (operation.HasFlag(DataPackageOperation.Move))

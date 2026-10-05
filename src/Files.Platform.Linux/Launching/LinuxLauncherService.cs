@@ -38,9 +38,19 @@ namespace Files.Platform.Linux.Launching
 		public async Task<bool> OpenAsync(IEnumerable<string> paths, CancellationToken cancellationToken = default)
 		{
 			var groups = new List<(DesktopApplication? App, List<string> Paths)>();
+			var refused = false;
 			foreach (var path in paths)
 			{
 				var mime = await mimeTypes.GetMimeTypeAsync(path, cancellationToken).ConfigureAwait(false);
+
+				// Defense in depth: opening is never a way to run something. Executable/launcher types are only run through the
+				// confirmation flow (RunCommandAsync / RunExecutableAsync), never through a default handler.
+				if (OpenDecision.IsExecutableMimeType(mime))
+				{
+					refused = true;
+					continue;
+				}
+
 				var app = await applications.GetDefaultApplicationAsync(mime, cancellationToken).ConfigureAwait(false);
 
 				var group = app is null ? default : groups.FirstOrDefault(g => g.App?.Id == app.Id);
@@ -53,7 +63,7 @@ namespace Files.Platform.Linux.Launching
 				group.Paths.Add(path);
 			}
 
-			var success = groups.Count > 0;
+			var success = groups.Count > 0 && !refused;
 			foreach (var (app, groupPaths) in groups)
 			{
 				if (app is not null)
@@ -62,9 +72,18 @@ namespace Files.Platform.Linux.Launching
 					continue;
 				}
 
-				// No known default application: let xdg-open decide
+				// No known default application: let xdg-open decide, but never for files with an execute bit, which some
+				// handlers would run instead of open
 				foreach (var path in groupPaths)
+				{
+					if (HasExecuteBit(path))
+					{
+						success = false;
+						continue;
+					}
+
 					success &= await TryStartAsync(new ProcessLaunch("xdg-open", [path]), cancellationToken).ConfigureAwait(false);
+				}
 			}
 
 			return success;
@@ -99,8 +118,41 @@ namespace Files.Platform.Linux.Launching
 		}
 
 		/// <inheritdoc/>
+		public async Task<bool> RunCommandAsync(IReadOnlyList<string> argv, bool inTerminal, CancellationToken cancellationToken = default)
+		{
+			if (argv.Count == 0)
+				return false;
+
+			if (!inTerminal)
+				return await TryStartAsync(new ProcessLaunch(argv[0], [.. argv.Skip(1)]), cancellationToken).ConfigureAwait(false);
+
+			var terminal = terminals.Resolve();
+			return terminal is not null &&
+				await TryStartAsync(new ProcessLaunch(terminal.FileName, terminal.BuildExecuteArguments(argv)), cancellationToken).ConfigureAwait(false);
+		}
+
+		private static bool HasExecuteBit(string path)
+		{
+			try
+			{
+				if (OperatingSystem.IsWindows())
+					return false;
+
+				return (File.GetUnixFileMode(path) & (UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute)) != 0;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+			{
+				return false;
+			}
+		}
+
+		/// <inheritdoc/>
 		public Task<bool> LaunchUriAsync(Uri uri, CancellationToken cancellationToken = default)
 		{
+			// Local files go through OpenAsync and its gates, never through xdg-open
+			if (!uri.IsAbsoluteUri || uri.IsFile)
+				return Task.FromResult(false);
+
 			var target = uri.IsAbsoluteUri ? uri.AbsoluteUri : uri.OriginalString;
 			return TryStartAsync(new ProcessLaunch("xdg-open", [target]), cancellationToken);
 		}

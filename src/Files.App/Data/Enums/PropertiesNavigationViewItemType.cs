@@ -39,6 +39,11 @@ namespace Files.App.Data.Enums
 		Library,
 
 		/// <summary>
+		/// POSIX permissions page type (Linux)
+		/// </summary>
+		Permissions,
+
+		/// <summary>
 		/// Security page type
 		/// </summary>
 		Security,

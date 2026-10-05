@@ -39,10 +39,36 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.ItemType = $"DriveType{Drive.Type}".GetLocalizedResource();
 		}
 
+		private void GetSpecialPropertiesLinux(string drivePath)
+		{
+			try
+			{
+				var info = new System.IO.DriveInfo(drivePath);
+				var capacity = (ulong)Math.Max(0, info.TotalSize);
+				var free = (ulong)Math.Max(0, info.AvailableFreeSpace);
+
+				ViewModel.DriveCapacityValue = capacity;
+				ViewModel.DriveFreeSpaceValue = free;
+				ViewModel.DriveUsedSpaceValue = capacity > free ? capacity - free : 0;
+				ViewModel.DriveFileSystem = info.DriveFormat;
+			}
+			catch (Exception e) when (e is System.IO.IOException or UnauthorizedAccessException or ArgumentException)
+			{
+				ViewModel.LastSeparatorVisibility = false;
+				App.Logger.LogWarning(e, e.Message);
+			}
+		}
+
 		public async override Task GetSpecialPropertiesAsync()
 		{
 			ViewModel.ItemAttributesVisibility = false;
 			var drivePath = Drive.GetRequiredPath();
+
+			if (OperatingSystem.IsLinux())
+			{
+				GetSpecialPropertiesLinux(drivePath);
+				return;
+			}
 
 			var rootResult = await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(drivePath));
 			var diskRootResult = await FilesystemTasks.WrapNullable(

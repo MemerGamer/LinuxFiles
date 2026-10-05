@@ -199,8 +199,8 @@
 								<StackPanel
 									x:Name="CalculatingPanel"
 									Grid.Column="2"
-									x:Load="{x:Bind IsCalculating, Mode=OneWay}"
-									Orientation="Horizontal">
+									Orientation="Horizontal"
+									Visibility="{x:Bind IsCalculating, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}">
 									<TextBlock
 										VerticalAlignment="Center"
 										Style="{StaticResource App.Theme.BodyTextBlockStyle}"
@@ -218,11 +218,11 @@
 									x:Name="HashValueText"
 									Grid.Column="2"
 									VerticalAlignment="Center"
-									x:Load="{x:Bind IsCalculating, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
 									Style="{StaticResource App.Theme.BodyTextBlockStyle}"
 									Text="{x:Bind HashValue, Mode=OneWay}"
 									TextTrimming="CharacterEllipsis"
 									TextWrapping="NoWrap"
+									Visibility="{x:Bind IsCalculated, Converter={StaticResource BoolToVisibilityConverter}, Mode=OneWay}"
 									ToolTipService.ToolTip="{x:Bind HashValue, Mode=OneWay}" />
 
 								<!--  Copy button  -->

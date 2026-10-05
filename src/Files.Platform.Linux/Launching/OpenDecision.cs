@@ -1,4 +1,4 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Files.Platform.Linux.Native;
@@ -84,6 +84,36 @@ namespace Files.Platform.Linux.Launching
 	}
 
 	/// <summary>
+	/// The user's answer to a confirmation dialog.
+	/// </summary>
+	public enum ConfirmChoice
+	{
+		/// <summary>The primary button.</summary>
+		Run,
+
+		/// <summary>The secondary button of the script dialog.</summary>
+		Display,
+
+		/// <summary>Cancel, close, Escape, or the dialog failing to show.</summary>
+		Cancel,
+	}
+
+	/// <summary>
+	/// What happens after a confirmation dialog.
+	/// </summary>
+	public enum FollowUp
+	{
+		/// <summary>Nothing happens.</summary>
+		Nothing,
+
+		/// <summary>Run exactly what the dialog described.</summary>
+		RunExact,
+
+		/// <summary>Open the file in a viewer chosen explicitly as a text/plain handler, never via the file's own MIME.</summary>
+		DisplayAsText,
+	}
+
+	/// <summary>
 	/// Decides how to open a file. The execute bit alone never grants trust: nothing runs without confirmation,
 	/// except .desktop files installed in an applications directory. Decisions rest on file content, not the name.
 	/// </summary>
@@ -97,6 +127,19 @@ namespace Files.Platform.Linux.Launching
 			"application/vnd.appimage",
 			"application/x-desktop",
 		];
+
+		/// <summary>
+		/// Maps the user's answer to the one follow-up the dialog described. Anything but an explicit Run or Display does nothing.
+		/// </summary>
+		public static FollowUp Resolve(OpenAction action, ConfirmChoice choice) => (action, choice) switch
+		{
+			(OpenAction.RunBinaryWithConfirm, ConfirmChoice.Run) => FollowUp.RunExact,
+			(OpenAction.RunScriptWithConfirm, ConfirmChoice.Run) => FollowUp.RunExact,
+			(OpenAction.RunScriptWithConfirm, ConfirmChoice.Display) => FollowUp.DisplayAsText,
+			(OpenAction.LaunchDesktopConfirm, ConfirmChoice.Run) => FollowUp.RunExact,
+			(OpenAction.LaunchDesktopTrusted, _) => FollowUp.RunExact,
+			_ => FollowUp.Nothing,
+		};
 
 		/// <summary>
 		/// Detects executable content from the first bytes of a file.

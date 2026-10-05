@@ -44,6 +44,12 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.LoadFileIcon = Item.LoadFileIcon;
 			ViewModel.ContainsFilesOrFolders = Item.ContainsFilesOrFolders;
 
+			if (OperatingSystem.IsLinux())
+			{
+				SetupLinuxLink(itemPath);
+				return;
+			}
+
 			if (Item.IsShortcut && Item is IShortcutItem shortcutItem)
 			{
 				ViewModel.ShortcutItemType = Strings.Folder.GetLocalizedResource();
@@ -69,9 +75,66 @@ namespace Files.App.ViewModels.Properties
 			}
 		}
 
+		private void SetupLinuxLink(string itemPath)
+		{
+			if (!LinuxShortcutHelper.IsSymbolicLink(itemPath, out var target))
+				return;
+
+			var directory = Path.GetDirectoryName(itemPath) ?? "/";
+			var resolved = string.IsNullOrEmpty(target) ? null : Path.GetFullPath(target, directory);
+
+			ViewModel.ShortcutItemType = Strings.Folder.GetLocalizedResource();
+			ViewModel.ShortcutItemPath = target;
+			ViewModel.IsShortcutItemPathReadOnly = true;
+			ViewModel.ShortcutItemWorkingDirVisibility = false;
+			ViewModel.ShortcutItemArgumentsVisibility = false;
+			ViewModel.ShortcutItemWindowArgsVisibility = false;
+			ViewModel.IsLinuxOpenTargetAvailable = resolved is not null;
+			ViewModel.ShortcutItemOpenLinkCommand = new RelayCommand(
+				async () =>
+				{
+					var location = Directory.Exists(resolved) ? resolved : Path.GetDirectoryName(resolved);
+					if (!string.IsNullOrEmpty(location))
+						await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => NavigationHelpers.OpenPathInNewTab(location, true));
+				},
+				() => !string.IsNullOrEmpty(resolved));
+		}
+
+		private async Task GetSpecialPropertiesLinuxAsync(string itemPath)
+		{
+			ApplyLinuxStat(itemPath);
+			await ApplyLinuxTypeAsync(itemPath);
+
+			try
+			{
+				var result = await FileThumbnailHelper.GetIconAsync(itemPath, Constants.ShellIconSizes.ExtraLarge, true, IconOptions.None);
+				if (result is not null)
+				{
+					ViewModel.IconData = result;
+					ViewModel.LoadFolderGlyph = false;
+					ViewModel.LoadFileIcon = true;
+				}
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				App.Logger.LogWarning(ex, "Could not load the properties icon");
+			}
+
+			// A symbolic link to a folder reports the size of the link itself, a real folder is scanned
+			if (!LinuxShortcutHelper.IsSymbolicLink(itemPath, out _))
+				_ = GetFolderSizeAsync(itemPath, TokenSource.Token);
+		}
+
 		public async override Task GetSpecialPropertiesAsync()
 		{
 			var itemPath = Item.GetRequiredPath();
+
+			if (OperatingSystem.IsLinux())
+			{
+				await GetSpecialPropertiesLinuxAsync(itemPath);
+				return;
+			}
+
 			var fileAttributes = Win32Helper.GetFileAttributes(itemPath);
 			ViewModel.IsHidden = fileAttributes.HasFlag(FileAttributes.Hidden);
 			ViewModel.CanCompressContent = Win32Helper.CanCompressContent(itemPath);
@@ -203,6 +266,9 @@ namespace Files.App.ViewModels.Properties
 
 		private async void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{
+			if (OperatingSystem.IsLinux())
+				return;
+
 			var itemPath = Item.GetRequiredPath();
 			switch (e.PropertyName)
 			{

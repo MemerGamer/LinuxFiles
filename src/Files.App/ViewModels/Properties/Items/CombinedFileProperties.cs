@@ -17,6 +17,13 @@ namespace Files.App.ViewModels.Properties
 
 		public async Task GetSystemFilePropertiesAsync()
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				// Metadata of several files is not aggregated on Linux
+				ViewModel.PropertySections = new ObservableCollection<FilePropertySection>();
+				return;
+			}
+
 			var queries = await Task.WhenAll(List.AsParallel().Select(async item =>
 			{
 				var itemPath = item.GetRequiredPath();

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Shared.Helpers;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using System.IO;
 
@@ -40,11 +41,17 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.LoadCustomIcon = Item.LoadCustomIcon;
 			ViewModel.CustomIconSource = Item.CustomIconSource;
 			ViewModel.LoadFileIcon = Item.LoadFileIcon;
-			ViewModel.IsDownloadedFile = Win32Helper.ReadStringFromFile($"{itemPath}:Zone.Identifier") is not null;
+			ViewModel.IsDownloadedFile = !OperatingSystem.IsLinux() && Win32Helper.ReadStringFromFile($"{itemPath}:Zone.Identifier") is not null;
 			ViewModel.IsEditAlbumCoverVisible =
 				Item.FileExtension is not ".avi" && (
 				FileExtensionHelpers.IsVideoFile(Item.FileExtension) ||
 				FileExtensionHelpers.IsAudioFile(Item.FileExtension));
+
+			if (OperatingSystem.IsLinux())
+			{
+				SetupLinuxShortcut(itemPath);
+				return;
+			}
 
 			if (!Item.IsShortcut)
 				return;
@@ -92,9 +99,73 @@ namespace Files.App.ViewModels.Properties
 			});
 		}
 
+		private void SetupLinuxShortcut(string itemPath)
+		{
+			if (LinuxShortcutHelper.IsSymbolicLink(itemPath, out var target))
+			{
+				var directory = Path.GetDirectoryName(itemPath) ?? "/";
+				var resolved = string.IsNullOrEmpty(target) ? null : Path.GetFullPath(target, directory);
+
+				ViewModel.ShortcutItemType = Strings.PropertiesShortcutTypeLink.GetLocalizedResource();
+				ViewModel.ShortcutItemPath = target;
+				ViewModel.IsShortcutItemPathReadOnly = true;
+				ViewModel.ShortcutItemWorkingDirVisibility = false;
+				ViewModel.ShortcutItemArgumentsVisibility = false;
+				ViewModel.ShortcutItemWindowArgsVisibility = false;
+				ViewModel.IsLinuxOpenTargetAvailable = resolved is not null;
+				ViewModel.ShortcutItemOpenLinkCommand = new RelayCommand(
+					async () =>
+					{
+						// Folder targets open themselves, anything else opens its parent folder
+						var location = Directory.Exists(resolved) ? resolved : Path.GetDirectoryName(resolved);
+						if (!string.IsNullOrEmpty(location))
+							await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => NavigationHelpers.OpenPathInNewTab(location, true));
+					},
+					() => !string.IsNullOrEmpty(resolved));
+			}
+			else if (LinuxShortcutHelper.IsDesktopEntry(itemPath))
+			{
+				var (name, exec) = LinuxShortcutHelper.ReadDesktopEntry(itemPath);
+				ViewModel.ShortcutItemType = Strings.Application.GetLocalizedResource();
+				ViewModel.DesktopEntryName = name;
+				ViewModel.ShortcutItemPath = exec;
+				ViewModel.IsShortcutItemPathReadOnly = true;
+				ViewModel.ShortcutItemWorkingDirVisibility = false;
+				ViewModel.ShortcutItemArgumentsVisibility = false;
+				ViewModel.ShortcutItemWindowArgsVisibility = false;
+			}
+		}
+
+		private async Task GetSpecialPropertiesLinuxAsync(string itemPath)
+		{
+			ApplyLinuxStat(itemPath);
+			await ApplyLinuxTypeAsync(itemPath);
+
+			try
+			{
+				var result = await FileThumbnailHelper.GetIconAsync(itemPath, Constants.ShellIconSizes.ExtraLarge, false, IconOptions.None);
+				if (result is not null)
+				{
+					ViewModel.IconData = result;
+					ViewModel.LoadUnknownTypeGlyph = false;
+					ViewModel.LoadFileIcon = true;
+				}
+			}
+			catch (Exception ex) when (ex is not OperationCanceledException)
+			{
+				App.Logger.LogWarning(ex, "Could not load the properties icon");
+			}
+		}
+
 		public override async Task GetSpecialPropertiesAsync()
 		{
 			var itemPath = Item.GetRequiredPath();
+
+			if (OperatingSystem.IsLinux())
+			{
+				await GetSpecialPropertiesLinuxAsync(itemPath);
+				return;
+			}
 
 			// Check if item is on device (not online)
 			var isOnDevice = Item.SyncStatusUI.SyncStatus is not CloudDriveSyncStatus.FileOnline and not CloudDriveSyncStatus.FolderOnline;
@@ -174,6 +245,13 @@ namespace Files.App.ViewModels.Properties
 		public async Task GetSystemFilePropertiesAsync()
 		{
 			var itemPath = Item.GetRequiredPath();
+
+			if (OperatingSystem.IsLinux())
+			{
+				GetSystemFilePropertiesLinux(itemPath);
+				return;
+			}
+
 			var fileResult = await FilesystemTasks.WrapNullable(() => StorageFileExtensions.DangerousGetFileFromPathAsync(itemPath));
 			if (fileResult.Result is not { } file)
 			{
@@ -205,8 +283,23 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.FileProperties = new ObservableCollection<FileProperty>(list.Where(i => i.Value is not null));
 		}
 
+		private void GetSystemFilePropertiesLinux(string itemPath)
+		{
+			var list = LinuxFileMetadata.Read(itemPath);
+			var sections = list
+				.GroupBy(p => p.SectionResource!)
+				.Select(group => new FilePropertySection(group) { Key = group.Key })
+				.OrderBy(section => section.Priority);
+
+			ViewModel.PropertySections = new ObservableCollection<FilePropertySection>(sections);
+			ViewModel.FileProperties = new ObservableCollection<FileProperty>(list);
+		}
+
 		public async Task SyncPropertyChangesAsync()
 		{
+			if (OperatingSystem.IsLinux())
+				return;
+
 			// Couldn't access the file to save properties
 			var itemPath = Item.GetRequiredPath();
 			var fileResult = await FilesystemTasks.WrapNullable(() => StorageFileExtensions.DangerousGetFileFromPathAsync(itemPath));
@@ -251,6 +344,9 @@ namespace Files.App.ViewModels.Properties
 
 		public async Task ClearPropertiesAsync()
 		{
+			if (OperatingSystem.IsLinux())
+				return;
+
 			var failedProperties = new List<string>();
 			var itemPath = Item.GetRequiredPath();
 			var fileResult = await FilesystemTasks.WrapNullable(() => StorageFileExtensions.DangerousGetFileFromPathAsync(itemPath));
@@ -290,6 +386,9 @@ namespace Files.App.ViewModels.Properties
 
 		private async void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{
+			if (OperatingSystem.IsLinux())
+				return;
+
 			var itemPath = Item.GetRequiredPath();
 
 			switch (e.PropertyName)

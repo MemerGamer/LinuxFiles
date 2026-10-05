@@ -1,11 +1,13 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if WINDOWS
 using Microsoft.Win32;
 using System.Runtime.CompilerServices;
 using System.Security;
 using Windows.ApplicationModel;
 using static Files.App.Helpers.RegistryHelpers;
+#endif
 using static Files.App.Utils.FileTags.TaggedFileRegistry;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 

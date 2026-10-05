@@ -13,7 +13,9 @@ using System.Runtime.InteropServices;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Storage;
+#if WINDOWS
 using Windows.Win32.Foundation;
+#endif
 using WinRT;
 using IO = System.IO;
 
@@ -125,7 +127,7 @@ namespace Files.App
 					else if (!(string.IsNullOrEmpty(launchArgs.Arguments) && MainPageViewModel.AppInstances.Count > 0))
 					{
 						// Bring to foreground (#14730)
-						Win32Helper.BringToForegroundEx(new(WindowHandle));
+						BringToForeground();
 
 						await NavigationHelpers.AddNewTabByPathAsync(typeof(ShellPanesPage), launchArgs.Arguments, true);
 					}
@@ -141,7 +143,7 @@ namespace Files.App
 						rootFrame.Navigate(typeof(MainPage), null, new SuppressNavigationTransitionInfo());
 
 						// Bring to foreground (#14730)
-						Win32Helper.BringToForegroundEx(new(WindowHandle));
+						BringToForeground();
 
 						// Ensure app-level keyboard shortcuts work immediately after Win+E activation.
 						_ = EnsureContentHasKeyboardFocusAsync();
@@ -223,7 +225,7 @@ namespace Files.App
 						else
 						{
 							// Bring to foreground (#14730)
-							Win32Helper.BringToForegroundEx(new(WindowHandle));
+							BringToForeground();
 						}
 
 						for (; index < fileArgs.Files.Count; index++)
@@ -237,7 +239,7 @@ namespace Files.App
 						if (rootFrame.Content is null || rootFrame.Content is SplashScreenPage || !MainPageViewModel.AppInstances.Any())
 							rootFrame.Navigate(typeof(MainPage), null, new SuppressNavigationTransitionInfo());
 						else
-							Win32Helper.BringToForegroundEx(new(WindowHandle));
+							BringToForeground();
 					}
 					break;
 
@@ -260,7 +262,7 @@ namespace Files.App
 				Activate();
 
 				// Bring to foreground (#14730) in case Activate() doesn't
-				Win32Helper.BringToForegroundEx(new(WindowHandle));
+				BringToForeground();
 			}
 
 #if WINDOWS
@@ -361,7 +363,7 @@ namespace Files.App
 				if (rootFrame.Content is MainPage && MainPageViewModel.AppInstances.Any())
 				{
 					// Bring to foreground (#14730)
-					Win32Helper.BringToForegroundEx(new(WindowHandle));
+					BringToForeground();
 
 					var existingTabIndex = MainPageViewModel.AppInstances
 						.Select((tabItem, idx) => new { tabItem, idx })
@@ -444,6 +446,15 @@ namespace Files.App
 		{
 			SystemBackdrop ??= new AppSystemBackdrop();
 			return EnsureWindowIsInitialized();
+		}
+
+		private void BringToForeground()
+		{
+#if WINDOWS
+			Win32Helper.BringToForegroundEx(new(WindowHandle));
+#else
+			Activate();
+#endif
 		}
 
 		public bool SetCanWindowToFront(bool canWindowToFront)

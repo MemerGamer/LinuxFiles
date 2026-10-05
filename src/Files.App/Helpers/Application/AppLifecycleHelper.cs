@@ -408,7 +408,9 @@ namespace Files.App.Helpers
 					.AddSingleton<IStorageCacheService, StorageCacheService>()
 					.AddSingleton<IIconCacheService, IconCacheService>()
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
+#if WINDOWS
 					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
+#endif
 #if WINDOWS
 					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
 #endif

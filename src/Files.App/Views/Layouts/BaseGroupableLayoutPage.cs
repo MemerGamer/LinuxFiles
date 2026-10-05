@@ -11,7 +11,9 @@ using Microsoft.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.System;
 using Windows.UI.Core;
+#if WINDOWS
 using Windows.Win32;
+#endif
 using WinRT;
 
 namespace Files.App.Views.Layouts
@@ -23,7 +25,9 @@ namespace Files.App.Views.Layouts
 	{
 		// Constants
 
+#if WINDOWS
 		private const int KEY_DOWN_MASK = 0x8000;
+#endif
 
 		// Fields
 
@@ -295,6 +299,16 @@ namespace Files.App.Views.Layouts
 			ListViewBase.Focus(FocusState.Programmatic);
 		}
 
+		/// <summary>
+		/// Uno can leave a container (and the rename box inside it) with the application theme instead of the page's
+		/// theme after the rename box takes focus, which paints dark-theme text on a light row and vice versa.
+		/// </summary>
+		protected void SyncContainerTheme(FrameworkElement? container)
+		{
+			if (container is not null && container.ActualTheme != ActualTheme)
+				container.RequestedTheme = ActualTheme;
+		}
+
 		protected static bool ShouldShowExtensionInRename(ListedItem item) =>
 			(!item.IsFolder || item.IsArchive) && !item.IsShortcut && item is not AlternateStreamItem;
 
@@ -314,6 +328,7 @@ namespace Files.App.Views.Layouts
 			if (listViewItem is null)
 				return;
 
+			SyncContainerTheme(listViewItem);
 			TextBlock? textBlock = listViewItem.FindDescendant("ItemName") as TextBlock;
 			TextBox? textBox = listViewItem.FindDescendant(itemNameTextBox) as TextBox;
 			if (textBlock is null || textBox is null)
@@ -451,9 +466,13 @@ namespace Files.App.Views.Layouts
 		protected async void RenameTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
 		{
 			var textBox = (TextBox)sender;
+#if WINDOWS
 			var isShiftPressed = OperatingSystem.IsWindows()
 				? (PInvoke.GetKeyState((int)VirtualKey.Shift) & KEY_DOWN_MASK) != 0
 				: Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+#else
+			var isShiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+#endif
 
 			switch (e.Key)
 			{

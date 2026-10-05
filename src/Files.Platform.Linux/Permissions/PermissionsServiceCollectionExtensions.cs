@@ -13,12 +13,13 @@ namespace Files.Platform.Linux.Permissions
 	public static class PermissionsServiceCollectionExtensions
 	{
 		/// <summary>
-		/// Registers <see cref="IFilePermissionsService"/> and <see cref="IFileStatService"/>.
+		/// Registers <see cref="IFilePermissionsService"/>, <see cref="IFileStatService"/> and <see cref="IFileAttributesService"/>.
 		/// </summary>
 		public static IServiceCollection AddLinuxPermissions(this IServiceCollection services)
 		{
 			services.TryAddSingleton<IFilePermissionsService, LinuxFilePermissionsService>();
 			services.TryAddSingleton<IFileStatService, LinuxFileStatService>();
+			services.TryAddSingleton<IFileAttributesService, LinuxFileAttributesService>();
 			return services;
 		}
 	}

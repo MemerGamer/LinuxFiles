@@ -22,14 +22,8 @@
 						x:Key="TabFlyout"
 						Closing="TabItemContextMenu_Closing"
 						Opening="TabItemContextMenu_Opening">
-						<MenuFlyoutItem
-							Command="{x:Bind Commands.NewTab}"
-							KeyboardAcceleratorTextOverride="{x:Bind Commands.NewTab.HotKeyText, Mode=OneWay}"
-							Text="{x:Bind Commands.NewTab.Label}" />
-						<MenuFlyoutItem
-							Command="{x:Bind Commands.DuplicateSelectedTab}"
-							KeyboardAcceleratorTextOverride="{x:Bind Commands.DuplicateSelectedTab.HotKeyText, Mode=OneWay}"
-							Text="{x:Bind Commands.DuplicateSelectedTab.Label}" />
+						<MenuFlyoutItem />
+						<MenuFlyoutItem />
 						<MenuFlyoutItem
 							x:Name="MenuItemMoveTabToNewWindow"
 							Click="MoveTabToNewWindowAsync"
@@ -38,22 +32,10 @@
 								<FontIcon Glyph="&#xE8A7;" />
 							</MenuFlyoutItem.Icon>
 						</MenuFlyoutItem>
-						<MenuFlyoutItem
-							Command="{x:Bind Commands.CloseTabsToTheLeftSelected}"
-							KeyboardAcceleratorTextOverride="{x:Bind Commands.CloseTabsToTheLeftSelected.HotKeyText, Mode=OneWay}"
-							Text="{x:Bind Commands.CloseTabsToTheLeftSelected.Label}" />
-						<MenuFlyoutItem
-							Command="{x:Bind Commands.CloseTabsToTheRightSelected}"
-							KeyboardAcceleratorTextOverride="{x:Bind Commands.CloseTabsToTheRightSelected.HotKeyText, Mode=OneWay}"
-							Text="{x:Bind Commands.CloseTabsToTheRightSelected.Label}" />
-						<MenuFlyoutItem
-							Command="{x:Bind Commands.CloseOtherTabsSelected}"
-							KeyboardAcceleratorTextOverride="{x:Bind Commands.CloseOtherTabsSelected.HotKeyText, Mode=OneWay}"
-							Text="{x:Bind Commands.CloseOtherTabsSelected.Label}" />
-						<MenuFlyoutItem
-							Command="{x:Bind Commands.ReopenClosedTab}"
-							KeyboardAcceleratorTextOverride="{x:Bind Commands.ReopenClosedTab.HotKeyText, Mode=OneWay}"
-							Text="{x:Bind Commands.ReopenClosedTab.Label}" />
+						<MenuFlyoutItem />
+						<MenuFlyoutItem />
+						<MenuFlyoutItem />
+						<MenuFlyoutItem />
 					</MenuFlyout>
 				</ResourceDictionary>
 			</ResourceDictionary.MergedDictionaries>

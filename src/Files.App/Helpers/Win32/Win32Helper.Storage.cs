@@ -318,7 +318,7 @@ namespace Files.App.Helpers
 		{
 			var iconsList = new List<IconFileInfo>();
 
-			// LINUX-TODO(icons): no PE resource icons on Linux; callers fall back to theme icons via IIconThemeProvider
+			// PE resource icons do not exist on Linux; callers fall back to theme icons via IIconThemeProvider
 			if (!OperatingSystem.IsWindows())
 				return iconsList;
 

@@ -56,6 +56,9 @@ namespace Files.App.Services.Desktop
 		{
 			var items = await _trash.ListAsync();
 			var results = await _trash.RestoreAsync(items);
+			var warned = results.Where(r => r.Succeeded && !string.IsNullOrEmpty(r.ErrorMessage)).ToList();
+			if (warned.Count > 0)
+				StatusCenterHelper.AddCard_RestoreWarning(warned.Select(r => r.ResultPath ?? r.Item?.OriginalPath).OfType<string>());
 			return results.All(r => r.Succeeded);
 		}
 	}

@@ -55,6 +55,7 @@ namespace Files.Platform.Linux.Clipboard
 		private readonly nuint _atomType;
 		private readonly nuint _cardinal;
 		private readonly nuint _property;
+		private readonly nuint _timeProperty;
 		private readonly nuint _xdndAware;
 		private readonly nuint _xdndEnter;
 		private readonly nuint _xdndPosition;
@@ -91,6 +92,7 @@ namespace Files.Platform.Linux.Clipboard
 			_atomType = Atom("ATOM");
 			_cardinal = Atom("CARDINAL");
 			_property = Atom("FILES_SELECTION_DATA");
+			_timeProperty = Atom("FILES_XDND_TIME");
 			_xdndAware = Atom("XdndAware");
 			_xdndEnter = Atom("XdndEnter");
 			_xdndPosition = Atom("XdndPosition");
@@ -250,9 +252,11 @@ namespace Files.Platform.Linux.Clipboard
 					return;
 				}
 
-				X11Native.XSetSelectionOwner(_display, _xdndSelection, _window, 0);
+				// KWin's XWayland drag bridge ignores an XdndSelection owner taken with CurrentTime; a real server time is required
+				var timestamp = GetServerTime();
+				X11Native.XSetSelectionOwner(_display, _xdndSelection, _window, timestamp);
 				X11Native.XFlush(_display);
-				_drag = new DragSession(content, tcs, Environment.TickCount64);
+				_drag = new DragSession(content, tcs, Environment.TickCount64) { Timestamp = timestamp };
 			});
 			Wake();
 
@@ -266,6 +270,19 @@ namespace Files.Platform.Linux.Clipboard
 			}
 
 			return tcs.Task;
+		}
+
+		/// <summary>
+		/// Reads the current X server time through a zero-length property append on the own window. Returns 0 (CurrentTime) on timeout.
+		/// </summary>
+		private nuint GetServerTime()
+		{
+			X11Native.XChangeProperty(_display, _window, _timeProperty, _atomType, 32, X11Native.PropModeAppend, null, 0);
+			X11Native.XFlush(_display);
+
+			return WaitFor(ev => ev->Type == X11Native.PropertyNotify && ev->Property.Window == _window && ev->Property.Atom == _timeProperty, 500, out var found)
+				? found.Property.Time
+				: 0;
 		}
 
 		private Task<T> Post<T>(Func<T> work)
@@ -663,6 +680,8 @@ namespace Files.Platform.Linux.Clipboard
 
 			public long LastPositionTick { get; set; }
 
+			public nuint Timestamp { get; set; }
+
 			public bool Dropping { get; set; }
 
 			public long DropTick { get; set; }
@@ -729,7 +748,7 @@ namespace Files.Platform.Linux.Clipboard
 			{
 				if (drag.Target != 0 && drag.Accepted)
 				{
-					SendClientMessage(drag.Target, _xdndDrop, (nint)_window, 0, 0, 0, 0);
+					SendClientMessage(drag.Target, _xdndDrop, (nint)_window, 0, (nint)drag.Timestamp, 0, 0);
 					drag.Dropping = true;
 					drag.DropTick = now;
 				}
@@ -746,7 +765,7 @@ namespace Files.Platform.Linux.Clipboard
 			{
 				// Shift asks for a move, everything else copies; the receiving application decides what it does with that
 				var action = (mask & X11Native.ShiftMask) != 0 ? _xdndActionMove : _xdndActionCopy;
-				SendClientMessage(drag.Target, _xdndPosition, (nint)_window, 0, (nint)(((long)rootX << 16) | (uint)(rootY & 0xFFFF)), 0, (nint)action);
+				SendClientMessage(drag.Target, _xdndPosition, (nint)_window, 0, (nint)(((long)rootX << 16) | (uint)(rootY & 0xFFFF)), (nint)drag.Timestamp, (nint)action);
 				drag.LastX = rootX;
 				drag.LastY = rootY;
 				drag.LastMask = mask;

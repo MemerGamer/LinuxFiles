@@ -7,7 +7,11 @@ namespace Files.App.Actions
 	internal sealed partial class OpenTerminalAsAdminAction : OpenTerminalAction
 	{
 		public override string Label
+#if WINDOWS
 			=> Strings.OpenTerminalAsAdmin.GetLocalizedResource();
+#else
+			=> Strings.OpenTerminalAsAdminLinux.GetLocalizedResource();
+#endif
 
 		public override string Description
 			=> Strings.OpenTerminalAsAdminDescription.GetLocalizedResource();

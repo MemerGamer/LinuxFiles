@@ -8,9 +8,12 @@ using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
+using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Storage;
+using Windows.Storage.Streams;
 using WinRT;
 
 namespace Files.App.Views.Properties
@@ -22,10 +25,30 @@ namespace Files.App.Views.Properties
 		{
 			InitializeComponent();
 
+			// FileIcon's x:Bind/x:Load expressions never refresh on Uno, so the icon is set directly.
+			ViewModel.PropertyChanged += (_, e) =>
+			{
+				if (e.PropertyName == nameof(SelectedItemsPropertiesViewModel.IconData))
+					_ = UpdateIconAsync();
+			};
+
 			_updateDateDisplayTimer = DispatcherQueue.CreateTimer();
 			_updateDateDisplayTimer.Interval = TimeSpan.FromSeconds(1);
 			_updateDateDisplayTimer.Tick += UpdateDateDisplayTimer_Tick;
 			_updateDateDisplayTimer.Start();
+		}
+
+		private async Task UpdateIconAsync()
+		{
+			if (ViewModel.IconData is not { } data)
+				return;
+
+			var image = new BitmapImage();
+			using var stream = new InMemoryRandomAccessStream();
+			await stream.WriteAsync(data.AsBuffer());
+			stream.Seek(0);
+			await image.SetSourceAsync(stream);
+			Icon.Source = image;
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(UIElement))]

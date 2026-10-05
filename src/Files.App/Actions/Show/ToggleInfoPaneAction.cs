@@ -23,6 +23,10 @@ namespace Files.App.Actions
 		public HotKey HotKey
 			=> new(Keys.I, KeyModifiers.CtrlAlt);
 
+		// Explorer's shortcut for the preview pane
+		public HotKey SecondHotKey
+			=> new(Keys.P, KeyModifiers.Alt);
+
 		public bool IsOn
 			=> viewModel.IsEnabled;
 

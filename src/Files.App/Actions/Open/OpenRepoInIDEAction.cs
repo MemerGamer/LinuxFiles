@@ -34,6 +34,7 @@ namespace Files.App.Actions
 
 		public async Task ExecuteAsync(object? parameter = null)
 		{
+#if WINDOWS
 			var res = await Win32Helper.RunPowershellCommandAsync(
 				$"& {Win32Helper.ToPowerShellStringLiteral(_devToolsSettingsService.IDEPath)} {Win32Helper.ToPowerShellStringLiteral(_context.ShellPage!.InstanceViewModel.GitRepositoryPath)}",
 				PowerShellExecutionOptions.Hidden
@@ -41,6 +42,16 @@ namespace Files.App.Actions
 
 			if (!res)
 				await DynamicDialogFactory.ShowFor_IDEErrorDialog(_devToolsSettingsService.IDEName);
+#else
+			var path = _context.ShellPage?.InstanceViewModel.GitRepositoryPath;
+			if (!SystemIO.Path.IsPathRooted(path))
+				return;
+
+			var launched = await Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>()
+				.StartAsync(_devToolsSettingsService.IDEPath, [path]);
+			if (!launched)
+				await DynamicDialogFactory.ShowFor_IDEErrorDialog(_devToolsSettingsService.IDEName);
+#endif
 		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

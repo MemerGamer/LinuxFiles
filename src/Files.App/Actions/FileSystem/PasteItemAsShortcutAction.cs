@@ -33,6 +33,9 @@ namespace Files.App.Actions
 
 		public Task ExecuteAsync(object? parameter = null)
 		{
+			if (!IsExecutable)
+				return Task.CompletedTask;
+
 			if (context.ShellPage is not { } shellPage)
 				return Task.CompletedTask;
 
@@ -44,6 +47,7 @@ namespace Files.App.Actions
 		public bool GetIsExecutable()
 		{
 			return
+				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IPlatformCapabilities>().SupportsShortcutFiles &&
 				App.AppModel.IsPasteEnabled &&
 				context.PageType != ContentPageTypes.Home &&
 				context.PageType != ContentPageTypes.RecycleBin &&

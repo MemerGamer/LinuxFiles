@@ -1,21 +1,17 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Microsoft.UI.Xaml.Media.Imaging;
-using Windows.Win32;
-using Windows.Win32.System.Com;
-using Windows.Win32.System.WinRT;
-using Windows.Win32.UI.Shell;
 
 namespace Files.App.Data.Items
 {
-	public sealed partial class WidgetFolderCardItem : WidgetCardItem, IWidgetCardItem<IWindowsStorable>, IDisposable
+	public sealed partial class WidgetFolderCardItem : WidgetCardItem, IWidgetCardItem<IStorable>, IDisposable
 	{
 		// Properties
 
 		public string? AutomationProperties { get; set; }
 
-		public new IWindowsStorable Item { get; private set; }
+		public new IStorable Item { get; private set; }
 
 		public string? Text { get; set; }
 
@@ -29,7 +25,7 @@ namespace Files.App.Data.Items
 
 		// Constructor
 
-		public WidgetFolderCardItem(IWindowsStorable item, string text, string path, bool isPinned, string tooltip)
+		public WidgetFolderCardItem(IStorable item, string text, string path, bool isPinned, string tooltip)
 		{
 			AutomationProperties = text;
 			Item = item;
@@ -46,7 +42,9 @@ namespace Files.App.Data.Items
 		public WidgetFolderCardItem(string path, string text, bool isPinned, string tooltip)
 		{
 			AutomationProperties = text;
-			Item = null!;
+			Item = SystemIO.Path.IsPathFullyQualified(path)
+				? new OwlCore.Storage.System.IO.SystemFolder(path)
+				: new FolderPath(path, text);
 			Text = text;
 			IsPinned = isPinned;
 			Path = path;
@@ -54,51 +52,35 @@ namespace Files.App.Data.Items
 		}
 #endif
 
+		private sealed record FolderPath(string Id, string Name) : IStorable;
+
 		// Methods
 
+#if !WINDOWS
 		public async Task LoadCardThumbnailAsync()
 		{
 			if (_isDisposed || string.IsNullOrEmpty(Path))
 				return;
 
-			if (Item is null)
+			byte[]? icon = Path == Constants.UserEnvironmentPaths.RecycleBinPath
+				? await DriveHelpers.GetDriveIconAsync(null, Constants.ShellIconSizes.Large)
+				: await FileThumbnailHelper.GetIconAsync(Path, (uint)Constants.ShellIconSizes.Large, true, IconOptions.ReturnIconOnly);
+			if (_isDisposed || icon is null)
+				return;
+
+			await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
 			{
-				byte[]? icon = Path == Constants.UserEnvironmentPaths.RecycleBinPath
-					? await DriveHelpers.GetDriveIconAsync(null, Constants.ShellIconSizes.Large)
-					: await FileThumbnailHelper.GetIconAsync(Path, (uint)Constants.ShellIconSizes.Large, true, IconOptions.ReturnIconOnly);
-				if (icon is not null)
-					Thumbnail = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => icon.ToBitmapAsync(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal);
-				return;
-			}
-
-			var thumbnailSize = (int)(Constants.ShellIconSizes.Large * App.AppModel.AppWindowDPI);
-			// Ensure thumbnail size is at least 1 to prevent layout errors
-			thumbnailSize = Math.Max(1, thumbnailSize);
-			var hr = PInvoke.RoGetAgileReference(AgileReferenceOptions.AGILEREFERENCE_DEFAULT, typeof(IShellItem).GUID, Item.ThisPtr, out IAgileReference shellItemReference);
-			if (hr.ThrowIfFailedOnDebug().Failed)
-				return;
-
-			var rawThumbnailData = await STATask.RunPooled(() =>
-			{
-				if (shellItemReference.Resolve(out IShellItem shellItem).ThrowIfFailedOnDebug().Failed)
-					return null;
-
-				using var folder = new WindowsFolder(shellItem);
-				folder.TryGetThumbnail(thumbnailSize, SIIGBF.SIIGBF_ICONONLY, out var data);
-				return data;
-			}, App.Logger);
-			if (_isDisposed || rawThumbnailData is null)
-				return;
-
-			var thumbnail = await rawThumbnailData.ToBitmapAsync();
-			if (!_isDisposed)
-				Thumbnail = thumbnail;
+				var thumbnail = await icon.ToBitmapAsync();
+				if (!_isDisposed)
+					Thumbnail = thumbnail;
+			});
 		}
+#endif
 
 		public void Dispose()
 		{
 			_isDisposed = true;
-			Item?.Dispose();
+			(Item as IDisposable)?.Dispose();
 		}
 	}
 }

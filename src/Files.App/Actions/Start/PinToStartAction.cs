@@ -25,6 +25,7 @@ namespace Files.App.Actions
 			=> ActionCategory.Start;
 
 		public bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			context.ShellPage is not null;
 
 		public PinToStartAction()
@@ -34,6 +35,9 @@ namespace Files.App.Actions
 
 		public async Task ExecuteAsync(object? parameter = null)
 		{
+			if (!IsExecutable)
+				return;
+
 			if (context.SelectedItems.Count > 0 && context.ShellPage?.SlimContentPage?.SelectedItems is not null)
 			{
 				foreach (ListedItem listedItem in context.ShellPage.SlimContentPage.SelectedItems)

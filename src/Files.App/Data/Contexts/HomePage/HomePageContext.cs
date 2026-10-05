@@ -1,4 +1,4 @@
-﻿// Copyright (c) Files Community
+// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -12,7 +12,20 @@ namespace Files.App.Data.Contexts
 
 		public bool IsAnyItemRightClicked => rightClickedItem is not null;
 
-		public IHomeFolder HomeFolder { get; } = new HomeFolder();
+		public IHomeFolder HomeFolder { get; } = CreateHomeFolder();
+
+		private static IHomeFolder CreateHomeFolder()
+		{
+#if WINDOWS
+			return new HomeFolder();
+#else
+			return new LinuxHomeFolder(
+				Ioc.Default.GetRequiredService<IUserDirectories>(),
+				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Volumes.IVolumeService>(),
+				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Recent.IRecentFilesStore>(),
+				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Gvfs.INetworkLocationService>());
+#endif
+		}
 
 		private WidgetCardItem? rightClickedItem = null;
 		public WidgetCardItem? RightClickedItem => rightClickedItem;

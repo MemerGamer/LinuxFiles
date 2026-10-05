@@ -326,6 +326,7 @@ namespace Files.App.UserControls
 		{
 			if (e.IsRootItem)
 			{
+#if WINDOWS
 				IHomeFolder homeFolder = new HomeFolder();
 				IContentPageContext contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
 
@@ -392,6 +393,35 @@ namespace Files.App.UserControls
 						shellPage.NavigateToPath(path);
 					};
 				}
+#else
+				IHomeFolder homeFolder = Ioc.Default.GetRequiredService<IHomePageContext>().HomeFolder;
+				IContentPageContext contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
+
+				async Task AddItemsAsync(string header, IAsyncEnumerable<IStorableChild> storables)
+				{
+					e.Flyout.Items.Add(new MenuFlyoutHeaderItem() { Text = header });
+
+					await foreach (var storable in storables)
+					{
+						var path = storable.Id;
+						var flyoutItem = new MenuFlyoutItem()
+						{
+							Text = string.IsNullOrEmpty(storable.Name) ? path : storable.Name,
+							Icon = new FontIcon() { Glyph = "\uE8B7" }, // As a placeholder
+						};
+						e.Flyout.Items.Add(flyoutItem);
+
+						var icon = await FileThumbnailHelper.GetIconAsync(path, 16u, true, IconOptions.ReturnIconOnly);
+						if (icon is not null)
+							flyoutItem.Icon = new ImageIcon() { Source = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => icon.ToBitmapAsync(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal) };
+
+						flyoutItem.Click += (sender, args) => contentPageContext.ShellPage?.NavigateToPath(path);
+					}
+				}
+
+				await AddItemsAsync(Strings.QuickAccess.GetLocalizedResource(), homeFolder.GetQuickAccessFolderAsync());
+				await AddItemsAsync(Strings.Drives.GetLocalizedResource(), homeFolder.GetLogicalDrivesAsync());
+#endif
 
 				return;
 			}

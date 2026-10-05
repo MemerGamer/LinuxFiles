@@ -1,7 +1,7 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
-using Windows.Win32.UI.WindowsAndMessaging;
+using Files.App.Data.Enums;
 
 namespace Files.App.Data.Items
 {
@@ -17,7 +17,7 @@ namespace Files.App.Data.Items
 
 		public bool InvalidTarget { get; set; }
 
-		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
+		public ShowWindowCommand ShowWindowCommand { get; set; }
 
 		public ShellLinkItem()
 		{

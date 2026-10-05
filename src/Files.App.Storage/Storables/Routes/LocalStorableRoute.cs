@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using Files.Core.Storage.Contracts;
-using OwlCore.Storage;
 using OwlCore.Storage.System.IO;
 using System;
 using System.IO;
@@ -29,39 +28,43 @@ namespace Files.App.Storage.Storables
 		public int Order => DefaultOrder;
 
 		/// <inheritdoc/>
-		public bool CanResolve(string path)
-		{
-			return !string.IsNullOrEmpty(path) && !path.Contains('\0') && Path.IsPathFullyQualified(path);
-		}
-
-		/// <inheritdoc/>
-		public Task<IStorable?> TryGetAsync(string path, CancellationToken cancellationToken = default)
+		public Task<StorableResult> TryGetAsync(string path, CancellationToken cancellationToken = default)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 
-			if (!CanResolve(path))
-				return Task.FromResult<IStorable?>(null);
+			if (string.IsNullOrEmpty(path) || path.Contains('\0') || !Path.IsPathFullyQualified(path))
+				return Task.FromResult(StorableResult.NotMine);
 
-			var normalized = Path.TrimEndingDirectorySeparator(path);
+			return Task.FromResult(Resolve(Path.TrimEndingDirectorySeparator(path)));
+		}
 
-			// Exists checks follow symlinks, so a link to a directory resolves as a folder;
-			// a dangling link still exists as an entry and resolves as a file.
-			IStorable? storable;
+		private static StorableResult Resolve(string path)
+		{
 			try
 			{
-				storable = Directory.Exists(normalized)
-					? new SystemFolder(normalized)
-					: File.Exists(normalized)
-						? new SystemFile(normalized)
-						: null;
-			}
-			catch (IOException)
-			{
-				// Removed or replaced between the check and the constructor's own validation
-				storable = null;
-			}
+				// Exists checks follow symlinks, so a link to a directory resolves as a folder;
+				// a dangling link still exists as an entry and resolves as a file.
+				if (Directory.Exists(path))
+					return StorableResult.Success(new SystemFolder(path));
+				if (File.Exists(path))
+					return StorableResult.Success(new SystemFile(path));
 
-			return Task.FromResult<IStorable?>(storable);
+				// Exists hides the reason; stat again to tell a missing item from an inaccessible one
+				File.GetAttributes(path);
+				return StorableResult.Error;
+			}
+			catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+			{
+				return StorableResult.NotFound;
+			}
+			catch (UnauthorizedAccessException)
+			{
+				return StorableResult.AccessDenied;
+			}
+			catch (Exception ex) when (ex is IOException or ArgumentException or NotSupportedException)
+			{
+				return StorableResult.Error;
+			}
 		}
 	}
 }

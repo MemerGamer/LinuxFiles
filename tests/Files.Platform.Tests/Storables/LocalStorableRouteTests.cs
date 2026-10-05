@@ -1,12 +1,16 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#pragma warning disable CA1416
+
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.App.Storage.Storables;
+using Files.Core.Storage.Contracts;
+using Files.Core.Storage.Enums;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using OwlCore.Storage;
 using OwlCore.Storage.System.IO;
@@ -38,16 +42,10 @@ namespace Files.Platform.Tests.Storables
 		[DataRow("ftp://host/file")]
 		[DataRow("Shell:RecycleBinFolder")]
 		[DataRow("")]
-		public void CanResolve_RejectsNonLocalPaths(string path)
+		[DataRow("/tmp/a\0b")]
+		public async Task TryGet_NonLocalPath_ReturnsNotMine(string path)
 		{
-			Assert.IsFalse(_route.CanResolve(path));
-		}
-
-		[TestMethod]
-		public void CanResolve_DoesNotRequireExistence()
-		{
-			Assert.IsTrue(_route.CanResolve(Path.Combine(_root, "missing")));
-			Assert.IsFalse(_route.CanResolve(_root + "/a\0b"));
+			Assert.AreEqual(StorableStatus.NotMine, (await _route.TryGetAsync(path)).Status);
 		}
 
 		[TestMethod]
@@ -57,7 +55,7 @@ namespace Files.Platform.Tests.Storables
 			Directory.CreateDirectory(path);
 			File.WriteAllText(Path.Combine(path, "child.txt"), "data");
 
-			var folder = await _route.TryGetAsync(path) as SystemFolder;
+			var folder = (await _route.TryGetAsync(path)).Item as SystemFolder;
 
 			Assert.IsNotNull(folder);
 			Assert.AreEqual(path, folder.Id);
@@ -74,7 +72,7 @@ namespace Files.Platform.Tests.Storables
 			var path = Path.Combine(_root, "file.txt");
 			File.WriteAllText(path, "data");
 
-			var file = await _route.TryGetAsync(path) as SystemFile;
+			var file = (await _route.TryGetAsync(path)).Item as SystemFile;
 
 			Assert.IsNotNull(file);
 			Assert.AreEqual(path, file.Id);
@@ -90,7 +88,7 @@ namespace Files.Platform.Tests.Storables
 			var path = Path.Combine(_root, "dir");
 			Directory.CreateDirectory(path);
 
-			var folder = await _route.TryGetAsync(path + Path.DirectorySeparatorChar) as IFolder;
+			var folder = (await _route.TryGetAsync(path + Path.DirectorySeparatorChar)).Item as IFolder;
 
 			Assert.IsNotNull(folder);
 			Assert.AreEqual(path, folder.Id);
@@ -102,20 +100,33 @@ namespace Files.Platform.Tests.Storables
 		{
 			var root = Path.GetPathRoot(_root)!;
 
-			Assert.IsInstanceOfType<IFolder>(await _route.TryGetAsync(root));
+			Assert.IsInstanceOfType<IFolder>((await _route.TryGetAsync(root)).Item);
 		}
 
 		[TestMethod]
-		public async Task TryGet_Missing_ReturnsNull()
+		public async Task TryGet_Missing_ReturnsNotFound()
 		{
-			Assert.IsNull(await _route.TryGetAsync(Path.Combine(_root, "missing")));
-			Assert.IsNull(await _route.TryGetAsync(Path.Combine(_root, "missing", "deeper")));
+			Assert.AreEqual(StorableResult.NotFound, await _route.TryGetAsync(Path.Combine(_root, "missing")));
+			Assert.AreEqual(StorableResult.NotFound, await _route.TryGetAsync(Path.Combine(_root, "missing", "deeper")));
 		}
 
 		[TestMethod]
-		public async Task TryGet_NonLocalPath_ReturnsNull()
+		public async Task TryGet_UnsearchableParent_ReturnsAccessDenied()
 		{
-			Assert.IsNull(await _route.TryGetAsync("relative"));
+			if (Environment.UserName == "root")
+				Assert.Inconclusive("root bypasses permission checks");
+
+			var parent = Path.Combine(_root, "locked");
+			Directory.CreateDirectory(Path.Combine(parent, "child"));
+			File.SetUnixFileMode(parent, UnixFileMode.None);
+			try
+			{
+				Assert.AreEqual(StorableResult.AccessDenied, await _route.TryGetAsync(Path.Combine(parent, "child")));
+			}
+			finally
+			{
+				File.SetUnixFileMode(parent, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+			}
 		}
 
 		[TestMethod]
@@ -126,7 +137,7 @@ namespace Files.Platform.Tests.Storables
 			var link = Path.Combine(_root, "link");
 			Directory.CreateSymbolicLink(link, target);
 
-			var folder = await _route.TryGetAsync(link) as IFolder;
+			var folder = (await _route.TryGetAsync(link)).Item as IFolder;
 
 			Assert.IsNotNull(folder);
 			Assert.AreEqual(link, folder.Id);
@@ -138,7 +149,7 @@ namespace Files.Platform.Tests.Storables
 			var link = Path.Combine(_root, "dangling");
 			File.CreateSymbolicLink(link, Path.Combine(_root, "missing"));
 
-			Assert.IsInstanceOfType<IFile>(await _route.TryGetAsync(link));
+			Assert.IsInstanceOfType<IFile>((await _route.TryGetAsync(link)).Item);
 		}
 
 		[TestMethod]
@@ -152,8 +163,8 @@ namespace Files.Platform.Tests.Storables
 		{
 			var resolver = new StorableResolver([_route]);
 
-			Assert.IsInstanceOfType<IFolder>(await resolver.TryGetAsync(_root));
-			Assert.IsNull(await resolver.TryGetAsync("relative"));
+			Assert.IsInstanceOfType<IFolder>((await resolver.TryGetAsync(_root)).Item);
+			Assert.AreEqual(StorableResult.NotMine, await resolver.TryGetAsync("relative"));
 		}
 	}
 }

@@ -10,6 +10,11 @@ namespace Files.App.Data.Enums
 	public enum ShowWindowCommand
 	{
 		/// <summary>
+		/// No preference was stored; the window is shown as <see cref="Normal"/>.
+		/// </summary>
+		Default = 0,
+
+		/// <summary>
 		/// The window is shown at its normal size and position.
 		/// </summary>
 		Normal = 1,

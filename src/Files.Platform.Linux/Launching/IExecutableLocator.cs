@@ -51,9 +51,12 @@ namespace Files.Platform.Linux.Launching
 			var path = getEnvironmentVariable("PATH") ?? "/usr/local/bin:/usr/bin:/bin";
 			foreach (var dir in path.Split(':', StringSplitOptions.RemoveEmptyEntries))
 			{
+				if (!Path.IsPathRooted(dir))
+					continue;
+
 				var candidate = Path.Combine(dir, command);
 				if (IsExecutable(candidate))
-					return candidate;
+					return Path.GetFullPath(candidate);
 			}
 
 			return null;

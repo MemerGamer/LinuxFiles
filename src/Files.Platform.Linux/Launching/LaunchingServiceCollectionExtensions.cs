@@ -22,11 +22,7 @@ namespace Files.Platform.Linux.Launching
 			services.TryAddSingleton<IProcessStarter>(_ => Environment.GetEnvironmentVariable("FILES_LAUNCH_DRYRUN") is "1" or "true"
 				? new DryRunProcessStarter()
 				: new DetachedProcessStarter());
-			services.TryAddSingleton<IExecutableService>(provider => new LinuxExecutableService(
-				provider.GetRequiredService<IExecutableLocator>(),
-				Environment.GetEnvironmentVariable("FILES_LAUNCH_DRYRUN") is "1" or "true"
-					? new DryRunProcessStarter()
-					: new DirectProcessStarter()));
+			services.TryAddSingleton<IExecutableService, LinuxExecutableService>();
 			services.TryAddSingleton<TerminalResolver>();
 			services.TryAddSingleton<ILauncherService, LinuxLauncherService>();
 			services.TryAddSingleton<ITemplatesService, LinuxTemplatesService>();

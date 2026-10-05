@@ -41,8 +41,11 @@ namespace Files.App.Actions
 
 			if (OperatingSystem.IsLinux())
 			{
+				if (!SystemIO.Path.IsPathRooted(workingDirectory))
+					return;
+
 				var launched = await Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>()
-					.StartAsync(_devToolsSettingsService.IDEPath, workingDirectory is null ? [] : [workingDirectory]);
+					.StartAsync(_devToolsSettingsService.IDEPath, [workingDirectory]);
 				if (!launched)
 					await DynamicDialogFactory.ShowFor_IDEErrorDialog(_devToolsSettingsService.IDEName);
 				return;

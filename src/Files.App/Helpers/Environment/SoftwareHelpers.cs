@@ -12,10 +12,13 @@ namespace Files.App.Helpers
 
 		private const string VsCodeName = "Microsoft Visual Studio Code";
 
+		private static readonly Lazy<bool> LinuxVSCodeInstalled = new(() =>
+			Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>().Locate("code") is not null);
+
 		public static bool IsVSCodeInstalled()
 		{
 			if (OperatingSystem.IsLinux())
-				return Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>().Locate("code") is not null;
+				return LinuxVSCodeInstalled.Value;
 
 			try
 			{

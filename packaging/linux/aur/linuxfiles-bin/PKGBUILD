@@ -1,3 +1,5 @@
+# Upstream: Files by Files Community (https://github.com/files-community/Files); this is the unofficial LinuxFiles fork.
+# Developer: LinuxFiles contributors (fork of Files by Files Community)
 # Maintainer: MemerGamer <kovacsbalinthunor13@gmail.com>
 # Binary package: repackages the self-contained release tarball built by .github/workflows/package-linux.yml.
 # Regenerate checksums and .SRCINFO for a release with scripts/linux/gen-aur.sh.
@@ -5,7 +7,7 @@ pkgname=linuxfiles-bin
 _pkgname=linuxfiles
 pkgver=0.1.0
 pkgrel=1
-pkgdesc='Files, a modern file manager (Linux port built on Uno Platform), prebuilt binaries'
+pkgdesc='LinuxFiles, unofficial Linux port of Files, a modern file manager (Linux port built on Uno Platform), prebuilt binaries'
 arch=('x86_64')
 url='https://github.com/MemerGamer/LinuxFiles'
 license=('MIT')

@@ -262,40 +262,43 @@ namespace Files.App.ViewModels
 			if (token.IsCancellationRequested)
 				return;
 
-			var freshPaths = fresh.Select(x => x.ItemPath).ToHashSet(StringComparer.Ordinal);
-			var current = filesAndFolders.ToList();
-			var currentPaths = current.Select(x => x.ItemPath).ToHashSet(StringComparer.Ordinal);
-
-			var removed = current.Where(x => !freshPaths.Contains(x.ItemPath)).ToList();
-			var added = fresh.Where(x => !currentPaths.Contains(x.ItemPath)).ToList();
-			if (removed.Count == 0 && added.Count == 0)
-				return;
-
-			foreach (var item in removed)
-				filesAndFolders.Remove(item);
-			filesAndFolders.AddRange(added);
-			await OrderFilesAndFoldersAsync();
-
-			if (!string.IsNullOrEmpty(FilesAndFoldersFilter) || folderSettings.DirectoryGroupOption != GroupOption.None)
-			{
-				await ApplyFilesAndFoldersChangesAsync();
-				return;
-			}
-
-			var ordered = filesAndFolders.ToList();
-			await dispatcherQueue.EnqueueOrInvokeAsync(() =>
+			// Diff, backing state and displayed collection are updated together on the UI thread so a superseded
+			// refresh can never leave them out of step.
+			await dispatcherQueue.EnqueueOrInvokeAsync(async () =>
 			{
 				if (token.IsCancellationRequested)
 					return;
 
+				var freshPaths = fresh.Select(x => x.ItemPath).ToHashSet(StringComparer.Ordinal);
+				var displayed = FilesAndFolders.ToList();
+				var currentPaths = displayed.Select(x => x.ItemPath).ToHashSet(StringComparer.Ordinal);
+
+				var removed = displayed.Where(x => !freshPaths.Contains(x.ItemPath)).ToList();
+				var added = fresh.Where(x => !currentPaths.Contains(x.ItemPath)).ToList();
+				if (removed.Count == 0 && added.Count == 0)
+					return;
+
+				foreach (var item in removed)
+					filesAndFolders.Remove(item);
+				filesAndFolders.AddRange(added);
+
+				if (!string.IsNullOrEmpty(FilesAndFoldersFilter) || folderSettings.DirectoryGroupOption != GroupOption.None)
+				{
+					await OrderFilesAndFoldersAsync();
+					await ApplyFilesAndFoldersChangesAsync();
+					return;
+				}
+
+				var ordered = SortingHelper.OrderFileList(filesAndFolders.ToList(), folderSettings.DirectorySortOption, folderSettings.DirectorySortDirection,
+					folderSettings.SortDirectoriesAlongsideFiles, folderSettings.SortFilesFirst);
+				filesAndFolders = new ConcurrentCollection<ListedItem>(ordered);
+
 				foreach (var item in removed)
 					FilesAndFolders.Remove(item);
 
-				foreach (var item in added)
-				{
-					var index = ordered.IndexOf(item);
-					FilesAndFolders.Insert(Math.Clamp(index, 0, FilesAndFolders.Count), item);
-				}
+				// Ascending final positions, so each insert lands after everything that sorts before it
+				foreach (var item in added.OrderBy(x => ordered.IndexOf(x)))
+					FilesAndFolders.Insert(Math.Clamp(ordered.IndexOf(item), 0, FilesAndFolders.Count), item);
 
 				UpdateEmptyTextType();
 				UpdateNetworkAvailabilityInfoBar();

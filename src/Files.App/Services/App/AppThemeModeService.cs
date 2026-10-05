@@ -108,12 +108,6 @@ namespace Files.App.Services
 				{
 					var resolvedTheme = ResolveRootTheme((ElementTheme)rootTheme);
 					rootElement.RequestedTheme = resolvedTheme;
-#if HAS_UNO
-					// Style setters and templates realized later (new rows, rename boxes) resolve ThemeResource against the
-					// application theme, so keep it in step with the root; otherwise they pick the opposite palette.
-					if (resolvedTheme is not ElementTheme.Default)
-						Application.Current.RequestedTheme = resolvedTheme == ElementTheme.Dark ? ApplicationTheme.Dark : ApplicationTheme.Light;
-#endif
 				}
 
 				if (titleBar is not null)

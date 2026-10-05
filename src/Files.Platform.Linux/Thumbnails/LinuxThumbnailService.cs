@@ -284,15 +284,28 @@ namespace Files.Platform.Linux.Thumbnails
 					width > otherMax || height > otherMax || (long)width * height > _options.MaxImagePixels)
 					continue;
 
-				if (width <= maxSize && height <= maxSize)
-					return bytes;
-
-				var scaled = ScaleDown(bytes, width, height, maxSize);
+				var scaled = width <= maxSize && height <= maxSize
+					? Reencode(bytes, width, height)
+					: ScaleDown(bytes, width, height, maxSize);
 				if (scaled is not null)
 					return scaled;
 			}
 
 			return null;
+		}
+
+		// Decodes the entry so a truncated or corrupt PNG with plausible metadata is never promoted to a cache hit.
+		private static byte[]? Reencode(byte[] png, int width, int height)
+		{
+			try
+			{
+				using var bitmap = SKBitmap.Decode(png);
+				return bitmap is not null && bitmap.Width == width && bitmap.Height == height ? png : null;
+			}
+			catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+			{
+				return null;
+			}
 		}
 
 		private static byte[]? ScaleDown(byte[] png, int width, int height, int maxSize)

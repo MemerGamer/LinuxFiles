@@ -53,7 +53,9 @@ namespace Files.App.Helpers.ContextFlyouts
 				App.LastOpenedFlyout = Flyout;
 				openStopwatch.Restart();
 			};
+#if !WINDOWS
 			Flyout.Closing += Flyout_Closing;
+#endif
 			Flyout.Opened += (s, e) => openStopwatch.Restart();
 			Flyout.Opened += Flyout_Opened;
 			Flyout.Closed += Flyout_Closed;
@@ -589,10 +591,22 @@ namespace Files.App.Helpers.ContextFlyouts
 		// light-dismiss it. Real choices take far longer than this and close through Hide() on item invoke.
 		private static readonly TimeSpan MinimumOpenDuration = TimeSpan.FromMilliseconds(350);
 
+		private bool explicitHide;
+
 		private void Flyout_Closing(FlyoutBase sender, FlyoutBaseClosingEventArgs e)
 		{
-			if (openStopwatch.IsRunning && openStopwatch.Elapsed < MinimumOpenDuration)
+			if (!explicitHide && openStopwatch.IsRunning && openStopwatch.Elapsed < MinimumOpenDuration)
 				e.Cancel = true;
+		}
+
+		/// <summary>
+		/// Closes the menu on purpose (e.g. after a command ran), bypassing the early light-dismiss guard.
+		/// </summary>
+		public void Hide()
+		{
+			explicitHide = true;
+			try { Flyout.Hide(); }
+			finally { explicitHide = false; }
 		}
 
 		private void Flyout_Closed(object? sender, object e)
@@ -805,7 +819,7 @@ namespace Files.App.Helpers.ContextFlyouts
 				Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(button, model.Text ?? string.Empty);
 				Microsoft.UI.Xaml.Automation.AutomationProperties.SetAutomationId(button, $"ContextMenuPrimaryButton_{model.Text}");
 				ToolTipService.SetToolTip(button, model.Text);
-				button.Click += (s, args) => Flyout.Hide();
+				button.Click += (s, args) => Hide();
 				row.Children.Add(button);
 			}
 

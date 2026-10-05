@@ -748,7 +748,7 @@ namespace Files.App.ViewModels.UserControls
 			var workingPath =
 				PathComponents[PathComponents.Count - 1].Path?.TrimEnd(Path.DirectorySeparatorChar);
 
-			foreach (var (name, childPath, isHidden) in childFolders.Take(MaxBreadcrumbSubfolders))
+			foreach (var (name, childPath, isHidden) in childFolders.Take(OperatingSystem.IsWindows() ? int.MaxValue : MaxBreadcrumbSubfolders))
 			{
 				var flyoutItem = new MenuFlyoutItem
 				{
@@ -774,7 +774,7 @@ namespace Files.App.ViewModels.UserControls
 				_ = LoadFlyoutItemIconAsync(flyoutItem, childPath);
 			}
 
-			if (childFolders.Count > MaxBreadcrumbSubfolders)
+			if (!OperatingSystem.IsWindows() && childFolders.Count > MaxBreadcrumbSubfolders)
 			{
 				flyout.Items?.Add(new MenuFlyoutSeparator());
 				flyout.Items?.Add(new MenuFlyoutItem

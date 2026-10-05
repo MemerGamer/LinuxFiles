@@ -242,6 +242,9 @@ namespace Files.App.Helpers
 
 				await associatedInstance.FilesystemHelpers.MoveItemsAsync(items, items.Select(x => PathNormalization.Combine(folder.Path, x.Name)), false, true);
 				await associatedInstance.RefreshIfNoWatcherExistsAsync();
+
+				if (OperatingSystem.IsLinux() && folder.Path is not null)
+					await SelectAndRenameNewItemAsync(associatedInstance, folder.Path);
 			}
 			catch (Exception ex)
 			{

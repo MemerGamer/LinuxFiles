@@ -387,6 +387,48 @@ namespace Files.App.Views.Layouts
 
 		// Methods
 
+#if DESKTOP
+		/// <summary>
+		/// Home, End, Page Up and Page Down don't move the selection in Uno's list controls.
+		/// </summary>
+		protected bool TryHandleListJumpKey(KeyRoutedEventArgs e)
+		{
+			if (e.Key is not (VirtualKey.Home or VirtualKey.End or VirtualKey.PageUp or VirtualKey.PageDown) ||
+				ListViewBase.Items.Count == 0 ||
+				FocusManager.GetFocusedElement(MainWindow.Instance.Content.XamlRoot) is TextBox)
+				return false;
+
+			var count = ListViewBase.Items.Count;
+			var current = Math.Max(ListViewBase.SelectedIndex, 0);
+			var pageSize = 1;
+			if (ListViewBase.FindDescendant<ScrollViewer>() is { } scrollViewer &&
+				ListViewBase.ContainerFromIndex(current) is FrameworkElement container &&
+				container.ActualHeight > 0 && container.ActualWidth > 0)
+			{
+				pageSize = Math.Max(1, (int)(scrollViewer.ViewportHeight / container.ActualHeight)) *
+					Math.Max(1, (int)(scrollViewer.ViewportWidth / container.ActualWidth));
+			}
+
+			var target = e.Key switch
+			{
+				VirtualKey.Home => 0,
+				VirtualKey.End => count - 1,
+				VirtualKey.PageUp => Math.Max(current - pageSize, 0),
+				_ => Math.Min(current + pageSize, count - 1),
+			};
+
+			if (ListViewBase.Items[target] is ListedItem item)
+			{
+				ItemManipulationModel.SetSelectedItem(item);
+				ItemManipulationModel.ScrollIntoView(item);
+				ItemManipulationModel.FocusSelectedItems();
+			}
+
+			e.Handled = true;
+			return true;
+		}
+
+#endif
 		[DynamicWindowsRuntimeCast(typeof(TextBox))]
 		protected async void RenameTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
 		{

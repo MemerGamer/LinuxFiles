@@ -37,6 +37,7 @@
 			<ColumnDefinition Width="Auto" />
 			<ColumnDefinition Width="Auto" />
 			<ColumnDefinition Width="Auto" />
+			<ColumnDefinition Width="Auto" />
 		</Grid.ColumnDefinitions>
 
 		<!--  Folder and selection info  -->
@@ -604,6 +605,46 @@
 				</Button.Flyout>
 			</Button>
 		</Grid>
+
+		<!--  Layout toggles (Details / Grid)  -->
+		<StackPanel
+			x:Name="LayoutToggles"
+			Grid.Column="4"
+			Margin="4,0,0,0"
+			VerticalAlignment="Center"
+			Orientation="Horizontal"
+			Spacing="2">
+			<Button
+				x:Name="DetailsLayoutButton"
+				Width="28"
+				Height="24"
+				Padding="0"
+				AutomationProperties.Name="{x:Bind Commands.LayoutDetails.AutomationName}"
+				Background="{x:Bind GetLayoutToggleBackground(Commands.LayoutDetails.IsOn), Mode=OneWay}"
+				BorderBrush="Transparent"
+				Command="{x:Bind Commands.LayoutDetails}"
+				ToolTipService.ToolTip="{x:Bind Commands.LayoutDetails.LabelWithHotKey, Mode=OneWay}">
+				<controls:ThemedIcon
+					Width="16"
+					Height="16"
+					Style="{x:Bind Commands.LayoutDetails.ThemedIconStyle}" />
+			</Button>
+			<Button
+				x:Name="GridLayoutButton"
+				Width="28"
+				Height="24"
+				Padding="0"
+				AutomationProperties.Name="{x:Bind Commands.LayoutGrid.AutomationName}"
+				Background="{x:Bind GetLayoutToggleBackground(Commands.LayoutGrid.IsOn), Mode=OneWay}"
+				BorderBrush="Transparent"
+				Command="{x:Bind Commands.LayoutGrid}"
+				ToolTipService.ToolTip="{x:Bind Commands.LayoutGrid.LabelWithHotKey, Mode=OneWay}">
+				<controls:ThemedIcon
+					Width="16"
+					Height="16"
+					Style="{x:Bind Commands.LayoutGrid.ThemedIconStyle}" />
+			</Button>
+		</StackPanel>
 
 		<VisualStateManager.VisualStateGroups>
 			<VisualStateGroup x:Name="ResponsiveStates">

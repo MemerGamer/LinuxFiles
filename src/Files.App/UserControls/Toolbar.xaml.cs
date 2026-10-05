@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.App.Controls;
 using CommunityToolkit.WinUI;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
@@ -23,6 +24,8 @@ namespace Files.App.UserControls
 		private readonly IModifiableCommandManager ModifiableCommands = Ioc.Default.GetRequiredService<IModifiableCommandManager>();
 		private readonly IAddItemService addItemService = Ioc.Default.GetRequiredService<IAddItemService>();
 		private readonly DispatcherQueueTimer toolbarRefreshTimer;
+		private readonly DispatcherQueueTimer layoutIconTimer;
+		private Style? appliedLayoutIconStyle;
 		private readonly IContentPageContext PageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
 		private UserControls.Menus.FileTagsContextMenu? editTagsMenu;
 		private int openWithFlyoutRequestId;
@@ -37,6 +40,7 @@ namespace Files.App.UserControls
 		public Toolbar()
 		{
 			toolbarRefreshTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
+			layoutIconTimer = DispatcherQueue.GetForCurrentThread().CreateTimer();
 			InitializeComponent();
 			Loaded += Toolbar_Loaded;
 			Unloaded += Toolbar_Unloaded;
@@ -78,11 +82,52 @@ namespace Files.App.UserControls
 
 		partial void OnViewModelChanged(NavigationToolbarViewModel? newValue)
 		{
+			if (newValue is not null)
+			{
+				newValue.PropertyChanged += ViewModel_PropertyChanged;
+				RefreshLayoutIcon();
+			}
+
 			if (newValue?.InstanceViewModel is not null)
 			{
 				newValue.InstanceViewModel.PropertyChanged += InstanceViewModel_PropertyChanged;
 				RequestToolbarRefresh(true);
 			}
+		}
+
+		private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName is nameof(NavigationToolbarViewModel.LayoutThemedIcon)
+				or nameof(NavigationToolbarViewModel.IsDetailsLayout)
+				or nameof(NavigationToolbarViewModel.IsColumnLayout))
+			{
+				RefreshLayoutIcon();
+
+				// The layout mode can settle after these notifications (columns view uses its own preferences)
+				layoutIconTimer.Debounce(RefreshLayoutIcon, TimeSpan.FromMilliseconds(300), false);
+			}
+		}
+
+		// Swapping the style of a live ThemedIcon leaves the previous glyph on Uno, so use a fresh icon
+		private void RefreshLayoutIcon()
+		{
+			if (!OperatingSystem.IsLinux() || ViewModel?.InstanceViewModel?.FolderSettings is not { } settings)
+				return;
+
+			var style = settings.LayoutMode switch
+			{
+				FolderLayoutModes.ListView => Commands.LayoutList.ThemedIconStyle,
+				FolderLayoutModes.CardsView => Commands.LayoutCards.ThemedIconStyle,
+				FolderLayoutModes.ColumnView => Commands.LayoutColumns.ThemedIconStyle,
+				FolderLayoutModes.GridView => Commands.LayoutGrid.ThemedIconStyle,
+				_ => Commands.LayoutDetails.ThemedIconStyle
+			};
+
+			if (style is null || ReferenceEquals(appliedLayoutIconStyle, style))
+				return;
+
+			appliedLayoutIconStyle = style;
+			LayoutOptionsButton.Content = new ThemedIcon { Style = style };
 		}
 
 		private void Command_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -427,7 +472,9 @@ namespace Files.App.UserControls
 			if (setContent)
 				button.Content = glyph.ToIcon();
 
-			button.Icon = glyph.ToFontIcon() ?? glyph.ToOverflowIcon();
+			// On Uno an Icon replaces the templated Content, which hides the ThemedIcon
+			if (!(setContent && OperatingSystem.IsLinux()))
+				button.Icon = glyph.ToFontIcon() ?? glyph.ToOverflowIcon();
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]

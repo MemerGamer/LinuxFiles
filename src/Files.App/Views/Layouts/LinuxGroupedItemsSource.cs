@@ -104,6 +104,8 @@ namespace Files.App.Views.Layouts
 
 			var selectedPaths = pendingSelection ?? owner.SelectedItems.OfType<ListedItem>().Select(item => item.ItemPath).ToHashSet(StringComparer.Ordinal);
 			pendingSelection = null;
+			var previous = Items.ToHashSet(ReferenceEqualityComparer.Instance);
+			var inserted = rows.OfType<ListedItem>().Where(item => !previous.Contains(item)).ToHashSet(ReferenceEqualityComparer.Instance);
 			// Small watcher updates keep existing containers, focus and selection alive.
 			if (removeCount + addCount <= 64)
 			{
@@ -124,11 +126,14 @@ namespace Files.App.Views.Layouts
 			{
 				if (disposed)
 					return;
-				foreach (var item in Items.OfType<ListedItem>().Where(item => selectedPaths.Contains(item.ItemPath)))
-				{
-					if (!owner.SelectedItems.Contains(item))
-						owner.SelectedItems.Add(item);
-				}
+
+				// Recycled containers can carry a stale selection onto inserted rows
+				foreach (var item in owner.SelectedItems.OfType<ListedItem>().Where(item => inserted.Contains(item) && !selectedPaths.Contains(item.ItemPath)).ToList())
+					owner.SelectedItems.Remove(item);
+
+				var selected = owner.SelectedItems.ToHashSet(ReferenceEqualityComparer.Instance);
+				foreach (var item in Items.OfType<ListedItem>().Where(item => selectedPaths.Contains(item.ItemPath) && !selected.Contains(item)).ToList())
+					owner.SelectedItems.Add(item);
 			});
 		}
 

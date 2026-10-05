@@ -318,7 +318,7 @@ namespace Files.App.Helpers
 				}
 				else
 				{
-					tabLocationHeader = currentPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).Split('\\', StringSplitOptions.RemoveEmptyEntries).Last();
+					tabLocationHeader = currentPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Last();
 
 					var rootItem = await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(currentPath));
 					if (rootItem)

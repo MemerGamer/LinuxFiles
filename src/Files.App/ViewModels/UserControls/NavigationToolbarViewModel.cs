@@ -480,7 +480,9 @@ namespace Files.App.ViewModels.UserControls
 
 			var storageItems = await FilesystemHelpers.GetDraggedStorageItems(e.DataView);
 
-			if (storageItems.ContainsDestinationOrAncestor(pathBoxItem.Path) ||
+			// Archives are read-only: nothing can be dropped into them
+			if ((!OperatingSystem.IsWindows() && ZipStorageFolder.IsZipPath(pathBoxItem.Path)) ||
+				storageItems.ContainsDestinationOrAncestor(pathBoxItem.Path) ||
 				!storageItems.Any(storageItem =>
 					!string.IsNullOrEmpty(storageItem?.Path) &&
 					storageItem.Path.Replace(pathBoxItem.Path, string.Empty, StringComparison.Ordinal)

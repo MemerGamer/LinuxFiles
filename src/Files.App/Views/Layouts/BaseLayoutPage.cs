@@ -6,6 +6,7 @@ using Files.App.Controls;
 using Files.App.Helpers.ContextFlyouts;
 using Files.App.UserControls.Menus;
 using Files.App.ViewModels.Layouts;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -115,7 +116,19 @@ namespace Files.App.Views.Layouts
 
 		public IShellPage? ParentShellPageInstance { get; private set; }
 
-		public bool IsRenamingItem { get; set; }
+		private bool isRenamingItem;
+		public bool IsRenamingItem
+		{
+			get => isRenamingItem;
+			set
+			{
+				if (isRenamingItem == value)
+					return;
+
+				isRenamingItem = value;
+				UpdateRenamingItemToolTip();
+			}
+		}
 		public bool LockPreviewPaneContent { get; set; }
 
 		protected static TimeSpan RenameDoubleClickGuardDuration
@@ -1165,7 +1178,11 @@ namespace Files.App.Views.Layouts
 					// Dropping onto an executable or a script opens the dragged items with it, so only the item itself is rejected there
 					var isOpenWithTarget = item.IsExecutable || item.IsScriptFile;
 
-					if (isOpenWithTarget
+					if (!OperatingSystem.IsWindows() && ZipStorageFolder.IsZipPath(item.ItemPath))
+					{
+						e.AcceptedOperation = DataPackageOperation.None;
+					}
+					else if (isOpenWithTarget
 						? draggedItems.ContainsDestinationPath(item.ItemPath)
 						: draggedItems.ContainsDestinationOrAncestor(item.ItemPath))
 					{
@@ -1462,6 +1479,19 @@ namespace Files.App.Views.Layouts
 			}
 		}
 
+		/// <summary>
+		/// The hover tooltip of the row being renamed stays off: a tooltip that opens while the rename box has focus
+		/// can take the box away on Uno.
+		/// </summary>
+		private void UpdateRenamingItemToolTip()
+		{
+			var item = RenamingItem;
+			if (item is null || ItemsControl?.ContainerFromItem(item) is not SelectorItem container)
+				return;
+
+			UpdateItemToolTip(container, isRenamingItem ? null : item.ItemTooltipText);
+		}
+
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
 		private static void UpdateItemToolTip(SelectorItem container, string? tooltipText)
 		{
@@ -1530,7 +1560,7 @@ namespace Files.App.Views.Layouts
 				MainWindow.Instance.SetCanWindowToFront(false);
 
 			if (sender is SelectorItem tooltipContainer && tooltipContainer.Content is ListedItem listedItem)
-				UpdateItemToolTip(tooltipContainer, listedItem.ItemTooltipText);
+				UpdateItemToolTip(tooltipContainer, IsRenamingItem && listedItem == RenamingItem ? null : listedItem.ItemTooltipText);
 
 			if (!UserSettingsService.FoldersSettingsService.SelectFilesOnHover)
 				return;
@@ -1817,15 +1847,43 @@ namespace Files.App.Views.Layouts
 		{
 			guardRenameFromDoubleClick = true;
 			renameGuardStartTime = DateTime.UtcNow;
+			var item = SelectedItem;
 
 			try
 			{
+				// Same routine as F2 (ItemManipulationModel.StartRenameItem)
 				StartRenameItem();
+			}
+			catch (Exception ex)
+			{
+				App.Logger?.LogWarning(ex, "Starting rename from a slow click failed");
 			}
 			finally
 			{
 				guardRenameFromDoubleClick = false;
 			}
+
+			// The name must never stay hidden when the rename box did not come up or was lost right away
+			if (!IsRenamingItem)
+				RestoreItemNameDisplay(item);
+			else
+				_ = VerifyRenameStartedAsync(item);
+		}
+
+		private async Task VerifyRenameStartedAsync(ListedItem? item)
+		{
+			await Task.Delay(350);
+			await DispatcherQueue.EnqueueOrInvokeAsync(() =>
+			{
+				RestoreItemNameDisplay(item);
+			});
+		}
+
+		/// <summary>
+		/// Shows the name label of an item again after a rename ended or could not start.
+		/// </summary>
+		protected virtual void RestoreItemNameDisplay(ListedItem? item)
+		{
 		}
 
 		public void ResetRenameDoubleClick()

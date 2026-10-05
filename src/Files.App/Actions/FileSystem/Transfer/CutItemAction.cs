@@ -29,6 +29,10 @@ namespace Files.App.Actions
 		public HotKey HotKey
 			=> new(Keys.X, KeyModifiers.Ctrl);
 
+		// Archives are read-only, so their items can only be copied out
+		public override bool IsExecutable
+			=> base.IsExecutable && (OperatingSystem.IsWindows() || ContentPageContext.PageType != ContentPageTypes.ZipFolder);
+
 		public CutItemAction() : base()
 		{
 		}

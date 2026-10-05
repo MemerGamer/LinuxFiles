@@ -111,6 +111,7 @@ public interface ICommandManager : IEnumerable<IRichCommand>
 	IRichCommand NewWindow { get; }
 	IRichCommand NextTab { get; }
 	IRichCommand OpenAllTagged { get; }
+	IRichCommand OpenArchiveAsFolder { get; }
 	IRichCommand OpenClassicProperties { get; }
 	IRichCommand OpenCommandPalette { get; }
 	IRichCommand OpenCurrentFolderInOtherPane { get; }

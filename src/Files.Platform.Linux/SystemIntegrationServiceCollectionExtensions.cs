@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Elevation;
+using Files.Platform.Abstractions.FileChooser;
 using Files.Platform.Abstractions.Fonts;
 using Files.Platform.Abstractions.Instance;
 using Files.Platform.Abstractions.Notifications;
@@ -10,6 +11,7 @@ using Files.Platform.Abstractions.Tags;
 using Files.Platform.Abstractions.Wallpaper;
 using Files.Platform.Linux.DBus;
 using Files.Platform.Linux.Elevation;
+using Files.Platform.Linux.FileChooser;
 using Files.Platform.Linux.Fonts;
 using Files.Platform.Linux.Instance;
 using Files.Platform.Linux.Launching;
@@ -44,6 +46,7 @@ namespace Files.Platform.Linux
 			services.TryAddSingleton<IElevationService, PkexecElevationService>();
 			services.TryAddSingleton<IFontInstallService>(sp => new UserFontInstallService(UserFontInstallService.DefaultFontsDirectory(System.Environment.GetEnvironmentVariable), sp.GetRequiredService<IExecutableLocator>(), sp.GetRequiredService<IElevatedProcessRunner>()));
 			services.TryAddSingleton<IWallpaperService>(_ => new PortalWallpaperService());
+			services.TryAddSingleton<IFileChooserService>(_ => new PortalFileChooserService());
 			return services;
 		}
 	}

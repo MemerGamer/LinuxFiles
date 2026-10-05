@@ -10,6 +10,11 @@ namespace Files.App.Views.Layouts
 	{
 		private LinuxGroupedItemsSource? linuxGroupedItemsSource;
 
+		/// <summary>
+		/// Whether the list shows the flattened grouped rows, whose group headers are items that must be skipped.
+		/// </summary>
+		protected bool IsLinuxGrouped => linuxGroupedItemsSource is not null;
+
 		private void UpdateLinuxGroupedItemsSource()
 		{
 			DisposeLinuxGroupedItemsSource();

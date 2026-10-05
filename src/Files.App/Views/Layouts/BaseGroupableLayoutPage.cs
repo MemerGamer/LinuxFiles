@@ -32,6 +32,9 @@ namespace Files.App.Views.Layouts
 		// Fields
 
 		protected int NextRenameIndex = 0;
+#if !WINDOWS
+		private bool isSelectingAll;
+#endif
 		protected TextBox? renameTextBox;
 
 		// Properties
@@ -230,11 +233,24 @@ namespace Files.App.Views.Layouts
 #if WINDOWS
 			ListViewBase.SelectAll();
 #else
-			foreach (var item in GetAllItems())
+			// Uno doesn't implement SelectAll. Each Add raises SelectionChanged, so update the page once at the end instead of per item.
+			var selected = ListViewBase.SelectedItems.ToHashSet(ReferenceEqualityComparer.Instance);
+			var added = GetAllItems().Where(item => !selected.Contains(item)).Cast<object>().ToList();
+			if (added.Count == 0)
+				return;
+
+			isSelectingAll = true;
+			try
 			{
-				if (!ListViewBase.SelectedItems.Contains(item))
+				foreach (var item in added)
 					ListViewBase.SelectedItems.Add(item);
 			}
+			finally
+			{
+				isSelectingAll = false;
+			}
+
+			FileList_SelectionChanged(ListViewBase, new SelectionChangedEventArgs([], added));
 #endif
 		}
 
@@ -281,6 +297,9 @@ namespace Files.App.Views.Layouts
 				return;
 
 #if !WINDOWS
+			if (isSelectingAll)
+				return;
+
 			foreach (var header in ListViewBase.SelectedItems.Where(x => x is not ListedItem).ToList())
 				ListViewBase.SelectedItems.Remove(header);
 #endif
@@ -368,38 +387,64 @@ namespace Files.App.Views.Layouts
 			if (textBlock is null || textBox is null)
 				throw new InvalidOperationException("The rename controls are not available for the selected item.");
 
-			string editText = ShouldShowExtensionInRename(renamingItem) ? renamingItem.ItemNameRaw! : textBlock.Text;
-			ApplyRenameBoxColors(textBox);
-			textBox.Text = editText;
-			OldItemName = editText;
-			textBlock.Visibility = Visibility.Collapsed;
-			textBox.Visibility = Visibility.Visible;
+			try
+			{
+				string editText = ShouldShowExtensionInRename(renamingItem) ? renamingItem.ItemNameRaw! : textBlock.Text;
+				ApplyRenameBoxColors(textBox);
+				textBox.Text = editText;
+				OldItemName = editText;
+				textBlock.Visibility = Visibility.Collapsed;
+				textBox.Visibility = Visibility.Visible;
 
-			var parentGrid = textBox.FindParent<Grid>();
-			if (parentGrid is null)
+				var parentGrid = textBox.FindParent<Grid>();
+				if (parentGrid is null)
+				{
+					textBlock.Visibility = Visibility.Visible;
+					textBox.Visibility = Visibility.Collapsed;
+					return;
+				}
+
+				Grid.SetColumnSpan(parentGrid, 8);
+
+				textBox.Focus(FocusState.Pointer);
+				textBox.LostFocus += RenameTextBox_LostFocus;
+				textBox.KeyDown += RenameTextBox_KeyDown;
+
+				int selectedTextLength = editText.Length;
+
+				if (!renamingItem.IsShortcut && (ShouldShowExtensionInRename(renamingItem) || UserSettingsService.FoldersSettingsService.ShowFileExtensions))
+					selectedTextLength -= extensionLength;
+
+				textBox.Select(0, selectedTextLength);
+				IsRenamingItem = true;
+
+				renameTextBox = textBox;
+				if (guardRenameFromDoubleClick)
+					DeferRenameTextBoxHitTesting(textBox);
+			}
+			catch
+			{
+				// A failure after the label was hidden must not leave the name blank
+				textBox.LostFocus -= RenameTextBox_LostFocus;
+				textBox.KeyDown -= RenameTextBox_KeyDown;
+				textBox.Visibility = Visibility.Collapsed;
+				textBlock.Visibility = Visibility.Visible;
+				IsRenamingItem = false;
+				throw;
+			}
+		}
+
+		protected override void RestoreItemNameDisplay(ListedItem? item)
+		{
+			if (item is null || IsRenamingItem)
+				return;
+
+			if (ListViewBase.ContainerFromItem(item) is DependencyObject container &&
+				container.FindDescendant("ItemName") is TextBlock textBlock)
 			{
 				textBlock.Visibility = Visibility.Visible;
-				textBox.Visibility = Visibility.Collapsed;
-				return;
+				textBlock.Opacity = item.Opacity;
 			}
-
-			Grid.SetColumnSpan(parentGrid, 8);
-
-			textBox.Focus(FocusState.Pointer);
-			textBox.LostFocus += RenameTextBox_LostFocus;
-			textBox.KeyDown += RenameTextBox_KeyDown;
-
-			int selectedTextLength = editText.Length;
-
-			if (!renamingItem.IsShortcut && (ShouldShowExtensionInRename(renamingItem) || UserSettingsService.FoldersSettingsService.ShowFileExtensions))
-				selectedTextLength -= extensionLength;
-
-			textBox.Select(0, selectedTextLength);
-			IsRenamingItem = true;
-
-			renameTextBox = textBox;
-			if (guardRenameFromDoubleClick)
-				DeferRenameTextBoxHitTesting(textBox);
 		}
 
 		protected async void DeferRenameTextBoxHitTesting(TextBox textBox)
@@ -517,6 +562,49 @@ namespace Files.App.Views.Layouts
 		}
 
 		/// <summary>
+		/// Arrow keys skip the header rows of grouped lists; Uno's list controls would stop on a header, and don't move at all in the grouped wrap panel.
+		/// </summary>
+		protected bool TryHandleGroupedArrowKey(KeyRoutedEventArgs e)
+		{
+			if (e.Key is not (VirtualKey.Up or VirtualKey.Down or VirtualKey.Left or VirtualKey.Right) ||
+				!IsLinuxGrouped ||
+				ListViewBase.Items.Count == 0 ||
+				FocusManager.GetFocusedElement(MainWindow.Instance.Content.XamlRoot) is TextBox ||
+				InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down) ||
+				InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down))
+				return false;
+
+			var panel = ListViewBase.ItemsPanelRoot as LinuxGroupedWrapPanel;
+			if (panel is null && e.Key is VirtualKey.Left or VirtualKey.Right)
+				return false;
+
+			var forward = e.Key is VirtualKey.Down or VirtualKey.Right;
+			var sequential = panel is null || (panel.Orientation == Orientation.Vertical
+				? e.Key is VirtualKey.Up or VirtualKey.Down
+				: e.Key is VirtualKey.Left or VirtualKey.Right);
+			var current = ListViewBase.SelectedIndex;
+			int target;
+			if (current < 0)
+				target = SkipHeaderRows(0, 1);
+			else if (sequential)
+				target = SkipHeaderRows(current + (forward ? 1 : -1), forward ? 1 : -1);
+			else
+				target = ListViewBase.ContainerFromIndex(current) is UIElement container && panel!.FindInAdjacentLine(container, forward) is { } next
+					? ListViewBase.IndexFromContainer(next)
+					: -1;
+
+			if (target >= 0 && target < ListViewBase.Items.Count && ListViewBase.Items[target] is ListedItem item)
+			{
+				ItemManipulationModel.SetSelectedItem(item);
+				ItemManipulationModel.ScrollIntoView(item);
+				ItemManipulationModel.FocusSelectedItems();
+			}
+
+			e.Handled = true;
+			return true;
+		}
+
+		/// <summary>
 		/// Home, End, Page Up and Page Down don't move the selection in Uno's list controls.
 		/// </summary>
 		protected bool TryHandleListJumpKey(KeyRoutedEventArgs e)
@@ -618,7 +706,7 @@ namespace Files.App.Views.Layouts
 					}
 					else
 					{
-						var newIndex = ListViewBase.SelectedIndex + NextRenameIndex;
+						var newIndex = SkipHeaderRows(ListViewBase.SelectedIndex + NextRenameIndex, NextRenameIndex);
 						NextRenameIndex = 0;
 						EndRename(textBox);
 
@@ -637,7 +725,7 @@ namespace Files.App.Views.Layouts
 
 		protected bool TryStartRenameNextItem(ListedItem item)
 		{
-			var nextItemIndex = ListViewBase.Items.IndexOf(item) + NextRenameIndex;
+			var nextItemIndex = SkipHeaderRows(ListViewBase.Items.IndexOf(item) + NextRenameIndex, NextRenameIndex);
 			NextRenameIndex = 0;
 
 			if (nextItemIndex >= 0 &&
@@ -650,6 +738,17 @@ namespace Files.App.Views.Layouts
 			}
 
 			return false;
+		}
+
+		/// <summary>
+		/// Moves <paramref name="index"/> past group header rows (Linux grouped lists) in <paramref name="direction"/>.
+		/// </summary>
+		private int SkipHeaderRows(int index, int direction)
+		{
+			while (direction != 0 && index >= 0 && index < ListViewBase.Items.Count && ListViewBase.Items[index] is not ListedItem)
+				index += direction;
+
+			return index;
 		}
 
 		protected void SelectionCheckbox_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)

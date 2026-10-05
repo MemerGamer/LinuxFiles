@@ -36,6 +36,24 @@ namespace Files.App.Data.Contracts
 		bool Open_FileSaveDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath);
 
 		/// <summary>
+		/// Asynchronous <see cref="Open_FileOpenDialog"/>; implementations that can should avoid blocking the calling thread.
+		/// </summary>
+		Task<(bool Result, string FilePath)> OpenFileOpenDialogAsync(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, Guid? clientGuid = null)
+		{
+			var result = Open_FileOpenDialog(hWnd, pickFoldersOnly, filters, defaultFolder, out var filePath, clientGuid);
+			return Task.FromResult((result, filePath));
+		}
+
+		/// <summary>
+		/// Asynchronous <see cref="Open_FileSaveDialog"/>; implementations that can should avoid blocking the calling thread.
+		/// </summary>
+		Task<(bool Result, string FilePath)> OpenFileSaveDialogAsync(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder)
+		{
+			var result = Open_FileSaveDialog(hWnd, pickFoldersOnly, filters, defaultFolder, out var filePath);
+			return Task.FromResult((result, filePath));
+		}
+
+		/// <summary>
 		/// Opens a common dialog called NetworkConnectionDialog through native Win32API.
 		/// </summary>
 		/// <param name="hideRestoreConnectionCheckBox">The value indicating whether to hide the check box allowing the user to restore the connection at logon.</param>

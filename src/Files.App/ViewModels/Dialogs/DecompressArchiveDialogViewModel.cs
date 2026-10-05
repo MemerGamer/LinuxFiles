@@ -136,12 +136,11 @@ namespace Files.App.ViewModels.Dialogs
 			return string.IsNullOrEmpty(directory) ? fileName : Path.Combine(directory, fileName);
 		}
 
-		private Task SelectDestinationAsync()
+		private async Task SelectDestinationAsync()
 		{
-			bool result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop, out var filePath);
+			var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop);
 			if (result)
 				DestinationFolderPath = filePath;
-			return Task.CompletedTask;
 		}
 
 		private void RefreshEncodingOptions()

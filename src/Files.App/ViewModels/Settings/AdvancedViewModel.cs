@@ -165,7 +165,7 @@ namespace Files.App.ViewModels.Settings
 		private async Task ImportSettingsAsync()
 		{
 			string[] extensions = [Strings.ZipFileCapitalized.GetLocalizedResource(), "*.zip"];
-			bool result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.Desktop, out var filePath);
+			var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.Desktop);
 			if (!result)
 				return;
 
@@ -212,7 +212,7 @@ namespace Files.App.ViewModels.Settings
 		private async Task ExportSettingsAsync()
 		{
 			string[] extensions = [Strings.ZipFileCapitalized.GetLocalizedResource(), "*.zip"];
-			bool result = CommonDialogService.Open_FileSaveDialog(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.Desktop, out var filePath);
+			var (result, filePath) = await CommonDialogService.OpenFileSaveDialogAsync(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.Desktop);
 			if (!result)
 				return;
 

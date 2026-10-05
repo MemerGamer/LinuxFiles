@@ -111,7 +111,7 @@ namespace Files.App.ViewModels.Properties
 					"PNG", "*.png",
 				];
 
-				var result = CommonDialogService.Open_FileOpenDialog(hWnd, false, extensions, Environment.SpecialFolder.Desktop, out var filePath);
+				var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(hWnd, false, extensions, Environment.SpecialFolder.Desktop);
 				if (result)
 				{
 					ViewModel.IsAblumCoverModified = true;

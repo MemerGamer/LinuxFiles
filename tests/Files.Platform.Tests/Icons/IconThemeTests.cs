@@ -5,6 +5,7 @@ using Files.Platform.Linux.Icons;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Files.Platform.Tests.Icons
@@ -199,6 +200,42 @@ namespace Files.Platform.Tests.Icons
 			var result = await provider.ResolveIconAsync(["nope", "text-x-generic", "folder"], 32);
 
 			Assert.AreEqual(Path.Combine(_icons, "Parent", "32x32/mimetypes", "text-x-generic.png"), result!.Value.Path);
+		}
+
+		[TestMethod]
+		public async Task Candidates_IncludeAlternateSizesAndInheritedThemesInOrder()
+		{
+			WriteTheme("breeze", "Inherits=Child", ("scalable/places", 48, "Scalable"));
+			Touch("hicolor", "64x64/places", "folder.svg");
+			Touch("breeze", "scalable/places", "folder.svg");
+			File.CreateSymbolicLink(Path.Combine(_icons, "Child", "16x16/places", "inode-directory.png"), "folder.png");
+
+			var results = await CreateProvider().ResolveIconCandidatesAsync(["folder", "inode-directory"], 16);
+
+			CollectionAssert.AreEqual(new[]
+			{
+				Path.Combine(_icons, "Child", "16x16/places", "folder.png"),
+				Path.Combine(_icons, "Child", "48x48/places", "folder.png"),
+				Path.Combine(_icons, "Parent", "32x32/places", "folder.png"),
+				Path.Combine(_icons, "hicolor", "64x64/places", "folder.svg"),
+				Path.Combine(_icons, "breeze", "scalable/places", "folder.svg"),
+				Path.Combine(_icons, "Child", "16x16/places", "inode-directory.png"),
+			}, results.Select(r => r.Path).ToArray());
+		}
+
+		[TestMethod]
+		public async Task Candidates_SkipBrokenLinksAndIncludeScalableFolderVariants()
+		{
+			File.Delete(Path.Combine(_icons, "Child", "16x16/places", "folder.png"));
+			File.CreateSymbolicLink(Path.Combine(_icons, "Child", "16x16/places", "folder.png"), "missing.png");
+			Touch("Child", "scalable/apps", "folder-documents.svg");
+			var provider = CreateProvider();
+
+			var results = await provider.ResolveIconCandidatesAsync(["folder-documents", "folder"], 16);
+
+			Assert.AreEqual(Path.Combine(_icons, "Child", "scalable/apps", "folder-documents.svg"), results[0].Path);
+			Assert.AreEqual(Path.Combine(_icons, "Child", "48x48/places", "folder.png"), results[1].Path);
+			Assert.AreEqual(3, results.Count);
 		}
 
 		[TestMethod]

@@ -190,7 +190,9 @@ namespace Files.App.UserControls.TabBar
 			args.Data.RequestedOperation = DataPackageOperation.Move;
 
 			// Get cursor position & time to track how far the tab was dragged.
-			PInvoke.GetCursorPos(out dragStartPoint);
+			// LINUX-TODO(tab-tearout): no global cursor position on Linux, so tab drag-out to a new window is disabled
+			if (OperatingSystem.IsWindows())
+				PInvoke.GetCursorPos(out dragStartPoint);
 			dragStartTime = DateTimeOffset.UtcNow;
 
 			// Focus the UI Element, without this the focus sometimes changes
@@ -295,6 +297,9 @@ namespace Files.App.UserControls.TabBar
 			PreviewKeyDown -= TabDragging_PreviewKeyDown;
 
 			if (isCancelingDragOperation)
+				return;
+
+			if (!OperatingSystem.IsWindows())
 				return;
 
 			PInvoke.GetCursorPos(out var droppedPoint);

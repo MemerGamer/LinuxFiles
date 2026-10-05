@@ -1760,7 +1760,7 @@ namespace Files.App.Views.Layouts
 							tapDebounceTimer?.Stop();
 						}
 					},
-					TimeSpan.FromMilliseconds(PInvoke.GetDoubleClickTime()));
+					TimeSpan.FromMilliseconds(OperatingSystem.IsWindows() ? PInvoke.GetDoubleClickTime() : 500));
 				}
 				else
 				{

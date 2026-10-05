@@ -12,6 +12,7 @@ using Files.Platform.Linux.Mime;
 using Files.Platform.Linux.Permissions;
 using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Trash;
+using Files.Platform.Linux.Volumes;
 using Files.Platform.Linux.Watching;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -40,7 +41,8 @@ namespace Files.Platform.Linux
 				.AddLinuxFileOperations()
 				.AddLinuxArchives()
 				.AddLinuxPermissions()
-				.AddLinuxClipboard();
+				.AddLinuxClipboard()
+				.AddLinuxVolumes();
 		}
 	}
 }

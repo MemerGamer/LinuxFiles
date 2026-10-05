@@ -25,7 +25,8 @@ namespace Files.App.Actions
 			drivesViewModel.Drives
 				.Cast<DriveItem>()
 				.FirstOrDefault(x => string.Equals(x.Path, context.Folder?.ItemPath)) is DriveItem driveItem &&
-				!(driveItem.Type == DriveType.Network || string.Equals(context.Folder?.ItemPath, $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\", StringComparison.OrdinalIgnoreCase));
+				!(driveItem.Type == DriveType.Network || string.Equals(context.Folder?.ItemPath, $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\", StringComparison.OrdinalIgnoreCase)) &&
+				IsFormatAvailable(driveItem.Path);
 
 		public virtual bool IsAccessibleGlobally
 			=> true;
@@ -37,8 +38,23 @@ namespace Files.App.Actions
 
 		public virtual Task ExecuteAsync(object? parameter = null)
 		{
-			return Win32Helper.OpenFormatDriveDialog(context.Folder?.ItemPath ?? string.Empty);
+			return FormatDrive(context.Folder?.ItemPath);
 		}
+
+		// Windows opens the shell format dialog; Linux opens GNOME Disks or KDE Partition Manager when one is installed (else the command is hidden)
+		protected static bool IsFormatAvailable(string? path)
+#if !WINDOWS
+			=> DriveHelpers.CanFormat(path);
+#else
+			=> true;
+#endif
+
+		protected static Task FormatDrive(string? path)
+#if !WINDOWS
+			=> DriveHelpers.OpenFormatDialogAsync(path);
+#else
+			=> Win32Helper.OpenFormatDriveDialog(path ?? string.Empty);
+#endif
 
 		public void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

@@ -41,7 +41,11 @@ namespace Files.App.Utils.Storage
 		public abstract IStorageItemExtraProperties Properties { get; }
 		[MaybeNull]
 		StorageItemContentProperties IStorageItemProperties.Properties
+#if WINDOWS
 			=> this is SystemStorageFile file ? file.File.Properties : null;
+#else
+			=> null;
+#endif
 
 		public static implicit operator BaseStorageFile?(StorageFile? value)
 		{

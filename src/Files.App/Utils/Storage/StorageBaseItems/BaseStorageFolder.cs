@@ -33,7 +33,11 @@ namespace Files.App.Utils.Storage
 
 		[MaybeNull]
 		StorageItemContentProperties IStorageItemProperties.Properties
+#if WINDOWS
 			=> this is SystemStorageFolder folder ? folder.Folder.Properties : null;
+#else
+			=> null;
+#endif
 
 		public static implicit operator BaseStorageFolder?(StorageFolder? value)
 		{

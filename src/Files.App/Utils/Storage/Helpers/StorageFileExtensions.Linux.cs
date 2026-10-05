@@ -49,12 +49,17 @@ namespace Files.App.Utils.Storage
 		/// <summary>Opens a path the resolver already accepted as a legacy item; null when no legacy type can represent it (e.g. archive members).</summary>
 		internal static async Task<BaseStorageFile?> OpenLegacyFileAsync(string path)
 		{
+			// Uno does not check existence or type, so only local regular files qualify
+			if (!Path.IsPathRooted(path) || !File.Exists(path))
+				return null;
 			try { return await BaseStorageFile.GetFileFromPathAsync(path); }
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { return null; }
 		}
 
 		internal static async Task<BaseStorageFolder?> OpenLegacyFolderAsync(string path)
 		{
+			if (!Path.IsPathRooted(path) || !Directory.Exists(path))
+				return null;
 			try { return await BaseStorageFolder.GetFolderFromPathAsync(path); }
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { return null; }
 		}

@@ -558,5 +558,6 @@ namespace Files.App.Utils.Storage
 			=> FilesystemTasks.WrapNullable(() => StorageFileExtensions.DangerousGetFolderFromPathAsync(path));
 
 		private static Task<FilesystemResult<BaseStorageFile>> GetStorageFileAsync(string path)
-			=> FilesystemTasks.WrapNullable(() => StorageFileExtensions.DangerousGetFileFromPathAsync(path));	}
+			=> FilesystemTasks.WrapNullable(() => StorageFileExtensions.DangerousGetFileFromPathAsync(path));
+	}
 }

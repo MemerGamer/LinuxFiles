@@ -267,9 +267,6 @@
     <!--  Windows-only sources (*.Windows.cs) never build for non-Windows TFMs, compat mode included  -->
     <ItemGroup Condition="!$(TargetFramework.Contains('-windows'))">
         <Compile Remove="**\*.Windows.cs" />
-        <!--  Thin wrappers over the Uno StorageFile/StorageFolder, the legacy item type returned for plain local paths  -->
-        <Compile Include="Utils\Storage\StorageItems\SystemStorageFile.Windows.cs" />
-        <Compile Include="Utils\Storage\StorageItems\SystemStorageFolder.Windows.cs" />
     </ItemGroup>
 
     <!--  Windows-only Properties pages (NTFS ACLs, Authenticode signatures, compatibility tab, icon customization)  -->

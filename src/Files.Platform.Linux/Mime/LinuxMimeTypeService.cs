@@ -3,6 +3,7 @@
 
 using Files.Platform.Abstractions.Mime;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -30,9 +31,91 @@ namespace Files.Platform.Linux.Mime
 
 		private readonly XdgDirectories xdg;
 		private readonly CultureInfo culture;
-		private readonly Lazy<GlobEntry[]> globs;
+		private readonly Lazy<GlobIndex> globs;
+		private readonly ConcurrentDictionary<string, XElement?> mimeXmlCache = new(StringComparer.Ordinal);
 
-		private sealed record GlobEntry(int Weight, string MimeType, string Pattern, bool CaseSensitive, bool IsLiteral);
+		private sealed record GlobEntry(int Order, int Weight, string MimeType, string Pattern, string LowerPattern, bool CaseSensitive, bool IsLiteral)
+		{
+			/// <summary>Gets whether this entry outranks <paramref name="other"/>: higher weight, then longer pattern, then earlier in the database.</summary>
+			public bool Beats(GlobEntry? other) =>
+				other is null || Weight > other.Weight ||
+				(Weight == other.Weight && (Pattern.Length > other.Pattern.Length || (Pattern.Length == other.Pattern.Length && Order < other.Order)));
+		}
+
+		/// <summary>
+		/// Globs grouped so a lookup touches only plausible entries: exact names and plain "*suffix" patterns are hashed, the rest are scanned.
+		/// </summary>
+		private sealed class GlobIndex
+		{
+			private readonly Dictionary<string, List<GlobEntry>> literalsCs = new(StringComparer.Ordinal);
+			private readonly Dictionary<string, List<GlobEntry>> literalsCi = new(StringComparer.Ordinal);
+			private readonly Dictionary<string, List<GlobEntry>> suffixesCs = new(StringComparer.Ordinal);
+			private readonly Dictionary<string, List<GlobEntry>> suffixesCi = new(StringComparer.Ordinal);
+			private readonly List<GlobEntry> complex = [];
+
+			public GlobIndex(IEnumerable<GlobEntry> entries)
+			{
+				foreach (var entry in entries)
+				{
+					if (entry.IsLiteral)
+					{
+						Add(entry.CaseSensitive ? literalsCs : literalsCi, entry.CaseSensitive ? entry.Pattern : entry.LowerPattern, entry);
+					}
+					else if (entry.Pattern.Length > 1 && entry.Pattern[0] == '*' && entry.Pattern.AsSpan(1).IndexOfAny("*?[\\") < 0)
+					{
+						Add(entry.CaseSensitive ? suffixesCs : suffixesCi, entry.CaseSensitive ? entry.Pattern[1..] : entry.LowerPattern[1..], entry);
+					}
+					else
+					{
+						complex.Add(entry);
+					}
+				}
+			}
+
+			private static void Add(Dictionary<string, List<GlobEntry>> map, string key, GlobEntry entry)
+			{
+				if (!map.TryGetValue(key, out var list))
+					map[key] = list = [];
+				list.Add(entry);
+			}
+
+			public string? Match(string fileName, string lower)
+			{
+				GlobEntry? best = null;
+
+				void Consider(Dictionary<string, List<GlobEntry>> map, ReadOnlySpan<char> key)
+				{
+					if (map.GetAlternateLookup<ReadOnlySpan<char>>().TryGetValue(key, out var list))
+					{
+						foreach (var entry in list)
+						{
+							if (entry.Beats(best))
+								best = entry;
+						}
+					}
+				}
+
+				Consider(literalsCs, fileName);
+				Consider(literalsCi, lower);
+				for (var i = 0; i < fileName.Length; i++)
+				{
+					Consider(suffixesCs, fileName.AsSpan(i));
+					Consider(suffixesCi, lower.AsSpan(i));
+				}
+
+				foreach (var glob in complex)
+				{
+					if (!glob.Beats(best))
+						continue;
+
+					var matches = glob.CaseSensitive ? GlobMatch(glob.Pattern, fileName) : GlobMatch(glob.LowerPattern, lower);
+					if (matches)
+						best = glob;
+				}
+
+				return best?.MimeType;
+			}
+		}
 
 		/// <summary>
 		/// Creates the service for the process environment and current UI culture.
@@ -48,7 +131,7 @@ namespace Files.Platform.Linux.Mime
 		{
 			this.xdg = xdg;
 			this.culture = culture;
-			globs = new(LoadGlobs);
+			globs = new(() => new GlobIndex(LoadGlobs()));
 		}
 
 		/// <inheritdoc/>
@@ -124,26 +207,7 @@ namespace Files.Platform.Linux.Mime
 			if (fileName.Length == 0)
 				return null;
 
-			var lower = fileName.ToLowerInvariant();
-			GlobEntry? best = null;
-
-			foreach (var glob in globs.Value)
-			{
-				var name = glob.CaseSensitive ? fileName : lower;
-				var pattern = glob.CaseSensitive ? glob.Pattern : glob.Pattern.ToLowerInvariant();
-				var matches = glob.IsLiteral ? name == pattern : GlobMatch(pattern, name);
-				if (!matches)
-					continue;
-
-				if (best is null
-					|| glob.Weight > best.Weight
-					|| (glob.Weight == best.Weight && glob.Pattern.Length > best.Pattern.Length))
-				{
-					best = glob;
-				}
-			}
-
-			return best?.MimeType;
+			return globs.Value.Match(fileName, fileName.ToLowerInvariant());
 		}
 
 		/// <summary>
@@ -256,7 +320,7 @@ namespace Files.Platform.Linux.Mime
 							continue;
 
 						var flags = parts.Length > 3 ? parts[3].Split(',') : [];
-						entries.Add(MakeEntry(weight, parts[1], parts[2], flags.Contains("cs")));
+						entries.Add(MakeEntry(entries.Count, weight, parts[1], parts[2], flags.Contains("cs")));
 					}
 				}
 				else if (TryReadLines(Path.Combine(dir, "mime", "globs"), out lines))
@@ -268,7 +332,7 @@ namespace Files.Platform.Linux.Mime
 
 						var parts = line.Split(':', 2);
 						if (parts.Length == 2)
-							entries.Add(MakeEntry(50, parts[0], parts[1], false));
+							entries.Add(MakeEntry(entries.Count, 50, parts[0], parts[1], false));
 					}
 				}
 			}
@@ -276,8 +340,8 @@ namespace Files.Platform.Linux.Mime
 			return [.. entries];
 		}
 
-		private static GlobEntry MakeEntry(int weight, string mime, string pattern, bool caseSensitive) =>
-			new(weight, mime, pattern, caseSensitive, pattern.IndexOfAny(['*', '?', '[']) < 0);
+		private static GlobEntry MakeEntry(int order, int weight, string mime, string pattern, bool caseSensitive) =>
+			new(order, weight, mime, pattern, pattern.ToLowerInvariant(), caseSensitive, pattern.IndexOfAny(['*', '?', '[']) < 0);
 
 		private static bool TryReadLines(string path, out string[] lines)
 		{
@@ -293,7 +357,10 @@ namespace Files.Platform.Linux.Mime
 			}
 		}
 
-		private XElement? LoadMimeXml(string mimeType)
+		private XElement? LoadMimeXml(string mimeType) =>
+			mimeXmlCache.GetOrAdd(mimeType, static (type, self) => self.ReadMimeXml(type), this);
+
+		private XElement? ReadMimeXml(string mimeType)
 		{
 			if (mimeType.Contains("..", StringComparison.Ordinal) || mimeType.Split('/').Length != 2)
 				return null;

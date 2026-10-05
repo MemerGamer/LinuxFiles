@@ -200,9 +200,9 @@ namespace Files.App.Views.Layouts
 		protected override void ItemManipulationModel_ScrollToTopInvoked(object? sender, EventArgs e)
 		{
 			if (FolderSettings?.LayoutMode is FolderLayoutModes.ListView)
-				ContentScroller?.ChangeView(0, null, null, true);
+				ResetScroll(ContentScroller, 0, null);
 			else
-				ContentScroller?.ChangeView(null, 0, null, true);
+				ResetScroll(ContentScroller, null, 0);
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]

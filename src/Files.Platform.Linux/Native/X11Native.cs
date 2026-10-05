@@ -26,6 +26,7 @@ namespace Files.Platform.Linux.Native
 		public const int PropertyDelete = 1;
 
 		public const int PropModeReplace = 0;
+		public const int PropModeAppend = 2;
 
 		public const int ShiftMask = 1;
 		public const int ControlMask = 4;

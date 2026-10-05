@@ -68,7 +68,7 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
-		private const int MaxIconFileSize = 2 * 1024 * 1024;
+		private const int MaxIconFileSize = 4 * 1024 * 1024;
 
 		// Display only. The Icon value is untrusted: only theme names, or image files under the standard icon directories
 		// that are regular files within the size budget, are rendered; anything else falls back to the generic icon.
@@ -97,7 +97,7 @@ namespace Files.App.Utils.Storage
 					return null;
 
 				if (iconPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
-					return SvgRasterizer.RenderToPng(iconPath, (int)size);
+					return SvgRasterizer.RenderToPng(data, (int)size);
 
 				// PNG signature
 				return data.Length > 8 && data[0] == 0x89 && data[1] == (byte)'P' && data[2] == (byte)'N' && data[3] == (byte)'G' ? data : null;

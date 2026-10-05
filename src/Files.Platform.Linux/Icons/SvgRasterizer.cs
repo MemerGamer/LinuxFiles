@@ -25,12 +25,25 @@ namespace Files.Platform.Linux.Icons
 			return _cache.GetOrAdd((path, pixelSize), key => Render(key.Path, key.Size));
 		}
 
+		/// <summary>
+		/// Renders SVG content the caller already read (not cached), so the file is never opened a second time.
+		/// </summary>
+		public static byte[]? RenderToPng(byte[] svgData, int pixelSize)
+		{
+			pixelSize = Math.Clamp(pixelSize, 8, 1024);
+			using var stream = new System.IO.MemoryStream(svgData, writable: false);
+			return Render(svg => svg.Load(stream), pixelSize);
+		}
+
 		private static byte[]? Render(string path, int pixelSize)
+			=> Render(svg => svg.Load(path), pixelSize);
+
+		private static byte[]? Render(Func<SKSvg, SKPicture?> load, int pixelSize)
 		{
 			try
 			{
 				using var svg = new SKSvg();
-				if (svg.Load(path) is not { } picture)
+				if (load(svg) is not { } picture)
 					return null;
 
 				var bounds = picture.CullRect;

@@ -34,7 +34,7 @@ namespace Files.Platform.Tests.Clipboard
 				if (File.Exists($"/tmp/.X11-unix/X{display}") || File.Exists($"/tmp/.X{display}-lock"))
 					continue;
 
-				var start = new ProcessStartInfo("Xvfb") { RedirectStandardError = true, RedirectStandardOutput = true };
+				var start = new ProcessStartInfo("Xvfb");
 				start.ArgumentList.Add($":{display}");
 				start.ArgumentList.Add("-nolisten");
 				start.ArgumentList.Add("tcp");
@@ -78,6 +78,9 @@ namespace Files.Platform.Tests.Clipboard
 			s_xvfb = null;
 		}
 
+		private static string Diagnose(LinuxClipboardService service)
+			=> $"clipboard set failed (DISPLAY={Environment.GetEnvironmentVariable("DISPLAY")}, available={service.IsAvailable}, xvfbExited={s_xvfb?.HasExited})";
+
 		private static void RequireXvfb()
 		{
 			if (s_xvfb is null)
@@ -91,7 +94,7 @@ namespace Files.Platform.Tests.Clipboard
 			using var owner = new LinuxClipboardService();
 			using var reader = new LinuxClipboardService();
 
-			Assert.IsTrue(await owner.SetFilesAsync(["/tmp/a b.txt", "/home/u/árvíz#1"], ClipboardOperation.Copy));
+			Assert.IsTrue(await owner.SetFilesAsync(["/tmp/a b.txt", "/home/u/árvíz#1"], ClipboardOperation.Copy), Diagnose(owner));
 			var read = await reader.GetFilesAsync();
 
 			Assert.IsNotNull(read);
@@ -106,7 +109,7 @@ namespace Files.Platform.Tests.Clipboard
 			using var owner = new LinuxClipboardService();
 			using var reader = new LinuxClipboardService();
 
-			Assert.IsTrue(await owner.SetFilesAsync(["/tmp/x"], ClipboardOperation.Cut));
+			Assert.IsTrue(await owner.SetFilesAsync(["/tmp/x"], ClipboardOperation.Cut), Diagnose(owner));
 			var read = await reader.GetFilesAsync();
 
 			Assert.AreEqual(ClipboardOperation.Cut, read!.Operation);
@@ -120,7 +123,7 @@ namespace Files.Platform.Tests.Clipboard
 			using var reader = new LinuxClipboardService();
 
 			var paths = Enumerable.Range(0, 3000).Select(i => $"/data/folder {i}/file-{i}.bin").ToArray();
-			Assert.IsTrue(await owner.SetFilesAsync(paths, ClipboardOperation.Copy));
+			Assert.IsTrue(await owner.SetFilesAsync(paths, ClipboardOperation.Copy), Diagnose(owner));
 			var read = await reader.GetFilesAsync();
 
 			Assert.IsNotNull(read);
@@ -137,7 +140,7 @@ namespace Files.Platform.Tests.Clipboard
 			await first.SetFilesAsync(["/one"], ClipboardOperation.Copy);
 			first.ContentChanged += (_, _) => notified.TrySetResult();
 
-			Assert.IsTrue(await second.SetFilesAsync(["/two"], ClipboardOperation.Cut));
+			Assert.IsTrue(await second.SetFilesAsync(["/two"], ClipboardOperation.Cut), Diagnose(second));
 
 			await notified.Task.WaitAsync(TimeSpan.FromSeconds(5));
 			var read = await first.GetFilesAsync();

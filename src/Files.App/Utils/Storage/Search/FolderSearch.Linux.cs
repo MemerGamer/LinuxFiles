@@ -69,7 +69,7 @@ namespace Files.App.Utils.Storage
 			var service = Ioc.Default.GetRequiredService<IFileSearchService>();
 			var iconCache = Ioc.Default.GetRequiredService<IIconCacheService>();
 
-			// Items are added on the caller's context, so the tick handler (which copies the list) never races with Add
+			// Items are added on the caller's context; AddResult batches them for SearchTick
 			await foreach (var match in service.SearchAsync(root, pattern, options, token))
 			{
 				var entry = match.Entry;
@@ -86,10 +86,7 @@ namespace Files.App.Utils.Storage
 					logger.LogDebug(ex, "Could not load a search result icon");
 				}
 
-				results.Add(item);
-
-				if (results.Count == 32 || results.Count % 300 == 0)
-					SearchTick?.Invoke(this, EventArgs.Empty);
+				AddResult(results, item, token);
 			}
 		}
 
@@ -125,9 +122,7 @@ namespace Files.App.Utils.Storage
 					continue;
 				}
 
-				results.Add(item);
-				if (results.Count == 32 || results.Count % 300 == 0)
-					SearchTick?.Invoke(this, EventArgs.Empty);
+				AddResult(results, item, token);
 			}
 
 			await Task.CompletedTask;

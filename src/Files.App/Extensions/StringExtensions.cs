@@ -54,24 +54,26 @@ namespace Files.App.Extensions
 			return result;
 		}
 
+		private static readonly Lock resourceLookupLock = new();
+
 		private static readonly ConcurrentDictionary<string, string> cachedResources = new();
 
 		private static readonly Dictionary<string, string> abbreviations = new()
 		{
-			{ ByteSize.KiloByteSymbol, Strings.KiloByteSymbol.GetLocalizedResource() },
-			{ ByteSize.MegaByteSymbol, Strings.MegaByteSymbol.GetLocalizedResource() },
-			{ ByteSize.GigaByteSymbol, Strings.GigaByteSymbol.GetLocalizedResource() },
-			{ ByteSize.TeraByteSymbol, Strings.TeraByteSymbol.GetLocalizedResource() },
-			{ ByteSize.PetaByteSymbol, Strings.PetaByteSymbol.GetLocalizedResource() },
-			{ ByteSize.BitSymbol, Strings.ByteSymbol.GetLocalizedResource() },
-			{ ByteSize.ByteSymbol, Strings.ByteSymbol.GetLocalizedResource() }
+			{ ByteSize.KiloByteSymbol, Strings.KiloByteSymbol },
+			{ ByteSize.MegaByteSymbol, Strings.MegaByteSymbol },
+			{ ByteSize.GigaByteSymbol, Strings.GigaByteSymbol },
+			{ ByteSize.TeraByteSymbol, Strings.TeraByteSymbol },
+			{ ByteSize.PetaByteSymbol, Strings.PetaByteSymbol },
+			{ ByteSize.BitSymbol, Strings.ByteSymbol },
+			{ ByteSize.ByteSymbol, Strings.ByteSymbol }
 		};
 
 		public static string ConvertSizeAbbreviation(this string value)
 		{
 			foreach (var item in abbreviations)
 			{
-				value = value.Replace(item.Key, item.Value, StringComparison.Ordinal);
+				value = value.Replace(item.Key, item.Value.GetLocalizedResource(), StringComparison.Ordinal);
 			}
 
 			return value;
@@ -99,9 +101,23 @@ namespace Files.App.Extensions
 				return value;
 			}
 
-			value = ResourceLookup.TryGet(resourceKey);
+			lock (resourceLookupLock)
+			{
+				if (cachedResources.TryGetValue(resourceKey, out value))
+					return value;
 
-			return cachedResources[resourceKey] = value ?? string.Empty;
+				value = ResourceLookup.TryGet(resourceKey);
+				return cachedResources[resourceKey] = value ?? string.Empty;
+			}
+		}
+
+		internal static void ResetLocalizedResources()
+		{
+			lock (resourceLookupLock)
+			{
+				ResourceLookup.Reset();
+				cachedResources.Clear();
+			}
 		}
 	}
 }

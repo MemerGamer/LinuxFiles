@@ -86,6 +86,10 @@ namespace Files.App.Utils.FileTags
 
 		public static void UpdateTagsDb()
 		{
+			// File reference numbers are NTFS-only
+			if (!OperatingSystem.IsWindows())
+				return;
+
 			var dbInstance = GetDbInstance();
 			foreach (var file in dbInstance.GetAll())
 			{

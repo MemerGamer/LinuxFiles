@@ -200,9 +200,9 @@ namespace Files.App.Views.Layouts
 		protected override void ItemManipulationModel_ScrollToTopInvoked(object? sender, EventArgs e)
 		{
 			if (FolderSettings?.LayoutMode is FolderLayoutModes.ListView)
-				ContentScroller?.ChangeView(0, null, null, true);
+				ResetScroll(ContentScroller, 0, null);
 			else
-				ContentScroller?.ChangeView(null, 0, null, true);
+				ResetScroll(ContentScroller, null, 0);
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]
@@ -606,6 +606,11 @@ namespace Files.App.Views.Layouts
 		{
 			if (ParentShellPageInstance is null || IsRenamingItem)
 				return;
+
+#if DESKTOP
+			if (TryHandleListJumpKey(e))
+				return;
+#endif
 
 			var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
 			var shiftPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);

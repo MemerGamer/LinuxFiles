@@ -35,7 +35,26 @@ namespace Files.App.UserControls
 			PaneSettingsService = Ioc.Default.GetRequiredService<IInfoPaneSettingsService>();
 			Commands = Ioc.Default.GetRequiredService<ICommandManager>();
 			ViewModel = Ioc.Default.GetRequiredService<InfoPaneViewModel>();
+#if DESKTOP
+			// Uno doesn't evaluate the enum-valued IsEqualStateTrigger states in the XAML, so drive them explicitly.
+			ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+			Loaded += (_, _) => UpdateStateGroups();
+#endif
 		}
+
+#if DESKTOP
+		private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName is nameof(InfoPaneViewModel.PreviewPaneState) or nameof(InfoPaneViewModel.SelectedTab))
+				UpdateStateGroups();
+		}
+
+		private void UpdateStateGroups()
+		{
+			VisualStateManager.GoToState(this, ViewModel.PreviewPaneState.ToString(), false);
+			VisualStateManager.GoToState(this, ViewModel.SelectedTab == InfoPaneTabs.Preview ? "PreviewTab" : "DetailsTab", false);
+		}
+#endif
 
 		public void UpdatePosition(double panelWidth, double panelHeight)
 		{
@@ -55,6 +74,9 @@ namespace Files.App.UserControls
 
 		private void Root_Unloaded(object sender, RoutedEventArgs e)
 		{
+#if DESKTOP
+			ViewModel.PropertyChanged -= ViewModel_PropertyChanged;
+#endif
 			ViewModel.UnloadPreview();
 			PreviewControlPresenter.Content = null;
 			Bindings.StopTracking();

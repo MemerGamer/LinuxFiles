@@ -28,7 +28,19 @@ namespace Files.App.Services.Desktop
 				try
 				{
 					if (File.Exists(FilePath))
-						return JsonSerializer.Deserialize<List<string>>(File.ReadAllText(FilePath)) ?? [];
+					{
+						var stored = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(FilePath)) ?? [];
+						var cleaned = SanitizePinned(stored);
+						if (cleaned.Count != stored.Count || !cleaned.SequenceEqual(stored))
+						{
+							try { Write(cleaned); }
+							catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+							{
+							}
+						}
+
+						return cleaned;
+					}
 				}
 				catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
 				{
@@ -54,6 +66,28 @@ namespace Files.App.Services.Desktop
 
 				return defaults;
 			}
+		}
+
+		/// <summary>
+		/// Drops Windows shell: pins that leaked in from default settings; the Recycle Bin pseudo-path is kept once, in canonical casing.
+		/// </summary>
+		private static List<string> SanitizePinned(List<string> stored)
+		{
+			var result = new List<string>();
+			foreach (var path in stored)
+			{
+				if (string.Equals(path, Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.OrdinalIgnoreCase))
+				{
+					if (!result.Contains(Constants.UserEnvironmentPaths.RecycleBinPath))
+						result.Add(Constants.UserEnvironmentPaths.RecycleBinPath);
+				}
+				else if (!path.StartsWith("shell:", StringComparison.OrdinalIgnoreCase) && !result.Contains(path))
+				{
+					result.Add(path);
+				}
+			}
+
+			return result;
 		}
 
 		private static IEnumerable<string> ReadGtkBookmarks()

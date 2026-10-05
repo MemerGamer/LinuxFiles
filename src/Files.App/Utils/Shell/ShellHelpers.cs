@@ -9,6 +9,7 @@ namespace Files.App.Utils.Shell
 	{
 		public static string ResolveShellPath(string shPath)
 		{
+#if WINDOWS
 			if (!ShellStorageFolder.IsShellPath(shPath))
 				return shPath;
 
@@ -26,12 +27,19 @@ namespace Files.App.Utils.Shell
 				return Constants.UserEnvironmentPaths.NetworkFolderPath;
 
 			return shPath;
+#else
+			return shPath;
+#endif
 		}
 
 		public static bool IsSupportedShellPath(string shPath)
 		{
+#if WINDOWS
 			return ShellStorageFolder.IsShellPath(shPath) &&
 				Constants.UserEnvironmentPaths.ShellPlaces.ContainsKey(GetShellPathLookupKey(shPath));
+#else
+			return false;
+#endif
 		}
 
 		private static string GetShellPathLookupKey(string shPath)

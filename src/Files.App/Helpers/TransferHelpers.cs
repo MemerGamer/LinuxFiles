@@ -56,7 +56,11 @@ namespace Files.App.Helpers
 						throw new SystemIO.IOException($"Failed to process {storable.Id} in cutting/copying to the clipboard.", (int)result.ErrorCode);
 				}, 10, statusCenterItem?.CancellationToken ?? CancellationToken.None);
 
-				var standardObjectsOnly = items.All(x => x is StorageFile or StorageFolder or SystemStorageFile or SystemStorageFolder);
+				var standardObjectsOnly = items.All(x => x is StorageFile or StorageFolder
+#if WINDOWS
+					or SystemStorageFile or SystemStorageFolder
+#endif
+				);
 				if (standardObjectsOnly)
 					items = new(await items.ToStandardStorageItemsAsync());
 
@@ -171,7 +175,11 @@ namespace Files.App.Helpers
 					}
 				}, 10, statusCenterItem?.CancellationToken ?? CancellationToken.None);
 
-				var standardObjectsOnly = items.All(x => x is StorageFile or StorageFolder or SystemStorageFile or SystemStorageFolder);
+				var standardObjectsOnly = items.All(x => x is StorageFile or StorageFolder
+#if WINDOWS
+					or SystemStorageFile or SystemStorageFolder
+#endif
+				);
 				if (standardObjectsOnly)
 					items = new(await items.ToStandardStorageItemsAsync());
 

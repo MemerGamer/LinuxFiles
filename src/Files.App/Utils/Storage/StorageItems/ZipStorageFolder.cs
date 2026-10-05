@@ -228,8 +228,13 @@ namespace Files.App.Utils.Storage
 			{
 				if (Path == containerPath)
 				{
+#if WINDOWS
 					var zipFile = new SystemStorageFile(await StorageFile.GetFileFromPathAsync(Path));
 					return await zipFile.GetBasicPropertiesAsync();
+#else
+					// LINUX-TODO(archives): use ArchiveFolder metadata for the archive root.
+					throw new NotSupportedException("Legacy archive metadata is Windows-only.");
+#endif
 				}
 
 				if (CurrentEncoding is not null)

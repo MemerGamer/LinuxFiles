@@ -2292,7 +2292,7 @@ namespace Files.App.ViewModels
 
 #if !WINDOWS
 			return await EnumerateLinuxFolderAsync(path, cancellationToken, library);
-#endif
+#else
 
 			// Flag to use FindFirstFileExFromApp or StorageFolder enumeration - Use storage folder for Box Drive (#4629)
 			var isBoxFolder = CloudDrivesManager.Drives.FirstOrDefault(x => x.Text == "Box")?.Path?.TrimEnd('\\') is string boxFolder && path.StartsWith(boxFolder);
@@ -2542,10 +2542,12 @@ namespace Files.App.ViewModels
 					return 0;
 				}
 			}
+#endif
 		}
 
 		private async Task EnumFromStorageFolderAsync(string path, BaseStorageFolder? rootFolder, StorageFolderWithPath? currentStorageFolder, CancellationToken cancellationToken)
 		{
+#if WINDOWS
 			if (rootFolder is null)
 				return;
 
@@ -2597,6 +2599,10 @@ namespace Files.App.ViewModels
 
 			if (rootFolder is IPasswordProtectedItem ppiu)
 				ppiu.PasswordRequestedCallback = null;
+#else
+			// LINUX-TODO(shell): enumerate storables for non-local locations in P4-E.
+			await Task.CompletedTask;
+#endif
 		}
 
 		private void CheckForSolutionFile()
@@ -3186,10 +3192,15 @@ namespace Files.App.ViewModels
 
 		public Task<ListedItem?> AddFileOrFolderFromShellFile(ShellFileItem item)
 		{
+#if WINDOWS
 			return
 				item.IsFolder ?
 				UniversalStorageEnumerator.AddFolderAsync(ShellStorageFolder.FromShellItem(item), currentStorageFolder, addFilesCTS.Token) :
 				UniversalStorageEnumerator.AddFileAsync(ShellStorageFile.FromShellItem(item), currentStorageFolder, addFilesCTS.Token);
+#else
+			// LINUX-TODO(shell): replace the Windows Shell item factory in P4-E.
+			return Task.FromResult<ListedItem?>(null);
+#endif
 		}
 
 		private async Task AddFileOrFolderAsync(ListedItem? item)
@@ -3210,6 +3221,7 @@ namespace Files.App.ViewModels
 			{
 				filesAndFolders.Add(item);
 
+#if WINDOWS
 				if (UserSettingsService.FoldersSettingsService.AreAlternateStreamsVisible)
 				{
 					// New file added, enumerate ADS
@@ -3219,6 +3231,7 @@ namespace Files.App.ViewModels
 						filesAndFolders.Add(adsItem);
 					}
 				}
+#endif
 			}
 
 			enumFolderSemaphore.Release();
@@ -3226,6 +3239,7 @@ namespace Files.App.ViewModels
 
 		private async Task<ListedItem?> AddFileOrFolderAsync(string fileOrFolderPath)
 		{
+#if WINDOWS
 			FINDEX_INFO_LEVELS findInfoLevel = FINDEX_INFO_LEVELS.FindExInfoBasic;
 			var additionalFlags = FIND_FIRST_EX_CASE_SENSITIVE;
 
@@ -3268,6 +3282,11 @@ namespace Files.App.ViewModels
 			await AddFileOrFolderAsync(listedItem);
 
 			return listedItem;
+#else
+			// LINUX-TODO(shell): replace the Win32 incremental item factory in P4-E.
+			await Task.CompletedTask;
+			return null;
+#endif
 		}
 
 		private async Task<(ListedItem Item, CloudDriveSyncStatus? SyncStatus, long? Size, DateTimeOffset Created, DateTimeOffset Modified)?> GetFileOrFolderUpdateInfoAsync(ListedItem item, bool hasSyncStatus)

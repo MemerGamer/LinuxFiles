@@ -214,7 +214,12 @@ namespace Files.App.Utils.Storage
 					}
 
 					var hFile = Win32Helper.OpenFileForRead(containerPath);
+#if WINDOWS
 					return hFile.IsInvalid ? null : new StreamWithContentType(new FileStream(hFile, FileAccess.Read).AsRandomAccessStream());
+#else
+				// LINUX-TODO(storage): use the archive/FTP storable stream instead of the WinRT content stream.
+				throw new NotSupportedException("WinRT content streams are Windows-only.");
+#endif
 				}
 
 				SevenZipExtractor? zipFile = await OpenZipFileAsync();
@@ -237,7 +242,12 @@ namespace Files.App.Utils.Storage
 				{
 					DisposeCallback = () => zipFile.Dispose()
 				};
+#if WINDOWS
 				return new StreamWithContentType(nsStream);
+#else
+				// LINUX-TODO(storage): use the archive/FTP storable stream instead of the WinRT content stream.
+				throw new NotSupportedException("WinRT content streams are Windows-only.");
+#endif
 			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 
@@ -268,7 +278,12 @@ namespace Files.App.Utils.Storage
 						}
 						ms.Position = 0;
 						var nsStream = new NonSeekableRandomAccessStreamForRead(ms, (ulong)entry.Size);
+#if WINDOWS
 						return new StreamWithContentType(nsStream);
+#else
+				// LINUX-TODO(storage): use the archive/FTP storable stream instead of the WinRT content stream.
+				throw new NotSupportedException("WinRT content streams are Windows-only.");
+#endif
 					}
 				}
 				return null;

@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if !WINDOWS
 using Files.Platform.Abstractions.Search;
 using Microsoft.Extensions.Logging;
 using System.IO;
@@ -34,6 +35,9 @@ namespace Files.App.Utils.Storage
 				return (text[NamePrefix.Length..].Trim(), false);
 			return (text, false);
 		}
+
+		private Task AddItemsAsync(string folder, IList<ListedItem> results, CancellationToken token)
+			=> SearchLinuxAsync(folder, results, token);
 
 		private async Task SearchLinuxAsync(string folder, IList<ListedItem> results, CancellationToken token)
 		{
@@ -183,3 +187,4 @@ namespace Files.App.Utils.Storage
 		}
 	}
 }
+#endif

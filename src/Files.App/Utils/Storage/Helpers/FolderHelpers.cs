@@ -2,8 +2,12 @@
 // Licensed under the MIT License.
 
 using System.IO;
+#if WINDOWS
 using Windows.Win32;
+#endif
+#if WINDOWS
 using Windows.Win32.Storage.FileSystem;
+#endif
 
 namespace Files.App.Utils.Storage
 {

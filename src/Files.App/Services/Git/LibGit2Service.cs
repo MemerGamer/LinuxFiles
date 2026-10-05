@@ -54,8 +54,11 @@ internal sealed partial class LibGit2Service // : IVersionControl
 
 		if (string.IsNullOrWhiteSpace(path) ||
 			path.Equals(root, StringComparison.OrdinalIgnoreCase) ||
-			path.Equals("Home", StringComparison.OrdinalIgnoreCase) ||
-			ShellStorageFolder.IsShellPath(path))
+			path.Equals("Home", StringComparison.OrdinalIgnoreCase)
+#if WINDOWS
+			|| ShellStorageFolder.IsShellPath(path)
+#endif
+			)
 		{
 			return null;
 		}

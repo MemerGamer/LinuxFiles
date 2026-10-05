@@ -39,6 +39,7 @@ namespace Files.App.Utils.Storage
 		public abstract string FolderRelativeId { get; }
 
 		public abstract IStorageItemExtraProperties Properties { get; }
+#if WINDOWS
 		[MaybeNull]
 		StorageItemContentProperties IStorageItemProperties.Properties
 			=> this is SystemStorageFile file ? file.File.Properties : null;
@@ -47,6 +48,13 @@ namespace Files.App.Utils.Storage
 		{
 			return value is not null ? new SystemStorageFile(value) : null;
 		}
+
+#else
+		[MaybeNull]
+		StorageItemContentProperties IStorageItemProperties.Properties
+			=> null;
+
+#endif
 
 		public abstract IAsyncOperation<StorageFile> ToStorageFileAsync();
 
@@ -165,12 +173,18 @@ namespace Files.App.Utils.Storage
 			return Task.FromResult<StorageItemThumbnail?>(null).AsAsyncOperation();
 		}
 
+#if WINDOWS
 		public static IAsyncOperation<BaseStorageFile?> GetFileFromPathAsync(string path)
 		{
 			return AsyncInfo.Run<BaseStorageFile?>(async (cancellationToken)
 					=> await ZipStorageFile.FromPathAsync(path) ?? await FtpStorageFile.FromPathAsync(path) ?? await ShellStorageFile.FromPathAsync(path) ?? await NativeStorageFile.FromPathAsync(path) ?? await SystemStorageFile.FromPathAsync(path)
 				);
 		}
+#else
+		// LINUX-TODO(storage): remove legacy WinRT resolution after downstream consumers use IStorableResolver.
+		public static IAsyncOperation<BaseStorageFile?> GetFileFromPathAsync(string path)
+			=> throw new NotSupportedException("Use IStorableResolver instead of the legacy WinRT storage layer.");
+#endif
 
 		public async Task<string> ReadTextAsync(int maxLength = -1)
 		{

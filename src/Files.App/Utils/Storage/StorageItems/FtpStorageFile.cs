@@ -131,7 +131,12 @@ namespace Files.App.Utils.Storage
 
 				var inStream = await ftpClient.OpenRead(FtpPath, token: cancellationToken);
 				var nsStream = new NonSeekableRandomAccessStreamForRead(inStream, (ulong)inStream.Length) { DisposeCallback = ftpClient.Dispose };
+#if WINDOWS
 				return new StreamWithContentType(nsStream);
+#else
+				// LINUX-TODO(storage): use the archive/FTP storable stream instead of the WinRT content stream.
+				throw new NotSupportedException("WinRT content streams are Windows-only.");
+#endif
 			}, ((IPasswordProtectedItem)this).RetryWithCredentialsAsync));
 		}
 		public override IAsyncOperation<IInputStream?> OpenSequentialReadAsync()

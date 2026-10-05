@@ -654,10 +654,12 @@ namespace Files.App.Helpers
 							// File.Exists distinguishes an archive root (real file on disk) from an inner path like "archive.zip\sub".
 							await STATask.RunPooled(() =>
 							{
+#if WINDOWS
 								if (folder.Item is SystemStorageFolder ||
 									(folder.Item is ZipStorageFolder && File.Exists(folder.Path)))
 									return WindowsRecentItemsService.Add(folder.Path);
 
+#endif
 								return false;
 							}, App.Logger);
 						});
@@ -692,8 +694,10 @@ namespace Files.App.Helpers
 					{
 						var childFileResult = await associatedInstance.ShellViewModel.GetFileWithPathFromPathAsync(shortcutInfo.TargetPath);
 						// Add location to Recent Items List
+#if WINDOWS
 						if (childFileResult.Result is { Item: SystemStorageFile } childFile)
 							WindowsRecentItemsService.Add(childFile.Path);
+#endif
 					}
 					await Win32Helper.InvokeWin32ComponentAsync(shortcutInfo.TargetPath, associatedInstance, $"{args} {shortcutInfo.Arguments}", shortcutInfo.RunAsAdmin, shortcutInfo.WorkingDirectory);
 				}
@@ -714,9 +718,11 @@ namespace Files.App.Helpers
 						{
 							var file = childFile!;
 							// Add location to Recent Items List
+#if WINDOWS
 							if (file.Item is SystemStorageFile)
 								WindowsRecentItemsService.Add(file.Path);
 
+#endif
 							if (openViaApplicationPicker)
 							{
 								var storageFile = file.Item

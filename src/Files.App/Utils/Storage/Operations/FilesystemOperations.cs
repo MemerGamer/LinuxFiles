@@ -238,7 +238,7 @@ namespace Files.App.Utils.Storage
 			}
 			else if (source.ItemType == FilesystemItemType.File)
 			{
-				var fsResult = (FilesystemResult)await Task.Run(() => PInvoke.CopyFileFromApp(source.Path, destination, true));
+				var fsResult = (FilesystemResult)(bool)await Task.Run(() => PInvoke.CopyFileFromApp(source.Path, destination, true));
 
 				if (!fsResult)
 				{
@@ -400,7 +400,7 @@ namespace Files.App.Utils.Storage
 				}
 				else
 				{
-					var fsResult = (FilesystemResult)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
+					var fsResult = (FilesystemResult)(bool)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
 
 					if (!fsResult)
 					{
@@ -468,7 +468,7 @@ namespace Files.App.Utils.Storage
 			}
 			else if (source.ItemType == FilesystemItemType.File)
 			{
-				var fsResult = (FilesystemResult)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
+				var fsResult = (FilesystemResult)(bool)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
 
 				if (!fsResult)
 				{
@@ -553,7 +553,7 @@ namespace Files.App.Utils.Storage
 
 			if (permanently)
 			{
-				fsResult = (FilesystemResult)PInvoke.DeleteFileFromApp(source.Path);
+				fsResult = (FilesystemResult)(bool)PInvoke.DeleteFileFromApp(source.Path);
 			}
 			if (!fsResult)
 			{
@@ -801,7 +801,7 @@ namespace Files.App.Utils.Storage
 
 			FilesystemResult fsResult = FileSystemStatusCode.InProgress;
 
-			fsResult = (FilesystemResult)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
+			fsResult = (FilesystemResult)(bool)await Task.Run(() => PInvoke.MoveFileFromApp(source.Path, destination));
 
 			if (!fsResult)
 			{

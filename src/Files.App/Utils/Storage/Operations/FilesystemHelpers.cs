@@ -830,6 +830,7 @@ namespace Files.App.Utils.Storage
 			// workaround for pasting folders from remote desktop (#12318)
 			try
 			{
+#if WINDOWS
 				if (hasVirtualItems && packageView.Contains("FileContents"))
 				{
 					var dataObject = ShellDataObject.GetClipboard();
@@ -849,6 +850,7 @@ namespace Files.App.Utils.Storage
 						}
 					}
 				}
+#endif
 			}
 			catch (Exception ex)
 			{

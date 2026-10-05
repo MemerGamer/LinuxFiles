@@ -68,11 +68,44 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
-		// Display only: the entry's Icon is looked up in the theme, nothing in the file is executed
+		private const int MaxIconFileSize = 2 * 1024 * 1024;
+
+		// Display only. The Icon value is untrusted: only theme names, or image files under the standard icon directories
+		// that are regular files within the size budget, are rendered; anything else falls back to the generic icon.
 		private static async Task<byte[]?> GetDesktopEntryIconAsync(string path, uint size)
 		{
 			var icon = await Task.Run(() => DesktopEntryDisplay.TryRead(path, CultureInfo.CurrentUICulture)?.Icon);
-			return icon is null ? null : await LoadThemeIconAsync([icon], size);
+
+			if (DesktopEntryDisplay.IsSafeIconName(icon))
+				return await LoadThemeIconAsync([icon!], size);
+
+			if (DesktopEntryDisplay.IsAllowedIconPath(icon, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), out var iconPath))
+				return await Task.Run(() => LoadIconFile(iconPath, size));
+
+			return null;
+		}
+
+		private static byte[]? LoadIconFile(string iconPath, uint size)
+		{
+			try
+			{
+				byte[]? data;
+				using (var stream = Files.Platform.Linux.Previews.PreviewFile.OpenRead(iconPath))
+					data = DesktopEntryDisplay.ReadBounded(stream, MaxIconFileSize);
+
+				if (data is null)
+					return null;
+
+				if (iconPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
+					return SvgRasterizer.RenderToPng(iconPath, (int)size);
+
+				// PNG signature
+				return data.Length > 8 && data[0] == 0x89 && data[1] == (byte)'P' && data[2] == (byte)'N' && data[3] == (byte)'G' ? data : null;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return null;
+			}
 		}
 
 		private static async Task<IReadOnlyList<string>> GetIconNamesAsync(string? path, bool isFolder)

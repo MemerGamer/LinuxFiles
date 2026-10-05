@@ -232,5 +232,64 @@ namespace Files.Platform.Tests.Listing
 			var info = DesktopEntryDisplay.TryRead(path, CultureInfo.InvariantCulture)!;
 			Assert.IsFalse(info.Name.Any(char.IsControl));
 		}
+	
+		[TestMethod]
+		public void DesktopDisplay_RefusesFifoWithoutBlocking()
+		{
+			var fifo = Path.Combine(_root, "pipe.desktop");
+			Assert.AreEqual(0, mkfifo(fifo, 0x1A4));
+			var task = System.Threading.Tasks.Task.Run(() => DesktopEntryDisplay.TryRead(fifo, CultureInfo.InvariantCulture));
+			Assert.IsTrue(task.Wait(TimeSpan.FromSeconds(5)), "FIFO read blocked");
+			Assert.IsNull(task.Result);
+		}
+
+		[System.Runtime.InteropServices.DllImport("libc", SetLastError = true)]
+		private static extern int mkfifo(string path, uint mode);
+
+		[TestMethod]
+		public void DesktopDisplay_CapsLineLengthLinesAndKeys()
+		{
+			var longLine = Path.Combine(_root, "long.desktop");
+			File.WriteAllText(longLine, "[Desktop Entry]\nType=Application\nName=A\nExec=/bin/true\nComment=" + new string('x', DesktopEntryDisplay.MaxLineLength + 1) + "\n");
+			Assert.IsNull(DesktopEntryDisplay.TryRead(longLine, CultureInfo.InvariantCulture));
+
+			var manyKeys = Path.Combine(_root, "keys.desktop");
+			File.WriteAllText(manyKeys, "[Desktop Entry]\nType=Application\nName=A\nExec=/bin/true\n" + string.Concat(Enumerable.Range(0, DesktopEntryDisplay.MaxKeys + 1).Select(i => $"X-K{i}=1\n")));
+			Assert.IsNull(DesktopEntryDisplay.TryRead(manyKeys, CultureInfo.InvariantCulture));
+		}
+
+		[TestMethod]
+		public void ReadBounded_EnforcesBytesActuallyRead()
+		{
+			Assert.IsNotNull(DesktopEntryDisplay.ReadBounded(new MemoryStream(new byte[100]), 100));
+			Assert.IsNull(DesktopEntryDisplay.ReadBounded(new MemoryStream(new byte[101]), 100));
+		}
+
+		[TestMethod]
+		public void IconValidation_AcceptsNamesAndStandardDirsOnly()
+		{
+			Assert.IsTrue(DesktopEntryDisplay.IsSafeIconName("org.gnome.Files-symbolic"));
+			foreach (var bad in new[] { "/etc/passwd", "../x", "a/b", "a..b", "", new string('a', 129), "ico\nn" })
+				Assert.IsFalse(DesktopEntryDisplay.IsSafeIconName(bad), bad);
+
+			var good = Path.Combine(_root, ".local/share/icons/a/x.svg");
+			Directory.CreateDirectory(Path.GetDirectoryName(good)!);
+			File.WriteAllText(good, "<svg/>");
+			Assert.IsTrue(DesktopEntryDisplay.IsAllowedIconPath(good, _root, out _));
+			foreach (var bad in new[] { "/etc/shadow.png", "/proc/self/environ", "/usr/share/icons/../../../etc/x.png", "/usr/share/pixmaps/x.txt", "/home/u/.ssh/id.png", "relative.png" })
+				Assert.IsFalse(DesktopEntryDisplay.IsAllowedIconPath(bad, "/home/u", out _), bad);
+		}
+
+		[TestMethod]
+		public void IconValidation_RejectsSymlinkEscapingTheIconDirs()
+		{
+			var home = _root;
+			var icons = Path.Combine(home, ".local/share/icons");
+			Directory.CreateDirectory(icons);
+			var secret = Path.Combine(_root, "secret.png");
+			File.WriteAllText(secret, "x");
+			File.CreateSymbolicLink(Path.Combine(icons, "leak.png"), secret);
+			Assert.IsFalse(DesktopEntryDisplay.IsAllowedIconPath(Path.Combine(icons, "leak.png"), home, out _));
+		}
 	}
 }

@@ -52,7 +52,7 @@ namespace Files.Platform.Linux.FileOperations
 
 				if (sameDevice && (!stat.IsDirectory || !resolved.Replace))
 				{
-					if (PosixNative.TryRenameAt(sourceParent.Descriptor, name, destinationParent.Descriptor, destinationName, resolved.Replace, out var errno))
+					if (PosixNative.TryRenameAt(sourceParent.Descriptor, name, destinationParent.Descriptor, destinationName, resolved.Replace, out var errno, context.Hooks))
 					{
 						context.AddBytes(stat.IsRegularFile ? (long)stat.Size : 0, source);
 						context.ItemDone(source);
@@ -220,8 +220,8 @@ namespace Files.Platform.Linux.FileOperations
 				&& !parent.ListNames().Contains(newName))
 			{
 				var temporary = Path.GetFileName(TemporaryPathNextTo(destination));
-				PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, temporary, false, destination);
-				PosixNative.RenameAt(parent.Descriptor, temporary, parent.Descriptor, newName, false, destination);
+				PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, temporary, false, destination, context.Hooks);
+				PosixNative.RenameAt(parent.Descriptor, temporary, parent.Descriptor, newName, false, destination, context.Hooks);
 				return Outcome.Success(destination);
 			}
 
@@ -233,7 +233,7 @@ namespace Files.Platform.Linux.FileOperations
 
 			context.Hooks?.BeforeMoveEntry?.Invoke(source, resolved.Destination);
 			context.CancellationToken.ThrowIfCancellationRequested();
-			PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, Path.GetFileName(resolved.Destination), resolved.Replace, resolved.Destination);
+			PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, Path.GetFileName(resolved.Destination), resolved.Replace, resolved.Destination, context.Hooks);
 			return Outcome.Success(resolved.Destination);
 		}
 	}

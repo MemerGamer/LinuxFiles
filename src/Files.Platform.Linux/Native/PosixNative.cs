@@ -230,10 +230,12 @@ namespace Files.Platform.Linux.Native
 	internal sealed class DirectoryHandle : IDisposable
 	{
 		private int _fd;
+		private readonly bool _pathOnly;
 
-		private DirectoryHandle(int fd, string path)
+		private DirectoryHandle(int fd, string path, bool pathOnly)
 		{
 			_fd = fd;
+			_pathOnly = pathOnly;
 			Path = path;
 		}
 
@@ -244,19 +246,25 @@ namespace Files.Platform.Linux.Native
 		/// <summary>
 		/// Opens a directory. With <paramref name="noFollow"/> a symbolic link in the last component is refused (errno ELOOP/ENOTDIR).
 		/// </summary>
-		public static DirectoryHandle? TryOpen(int parentFd, string name, string displayPath, bool noFollow, out int errno)
+		public static DirectoryHandle? TryOpen(int parentFd, string name, string displayPath, bool noFollow, out int errno, bool pathOnly = false)
 		{
-			var flags = PosixNative.ReadOnlyFlags | PosixNative.ODirectory | (noFollow ? PosixNative.ONofollow : 0);
+			var flags = (pathOnly ? PosixNative.PathFlags : PosixNative.ReadOnlyFlags) | PosixNative.ODirectory | (noFollow ? PosixNative.ONofollow : 0);
 			var fd = PosixNative.OpenAt(parentFd, name, flags, out errno);
-			return fd < 0 ? null : new DirectoryHandle(fd, displayPath);
+			return fd < 0 ? null : new DirectoryHandle(fd, displayPath, pathOnly);
 		}
 
-		public List<string> ListNames() => PosixNative.ListNames(_fd, Path);
+		public List<string> ListNames()
+		{
+			if (!_pathOnly)
+				return PosixNative.ListNames(_fd, Path);
+			using var readable = OpenChild(_fd, ".", Path);
+			return PosixNative.ListNames(readable.Descriptor, Path);
+		}
 
 		/// <summary>Walks an already resolved absolute path, refusing links in every component.</summary>
 		public static DirectoryHandle OpenPath(string resolvedPath, bool create = false)
 		{
-			using var root = OpenChild(PosixNative.AtFdCwd, "/", "/");
+			using var root = OpenChild(PosixNative.AtFdCwd, "/", "/", pathOnly: true);
 			return root.OpenRelativePath(System.IO.Path.GetFullPath(resolvedPath).TrimStart('/'), create);
 		}
 
@@ -267,7 +275,7 @@ namespace Files.Platform.Linux.Native
 			var names = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 			if (Array.Exists(names, name => name == ".."))
 				throw new ArgumentException("The path cannot escape its parent.", nameof(relativePath));
-			var current = OpenChild(_fd, ".", Path);
+			var current = OpenChild(_fd, ".", Path, pathOnly: true);
 			try
 			{
 				foreach (var name in names)
@@ -275,7 +283,7 @@ namespace Files.Platform.Linux.Native
 					if (name == ".")
 						continue;
 					var path = System.IO.Path.Combine(current.Path, name);
-					var next = TryOpen(current.Descriptor, name, path, true, out var errno);
+					var next = TryOpen(current.Descriptor, name, path, true, out var errno, pathOnly: true);
 					if (next is null && create && PosixNative.IsNotFound(errno))
 					{
 						try
@@ -286,7 +294,7 @@ namespace Files.Platform.Linux.Native
 						{
 							// Another creator won; the no-follow open still validates its entry.
 						}
-						next = TryOpen(current.Descriptor, name, path, true, out errno);
+						next = TryOpen(current.Descriptor, name, path, true, out errno, pathOnly: true);
 					}
 					if (next is null)
 						throw PosixNative.CreateException(errno, path);
@@ -302,8 +310,8 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 
-		public static DirectoryHandle OpenChild(int parentFd, string name, string displayPath)
-			=> TryOpen(parentFd, name, displayPath, true, out var errno) ?? throw PosixNative.CreateException(errno, displayPath);
+		public static DirectoryHandle OpenChild(int parentFd, string name, string displayPath, bool pathOnly = false)
+			=> TryOpen(parentFd, name, displayPath, true, out var errno, pathOnly) ?? throw PosixNative.CreateException(errno, displayPath);
 
 		public bool EntryExists(string name)
 		{
@@ -374,7 +382,7 @@ namespace Files.Platform.Linux.Native
 
 		public bool IsSameOrInside(PosixStat ancestor)
 		{
-			var current = OpenChild(_fd, ".", Path);
+			var current = OpenChild(_fd, ".", Path, pathOnly: true);
 			try
 			{
 				while (true)
@@ -383,7 +391,7 @@ namespace Files.Platform.Linux.Native
 						throw new IOException($"Cannot inspect '{Path}'.");
 					if (PosixNative.SameEntry(stat, ancestor))
 						return true;
-					var parent = OpenChild(current.Descriptor, "..", Path);
+					var parent = OpenChild(current.Descriptor, "..", Path, pathOnly: true);
 					var root = parent.IsSameEntry(stat);
 					current.Dispose();
 					current = parent;

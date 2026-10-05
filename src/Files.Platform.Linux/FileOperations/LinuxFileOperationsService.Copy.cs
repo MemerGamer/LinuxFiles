@@ -4,6 +4,7 @@
 using System;
 using System.Buffers;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.FileOperations;
 using Files.Platform.Linux.Native;
@@ -14,6 +15,14 @@ namespace Files.Platform.Linux.FileOperations
 	public sealed partial class LinuxFileOperationsService
 	{
 		private const int CopyBufferSize = 1024 * 1024;
+
+		internal async Task CopyRestoreEntryAsync(string source, string destination, DirectoryHandle sourceParent, DirectoryHandle destinationParent, CancellationToken cancellationToken)
+		{
+			var context = new FileOperationContext(null, cancellationToken, _hooks);
+			var result = await CopyEntryAsync(source, destination, context, verifySource: true, destinationParent, sourceParent).ConfigureAwait(false);
+			if (result.Status != FileOperationStatus.Succeeded)
+				throw new IOException(result.ErrorMessage ?? "The trashed item could not be copied.");
+		}
 
 		private async Task<Outcome> CopyTopLevelAsync(string source, string destinationDirectory, FileOperationContext context, DirectoryHandle sourceParent, DirectoryHandle destinationParent)
 		{
@@ -207,7 +216,7 @@ namespace Files.Platform.Linux.FileOperations
 				try
 				{
 					context.CancellationToken.ThrowIfCancellationRequested();
-					PosixNative.RenameAt(destinationParent.Descriptor, name, destinationParent.Descriptor, Path.GetFileName(destination), true, destination);
+					PosixNative.RenameAt(destinationParent.Descriptor, name, destinationParent.Descriptor, Path.GetFileName(destination), true, destination, context.Hooks);
 				}
 				finally
 				{
@@ -266,7 +275,7 @@ namespace Files.Platform.Linux.FileOperations
 				}
 
 				context.CancellationToken.ThrowIfCancellationRequested();
-				PosixNative.RenameAt(destinationParent.Descriptor, Path.GetFileName(temporary), destinationParent.Descriptor, Path.GetFileName(destination), replace, destination);
+				PosixNative.RenameAt(destinationParent.Descriptor, Path.GetFileName(temporary), destinationParent.Descriptor, Path.GetFileName(destination), replace, destination, context.Hooks);
 				completed = true;
 				return Outcome.Success(destination);
 			}

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Concurrent;
 
 namespace Files.Platform.Linux.FileOperations
 {
@@ -10,6 +11,11 @@ namespace Files.Platform.Linux.FileOperations
 	/// </summary>
 	public sealed class LinuxFileOperationsHooks
 	{
+		/// <summary>Returns an errno to simulate a rename failure, or null to invoke libc. Names are fd-relative.</summary>
+		public Func<string, string, bool, int?>? RenameError { get; init; }
+
+		internal ConcurrentDictionary<(uint Major, uint Minor), byte> UnsupportedRenameDevices { get; } = new();
+
 		/// <summary>Invoked right after the temporary file of a copy was created, before any data is written.</summary>
 		public Action<string>? TemporaryFileCreated { get; init; }
 

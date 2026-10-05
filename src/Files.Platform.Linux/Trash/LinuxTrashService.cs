@@ -5,6 +5,7 @@
 #pragma warning disable CA1416
 
 using Files.Platform.Abstractions.Trash;
+using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Native;
 using System;
 using System.Collections.Generic;
@@ -128,13 +129,20 @@ namespace Files.Platform.Linux.Trash
 		public Task<IReadOnlyList<TrashOperationResult>> RestoreAsync(IEnumerable<TrashItem> items, TrashRestoreConflictBehavior conflictBehavior = TrashRestoreConflictBehavior.Fail, CancellationToken cancellationToken = default)
 		{
 			var list = items.ToList();
-			return Task.Run<IReadOnlyList<TrashOperationResult>>(() =>
+			return Task.Run<IReadOnlyList<TrashOperationResult>>(async () =>
 			{
 				var results = new List<TrashOperationResult>(list.Count);
 				foreach (var item in list)
 				{
 					cancellationToken.ThrowIfCancellationRequested();
-					results.Add(Guard(item.TrashedPath, () => RestoreOne(item, conflictBehavior)));
+					try
+					{
+						results.Add(await RestoreOneAsync(item, conflictBehavior, cancellationToken).ConfigureAwait(false));
+					}
+					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+					{
+						results.Add(TrashOperationResult.Failure(item.TrashedPath, ex.Message));
+					}
 				}
 
 				return results;
@@ -423,12 +431,14 @@ namespace Files.Platform.Linux.Trash
 
 		#region Restore and delete
 
-		private TrashOperationResult RestoreOne(TrashItem item, TrashRestoreConflictBehavior conflictBehavior)
+		private async Task<TrashOperationResult> RestoreOneAsync(TrashItem item, TrashRestoreConflictBehavior conflictBehavior, CancellationToken cancellationToken)
 		{
 			if (!TryGetItemLocation(item, out var location, out var name, out var infoPath))
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
-			using var trashRoot = DirectoryHandle.OpenPath(Path.Combine(RealPath(Path.GetDirectoryName(location.Root)!), Path.GetFileName(location.Root)));
+			using var trashRoot = DirectoryHandle.OpenPath(location.TopDirectory is null
+				? RealPath(location.Root)
+				: Path.Combine(RealPath(Path.GetDirectoryName(location.Root)!), Path.GetFileName(location.Root)));
 			using var files = DirectoryHandle.OpenChild(trashRoot.Descriptor, FilesDirectoryName, location.FilesDirectory);
 			using var info = DirectoryHandle.OpenChild(trashRoot.Descriptor, InfoDirectoryName, location.InfoDirectory);
 			if (!files.EntryExists(name))
@@ -474,7 +484,19 @@ namespace Files.Platform.Linux.Trash
 			}
 
 			_options.BeforeRestoreMove?.Invoke(item.TrashedPath, destination);
-			PosixNative.RenameAt(files.Descriptor, name, parent.Descriptor, destinationName, false, destination);
+			cancellationToken.ThrowIfCancellationRequested();
+			if (!PosixNative.TryRenameAt(files.Descriptor, name, parent.Descriptor, destinationName, false, out var errno, _options.FileOperationsHooks))
+			{
+				if (!PosixNative.IsCrossDevice(errno))
+					throw PosixNative.CreateException(errno, destination);
+				var sourceStat = PosixNative.StatAt(files.Descriptor, name, item.TrashedPath);
+				var operations = new LinuxFileOperationsService(null, _options.FileOperationsHooks);
+				await operations.CopyRestoreEntryAsync(item.TrashedPath, destination, files, parent, cancellationToken).ConfigureAwait(false);
+				cancellationToken.ThrowIfCancellationRequested();
+				if (!PosixNative.SameEntry(sourceStat, PosixNative.StatAt(files.Descriptor, name, item.TrashedPath)))
+					throw new IOException("The trashed item changed while it was being restored.");
+				files.DeleteEntry(name);
+			}
 			try
 			{
 				PosixNative.UnlinkAt(info.Descriptor, name + TrashInfoFile.Extension, 0, infoPath);

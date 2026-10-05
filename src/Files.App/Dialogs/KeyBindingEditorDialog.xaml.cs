@@ -69,7 +69,7 @@ namespace Files.App.Dialogs
 
 		private void KeyBindingEditorTextBox_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
 		{
-			var pressedKey = e.OriginalKey;
+			var pressedKey = HotKeyHelpers.GetHotKeyVirtualKey(e);
 			var pressedKeyValue = HotKey.LocalizedKeys.GetValueOrDefault((Keys)pressedKey);
 			var buffer = new StringBuilder();
 

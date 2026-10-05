@@ -441,6 +441,10 @@ namespace Files.App.Helpers
 			// Storable path resolution
 			services.AddStorables();
 			services.AddFtpStorables();
+#if !WINDOWS
+			Files.App.Storage.Archives.ArchiveServiceCollectionExtensions.AddArchiveStorables(services);
+			services.AddSingleton<Files.Platform.Abstractions.Archives.IArchivePasswordPrompt, Files.App.Actions.ArchivePasswordPrompt>();
+#endif
 
 			// Conditional DI
 #if WINDOWS

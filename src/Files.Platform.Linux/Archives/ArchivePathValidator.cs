@@ -7,6 +7,7 @@ using System.IO;
 using System.Text;
 using Files.Platform.Abstractions.Archives;
 using Files.Platform.Linux.FileOperations;
+using Files.Platform.Linux.Previews;
 
 namespace Files.Platform.Linux.Archives
 {
@@ -26,6 +27,9 @@ namespace Files.Platform.Linux.Archives
 		{
 			if (string.IsNullOrEmpty(entryName))
 				return string.Empty;
+
+			if (Encoding.UTF8.GetByteCount(entryName) > 4096)
+				throw new ArchiveSecurityException("Archive entry path is too long.");
 
 			if (entryName.Contains('\0'))
 				throw new ArchiveSecurityException($"Archive entry name contains a NUL character: '{Printable(entryName)}'.");
@@ -50,6 +54,9 @@ namespace Files.Platform.Linux.Archives
 
 				if (Encoding.UTF8.GetByteCount(segment) > MaxSegmentBytes)
 					throw new ArchiveSecurityException($"Archive entry has a name that is too long: '{Printable(entryName)}'.");
+
+				if (segments.Count >= 128)
+					throw new ArchiveSecurityException("Archive entry path is too deep.");
 
 				segments.Add(segment);
 			}
@@ -122,13 +129,6 @@ namespace Files.Platform.Linux.Archives
 			}
 		}
 
-		private static string Printable(string value)
-		{
-			var builder = new StringBuilder(Math.Min(value.Length, 200));
-			foreach (var c in value.Length > 200 ? value[..200] : value)
-				builder.Append(char.IsControl(c) ? '?' : c);
-
-			return builder.ToString();
-		}
+		internal static string Printable(string value) => PreviewEntryName.Sanitize(value, 200);
 	}
 }

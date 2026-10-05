@@ -1,11 +1,10 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using System.IO;
 using System.Text;
 using System.Windows.Input;
-
+using Windows.Storage;
 
 namespace Files.App.ViewModels.Dialogs
 {
@@ -16,9 +15,10 @@ namespace Files.App.ViewModels.Dialogs
 		private readonly IUserSettingsService UserSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
 		// Fields
-		private readonly string archivePath;
+		private readonly IStorageFile archive;
 
 		// Properties
+		public BaseStorageFolder? DestinationFolder { get; private set; }
 
 		private string destinationFolderPath;
 		public string DestinationFolderPath
@@ -116,9 +116,9 @@ namespace Files.App.ViewModels.Dialogs
 		public ICommand? QuerySubmittedCommand { get; private set; }
 
 		// Constructor
-		public DecompressArchiveDialogViewModel(string archivePath)
+		public DecompressArchiveDialogViewModel(IStorageFile archive)
 		{
-			this.archivePath = archivePath;
+			this.archive = archive;
 			destinationFolderPath = DefaultDestinationFolderPath();
 			SelectedEncoding = EncodingOptions[0];
 
@@ -130,18 +130,23 @@ namespace Files.App.ViewModels.Dialogs
 		// Private Methods
 		private string DefaultDestinationFolderPath()
 		{
-			var directory = Path.GetDirectoryName(archivePath);
-			var fileName = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().GetDefaultExtractFolderName(archivePath);
-
+			var directory = Path.GetDirectoryName(archive.Path);
+#if HAS_UNO
+			var fileName = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().GetDefaultExtractFolderName(archive.Path);
+#else
+			var fileName = Path.GetFileNameWithoutExtension(archive.Path);
+#endif
 			return string.IsNullOrEmpty(directory) ? fileName : Path.Combine(directory, fileName);
 		}
 
-		private Task SelectDestinationAsync()
+		private async Task SelectDestinationAsync()
 		{
 			bool result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop, out var filePath);
-			if (result)
-				DestinationFolderPath = filePath;
-			return Task.CompletedTask;
+			if (!result)
+				return;
+
+			DestinationFolder = await StorageHelpers.ToStorageItem<BaseStorageFolder>(filePath);
+			DestinationFolderPath = (DestinationFolder is not null) ? DestinationFolder.Path : DefaultDestinationFolderPath();
 		}
 
 		private void RefreshEncodingOptions()
@@ -183,5 +188,3 @@ namespace Files.App.ViewModels.Dialogs
 		}
 	}
 }
-
-#endif

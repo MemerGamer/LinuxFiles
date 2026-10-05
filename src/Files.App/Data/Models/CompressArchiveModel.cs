@@ -1,9 +1,8 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
-using Files.App.Utils.Storage.Operations;
-using Microsoft.Extensions.Logging;
-using SevenZip;
+#if !WINDOWS
+using Files.Platform.Abstractions.Archives;
 using System.IO;
 
 namespace Files.App.Data.Models
@@ -14,54 +13,6 @@ namespace Files.App.Data.Models
 	public sealed class CompressArchiveModel : ICompressArchiveModel
 	{
 		private StatusCenterItemProgressModel? _fileSystemProgress;
-
-		private FileSizeCalculator? _sizeCalculator;
-
-		private string ArchiveExtension => FileFormat switch
-		{
-			ArchiveFormats.Zip => ".zip",
-			ArchiveFormats.SevenZip => ".7z",
-			ArchiveFormats.Tar => ".tar",
-			ArchiveFormats.GZip => ".gz",
-			_ => throw new ArgumentOutOfRangeException(nameof(FileFormat)),
-		};
-
-		private OutArchiveFormat SevenZipArchiveFormat => FileFormat switch
-		{
-			ArchiveFormats.Zip => OutArchiveFormat.Zip,
-			ArchiveFormats.SevenZip => OutArchiveFormat.SevenZip,
-			ArchiveFormats.Tar => OutArchiveFormat.Tar,
-			ArchiveFormats.GZip => OutArchiveFormat.GZip,
-			_ => throw new ArgumentOutOfRangeException(nameof(FileFormat)),
-		};
-
-		private CompressionLevel SevenZipCompressionLevel => CompressionLevel switch
-		{
-			ArchiveCompressionLevels.Ultra => SevenZip.CompressionLevel.Ultra,
-			ArchiveCompressionLevels.High => SevenZip.CompressionLevel.High,
-			ArchiveCompressionLevels.Normal => SevenZip.CompressionLevel.Normal,
-			ArchiveCompressionLevels.Low => SevenZip.CompressionLevel.Low,
-			ArchiveCompressionLevels.Fast => SevenZip.CompressionLevel.Fast,
-			ArchiveCompressionLevels.None => SevenZip.CompressionLevel.None,
-			_ => throw new ArgumentOutOfRangeException(nameof(CompressionLevel)),
-		};
-
-		private long SevenZipVolumeSize => SplittingSize switch
-		{
-			ArchiveSplittingSizes.None => 0L,
-			ArchiveSplittingSizes.Mo10 => 10 * 1000 * 1000L,
-			ArchiveSplittingSizes.Mo100 => 100 * 1000 * 1000L,
-			ArchiveSplittingSizes.Mo1024 => 1024 * 1000 * 1000L,
-			ArchiveSplittingSizes.Mo2048 => 2048 * 1000 * 1000L,
-			ArchiveSplittingSizes.Mo5120 => 5120 * 1000 * 1000L,
-			ArchiveSplittingSizes.Fat4092 => 4092 * 1000 * 1000L,
-			ArchiveSplittingSizes.Cd650 => 650 * 1000 * 1000L,
-			ArchiveSplittingSizes.Cd700 => 700 * 1000 * 1000L,
-			ArchiveSplittingSizes.Dvd4480 => 4480 * 1000 * 1000L,
-			ArchiveSplittingSizes.Dvd8128 => 8128 * 1000 * 1000L,
-			ArchiveSplittingSizes.Bd23040 => 23040 * 1000 * 1000L,
-			_ => throw new ArgumentOutOfRangeException(nameof(SplittingSize)),
-		};
 
 		private IProgress<StatusCenterItemProgressModel>? _Progress;
 		public IProgress<StatusCenterItemProgressModel>? Progress
@@ -151,307 +102,61 @@ namespace Files.App.Data.Models
 			return Path.Combine(Directory, $"{FileName}{suffix}{ArchiveExtension}");
 		}
 
-		/// <inheritdoc/>
 		public async Task<bool> RunCreationAsync()
 		{
-			if (_fileSystemProgress is null)
-				throw new InvalidOperationException("Compression progress must be initialized before archive creation starts.");
-
-			string[] sources = Sources.ToArray();
-
-			var compressor = new SevenZipCompressor()
+			// LINUX-TODO(archives): encrypted creation, split volumes and custom 7z tuning need backend support.
+			if (!string.IsNullOrEmpty(Password) || SplittingSize != ArchiveSplittingSizes.None || DictionarySize != ArchiveDictionarySizes.Auto || WordSize != ArchiveWordSizes.Auto)
+				throw new NotSupportedException();
+			var service = Ioc.Default.GetRequiredService<IArchiveService>();
+			var format = FileFormat switch
 			{
-				ArchiveFormat = SevenZipArchiveFormat,
-				CompressionLevel = SevenZipCompressionLevel,
-				VolumeSize = FileFormat is ArchiveFormats.SevenZip ? SevenZipVolumeSize : 0,
-				FastCompression = false,
-				IncludeEmptyDirectories = true,
-				EncryptHeaders = true,
-				PreserveDirectoryRoot = sources.Length > 1,
+				ArchiveFormats.Zip => ArchiveFormat.Zip,
+				ArchiveFormats.SevenZip => ArchiveFormat.SevenZip,
+				ArchiveFormats.Tar => ArchiveFormat.Tar,
+				ArchiveFormats.GZip => ArchiveFormat.TarGz,
+				_ => throw new NotSupportedException(),
 			};
-
-			compressor.CustomParameters.Add("mt", CPUThreads.ToString());
-			// Use UTF-8 encoding. 
-			// References: 7-zip chm --> Command Line Version --> Switches
-			// --> -m --> cu=[off | on].
-			// Don't add "cu" parameter for 7zip files, see https://github.com/files-community/Files/issues/17257
-			if (FileFormat != ArchiveFormats.SevenZip)
-				compressor.CustomParameters.Add("cu", "on");
-
-			if (FileFormat is ArchiveFormats.SevenZip)
+			if (string.IsNullOrEmpty(ArchivePath))
+				ArchivePath = GetArchivePath();
+			var result = await service.CreateAsync(Sources.ToArray(), ArchivePath, new ArchiveCreateOptions
 			{
-				var dictParam = GetDictionarySizeParam();
-				if (dictParam is not null)
-					compressor.CustomParameters.Add("d", dictParam);
-
-				var wordParam = GetWordSizeParam();
-				if (wordParam is not null)
-					compressor.CustomParameters.Add("fb", wordParam);
-			}
-
-			compressor.Compressing += Compressor_Compressing;
-			compressor.FileCompressionStarted += Compressor_FileCompressionStarted;
-			compressor.FileCompressionFinished += Compressor_FileCompressionFinished;
-
-			var cts = new CancellationTokenSource();
-
-			try
-			{
-				var files = sources.Where(File.Exists).ToArray();
-				var directories = sources.Where(SystemIO.Directory.Exists);
-				var skippedItems = new List<string>();
-
-				_sizeCalculator = new FileSizeCalculator([.. files, .. directories]);
-				var sizeTask = _sizeCalculator.ComputeSizeAsync(cts.Token);
-				_ = sizeTask.ContinueWith(_ =>
+				Format = format,
+				Progress = new Progress<ArchiveProgress>(progress =>
 				{
-					_fileSystemProgress.TotalSize = _sizeCalculator.Size;
-					_fileSystemProgress.ItemsCount = _sizeCalculator.ItemsCount;
+					if (_fileSystemProgress is null)
+						return;
+					_fileSystemProgress.FileName = Files.Shared.Helpers.ArchiveDisplayName.Escape(progress.CurrentEntry ?? string.Empty);
+					_fileSystemProgress.ItemsCount = progress.EntriesTotal;
+					_fileSystemProgress.AddProcessedItemsCount(Math.Max(0, progress.EntriesProcessed - _fileSystemProgress.ProcessedItemsCount));
+					_fileSystemProgress.TotalSize = progress.BytesTotal;
+					_fileSystemProgress.SetProcessedSize(progress.BytesProcessed);
 					_fileSystemProgress.EnumerationCompleted = true;
 					_fileSystemProgress.Report();
-				});
-
-				// Enumerate the sources ourselves, skipping items that cannot be
-				// archived (e.g. broken junctions or locked files), see #16240
-				var directoryItems = new List<(string Path, List<string> ArchivableItems)>();
-				var archivableFiles = new List<string>();
-
-				await Task.Run(() =>
+				}),
+				Level = CompressionLevel switch
 				{
-					foreach (string directory in directories)
-					{
-						var directoryPath = Path.GetFullPath(directory);
-						var archivableItems = new List<string>();
-
-						AddArchivableItems(directoryPath, archivableItems, skippedItems);
-						directoryItems.Add((directoryPath, archivableItems));
-					}
-
-					foreach (var file in files)
-					{
-						if (CanOpenFile(file))
-							archivableFiles.Add(file);
-						else
-							skippedItems.Add(file);
-					}
-				});
-
-				if (skippedItems.Count > 0)
-				{
-					var logger = Ioc.Default.GetRequiredService<ILogger<App>>();
-					logger?.LogWarning($"Skipped {skippedItems.Count} item(s) that could not be archived to {LogPathHelper.RedactPath(ArchivePath)}: {string.Join(", ", skippedItems.Select(LogPathHelper.RedactPath))}");
-
-					// Ask the user whether to skip the items or cancel the operation, see #16240
-					var dialogService = Ioc.Default.GetRequiredService<IDialogService>();
-					var dialogResult = await dialogService.ShowDialogAsync(new CompressSkippedItemsDialogViewModel(skippedItems));
-
-					if (dialogResult is not DialogResult.Primary)
-					{
-						IsCancelled = true;
-						cts.Cancel();
-
-						return false;
-					}
-				}
-
-				foreach ((string directoryPath, List<string> archivableItems) in directoryItems)
-				{
-					if (archivableItems.Any(File.Exists))
-					{
-						var commonRootLength = GetCommonRootLength(directoryPath, sources.Length > 1);
-
-						if (string.IsNullOrEmpty(Password))
-							await compressor.CompressFilesAsync(ArchivePath, commonRootLength, [.. archivableItems]);
-						else
-							await compressor.CompressFilesEncryptedAsync(ArchivePath, commonRootLength, Password, [.. archivableItems]);
-					}
-					else
-					{
-						// The directory has no files, so we need to create entries manually
-						var fileDictionary = new Dictionary<string, string>();
-						AddEntry(fileDictionary, directoryPath, "");
-
-						compressor.CompressFileDictionary(fileDictionary, ArchivePath, Password);
-
-						static void AddEntry(IDictionary<string, string> fileDictionary, string directory, string entryPrefix)
-						{
-							DirectoryInfo directoryInfo = new DirectoryInfo(directory);
-
-							DirectoryInfo[] directories;
-
-							try
-							{
-								directories = directoryInfo.GetDirectories();
-							}
-							catch (Exception)
-							{
-								// The directory contents are inaccessible (e.g. a broken junction), skip it
-								return;
-							}
-
-							if (directories.Length == 0)
-							{
-								AddArchiveEntry(fileDictionary, entryPrefix + directoryInfo.Name, null);
-							}
-							else
-							{
-								entryPrefix += directoryInfo.Name + Path.DirectorySeparatorChar;
-								foreach (DirectoryInfo directoryInfo2 in directories)
-									AddEntry(fileDictionary, directoryInfo2.FullName, entryPrefix);
-							}
-						}
-
-						// SevenZipSharp uses a null source path to represent an empty directory.
-						static void AddArchiveEntry(IDictionary<string, string> entries, string name, string? sourcePath)
-							=> entries.Add(name, sourcePath!);
-					}
-
-					compressor.CompressionMode = CompressionMode.Append;
-				}
-
-				if (archivableFiles.Count > 0)
-				{
-					if (string.IsNullOrEmpty(Password))
-						await compressor.CompressFilesAsync(ArchivePath, [.. archivableFiles]);
-					else
-						await compressor.CompressFilesEncryptedAsync(ArchivePath, Password, [.. archivableFiles]);
-				}
-
-				cts.Cancel();
-
-				return true;
-			}
-			catch (Exception ex)
-			{
-				var logger = Ioc.Default.GetRequiredService<ILogger<App>>();
-				logger?.LogWarning(ex, $"Error compressing folder: {LogPathHelper.RedactPath(ArchivePath)}");
-
-				cts.Cancel();
-
-				return false;
-			}
+					ArchiveCompressionLevels.None => ArchiveCompressionLevel.None,
+					ArchiveCompressionLevels.Fast or ArchiveCompressionLevels.Low => ArchiveCompressionLevel.Fast,
+					ArchiveCompressionLevels.High => ArchiveCompressionLevel.High,
+					ArchiveCompressionLevels.Ultra => ArchiveCompressionLevel.Ultra,
+					_ => ArchiveCompressionLevel.Normal,
+				},
+			}, CancellationToken);
+			IsCancelled = result.Cancelled;
+			if (result.Succeeded)
+				_fileSystemProgress?.Report(100);
+			return result.Succeeded;
 		}
 
-		/// <summary>
-		/// Recursively collects the items of a directory that can be archived,
-		/// skipping items that cannot be read (e.g. broken junctions or locked files).
-		/// </summary>
-		private void AddArchivableItems(string directory, List<string> items, List<string> skippedItems)
+		private string ArchiveExtension => FileFormat switch
 		{
-			CancellationToken.ThrowIfCancellationRequested();
-
-			FileSystemInfo[] children;
-
-			try
-			{
-				children = new DirectoryInfo(directory).GetFileSystemInfos();
-			}
-			catch (Exception)
-			{
-				// The directory contents are inaccessible (e.g. a broken junction or access denied)
-				skippedItems.Add(directory);
-				return;
-			}
-
-			foreach (var child in children)
-			{
-				if (child is DirectoryInfo)
-				{
-					// Add the directory entry itself so empty directories are preserved
-					items.Add(child.FullName);
-					AddArchivableItems(child.FullName, items, skippedItems);
-				}
-				else if (CanOpenFile(child.FullName))
-				{
-					items.Add(child.FullName);
-				}
-				else
-				{
-					skippedItems.Add(child.FullName);
-				}
-			}
-		}
-
-		private static bool CanOpenFile(string path)
-		{
-			try
-			{
-				using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-
-				return true;
-			}
-			catch (Exception)
-			{
-				return false;
-			}
-		}
-
-		private static int GetCommonRootLength(string directoryPath, bool preserveRootEntry)
-		{
-			// Entries are relative to the directory itself unless the root should be preserved
-			var trimmedPath = directoryPath.TrimEnd(Path.DirectorySeparatorChar);
-			var root = preserveRootEntry ? Path.GetDirectoryName(trimmedPath) : trimmedPath;
-
-			return string.IsNullOrEmpty(root)
-				? trimmedPath.Length + 1
-				: root.TrimEnd(Path.DirectorySeparatorChar).Length + 1;
-		}
-
-		private void Compressor_FileCompressionStarted(object? sender, FileNameEventArgs e)
-		{
-			if (CancellationToken.IsCancellationRequested)
-			{
-				e.Cancel = true;
-				return;
-			}
-
-			_sizeCalculator!.ForceComputeFileSize(e.FilePath);
-			_fileSystemProgress!.FileName = e.FileName;
-			_fileSystemProgress.Report();
-		}
-
-		private void Compressor_FileCompressionFinished(object? sender, EventArgs e)
-		{
-			_fileSystemProgress!.AddProcessedItemsCount(1);
-			_fileSystemProgress.Report();
-		}
-
-		private void Compressor_Compressing(object? _, ProgressEventArgs e)
-		{
-			if (_fileSystemProgress!.TotalSize > 0)
-				_fileSystemProgress.Report((_fileSystemProgress.ProcessedSize + e.PercentDelta / 100.0 * e.BytesCount) / _fileSystemProgress.TotalSize * 100);
-		}
-
-		private string? GetDictionarySizeParam() => DictionarySize switch
-		{
-			ArchiveDictionarySizes.Auto => null,
-			ArchiveDictionarySizes.Kb64 => "64k",
-			ArchiveDictionarySizes.Kb256 => "256k",
-			ArchiveDictionarySizes.Mb1 => "1m",
-			ArchiveDictionarySizes.Mb2 => "2m",
-			ArchiveDictionarySizes.Mb4 => "4m",
-			ArchiveDictionarySizes.Mb8 => "8m",
-			ArchiveDictionarySizes.Mb16 => "16m",
-			ArchiveDictionarySizes.Mb32 => "32m",
-			ArchiveDictionarySizes.Mb64 => "64m",
-			ArchiveDictionarySizes.Mb128 => "128m",
-			ArchiveDictionarySizes.Mb256 => "256m",
-			ArchiveDictionarySizes.Mb512 => "512m",
-			ArchiveDictionarySizes.Mb1024 => "1024m",
-			_ => null,
-		};
-
-		private string? GetWordSizeParam() => WordSize switch
-		{
-			ArchiveWordSizes.Auto => null,
-			ArchiveWordSizes.Fb8 => "8",
-			ArchiveWordSizes.Fb16 => "16",
-			ArchiveWordSizes.Fb32 => "32",
-			ArchiveWordSizes.Fb64 => "64",
-			ArchiveWordSizes.Fb128 => "128",
-			ArchiveWordSizes.Fb256 => "256",
-			ArchiveWordSizes.Fb273 => "273",
-			_ => null,
+			ArchiveFormats.Zip => ".zip",
+			ArchiveFormats.SevenZip => ".7z",
+			ArchiveFormats.Tar => ".tar",
+			ArchiveFormats.GZip => ".tar.gz",
+			_ => throw new NotSupportedException(),
 		};
 	}
 }
+
+#endif

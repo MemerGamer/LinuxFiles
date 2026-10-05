@@ -754,6 +754,7 @@
 							Grid.ColumnSpan="3"
 							Height="1"
 							Margin="-16,0"
+							Visibility="{x:Bind ViewModel.CompressAttributeVisibility, Mode=OneWay}"
 							Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
 						<!--  Compress Contents  -->
@@ -762,7 +763,8 @@
 							Grid.Column="0"
 							VerticalAlignment="Center"
 							Text="{helpers:ResourceString Key=CompressContents}"
-							TextWrapping="WrapWholeWords" />
+							TextWrapping="WrapWholeWords"
+							Visibility="{x:Bind ViewModel.CompressAttributeVisibility, Mode=OneWay}" />
 
 						<CheckBox
 							Grid.Row="4"
@@ -772,7 +774,8 @@
 							VerticalAlignment="Center"
 							AutomationProperties.Name="{helpers:ResourceString Key=CompressContents}"
 							IsChecked="{x:Bind ViewModel.IsContentCompressedEditedValue, Mode=TwoWay}"
-							IsEnabled="{x:Bind ViewModel.CanCompressContent, Mode=OneWay}" />
+							IsEnabled="{x:Bind ViewModel.CanCompressContent, Mode=OneWay}"
+							Visibility="{x:Bind ViewModel.CompressAttributeVisibility, Mode=OneWay}" />
 
 					</Grid>
 				</Expander.Content>

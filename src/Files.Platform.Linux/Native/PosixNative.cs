@@ -220,6 +220,18 @@ namespace Files.Platform.Linux.Native
 		/// <summary>Lists entry names of an open directory descriptor without touching its path.</summary>
 		public static List<string> ListNames(int dirfd, string displayPath)
 		{
+			var names = new List<string>();
+			ForEachName(dirfd, displayPath, name =>
+			{
+				names.Add(name);
+				return true;
+			});
+			return names;
+		}
+
+		/// <summary>Streams entry names of an open directory descriptor; <paramref name="visitor"/> returns false to stop early.</summary>
+		public static void ForEachName(int dirfd, string displayPath, Func<string, bool> visitor)
+		{
 			var duplicate = dup(dirfd);
 			if (duplicate < 0)
 				throw CreateException(Marshal.GetLastPInvokeError(), displayPath);
@@ -232,7 +244,6 @@ namespace Files.Platform.Linux.Native
 				throw CreateException(errno, displayPath);
 			}
 
-			var names = new List<string>();
 			try
 			{
 				// dup shares the directory offset; repeated listings must start at the beginning.
@@ -244,16 +255,14 @@ namespace Files.Platform.Linux.Native
 						break;
 
 					var name = Marshal.PtrToStringUTF8((nint)(entry + 19))!;
-					if (name is not ("." or ".."))
-						names.Add(name);
+					if (name is not ("." or "..") && !visitor(name))
+						break;
 				}
 			}
 			finally
 			{
 				closedir(stream);
 			}
-
-			return names;
 		}
 
 		/// <summary>Maps an errno to the exception type the rest of the file operations code classifies.</summary>

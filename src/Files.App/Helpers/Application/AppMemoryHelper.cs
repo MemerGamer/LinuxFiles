@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #if WINDOWS
+#if WINDOWS
 using Windows.Win32;
+#endif
 #endif
 
 namespace Files.App.Helpers

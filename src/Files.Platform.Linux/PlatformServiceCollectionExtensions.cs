@@ -6,6 +6,7 @@ using Files.Platform.Linux.Archives;
 using Files.Platform.Linux.Clipboard;
 using Files.Platform.Linux.Enumeration;
 using Files.Platform.Linux.FileOperations;
+using Files.Platform.Linux.FileStat;
 using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
@@ -34,6 +35,7 @@ namespace Files.Platform.Linux
 				.AddSingleton<IPlatformCapabilities, LinuxPlatformCapabilities>()
 				.AddLinuxAppData()
 				.AddLinuxEnumeration()
+				.AddLinuxFileStat()
 				.AddLinuxWatching()
 				.AddLinuxThumbnails()
 				.AddLinuxIcons()

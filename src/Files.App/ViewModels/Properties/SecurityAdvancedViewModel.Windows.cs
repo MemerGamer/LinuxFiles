@@ -3,7 +3,6 @@
 
 using Microsoft.UI.Xaml;
 using Windows.Storage;
-using Windows.Win32.Foundation;
 
 namespace Files.App.ViewModels.Properties
 {
@@ -187,7 +186,7 @@ namespace Files.App.ViewModels.Properties
 			{
 				DisplayElements = false;
 
-				if (error is WIN32_ERROR.ERROR_ACCESS_DENIED)
+				if (error is FileSecurityResult.AccessDenied)
 				{
 					ErrorMessage =
 						Strings.SecurityRequireReadPermissions.GetLocalizedResource() +

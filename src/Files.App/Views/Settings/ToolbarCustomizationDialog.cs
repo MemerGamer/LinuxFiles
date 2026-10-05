@@ -6,7 +6,6 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
 using Windows.Graphics;
 using Microsoft.UI.Windowing;
-using Windows.Win32;
 using WinRT;
 
 namespace Files.App.Views.Settings
@@ -29,7 +28,7 @@ namespace Files.App.Views.Settings
 
 			// Move window to cursor position, matching properties window behavior
 			var pointerPosition = default(System.Drawing.Point);
-			var hasCursor = OperatingSystem.IsWindows() && PInvoke.GetCursorPos(out pointerPosition);
+			var hasCursor = UIHelpers.TryGetCursorPosition(out pointerPosition);
 			if (!hasCursor)
 			{
 				window.AppWindow.Show();

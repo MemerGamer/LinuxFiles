@@ -15,9 +15,18 @@ namespace Files.App.Helpers
 	internal static class ResourceLookup
 	{
 #if WINDOWS
-		private static readonly ResourceMap? _tree = new ResourceManager().MainResourceMap.TryGetSubtree("Resources");
+		private static readonly ResourceManager _manager = new();
+		private static readonly ResourceMap? _tree = _manager.MainResourceMap.TryGetSubtree("Resources");
+		private static ResourceContext? _context;
 
-		public static string? TryGet(string key) => _tree?.TryGetValue(key)?.ValueAsString;
+		public static string? TryGet(string key)
+		{
+			_context ??= _manager.CreateResourceContext();
+			return _tree?.TryGetValue(key, _context)?.ValueAsString;
+		}
+
+		/// <summary>Drops the cached context so a changed language override is picked up.</summary>
+		public static void Reset() => _context = null;
 #else
 		private static readonly ResourceLoader _loader = ResourceLoader.GetForViewIndependentUse();
 
@@ -26,6 +35,8 @@ namespace Files.App.Helpers
 			var value = _loader.GetString(key);
 			return string.IsNullOrEmpty(value) ? null : value;
 		}
+
+		public static void Reset() { }
 #endif
 	}
 }

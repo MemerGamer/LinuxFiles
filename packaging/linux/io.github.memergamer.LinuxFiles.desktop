@@ -6,7 +6,7 @@
 # "Use Files as the default file manager"; other file managers keep working otherwise.
 [Desktop Entry]
 Type=Application
-Name=Files
+Name=LinuxFiles
 GenericName=File Manager
 Comment=Browse and manage files and folders
 Exec=files %U

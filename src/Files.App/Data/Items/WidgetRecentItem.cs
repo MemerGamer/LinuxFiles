@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 using Microsoft.UI.Xaml.Media.Imaging;
+#if WINDOWS || FILES_WIN32_COMPAT
 using Windows.Win32.UI.Shell;
+#endif
 
 namespace Files.App.Data.Items
 {
@@ -31,10 +33,12 @@ namespace Files.App.Data.Items
 		/// </summary>
 		public required DateTime LastModified { get; set; }
 
+#if WINDOWS || FILES_WIN32_COMPAT
 		/// <summary>
-		/// Gets or initializes the Windows shell item of the recent item; unused on Linux.
+		/// Gets or initializes the Windows shell item of the recent item.
 		/// </summary>
 		public IShellItem? ShellItem { get; init; }
+#endif
 
 		/// <summary>
 		/// Loads thumbnail icon of the recent item.

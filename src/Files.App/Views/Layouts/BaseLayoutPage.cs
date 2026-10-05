@@ -1077,6 +1077,7 @@ namespace Files.App.Views.Layouts
 				var sortedItems = SortingHelper.OrderFileList(itemList, folderSettings.DirectorySortOption, folderSettings.DirectorySortDirection, folderSettings.SortDirectoriesAlongsideFiles, folderSettings.SortFilesFirst).ToList();
 				var orderedItems = sortedItems.SkipWhile(x => x != firstItem).Concat(sortedItems.TakeWhile(x => x != firstItem)).ToList();
 
+#if WINDOWS
 				var shellItemList = SafetyExtensions.IgnoreExceptions(() => orderedItems.Select(item => new ShellItem(item.GetRequiredPath())).ToArray());
 				try
 				{
@@ -1106,6 +1107,7 @@ namespace Files.App.Views.Layouts
 							item.Dispose();
 					}
 				}
+#endif
 
 				// Set can window to front (#13255)
 				MainWindow.Instance.SetCanWindowToFront(false);
@@ -1193,7 +1195,7 @@ namespace Files.App.Views.Layouts
 							// Some applications such as Edge can't raise the drop event by the Move flag (#14008), so we set the Copy flag as well.
 							e.AcceptedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
 						}
-						else if (draggedItems.Any(x => x.Item is ZipStorageFile || x.Item is ZipStorageFolder)
+						else if (draggedItems.Any(x => x.IsArchiveMember())
 							|| ZipStorageFolder.IsZipPath(item.ItemPath!))
 						{
 							e.DragUIOverride.Caption = string.Format(Strings.CopyToFolderCaptionText.GetLocalizedResource(), item.Name);
@@ -1482,8 +1484,10 @@ namespace Files.App.Views.Layouts
 		protected internal void FileListItem_PointerPressed(object sender, PointerRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
+#if WINDOWS
 			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
 				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
+#endif
 
 			if (sender is not SelectorItem selectorItem)
 				return;
@@ -1578,23 +1582,29 @@ namespace Files.App.Views.Layouts
 		protected void FileListItem_Tapped(object sender, TappedRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
+#if WINDOWS
 			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
 				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
+#endif
 		}
 
 		protected void FileListItem_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
+#if WINDOWS
 			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
 				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
+#endif
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(SelectorItem))]
 		protected void FileListItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
+#if WINDOWS
 			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
 				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
+#endif
 
 			var rightClickedItem = GetItemFromElement(sender);
 
@@ -1768,7 +1778,11 @@ namespace Files.App.Views.Layouts
 							tapDebounceTimer?.Stop();
 						}
 					},
+#if WINDOWS
 					TimeSpan.FromMilliseconds(OperatingSystem.IsWindows() ? PInvoke.GetDoubleClickTime() : 500));
+#else
+					TimeSpan.FromMilliseconds(500));
+#endif
 				}
 				else
 				{

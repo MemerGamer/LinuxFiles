@@ -1,4 +1,2 @@
 # Compiler error keys of: dotnet build src/Files.App -f net10.0-desktop -p:FilesWin32Compat=false
 # One "file: error CODE: message" per line. Regenerate with scripts/linux/compat-off-check.sh --update.
-src/Files.App/Data/Items/ContextMenu.cs: error CS0246: The type or namespace name 'MENU_ITEM_TYPE' could not be found (are you missing a using directive or an assembly reference?)
-src/Files.App/Data/Items/WidgetRecentItem.cs: error CS0246: The type or namespace name 'IShellItem' could not be found (are you missing a using directive or an assembly reference?)

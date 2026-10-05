@@ -38,5 +38,15 @@ namespace Files.App.Helpers
 			return result;
 		}
 
+		/// <summary>
+		/// Gets whether the item is a member of an archive; such items can only be copied out.
+		/// </summary>
+		public static bool IsArchiveMember(this IStorageItemWithPath item)
+#if WINDOWS
+			=> item.Item is ZipStorageFile || item.Item is ZipStorageFolder;
+#else
+			=> item.Storable is Files.App.Storage.Archives.ArchiveEntryFile or Files.App.Storage.Archives.ArchiveFolder
+				|| Files.Shared.Helpers.FileExtensionHelpers.IsZipPath(item.Path, includeRoot: false);
+#endif
 	}
 }

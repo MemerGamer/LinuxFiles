@@ -4931,6 +4931,9 @@
   <data name="OpenTerminalLinux" xml:space="preserve">
     <value>Open in terminal</value>
   </data>
+  <data name="LinuxBrokenLink" xml:space="preserve">
+    <value>Broken link</value>
+  </data>
   <data name="StatusCenter_RestoreWarning_Header" xml:space="preserve">
     <value>Item restored with a warning</value>
     <comment>Shown in a StatusCenter card.</comment>

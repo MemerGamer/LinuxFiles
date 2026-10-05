@@ -39,6 +39,9 @@ namespace Files.Platform.Abstractions.Archives
 		/// </summary>
 		Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default);
 
+		/// <summary>Lists untrusted preview headers with bounded input, expanded bytes and entry count, without extracting files.</summary>
+		Task<ArchiveListing> ListPreviewAsync(string archivePath, CancellationToken cancellationToken = default);
+
 		/// <summary>
 		/// Whether any entry needs a password.
 		/// </summary>

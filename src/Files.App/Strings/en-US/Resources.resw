@@ -4808,4 +4808,10 @@
   <data name="LinuxOpenRefusedText" xml:space="preserve">
     <value>{0} is an executable-looking or invalid file that cannot be opened safely.</value>
   </data>
+  <data name="PreviewTextTruncated" xml:space="preserve">
+    <value>Showing the first {0} of {1}.</value>
+  </data>
+  <data name="PreviewArchiveMoreEntries" xml:space="preserve">
+    <value>... and {0} more entries</value>
+  </data>
 </root>

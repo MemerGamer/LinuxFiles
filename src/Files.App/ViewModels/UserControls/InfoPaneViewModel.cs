@@ -276,6 +276,7 @@ namespace Files.App.ViewModels.UserControls
 				return new BasicPreview(model);
 			}
 
+#if WINDOWS
 			if (FileExtensionHelpers.IsBrowsableZipFile(item.FileExtension, out _))
 			{
 				var model = new ArchivePreviewViewModel(item);
@@ -283,7 +284,17 @@ namespace Files.App.ViewModels.UserControls
 
 				return new BasicPreview(model);
 			}
+#endif
 
+#if DESKTOP
+			if (item.PrimaryItemAttribute != StorageItemTypes.Folder && !item.IsFtpItem && ArchiveListingPreview.IsArchive(item))
+			{
+				var archivePreview = await ArchiveListingPreview.TryLoadAsync(item);
+				if (archivePreview is not null)
+					return archivePreview;
+			}
+
+#endif
 			if (item.PrimaryItemAttribute == StorageItemTypes.Folder)
 			{
 				var model = new FolderPreviewViewModel(item);
@@ -311,13 +322,20 @@ namespace Files.App.ViewModels.UserControls
 				contentPageContext.PageType != ContentPageTypes.ZipFolder &&
 				(FileExtensionHelpers.IsAudioFile(ext) || FileExtensionHelpers.IsVideoFile(ext)))
 			{
+#if DESKTOP
+				// LINUX-TODO(media): metadata only; playback needs libvlc (see MediaMetadataPreviewViewModel)
+				var model = new MediaMetadataPreviewViewModel(item);
+				await model.LoadAsync();
+
+				return new BasicPreview(model);
+#else
 				var model = new MediaPreviewViewModel(item);
 				await model.LoadAsync();
 
 				return new MediaPreview(model);
+#endif
 			}
 
-			// LINUX-TODO(preview): Markdown/Code/Shell previews are excluded on desktop; falls back to the text preview
 #if WINDOWS
 			if (FileExtensionHelpers.IsMarkdownFile(ext))
 			{
@@ -327,8 +345,23 @@ namespace Files.App.ViewModels.UserControls
 				return new MarkdownPreview(model);
 			}
 
+#else
+			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML is shown as source, never rendered.
+			// LINUX-TODO(preview): shell scripts and other languages without a ColorCode grammar are shown as plain text
+			if (FileExtensionHelpers.IsMarkdownFile(ext) &&
+				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Markdown, null) is { } markdownPreview)
+				return markdownPreview;
+
+			if (CodeLanguageMap.TryGetLanguage(ext, out var codeLanguage) &&
+				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Code, codeLanguage) is { } codePreview)
+				return codePreview;
+
 #endif
-			if (FileExtensionHelpers.IsImagePreviewFile(ext))
+			if (FileExtensionHelpers.IsImagePreviewFile(ext)
+#if DESKTOP
+				|| FileExtensionHelpers.IsPdfFile(ext)
+#endif
+				)
 			{
 				var model = new ImagePreviewViewModel(item);
 				await model.LoadAsync();
@@ -338,10 +371,14 @@ namespace Files.App.ViewModels.UserControls
 
 			if (FileExtensionHelpers.IsTextFile(ext))
 			{
+#if DESKTOP
+				return await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Plain, null);
+#else
 				var model = new TextPreviewViewModel(item);
 				await model.LoadAsync();
 
 				return new TextPreview(model);
+#endif
 			}
 
 			/*if (FileExtensionHelpers.IsPdfFile(ext))
@@ -360,6 +397,8 @@ namespace Files.App.ViewModels.UserControls
 				return new HtmlPreview(model);
 			}*/
 
+			// LINUX-TODO(preview): RTF falls back to bounded source text on desktop; Uno has no RTF renderer.
+#if WINDOWS
 			if (FileExtensionHelpers.IsRichTextFile(ext))
 			{
 				var model = new RichTextPreviewViewModel(item);
@@ -368,6 +407,7 @@ namespace Files.App.ViewModels.UserControls
 				return new RichTextPreview(model);
 			}
 
+#endif
 #if WINDOWS
 			if (CodePreviewViewModel.IsCodeFile(ext))
 			{
@@ -414,6 +454,9 @@ namespace Files.App.ViewModels.UserControls
 					PreviewPaneState = PreviewPaneStates.LoadingPreview;
 
 					if (SelectedTab == InfoPaneTabs.Preview ||
+#if DESKTOP
+						SelectedTab == InfoPaneTabs.Details ||
+#endif
 						SelectedItem?.PrimaryItemAttribute == StorageItemTypes.Folder)
 					{
 						await LoadPreviewControlAsync(token, downloadItem);

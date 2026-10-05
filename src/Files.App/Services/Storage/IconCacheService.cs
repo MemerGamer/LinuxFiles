@@ -11,7 +11,7 @@ namespace Files.App.Services
 	internal sealed class IconCacheService : IIconCacheService
 	{
 		// Dummy path to generate generic icons for folders, executables, and shortcuts.
-		private static readonly string _dummyPath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory)!, "x46696c6573");
+		private static readonly string _dummyPath = Path.Combine(Path.GetPathRoot(Environment.SystemDirectory) ?? "/", "x46696c6573");
 
 		private readonly ConcurrentDictionary<string, byte[]?> _cache = new();
 		private readonly ConcurrentDictionary<string, BitmapImage> _imageCache = new();

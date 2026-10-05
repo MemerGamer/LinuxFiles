@@ -150,9 +150,11 @@
         <PackageReference Include="System.Drawing.Common" />
         <PackageReference Include="TagLibSharp" />
         <PackageReference Include="UTF.Unknown" />
+        <PackageReference Include="Markdig" />
+        <PackageReference Include="ColorCode.Core" />
     </ItemGroup>
 
-    <!--  Packages that need Windows or have no Uno build yet. ColorCode/MarkdownTextBlock (README/markdown preview) are deferred  -->
+    <!--  Windows UI packages; desktop previews use ColorCode.Core and Markdig  -->
     <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
         <PackageReference Include="ColorCode.WinUI" />
         <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" />

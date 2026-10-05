@@ -68,7 +68,13 @@ namespace Files.App.ViewModels.Previews
 				{
 					// Add the details from the preview function, then the system file properties
 					DetailsFromPreview?.ForEach(i => detailsFull.Add(i));
+#if DESKTOP
+					// LINUX-TODO(props): the Windows property system (StorageFile.Properties) does not exist on Uno; show the basic file details.
+					// Rich metadata (EXIF, tags) comes from the properties workstream.
+					List<FileProperty>? props = GetBasicFileDetails();
+#else
 					List<FileProperty>? props = await GetSystemFilePropertiesAsync();
+#endif
 					if (props is not null)
 						detailsFull.AddRange(props);
 				}
@@ -140,6 +146,30 @@ namespace Files.App.ViewModels.Previews
 
 			return list.Where(i => i.ValueText is not null).ToList();
 		}
+
+#if DESKTOP
+		private List<FileProperty> GetBasicFileDetails()
+		{
+			var details = new List<FileProperty>();
+			try
+			{
+				var info = new FileInfo(Item.ItemPath!);
+				if (!info.Exists)
+					return details;
+
+				details.Add(GetFileProperty("Size", info.Length.ToSizeString()));
+				details.Add(GetFileProperty("PropertyDateModified", new DateTimeOffset(info.LastWriteTime)));
+				details.Add(GetFileProperty("PropertyDateCreated", new DateTimeOffset(info.CreationTime)));
+				details.Add(GetFileProperty("PropertyParsingPath", info.FullName));
+			}
+			catch (Exception ex)
+			{
+				Debug.WriteLine(ex);
+			}
+
+			return details;
+		}
+#endif
 
 		private sealed partial class DetailsOnlyPreviewModel : BasePreviewModel
 		{

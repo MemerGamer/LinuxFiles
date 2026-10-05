@@ -38,7 +38,12 @@ namespace Files.Platform.Tests.Thumbnails
 
 		private LinuxThumbnailService CreateService(Action<LinuxThumbnailOptions>? configure = null)
 		{
-			var options = new LinuxThumbnailOptions { CacheHome = _cacheHome, ThumbnailerDirectories = [] };
+			var options = new LinuxThumbnailOptions
+			{
+				CacheHome = _cacheHome,
+				ThumbnailerDirectories = [],
+				ThumbnailerTempRoot = Path.Combine(_root, "tmp-root"),
+			};
 			configure?.Invoke(options);
 			return new LinuxThumbnailService(options);
 		}
@@ -517,6 +522,54 @@ namespace Files.Platform.Tests.Thumbnails
 			var runner = await RunExternalAsync(Unsandboxed, result: b => Assert.IsNotNull(b));
 
 			Assert.IsFalse(Directory.Exists(runner.OutputDirectory));
+		}
+
+		[TestMethod]
+		public async Task PdfFallbackUsesSandboxAndLiteralPathAndCleansOutput()
+		{
+			var path = Path.Combine(_files, "-sample $(touch injected); 'quoted'.pdf");
+			File.WriteAllText(path, "%PDF-1.4");
+			var runner = new FakeRunner { OutputWriter = p => File.WriteAllBytes(p + ".png", TestImages.CreatePng(8, 8)) };
+			using var service = CreateService(o =>
+			{
+				o.MimeTypeResolver = _ => "application/pdf";
+				o.IsSandboxAvailable = () => true;
+				o.SandboxExternalThumbnailers = true;
+				o.ProcessRunner = runner;
+				o.ThumbnailerTempRoot = Path.Combine(_root, "tmp-root");
+			});
+			Assert.IsNotNull(await service.GetThumbnailAsync(path, 1024));
+			Assert.AreEqual("bwrap", runner.FileName);
+			CollectionAssert.Contains(runner.Arguments.ToList(), path);
+			CollectionAssert.Contains(runner.Arguments.ToList(), "pdftoppm");
+			Assert.IsFalse(Directory.Exists(runner.OutputDirectory));
+		}
+
+		[TestMethod]
+		public async Task PdfFallbackRendersFirstPage()
+		{
+			if (!BubblewrapSandbox.IsAvailable() || !File.Exists("/usr/bin/pdftoppm"))
+				Assert.Inconclusive("PDF integration requires bubblewrap and pdftoppm.");
+			var path = Path.Combine(_files, "first page.pdf");
+			using (var document = SKDocument.CreatePdf(path))
+			{
+				document.BeginPage(160, 200).Clear(SKColors.Red);
+				document.EndPage();
+				document.BeginPage(160, 200).Clear(SKColors.Green);
+				document.EndPage();
+				document.Close();
+			}
+			using var service = CreateService(o =>
+			{
+				o.MimeTypeResolver = _ => "application/pdf";
+				o.SandboxExternalThumbnailers = true;
+			});
+			var bytes = await service.GetThumbnailAsync(path, 1024);
+			Assert.IsNotNull(bytes);
+			using var image = SKBitmap.Decode(bytes);
+			Assert.AreEqual(1024, image.Height);
+			Assert.AreEqual(SKColors.Red, image.GetPixel(image.Width / 2, image.Height / 2));
+			Assert.IsEmpty(Directory.GetDirectories(Path.Combine(_root, "tmp-root")));
 		}
 
 		private sealed class FakeRunner : IThumbnailerProcessRunner

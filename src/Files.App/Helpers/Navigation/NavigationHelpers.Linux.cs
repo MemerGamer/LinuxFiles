@@ -7,6 +7,7 @@ using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
+using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.IO;
@@ -31,6 +32,22 @@ namespace Files.App.Helpers
 					var foldersSettings = Ioc.Default.GetRequiredService<IUserSettingsService>().FoldersSettingsService;
 					await OpenPath(forceOpenInNewTab, foldersSettings.OpenFoldersInNewTab, path, associatedInstance, selectItems);
 					return true;
+				}
+
+				// Members of an archive being browsed; the archive file itself still opens with its default application
+				if (FileExtensionHelpers.IsZipPath(path, includeRoot: false))
+				{
+					var resolved = await Ioc.Default.GetRequiredService<Files.Core.Storage.Contracts.IStorableResolver>().TryGetAsync(path);
+					if (resolved.Item is OwlCore.Storage.IFolder)
+					{
+						var foldersSettings = Ioc.Default.GetRequiredService<IUserSettingsService>().FoldersSettingsService;
+						await OpenPath(forceOpenInNewTab, foldersSettings.OpenFoldersInNewTab, path, associatedInstance, selectItems);
+						return true;
+					}
+
+					// LINUX-TODO(archives): open archive members by extracting them to a private temporary copy first
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
+					return false;
 				}
 
 				if (!File.Exists(path))

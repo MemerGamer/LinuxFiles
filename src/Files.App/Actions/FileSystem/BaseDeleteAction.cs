@@ -16,7 +16,7 @@ namespace Files.App.Actions
 
 		public override bool IsExecutable =>
 			context.HasSelection &&
-			context.PageType != ContentPageTypes.ZipFolder &&
+			(OperatingSystem.IsWindows() || context.PageType != ContentPageTypes.ZipFolder) &&
 			(!context.ShellPage?.SlimContentPage?.IsRenamingItem ?? false) &&
 			UIHelpers.CanShowDialog;
 

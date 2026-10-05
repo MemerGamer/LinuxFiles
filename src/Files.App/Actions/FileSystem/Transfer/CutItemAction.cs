@@ -31,7 +31,7 @@ namespace Files.App.Actions
 
 		// Archives are read-only, so their items can only be copied out
 		public override bool IsExecutable
-			=> base.IsExecutable && ContentPageContext.PageType != ContentPageTypes.ZipFolder;
+			=> base.IsExecutable && (OperatingSystem.IsWindows() || ContentPageContext.PageType != ContentPageTypes.ZipFolder);
 
 		public CutItemAction() : base()
 		{

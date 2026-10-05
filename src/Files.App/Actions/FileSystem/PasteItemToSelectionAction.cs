@@ -56,7 +56,10 @@ namespace Files.App.Actions
 			if (!App.AppModel.IsPasteEnabled)
 				return false;
 
-			if (context.PageType is ContentPageTypes.Home or ContentPageTypes.RecycleBin or ContentPageTypes.ZipFolder or ContentPageTypes.SearchResults or ContentPageTypes.ReleaseNotes or ContentPageTypes.Settings)
+			if (!OperatingSystem.IsWindows() && context.PageType is ContentPageTypes.ZipFolder)
+				return false;
+
+			if (context.PageType is ContentPageTypes.Home or ContentPageTypes.RecycleBin or ContentPageTypes.SearchResults or ContentPageTypes.ReleaseNotes or ContentPageTypes.Settings)
 				return false;
 
 			if (!context.HasSelection)

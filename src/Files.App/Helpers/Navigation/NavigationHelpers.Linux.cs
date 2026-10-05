@@ -78,7 +78,11 @@ namespace Files.App.Helpers
 
 				return opened;
 			}
-			catch (Exception ex) when (ex is not OperationCanceledException)
+			catch (OperationCanceledException)
+			{
+				return true;
+			}
+			catch (Exception ex)
 			{
 				App.Logger.LogWarning(ex, "Failed to open {Path}", path);
 				return false;
@@ -102,7 +106,14 @@ namespace Files.App.Helpers
 				await input.CopyToAsync(output);
 				return target;
 			}
-			catch (Exception ex) when (ex is not OperationCanceledException)
+			catch (OperationCanceledException)
+			{
+				// Password prompt cancelled by the user
+				if (target is not null)
+					ArchiveOpenTempStore.Discard(target);
+				return null;
+			}
+			catch (Exception ex)
 			{
 				App.Logger.LogWarning(ex, "Failed to extract archive member {Name}", DisplaySanitizer.Field(name));
 				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(name)));

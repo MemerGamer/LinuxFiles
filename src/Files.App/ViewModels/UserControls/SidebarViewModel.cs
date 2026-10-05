@@ -1305,7 +1305,7 @@ namespace Files.App.ViewModels.UserControls
 					path!.StartsWith("Home", StringComparison.OrdinalIgnoreCase) ||
 					path.StartsWith("ReleaseNotes", StringComparison.OrdinalIgnoreCase) ||
 					path.StartsWith("Settings", StringComparison.OrdinalIgnoreCase) ||
-					ZipStorageFolder.IsZipPath(path))
+					(!OperatingSystem.IsWindows() && ZipStorageFolder.IsZipPath(path)))
 				{
 					rawEvent.AcceptedOperation = DataPackageOperation.None;
 				}

@@ -150,7 +150,7 @@ namespace Files.App.ViewModels.Layouts
 
 				// As long as one file doesn't already belong to this folder, and this folder isn't one of the dragged items or inside one
 				if (_associatedInstance.InstanceViewModel.IsPageTypeSearchResults ||
-					ZipStorageFolder.IsZipPath(workingDirectoryPath) ||
+					(!OperatingSystem.IsWindows() && ZipStorageFolder.IsZipPath(workingDirectoryPath)) ||
 					draggedItems.Any() && (draggedItems.AreItemsAlreadyInFolder(workingDirectoryPath) || draggedItems.ContainsDestinationOrAncestor(workingDirectoryPath)))
 				{
 					e.AcceptedOperation = DataPackageOperation.None;

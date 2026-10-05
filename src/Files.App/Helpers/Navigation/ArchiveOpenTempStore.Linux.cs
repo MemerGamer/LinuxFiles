@@ -28,23 +28,58 @@ namespace Files.App.Helpers
 			}
 		}
 
+		private const UnixFileMode PrivateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+
+		/// <summary>
+		/// Creates (or validates) a directory component: it must be a real directory, not a symlink, and (when required) closed to group and others.
+		/// A directory owned by someone else that passes this is still unusable, since it cannot be written to.
+		/// </summary>
+		private static bool EnsurePrivateDirectory(string path, bool create, bool requirePrivateMode = true)
+		{
+			var info = new DirectoryInfo(path);
+			if (!info.Exists && !File.Exists(path) && info.LinkTarget is null)
+			{
+				if (!create)
+					return false;
+				Directory.CreateDirectory(path, PrivateMode);
+				info.Refresh();
+			}
+
+			return info.LinkTarget is null
+				&& info.Exists
+				&& (!requirePrivateMode || (File.GetUnixFileMode(path) & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) == 0);
+		}
+
+		private static bool EnsureRoot(bool create)
+		{
+			var root = Root;
+			var parent = Path.GetDirectoryName(root)!;
+			if (create)
+				Directory.CreateDirectory(Path.GetDirectoryName(parent)!);
+			return EnsurePrivateDirectory(parent, create, requirePrivateMode: false) && EnsurePrivateDirectory(root, create);
+		}
+
 		/// <summary>Creates a fresh private directory and returns the path for a sanitized file name inside it.</summary>
 		public static string CreateFilePath(string entryName)
 		{
 			lock (gate)
 			{
-				if (processDirectory is null)
-				{
-					Directory.CreateDirectory(Root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-					processDirectory = Path.Combine(Root, "p" + Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
-				}
+				if (!EnsureRoot(create: true))
+					throw new IOException("The archive scratch directory is not private.");
+
+				processDirectory ??= Path.Combine(Root, "p" + Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+				if (!EnsurePrivateDirectory(processDirectory, create: true))
+					throw new IOException("The archive scratch directory is not private.");
 
 				var directory = Path.Combine(processDirectory, Guid.NewGuid().ToString("N"));
-				Directory.CreateDirectory(processDirectory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-				Directory.CreateDirectory(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+				Directory.CreateDirectory(directory, PrivateMode);
 				return Path.Combine(directory, SanitizeName(entryName));
 			}
 		}
+
+		/// <summary>Removes the directory holding a file created by <see cref="CreateFilePath"/>.</summary>
+		public static void Discard(string filePath)
+			=> TryDelete(Path.GetDirectoryName(filePath));
 
 		/// <summary>Keeps only the last path segment, with control and separator characters replaced.</summary>
 		public static string SanitizeName(string entryPath)
@@ -57,7 +92,14 @@ namespace Files.App.Helpers
 
 			var result = builder.ToString().Trim();
 			if (result.Length > 120)
-				result = result[..120];
+			{
+				// Keep the extension: it decides which application opens the file
+				var extension = Path.GetExtension(result);
+				if (extension.Length is 0 or > 40)
+					result = result[..120];
+				else
+					result = result[..(120 - extension.Length)] + extension;
+			}
 			return result is "" or "." or ".." ? "file" : result;
 		}
 
@@ -68,7 +110,8 @@ namespace Files.App.Helpers
 			lock (gate)
 				directory = processDirectory;
 
-			TryDelete(directory);
+			if (directory is not null && EnsureRootSafe())
+				TryDelete(directory);
 		}
 
 		/// <summary>Removes directories left behind by processes that no longer exist.</summary>
@@ -77,7 +120,7 @@ namespace Files.App.Helpers
 			try
 			{
 				var root = Root;
-				if (!Directory.Exists(root))
+				if (!EnsureRootSafe())
 					return;
 
 				foreach (var directory in Directory.EnumerateDirectories(root, "p*"))
@@ -94,6 +137,18 @@ namespace Files.App.Helpers
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
+			}
+		}
+
+		private static bool EnsureRootSafe()
+		{
+			try
+			{
+				return EnsureRoot(create: false);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return false;
 			}
 		}
 

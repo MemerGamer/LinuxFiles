@@ -54,7 +54,7 @@ namespace Files.App.Actions
 		{
 			return
 				App.AppModel.IsPasteEnabled &&
-				context.PageType != ContentPageTypes.ZipFolder &&
+				(OperatingSystem.IsWindows() || context.PageType != ContentPageTypes.ZipFolder) &&
 				context.PageType != ContentPageTypes.Home &&
 				context.PageType != ContentPageTypes.RecycleBin &&
 				context.PageType != ContentPageTypes.SearchResults &&

@@ -4931,4 +4931,10 @@
   <data name="OpenTerminalLinux" xml:space="preserve">
     <value>Open in terminal</value>
   </data>
+  <data name="ShowOpenTerminalLinux" xml:space="preserve">
+    <value>Show option to open folders in the terminal</value>
+  </data>
+  <data name="OpenTerminalAsAdminLinux" xml:space="preserve">
+    <value>Open in terminal as administrator</value>
+  </data>
 </root>

@@ -10,16 +10,19 @@ using System.Threading.Tasks;
 namespace Files.Platform.Linux.Previews
 {
 	/// <summary>Validates file-declared sizes before TagLib can allocate, on a bounded immutable snapshot.</summary>
-	public static class MediaPreviewInput
+	public static partial class MediaPreviewInput
 	{
 		public const int MaxBytes = 16 * 1024 * 1024;
 		private const int MaxRecords = 8192;
 
-		public static async Task<MemoryStream> ReadAsync(Stream source, string? extension, CancellationToken token = default)
+		public static async Task<Stream> ReadAsync(Stream source, string? extension, CancellationToken token = default)
 		{
 			token.ThrowIfCancellationRequested();
-			if (source.Length <= 0 || source.Length > MaxBytes)
+			if (!source.CanSeek || source.Length <= 0)
 				throw InvalidSize();
+			if (source.Length > MaxBytes)
+				return await ReadRegionsAsync(source, extension, token).ConfigureAwait(false);
+			source.Position = 0;
 			var bytes = new byte[(int)source.Length];
 			await source.ReadExactlyAsync(bytes, token).ConfigureAwait(false);
 			Validate(bytes, extension, token);

@@ -123,21 +123,9 @@ namespace Files.Platform.Linux.Native
 			return fd;
 		}
 
-		/// <summary>Checks the mode of an open descriptor using fstat; struct stat differs by architecture.</summary>
+		/// <summary>Checks the type of an open descriptor using statx.</summary>
 		public static bool IsRegularFile(int fd)
-		{
-			byte* buffer = stackalloc byte[256];
-			if (fstat(fd, buffer) != 0)
-				throw CreateException(Marshal.GetLastPInvokeError(), "preview descriptor");
-			var modeOffset = RuntimeInformation.ProcessArchitecture switch
-			{
-				Architecture.X64 => 24,
-				Architecture.Arm64 => 16,
-				_ => throw new PlatformNotSupportedException("Preview fstat requires linux-x64 or linux-arm64."),
-			};
-			var mode = *(uint*)(buffer + modeOffset);
-			return (mode & 0xF000) == 0x8000;
-		}
+			=> TryStat(fd, out var stat) && stat.IsRegularFile;
 
 		public static void ClearNonBlocking(int fd)
 		{
@@ -214,9 +202,6 @@ namespace Files.Platform.Linux.Native
 				1 or 13 or 30 => new UnauthorizedAccessException($"Access to '{path}' is denied."),
 				_ => new IOException($"The operation on '{path}' failed with errno {errno}.", errno),
 			};
-
-		[LibraryImport("libc", EntryPoint = "fstat", SetLastError = true)]
-		private static partial int fstat(int fd, byte* buffer);
 
 		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]
 		private static partial int fcntl(int fd, int command, int argument);

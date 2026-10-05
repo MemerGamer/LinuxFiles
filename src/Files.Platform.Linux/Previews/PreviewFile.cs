@@ -9,14 +9,14 @@ using System.Threading;
 
 namespace Files.Platform.Linux.Previews
 {
-	/// <summary>Opens only regular files, without blocking on FIFOs or following the final symlink.</summary>
+	/// <summary>Opens only regular files, without blocking on FIFOs, including symbolic link targets.</summary>
 	public static class PreviewFile
 	{
 		public static FileStream OpenRead(string path, CancellationToken cancellationToken = default)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			var fd = PosixNative.OpenAt(PosixNative.AtFdCwd, path,
-				PosixNative.NonBlockingFlags | PosixNative.ONofollow, out var errno);
+				PosixNative.NonBlockingFlags, out var errno);
 			if (fd < 0)
 				throw PosixNative.CreateException(errno, path);
 

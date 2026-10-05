@@ -12,7 +12,9 @@ namespace Files.Platform.Linux.Native
 {
 	internal static unsafe partial class PosixNative
 	{
-		private static readonly ConcurrentDictionary<(uint Major, uint Minor), byte> s_noRename2 = new();
+		private const int RenameCacheLimit = 128;
+		private const long RenameCacheLifetimeMilliseconds = 60_000;
+		private static readonly ConcurrentDictionary<ulong, long> s_noRename2 = new();
 
 		public static bool IsCrossDevice(int errno) => errno == 18;
 
@@ -28,11 +30,13 @@ namespace Files.Platform.Linux.Native
 
 		public static bool TryRenameAt(int sourceFd, string source, int destinationFd, string destination, bool replace, out int errno, LinuxFileOperationsHooks? hooks = null)
 		{
-			var cache = hooks?.UnsupportedRenameDevices ?? s_noRename2;
+			var cache = hooks?.UnsupportedRenameMounts ?? s_noRename2;
 			if (!TryStat(sourceFd, string.Empty, AtEmptyPath, out var parent, out errno))
 				return false;
-			var device = (parent.DevMajor, parent.DevMinor);
-			if (replace || !cache.ContainsKey(device))
+			var mount = hooks?.RenameMountId is { } mountId ? mountId() : parent.MountId;
+			var now = hooks?.RenameCacheTimeMilliseconds?.Invoke() ?? Environment.TickCount64;
+			var cached = mount is { } id && cache.TryGetValue(id, out var timestamp) && now - timestamp < RenameCacheLifetimeMilliseconds;
+			if (replace || !cached)
 			{
 				var injected = hooks?.RenameError?.Invoke(source, destination, replace);
 				if (injected is { } error)
@@ -54,35 +58,69 @@ namespace Files.Platform.Linux.Native
 					return true;
 				if (replace || errno is not (22 or 38)) // EINVAL / ENOSYS
 					return false;
-				cache.TryAdd(device, 0);
+				// EINVAL is ambiguous for directories (including a move into itself). Only remember
+				// a simple non-directory rename to an absent name on the same mount; never cache ENOSYS.
+				if (errno == 22 && mount is { } unsupported && IsEntryName(source) && IsEntryName(destination)
+					&& TryStat(sourceFd, source, AtSymlinkNofollow, out var entry, out _) && !entry.IsDirectory
+					&& TryStat(destinationFd, string.Empty, AtEmptyPath, out var destinationParent, out _)
+					&& parent.MountId is not null && parent.MountId == destinationParent.MountId
+					&& !TryStat(destinationFd, destination, AtSymlinkNofollow, out _, out var destinationError) && IsNotFound(destinationError))
+				{
+					lock (cache)
+					{
+						if (cache.Count >= RenameCacheLimit)
+							cache.Clear();
+						cache[unsupported] = now;
+					}
+				}
 			}
 
 			if (!TryStat(sourceFd, source, AtSymlinkNofollow, out var stat, out errno))
 				return false;
 			if (stat.IsDirectory)
-			{
-				if (TryStat(destinationFd, destination, AtSymlinkNofollow, out _, out errno))
-				{
-					errno = 17; // EEXIST, including dangling symlinks
-					return false;
-				}
-				if (!IsNotFound(errno))
-					return false;
-				// Filesystems without RENAME_NOREPLACE leave a small check/rename race for directories.
-				var result = renameat(sourceFd, source, destinationFd, destination);
-				errno = result == 0 ? 0 : Marshal.GetLastPInvokeError();
-				return result == 0;
-			}
+				return TryCheckedRenameAt(sourceFd, source, destinationFd, destination, out errno);
 
 			// With flags=0 linkat links the entry itself, including symlinks, and atomically rejects EEXIST.
-			if (linkat(sourceFd, source, destinationFd, destination, 0) != 0)
+			errno = hooks?.LinkError?.Invoke(source, destination)
+				?? (linkat(sourceFd, source, destinationFd, destination, 0) == 0 ? 0 : Marshal.GetLastPInvokeError());
+			if (errno != 0)
+				return errno is 1 or 95 or 38 or 31 // EPERM / EOPNOTSUPP / ENOSYS / EMLINK
+					&& TryCheckedRenameAt(sourceFd, source, destinationFd, destination, out errno);
+
+			errno = TryRenameUnlink(sourceFd, source, hooks);
+			if (errno == 0)
+				return true;
+
+			// A failed source unlink is a failed move. Roll back only our hardlink, never a replacement.
+			if (TryStat(destinationFd, destination, AtSymlinkNofollow, out var linked, out var rollbackError))
 			{
-				errno = Marshal.GetLastPInvokeError();
+				if (stat.Inode != 0 && SameEntry(stat, linked) && TryRenameUnlink(destinationFd, destination, hooks) == 0)
+					return false;
+			}
+			else if (IsNotFound(rollbackError))
+				return false;
+
+			throw new IOException($"Source removal failed with errno {errno}; rollback could not safely remove '{destination}'. Both names may remain.");
+		}
+
+		private static bool IsEntryName(string name) => name.Length > 0 && name is not ("." or "..") && !name.Contains('/');
+
+		private static int TryRenameUnlink(int dirfd, string name, LinuxFileOperationsHooks? hooks)
+			=> hooks?.RenameUnlinkError?.Invoke(name) ?? (unlinkat(dirfd, name, 0) == 0 ? 0 : Marshal.GetLastPInvokeError());
+
+		private static bool TryCheckedRenameAt(int sourceFd, string source, int destinationFd, string destination, out int errno)
+		{
+			if (TryStat(destinationFd, destination, AtSymlinkNofollow, out _, out errno))
+			{
+				errno = 17; // EEXIST, including dangling symlinks
 				return false;
 			}
-			var removed = unlinkat(sourceFd, source, 0);
-			errno = removed == 0 ? 0 : Marshal.GetLastPInvokeError();
-			return removed == 0;
+			if (!IsNotFound(errno))
+				return false;
+			// Without RENAME_NOREPLACE, directories and entries that cannot be hardlinked retain a check/rename race.
+			var result = renameat(sourceFd, source, destinationFd, destination);
+			errno = result == 0 ? 0 : Marshal.GetLastPInvokeError();
+			return result == 0;
 		}
 
 		public static void RenameAt(int sourceFd, string source, int destinationFd, string destination, bool replace, string displayPath, LinuxFileOperationsHooks? hooks = null)

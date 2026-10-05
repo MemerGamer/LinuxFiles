@@ -15,7 +15,7 @@ namespace Files.Platform.Linux.Native
 	/// <summary>Mount-related <c>statx</c> fields: attribute bits with their support mask, the mount id (when reported) and the device.</summary>
 	public readonly record struct MountInfo(ulong Attributes, ulong AttributesMask, bool MountIdValid, ulong MountId, uint DevMajor, uint DevMinor);
 
-	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0)
+	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0, ulong? MountId = null)
 	{
 		public uint FileType => Mode & 0xF000;
 
@@ -49,6 +49,7 @@ namespace Files.Platform.Linux.Native
 		private const uint StatxMtime = 0x40;
 		private const uint StatxIno = 0x100;
 		private const uint StatxSize = 0x200;
+		private const uint StatxMountId = 0x1000;
 		private const int StatxBufferSize = 256;
 
 		public const int ONonblock = 0x800;
@@ -90,7 +91,7 @@ namespace Files.Platform.Linux.Native
 				var buffer = new byte[StatxBufferSize];
 				fixed (byte* p = buffer)
 				{
-					const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize | StatxIno;
+					const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize | StatxIno | StatxMountId;
 					if (statx(dirfd, path, flags, mask, p) != 0)
 					{
 						errno = Marshal.GetLastPInvokeError();
@@ -108,7 +109,8 @@ namespace Files.Platform.Linux.Native
 				var nanos = (returned & StatxMtime) != 0 ? BitConverter.ToUInt32(buffer, 120) : 0;
 
 				stat = new PosixStat(BitConverter.ToUInt16(buffer, 28), size, BitConverter.ToUInt32(buffer, 20), seconds, nanos,
-					(returned & StatxIno) != 0 ? BitConverter.ToUInt64(buffer, 32) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140));
+					(returned & StatxIno) != 0 ? BitConverter.ToUInt64(buffer, 32) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140),
+					(returned & StatxMountId) != 0 ? BitConverter.ToUInt64(buffer, 144) : null);
 				return true;
 			}
 			catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)

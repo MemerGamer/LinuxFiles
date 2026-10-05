@@ -14,7 +14,19 @@ namespace Files.Platform.Linux.FileOperations
 		/// <summary>Returns an errno to simulate a rename failure, or null to invoke libc. Names are fd-relative.</summary>
 		public Func<string, string, bool, int?>? RenameError { get; init; }
 
-		internal ConcurrentDictionary<(uint Major, uint Minor), byte> UnsupportedRenameDevices { get; } = new();
+		internal ConcurrentDictionary<ulong, long> UnsupportedRenameMounts { get; } = new();
+
+		/// <summary>Overrides the mount identity used by the rename compatibility cache; null disables caching.</summary>
+		public Func<ulong?>? RenameMountId { get; init; }
+
+		/// <summary>Overrides the monotonic clock used to expire rename compatibility cache entries.</summary>
+		public Func<long>? RenameCacheTimeMilliseconds { get; init; }
+
+		/// <summary>Returns an errno to simulate a fallback hardlink failure, or null to invoke libc.</summary>
+		public Func<string, string, int?>? LinkError { get; init; }
+
+		/// <summary>Returns an errno to simulate fallback source removal or rollback failure, or null to invoke libc.</summary>
+		public Func<string, int?>? RenameUnlinkError { get; init; }
 
 		/// <summary>Invoked right after the temporary file of a copy was created, before any data is written.</summary>
 		public Action<string>? TemporaryFileCreated { get; init; }

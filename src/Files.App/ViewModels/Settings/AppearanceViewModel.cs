@@ -52,10 +52,13 @@ namespace Files.App.ViewModels.Settings
 			];
 
 			BackdropMaterialTypes.Add(BackdropMaterialType.Solid, Strings.None.GetLocalizedResource());
-			BackdropMaterialTypes.Add(BackdropMaterialType.Acrylic, Strings.Acrylic.GetLocalizedResource());
-			BackdropMaterialTypes.Add(BackdropMaterialType.ThinAcrylic, Strings.ThinAcrylic.GetLocalizedResource());
-			BackdropMaterialTypes.Add(BackdropMaterialType.Mica, Strings.Mica.GetLocalizedResource());
-			BackdropMaterialTypes.Add(BackdropMaterialType.MicaAlt, Strings.MicaAlt.GetLocalizedResource());
+			if (OperatingSystem.IsWindows())
+			{
+				BackdropMaterialTypes.Add(BackdropMaterialType.Acrylic, Strings.Acrylic.GetLocalizedResource());
+				BackdropMaterialTypes.Add(BackdropMaterialType.ThinAcrylic, Strings.ThinAcrylic.GetLocalizedResource());
+				BackdropMaterialTypes.Add(BackdropMaterialType.Mica, Strings.Mica.GetLocalizedResource());
+				BackdropMaterialTypes.Add(BackdropMaterialType.MicaAlt, Strings.MicaAlt.GetLocalizedResource());
+			}
 
 			selectedBackdropMaterial = BackdropMaterialTypes[UserSettingsService.AppearanceSettingsService.AppThemeBackdropMaterial];
 

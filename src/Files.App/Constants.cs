@@ -181,6 +181,11 @@ namespace Files.App
 			public const string BugReportUrl = @"https://github.com/files-community/Files/issues/new?labels=bug&template=bug_report.yml";
 			public const string PrivacyPolicyUrl = @"https://files.community/privacy";
 			public const string SupportUsUrl = @"https://files.community/sponsor";
+
+			// LINUX-TODO(sponsor): set to the fork's sponsor page to show the sponsor entries on Linux
+			public const string ForkSupportUsUrl = "";
+			public static bool IsSupportUsAvailable => !OperatingSystem.IsLinux() || ForkSupportUsUrl.Length > 0;
+			public static string ActiveSupportUsUrl => OperatingSystem.IsLinux() ? ForkSupportUsUrl : SupportUsUrl;
 			public const string CrowdinUrl = @"https://crowdin.com/project/files-app";
 			public static readonly string ReleaseNotesUrl = $"https://files.community/blog/posts/v{Package.Current.Id.Version.Major}-{Package.Current.Id.Version.Minor}-{Package.Current.Id.Version.Build}?minimal";
 		}

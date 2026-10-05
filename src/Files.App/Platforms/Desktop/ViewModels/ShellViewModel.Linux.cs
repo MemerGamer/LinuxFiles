@@ -297,7 +297,7 @@ namespace Files.App.ViewModels
 				}
 
 				var ordered = SortingHelper.OrderFileList(filesAndFolders.ToList(), folderSettings.DirectorySortOption, folderSettings.DirectorySortDirection,
-					folderSettings.SortDirectoriesAlongsideFiles, folderSettings.SortFilesFirst);
+					folderSettings.SortDirectoriesAlongsideFiles, folderSettings.SortFilesFirst).ToList();
 				filesAndFolders = new ConcurrentCollection<ListedItem>(ordered);
 
 				foreach (var item in removed)

@@ -206,5 +206,34 @@ namespace Files.Platform.Tests.Search
 
 			Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare("relative/cache", ["Files"], "x.so", source));
 		}
+
+		[TestMethod]
+		public async Task GitDirectoryResolver_IgnoresFifoOversizedAndCyclicControlFiles()
+		{
+			var fifoRepo = Path.Combine(_root, "fifo");
+			Directory.CreateDirectory(fifoRepo);
+			using (var mk = System.Diagnostics.Process.Start("mkfifo", Path.Combine(fifoRepo, ".git")))
+				await mk!.WaitForExitAsync();
+			var task = Task.Run(() => GitDirectoryResolver.Resolve(fifoRepo));
+			Assert.AreSame(task, await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(10))), "blocked on a FIFO .git");
+			Assert.IsNull(await task);
+
+			var big = Path.Combine(_root, "big");
+			Directory.CreateDirectory(big);
+			Directory.CreateDirectory(Path.Combine(_root, "target"));
+			File.WriteAllText(Path.Combine(big, ".git"), "gitdir: " + Path.Combine(_root, "target") + new string(' ', GitDirectoryResolver.MaxControlFileBytes * 4));
+			Assert.IsNull(GitDirectoryResolver.Resolve(big));
+
+			var a = Path.Combine(_root, "cycA");
+			var b = Path.Combine(_root, "cycB");
+			Directory.CreateDirectory(a);
+			Directory.CreateDirectory(b);
+			File.WriteAllText(Path.Combine(a, "commondir"), b);
+			File.WriteAllText(Path.Combine(b, "commondir"), a);
+			var cyc = Path.Combine(_root, "cyc");
+			Directory.CreateDirectory(cyc);
+			File.WriteAllText(Path.Combine(cyc, ".git"), "gitdir: " + a);
+			Assert.IsNull(GitDirectoryResolver.Resolve(cyc));
+		}
 	}
 }

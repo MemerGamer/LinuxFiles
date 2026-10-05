@@ -65,9 +65,13 @@ namespace Files.App.UserControls.TabBar
 
 		protected void TabView_SelectionChanged(object? sender, SelectionChangedEventArgs? e)
 		{
+			if (OperatingSystem.IsLinux() && sender is TabView tabView)
+				App.AppModel.TabStripSelectedIndex = tabView.SelectedIndex;
+
 			if (App.AppModel.TabStripSelectedIndex >= 0 && App.AppModel.TabStripSelectedIndex < Items.Count)
 			{
 				CurrentSelectedAppInstance = GetCurrentSelectedTabInstance();
+				_ = NavigationHelpers.UpdateInstancePropertiesAsync(Items[App.AppModel.TabStripSelectedIndex].NavigationParameter?.NavigationParameter);
 
 				if (CurrentSelectedAppInstance is not null)
 				{

@@ -72,6 +72,10 @@ namespace Files.App.UserControls.TabBar
 		public TabBar()
 		{
 			InitializeComponent();
+			Loaded += (_, _) => InitializeLinuxCaptionButtons();
+			SizeChanged += (_, _) => UpdateTitleBarInsets();
+			TabBarAddNewTabButton.SizeChanged += (_, _) => UpdateTitleBarInsets();
+			DragAreaRectangle.SizeChanged += (_, _) => UpdateTitleBarInsets();
 			InitializeTabFlyoutCommands();
 
 			tabHoverTimer.Interval = TimeSpan.FromMilliseconds(Constants.DragAndDrop.HoverToOpenTimespan);
@@ -483,12 +487,24 @@ namespace Files.App.UserControls.TabBar
 
 		private void UpdateTitleBarInsets()
 		{
+#if !WINDOWS
+			if (OperatingSystem.IsLinux())
+			{
+				RightPaddingColumn.Width = new(MainWindow.Instance.HasClientSideDecorations ? 146 : 8);
+				if (XamlRoot is not null && MainWindow.Instance.Content.XamlRoot is not null)
+				{
+					var start = TabBarAddNewTabButton.TransformToVisual(MainWindow.Instance.Content)
+						.TransformPoint(new Windows.Foundation.Point(TabBarAddNewTabButton.ActualWidth + 4, 0));
+					MainWindow.Instance.UpdateLinuxChromeRegions((int)start.X, (int)ActualHeight);
+				}
+				return;
+			}
+#endif
 			var titleBarInset = ((AppLanguageHelper.IsPreferredLanguageRtl
 				? MainWindow.Instance.AppWindow.TitleBar.LeftInset
 				: MainWindow.Instance.AppWindow.TitleBar.RightInset) / DragAreaRectangle.XamlRoot.RasterizationScale) + 40;
 
-			// Native window decorations on Linux: no caption buttons to reserve space for
-			RightPaddingColumn.Width = new(OperatingSystem.IsLinux() ? 8 : titleBarInset > 40 ? titleBarInset : 138);
+			RightPaddingColumn.Width = new(titleBarInset > 40 ? titleBarInset : 138);
 			HorizontalTabView.Measure(new(
 				Math.Max(0, HorizontalTabView.ActualWidth - TabBarAddNewTabButton.Width - titleBarInset),
 				Math.Max(0, HorizontalTabView.ActualHeight)));

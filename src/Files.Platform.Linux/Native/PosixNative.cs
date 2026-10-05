@@ -12,6 +12,9 @@ namespace Files.Platform.Linux.Native
 	/// <summary>
 	/// The result of a <c>statx</c> call.
 	/// </summary>
+	/// <summary>Mount-related <c>statx</c> fields: attribute bits with their support mask, the mount id (when reported) and the device.</summary>
+	public readonly record struct MountInfo(ulong Attributes, ulong AttributesMask, bool MountIdValid, ulong MountId, uint DevMajor, uint DevMinor);
+
 	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0)
 	{
 		public uint FileType => Mode & 0xF000;
@@ -64,6 +67,9 @@ namespace Files.Platform.Linux.Native
 
 		public static int ReadOnlyFlags => OCloexec;
 
+		/// <summary>Flags for creating a new private read/write file: <c>O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC</c>.</summary>
+		public static int CreateExclusiveFlags => 0x2 | 0x40 | 0x80 | ONofollow | OCloexec;
+
 		public static int NonBlockingFlags => OCloexec | ONonblock;
 
 		public static bool IsNotFollowedError(int errno) => errno is ELOOP or ENOTDIR;
@@ -111,19 +117,69 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 
+		private const uint StatxMntId = 0x1000;
+		internal const ulong StatxAttrMountRoot = 0x2000;
+
+		/// <summary>
+		/// Reads the <c>statx</c> mount information of <paramref name="path"/> relative to <paramref name="dirfd"/>: the attribute bits
+		/// (with their support mask) and the mount id when the kernel reports it (5.8+).
+		/// </summary>
+		public static bool TryGetMountInfo(int dirfd, string path, int flags, out MountInfo info)
+		{
+			info = default;
+			try
+			{
+				var buffer = new byte[StatxBufferSize];
+				fixed (byte* p = buffer)
+				{
+					if (statx(dirfd, path, flags, StatxType | StatxMntId, p) != 0)
+						return false;
+				}
+
+				var returned = BitConverter.ToUInt32(buffer, 0);
+				var mntValid = (returned & StatxMntId) != 0;
+				info = new MountInfo(BitConverter.ToUInt64(buffer, 8), BitConverter.ToUInt64(buffer, 56),
+					mntValid, mntValid ? BitConverter.ToUInt64(buffer, 144) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140));
+				return true;
+			}
+			catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+			{
+				return false;
+			}
+		}
+
+		/// <summary>Takes an exclusive advisory lock on <paramref name="fd"/> without blocking; false when someone else holds it or on error.</summary>
+		public static bool TryLockExclusive(int fd) => flock(fd, 2 | 4) == 0; // LOCK_EX | LOCK_NB
+
 		/// <summary>Stats an open descriptor.</summary>
 		public static bool TryStat(int fd, out PosixStat stat)
 			=> TryStat(fd, string.Empty, AtEmptyPath, out stat, out _);
 
 		/// <summary>Opens <paramref name="name"/> relative to <paramref name="dirfd"/>; returns -1 with <paramref name="errno"/> set on failure.</summary>
-		public static int OpenAt(int dirfd, string name, int flags, out int errno)
+		public static int OpenAt(int dirfd, string name, int flags, out int errno, uint mode = 0)
 		{
-			var fd = openat(dirfd, name, flags, 0);
+			var fd = openat(dirfd, name, flags, mode);
 			errno = fd < 0 ? Marshal.GetLastPInvokeError() : 0;
 			return fd;
 		}
 
 		public static void Close(int fd) => _ = close(fd);
+
+		/// <summary>Creates a directory with mode 0700 relative to <paramref name="dirfd"/>; false (errno set) on failure.</summary>
+		public static bool MakeDirectoryAt(int dirfd, string name, out int errno)
+		{
+			var ok = mkdirat(dirfd, name, 0x1C0) == 0;
+			errno = ok ? 0 : Marshal.GetLastPInvokeError();
+			return ok;
+		}
+
+		/// <summary>Creates a symbolic link <paramref name="name"/> to <paramref name="target"/> relative to <paramref name="dirfd"/>.</summary>
+		public static bool SymlinkAt(string target, int dirfd, string name, out int errno)
+		{
+			var ok = symlinkat(target, dirfd, name) == 0;
+			errno = ok ? 0 : Marshal.GetLastPInvokeError();
+			return ok;
+		}
 
 		/// <summary>Removes a file, link or (with <see cref="AtRemoveDir"/>) empty directory relative to <paramref name="dirfd"/>.</summary>
 		public static void UnlinkAt(int dirfd, string name, int flags, string displayPath)
@@ -198,6 +254,15 @@ namespace Files.Platform.Linux.Native
 
 		[LibraryImport("libc", EntryPoint = "openat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int openat(int dirfd, string pathname, int flags, uint mode);
+
+		[LibraryImport("libc", EntryPoint = "mkdirat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial int mkdirat(int dirfd, string pathname, uint mode);
+
+		[LibraryImport("libc", EntryPoint = "symlinkat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial int symlinkat(string target, int newdirfd, string linkpath);
+
+		[LibraryImport("libc", EntryPoint = "flock", SetLastError = true)]
+		private static partial int flock(int fd, int operation);
 
 		[LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
 		private static partial int close(int fd);

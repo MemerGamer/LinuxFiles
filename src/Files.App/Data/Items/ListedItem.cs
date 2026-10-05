@@ -724,6 +724,21 @@ namespace Files.App.Utils
 			set => Interlocked.Exchange(ref commitPropertiesInitialized, value ? 1 : 0);
 		}
 
+		/// <summary>Clears the displayed Git values and flags so they load again (also when the item is next scrolled into view).</summary>
+		public void ResetGitProperties()
+		{
+			StatusPropertiesInitialized = false;
+			CommitPropertiesInitialized = false;
+			ItemPropertiesInitialized = false;
+			UnmergedGitStatusIcon = null;
+			UnmergedGitStatusName = null;
+			GitLastCommitDate = null;
+			GitLastCommitMessage = null;
+			GitLastCommitAuthor = null;
+			GitLastCommitSha = null;
+			GitLastCommitFullSha = null;
+		}
+
 		private Style? _UnmergedGitStatusIcon;
 		public Style? UnmergedGitStatusIcon
 		{

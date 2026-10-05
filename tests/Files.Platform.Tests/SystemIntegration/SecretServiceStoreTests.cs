@@ -1,0 +1,121 @@
+// Copyright (c) Files Community
+// Licensed under the MIT License.
+
+using Files.Platform.Linux.Secrets;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.Versioning;
+using System.Threading;
+
+namespace Files.Platform.Tests.SystemIntegration
+{
+	[TestClass]
+	[UnsupportedOSPlatform("windows")]
+	public sealed class SecretServiceStoreTests
+	{
+		[TestMethod]
+		public void WithoutService_SecretsLiveInMemory()
+		{
+			using var bus = PrivateBus.Start();
+			var store = new SecretServiceStore(bus.Address);
+
+			store.Save("resource", "account", "s3cret");
+
+			Assert.IsFalse(store.IsPersistent);
+			Assert.AreEqual("s3cret", store.Get("resource", "account"));
+			Assert.IsNull(store.Get("resource", "other"));
+			Assert.IsTrue(store.Delete("resource", "account"));
+			Assert.IsNull(store.Get("resource", "account"));
+		}
+
+		[TestMethod]
+		public void UnconfirmedDelete_NeverResurrectsAndDoesNotEatReplacement()
+		{
+			using var bus = PrivateBus.Start();
+			var store = new SecretServiceStore(bus.Address);
+
+			store.Save("r", "a", "old");
+			store.Delete("r", "a");
+			Assert.IsNull(store.Get("r", "a"));
+
+			store.Save("r", "a", "new");
+			Assert.AreEqual("new", store.Get("r", "a"));
+			Assert.AreEqual("new", store.Get("r", "a")); // a stale tombstone retry must not remove the replacement
+		}
+
+		[TestMethod]
+		public void WithKeyring_RoundTripsThroughSecretService()
+		{
+			using var bus = PrivateBus.Start();
+			var home = Path.Combine(Path.GetTempPath(), "fkr-" + Guid.NewGuid().ToString("N")[..8]);
+			Directory.CreateDirectory(Path.Combine(home, "run"));
+			File.SetUnixFileMode(Path.Combine(home, "run"), UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+			var startInfo = new ProcessStartInfo("gnome-keyring-daemon")
+			{
+				UseShellExecute = false,
+				RedirectStandardInput = true,
+				RedirectStandardOutput = true,
+			};
+			startInfo.ArgumentList.Add("--foreground");
+			startInfo.ArgumentList.Add("--unlock");
+			startInfo.ArgumentList.Add("--components=secrets");
+			// Entirely private: own bus, own HOME/XDG dirs, so the user's keyring is never reachable
+			startInfo.Environment["HOME"] = home;
+			startInfo.Environment["XDG_RUNTIME_DIR"] = Path.Combine(home, "run");
+			startInfo.Environment["XDG_DATA_HOME"] = Path.Combine(home, "data");
+			startInfo.Environment["XDG_CONFIG_HOME"] = Path.Combine(home, "cfg");
+			startInfo.Environment["DBUS_SESSION_BUS_ADDRESS"] = bus.Address;
+			startInfo.Environment.Remove("GNOME_KEYRING_CONTROL");
+
+			Process? daemon;
+			try
+			{
+				daemon = Process.Start(startInfo);
+			}
+			catch (System.ComponentModel.Win32Exception)
+			{
+				Assert.Inconclusive("gnome-keyring-daemon is not installed.");
+				return;
+			}
+
+			try
+			{
+				daemon!.StandardInput.Write("pw");
+				daemon.StandardInput.Close();
+
+				var store = new SecretServiceStore(bus.Address);
+				var deadline = DateTime.UtcNow.AddSeconds(8);
+				while (DateTime.UtcNow < deadline)
+				{
+					store.Save("Files:https://example.invalid", "token", "ghp_secret");
+					if (store.IsPersistent)
+						break;
+					Thread.Sleep(300);
+				}
+
+				if (!store.IsPersistent)
+					Assert.Inconclusive("The private keyring did not come up.");
+
+				// A second store has no in-memory copy, so this proves the value went through the service
+				var other = new SecretServiceStore(bus.Address);
+				Assert.AreEqual("ghp_secret", other.Get("Files:https://example.invalid", "token"));
+
+				store.Save("Files:https://example.invalid", "token", "replaced");
+				Assert.AreEqual("replaced", new SecretServiceStore(bus.Address).Get("Files:https://example.invalid", "token"));
+
+				Assert.IsTrue(store.Delete("Files:https://example.invalid", "token"));
+				Assert.IsNull(new SecretServiceStore(bus.Address).Get("Files:https://example.invalid", "token"));
+			}
+			finally
+			{
+				try { daemon!.Kill(); } catch (InvalidOperationException) { }
+				daemon!.WaitForExit(2000);
+				daemon.Dispose();
+				try { Directory.Delete(home, true); } catch (IOException) { }
+			}
+		}
+	}
+}

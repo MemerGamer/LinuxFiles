@@ -624,7 +624,11 @@ namespace Files.App.ViewModels.UserControls
 					{
 						var storageFile = resFile.Result
 							?? throw new InvalidOperationException("A successful file lookup did not return a storage file.");
+#if !WINDOWS
+						await NavigationHelpers.OpenPath(storageFile.Path, shellPage, FilesystemItemType.File);
+#else
 						await Win32Helper.InvokeWin32ComponentAsync(storageFile.Path, shellPage);
+#endif
 					}
 					else // Not a file or not accessible
 					{
@@ -931,7 +935,11 @@ namespace Files.App.ViewModels.UserControls
 						{
 							var storageFile = resFile.Result
 								?? throw new InvalidOperationException("A successful file lookup did not return a storage file.");
+#if !WINDOWS
+							await NavigationHelpers.OpenPath(storageFile.Path, shellPage, FilesystemItemType.File);
+#else
 							await Win32Helper.InvokeWin32ComponentAsync(storageFile.Path, shellPage);
+#endif
 						}
 						else // Not a file or not accessible
 						{

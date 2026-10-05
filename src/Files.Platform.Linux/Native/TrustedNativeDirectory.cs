@@ -87,13 +87,23 @@ namespace Files.Platform.Linux.Native
 						return null;
 				}
 
-				// Replace the link through the directory descriptor; it points at the pinned library inode, not at a path name
-				try { PosixNative.UnlinkAt(current, linkName, 0, linkName); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-				if (!PosixNative.SymlinkAt("/proc/self/fd/" + libraryFd, current, linkName, out _))
+				// Each process gets its own link directory: the link target is a process-local descriptor number, so a second launch
+				// must not rewrite what this process resolves. Stale directories of dead processes are removed first.
+				RemoveStaleProcessDirectories(current, uid);
+
+				var processDir = CreateProcessDirectory(current, uid, out var processDirName);
+				if (processDir < 0)
 					return null;
 
+				if (!PosixNative.SymlinkAt("/proc/self/fd/" + libraryFd, processDir, linkName, out _))
+				{
+					PosixNative.Close(processDir);
+					return null;
+				}
+
+				RegisterCleanup(current, processDirName, processDir, linkName);
 				keep = true;
-				return "/proc/self/fd/" + current;
+				return "/proc/self/fd/" + processDir;
 			}
 			finally
 			{
@@ -106,6 +116,79 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 
+		private static int CreateProcessDirectory(int parent, uint uid, out string name)
+		{
+			var pid = Environment.ProcessId;
+			for (var attempt = 0; attempt < 8; attempt++)
+			{
+				name = pid + "-" + Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(6)).ToLowerInvariant();
+				if (!PosixNative.MakeDirectoryAt(parent, name, out _))
+					continue;
+
+				var fd = PosixNative.OpenAt(parent, name, PosixNative.ODirectory | PosixNative.ONofollow | PosixNative.ReadOnlyFlags, out _);
+				if (fd >= 0 && IsTrusted(fd, uid, mustBeUser: true))
+					return fd;
+
+				if (fd >= 0)
+					PosixNative.Close(fd);
+			}
+
+			name = string.Empty;
+			return -1;
+		}
+
+		/// <summary>Removes <c>&lt;pid&gt;-&lt;hex&gt;</c> directories of processes that are gone, using descriptors only and never following links.</summary>
+		private static void RemoveStaleProcessDirectories(int parent, uint uid)
+		{
+			try
+			{
+				foreach (var name in PosixNative.ListNames(parent, "native"))
+				{
+					var dash = name.IndexOf('-');
+					if (dash <= 0 || !int.TryParse(name.AsSpan(0, dash), out var pid) || pid == Environment.ProcessId || Directory.Exists("/proc/" + pid))
+						continue;
+
+					RemoveDirectoryAt(parent, name, uid);
+				}
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+			}
+		}
+
+		private static void RemoveDirectoryAt(int parent, string name, uint uid)
+		{
+			var fd = PosixNative.OpenAt(parent, name, PosixNative.ODirectory | PosixNative.ONofollow | PosixNative.ReadOnlyFlags, out _);
+			if (fd < 0)
+				return;
+
+			try
+			{
+				if (!PosixNative.TryStat(fd, out var stat) || !stat.IsDirectory || stat.OwnerUserId != uid)
+					return;
+
+				foreach (var entry in PosixNative.ListNames(fd, name))
+				{
+					try { PosixNative.UnlinkAt(fd, entry, 0, entry); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+				}
+			}
+			finally
+			{
+				PosixNative.Close(fd);
+			}
+
+			try { PosixNative.UnlinkAt(parent, name, PosixNative.AtRemoveDir, name); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+		}
+
+		private static void RegisterCleanup(int parent, string processDirName, int processDir, string linkName)
+		{
+			AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+			{
+				try { PosixNative.UnlinkAt(processDir, linkName, 0, linkName); } catch (Exception) { }
+				try { PosixNative.UnlinkAt(parent, processDirName, PosixNative.AtRemoveDir, processDirName); } catch (Exception) { }
+			};
+		}
+
 		/// <summary>
 		/// Opens a regular file by walking its path with validated descriptors, resolving symlinks component by component.
 		/// Every directory on the way, and the file, must be owned by root or the user and not writable by group or others.
@@ -113,14 +196,19 @@ namespace Files.Platform.Linux.Native
 		private static int OpenTrustedFile(string path, uint uid)
 		{
 			var queue = new System.Collections.Generic.LinkedList<string>(path.Split('/', StringSplitOptions.RemoveEmptyEntries));
-			var dir = PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PosixNative.ODirectory | PosixNative.ReadOnlyFlags, out _);
-			if (dir < 0)
-				return -1;
-
+			var dirs = new System.Collections.Generic.List<int>(); // validated directory descriptors from "/" down; ".." pops
 			var hops = 0;
+
+			int OpenRoot() => PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PosixNative.ODirectory | PosixNative.ReadOnlyFlags, out _);
+
 			try
 			{
-				if (!IsTrusted(dir, uid, mustBeUser: false))
+				var root = OpenRoot();
+				if (root < 0)
+					return -1;
+
+				dirs.Add(root);
+				if (!IsTrusted(root, uid, mustBeUser: false))
 					return -1;
 
 				while (queue.First is { } node)
@@ -130,9 +218,22 @@ namespace Files.Platform.Linux.Native
 					if (name == ".")
 						continue;
 
-					if (name == ".." || name.Contains('\0'))
+					if (name.Contains('\0'))
 						return -1;
 
+					if (name == "..")
+					{
+						// Never above "/"
+						if (dirs.Count > 1)
+						{
+							PosixNative.Close(dirs[^1]);
+							dirs.RemoveAt(dirs.Count - 1);
+						}
+
+						continue;
+					}
+
+					var dir = dirs[^1];
 					if (!PosixNative.TryStat(dir, name, PosixNative.AtSymlinkNofollow, out var stat))
 						return -1;
 
@@ -149,10 +250,14 @@ namespace Files.Platform.Linux.Native
 
 						if (target.StartsWith('/'))
 						{
-							PosixNative.Close(dir);
-							dir = PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PosixNative.ODirectory | PosixNative.ReadOnlyFlags, out _);
-							if (dir < 0)
+							foreach (var fd in dirs)
+								PosixNative.Close(fd);
+							dirs.Clear();
+
+							var newRoot = OpenRoot();
+							if (newRoot < 0)
 								return -1;
+							dirs.Add(newRoot);
 						}
 
 						continue;
@@ -175,9 +280,11 @@ namespace Files.Platform.Linux.Native
 					}
 
 					var next = PosixNative.OpenAt(dir, name, PosixNative.ODirectory | PosixNative.ONofollow | PosixNative.ReadOnlyFlags, out _);
-					PosixNative.Close(dir);
-					dir = next;
-					if (dir < 0 || !IsTrusted(dir, uid, mustBeUser: false))
+					if (next < 0)
+						return -1;
+
+					dirs.Add(next);
+					if (!IsTrusted(next, uid, mustBeUser: false))
 						return -1;
 				}
 
@@ -185,8 +292,8 @@ namespace Files.Platform.Linux.Native
 			}
 			finally
 			{
-				if (dir >= 0)
-					PosixNative.Close(dir);
+				foreach (var fd in dirs)
+					PosixNative.Close(fd);
 			}
 		}
 

@@ -220,6 +220,44 @@ namespace Files.Platform.Tests.Search
 		}
 
 		[TestMethod]
+		[SupportedOSPlatform("linux")]
+		public void TrustedNativeDirectory_UsesPerProcessDirectoriesAndResolvesDotDotLinks()
+		{
+			var root = Path.Combine(AppContext.BaseDirectory, "trust-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(Path.Combine(root, "bundle", "native"));
+			Directory.CreateDirectory(Path.Combine(root, "bundle", "shared"));
+			try
+			{
+				var lib = Path.Combine(root, "bundle", "shared", "libgit2.so.1.9");
+				File.WriteAllText(lib, "x");
+				File.SetUnixFileMode(lib, (UnixFileMode)0x1A4);
+				File.CreateSymbolicLink(Path.Combine(root, "bundle", "native", "libgit2.so.1.9"), "../shared/libgit2.so.1.9");
+
+				var cache = Path.Combine(root, "cache");
+				var first = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(cache, ["Files", "native"], "git2-x.so", Path.Combine(root, "bundle", "native", "libgit2.so.1.9"));
+				var second = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(cache, ["Files", "native"], "git2-x.so", lib);
+				Assert.IsNotNull(first, "a '..' symlink target inside a trusted bundle must resolve");
+				Assert.IsNotNull(second);
+				Assert.AreNotEqual(first, second, "every call (every process) gets its own link directory");
+				Assert.IsTrue(File.Exists(Path.Combine(first, "git2-x.so")) && File.Exists(Path.Combine(second, "git2-x.so")));
+
+				// Directories of dead processes are removed, live ones are kept
+				var native = Path.Combine(cache, "Files", "native");
+				var stale = Path.Combine(native, "4194300-deadbeef");
+				Directory.CreateDirectory(stale);
+				File.CreateSymbolicLink(Path.Combine(stale, "git2-x.so"), "/proc/self/fd/9");
+				Assert.IsFalse(Directory.Exists("/proc/4194300"));
+				Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(cache, ["Files", "native"], "git2-x.so", lib);
+				Assert.IsFalse(Directory.Exists(stale));
+				Assert.IsTrue(File.Exists(Path.Combine(first, "git2-x.so")));
+			}
+			finally
+			{
+				Directory.Delete(root, recursive: true);
+			}
+		}
+
+		[TestMethod]
 		public async Task GitDirectoryResolver_IgnoresFifoOversizedAndCyclicControlFiles()
 		{
 			var fifoRepo = Path.Combine(_root, "fifo");

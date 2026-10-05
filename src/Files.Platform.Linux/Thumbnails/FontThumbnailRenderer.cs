@@ -1,6 +1,8 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Linux.Native;
+using Files.Platform.Linux.Previews;
 using SkiaSharp;
 using System;
 using System.IO;
@@ -8,11 +10,49 @@ using System.IO;
 namespace Files.Platform.Linux.Thumbnails
 {
 	/// <summary>
-	/// Renders a sample glyph pair of a font file to a square PNG.
+	/// Renders a sample glyph pair of a font file to a square PNG. Only fonts installed system-wide (root-owned file
+	/// in root-owned directories) are parsed in-process; any other font is untrusted and must go through the
+	/// sandboxed external thumbnailer path instead.
 	/// </summary>
 	public static class FontThumbnailRenderer
 	{
 		private const long MaxFontBytes = 64L * 1024 * 1024;
+
+		private static readonly string[] TrustedRoots = ["/usr/share/fonts", "/usr/local/share/fonts"];
+
+		/// <summary>
+		/// Gets whether <paramref name="path"/> lies under a system font directory with every ancestor owned by root and not group/world writable.
+		/// </summary>
+		public static bool IsSystemInstalledFontPath(string path)
+		{
+			try
+			{
+				var full = Path.GetFullPath(path);
+				var resolved = new FileInfo(full).ResolveLinkTarget(true)?.FullName ?? full;
+				foreach (var candidate in new[] { full, resolved })
+				{
+					var root = Array.Find(TrustedRoots, r => candidate.StartsWith(r + "/", StringComparison.Ordinal));
+					if (root is null)
+						return false;
+				}
+
+				// Directories from / down to the file's parent must be root-owned and not writable by others
+				for (var dir = Path.GetDirectoryName(resolved); !string.IsNullOrEmpty(dir); dir = Path.GetDirectoryName(dir))
+				{
+					if (!IsRootOwnedAndLocked(dir))
+						return false;
+				}
+
+				return true;
+			}
+			catch (Exception)
+			{
+				return false;
+			}
+		}
+
+		private static bool IsRootOwnedAndLocked(string path)
+			=> PosixNative.TryStat(PosixNative.AtFdCwd, path, 0, out var st) && st.OwnerUserId == 0 && (st.Mode & 0x12) == 0;
 
 		/// <summary>
 		/// Renders "Aa" in the font at <paramref name="path"/>, or returns <see langword="null"/> when the file is not a loadable font.
@@ -22,11 +62,18 @@ namespace Files.Platform.Linux.Thumbnails
 			pixelSize = Math.Clamp(pixelSize, 16, 512);
 			try
 			{
-				var info = new FileInfo(path);
-				if (!info.Exists || info.Length is 0 or > MaxFontBytes)
+				if (!IsSystemInstalledFontPath(path))
 					return null;
 
-				using var typeface = SKTypeface.FromFile(path);
+				// Pin the target, require a regular file, then read through the pinned descriptor
+				using var stream = PreviewFile.OpenRead(path);
+				if (stream.Length is 0 or > MaxFontBytes
+					|| !PosixNative.TryStat((int)stream.SafeFileHandle.DangerousGetHandle(), out var st)
+					|| st.OwnerUserId != 0 || (st.Mode & 0x12) != 0)
+					return null;
+
+				using var data0 = SKData.Create(stream);
+				using var typeface = SKTypeface.FromData(data0);
 				if (typeface is null)
 					return null;
 

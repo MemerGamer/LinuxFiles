@@ -29,6 +29,26 @@ namespace Files.Platform.Tests.Thumbnails
 		}
 
 		[TestMethod]
+		public void RefusesUntrustedFontEvenWhenValid()
+		{
+			var system = new[] { "/usr/share/fonts" }.Where(Directory.Exists)
+				.SelectMany(d => Directory.EnumerateFiles(d, "*.ttf", SearchOption.AllDirectories).Take(1)).FirstOrDefault();
+			if (system is null)
+				Assert.Inconclusive("No system font installed");
+			var copy = Path.Combine(Path.GetTempPath(), "files-font-" + Guid.NewGuid().ToString("N") + ".ttf");
+			File.Copy(system, copy);
+			try
+			{
+				Assert.IsFalse(FontThumbnailRenderer.IsSystemInstalledFontPath(copy));
+				Assert.IsNull(FontThumbnailRenderer.RenderToPng(copy, 64));
+			}
+			finally
+			{
+				File.Delete(copy);
+			}
+		}
+
+		[TestMethod]
 		public void ReturnsNullForMissingFile()
 		{
 			Assert.IsNull(FontThumbnailRenderer.RenderToPng("/nonexistent/none.ttf", 64));

@@ -485,6 +485,7 @@ namespace Files.Platform.Linux.Trash
 
 			_options.BeforeRestoreMove?.Invoke(item.TrashedPath, destination);
 			cancellationToken.ThrowIfCancellationRequested();
+			PosixStat? copiedSource = null;
 			if (!PosixNative.TryRenameAt(files.Descriptor, name, parent.Descriptor, destinationName, false, out var errno, _options.FileOperationsHooks))
 			{
 				if (!PosixNative.IsCrossDevice(errno))
@@ -492,21 +493,50 @@ namespace Files.Platform.Linux.Trash
 				var sourceStat = PosixNative.StatAt(files.Descriptor, name, item.TrashedPath);
 				var operations = new LinuxFileOperationsService(null, _options.FileOperationsHooks);
 				await operations.CopyRestoreEntryAsync(item.TrashedPath, destination, files, parent, cancellationToken).ConfigureAwait(false);
-				cancellationToken.ThrowIfCancellationRequested();
-				if (!PosixNative.SameEntry(sourceStat, PosixNative.StatAt(files.Descriptor, name, item.TrashedPath)))
-					throw new IOException("The trashed item changed while it was being restored.");
-				files.DeleteEntry(name);
+				copiedSource = sourceStat;
 			}
+
+			// Publication commits the restore. Retire metadata before deleting any remaining trash data
+			// so a cleanup failure cannot offer the already-restored item for restoration again.
+			string? warning = null;
+			var retiredInfo = ".files-restored-" + Guid.NewGuid().ToString("N");
+			var infoName = name + TrashInfoFile.Extension;
 			try
 			{
-				PosixNative.UnlinkAt(info.Descriptor, name + TrashInfoFile.Extension, 0, infoPath);
+				PosixNative.RenameAt(info.Descriptor, infoName, info.Descriptor, retiredInfo, false, infoPath);
+				infoName = retiredInfo;
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
+				warning = "The item was restored, but trash metadata could not be retired: " + ex.Message;
+			}
+
+			if (copiedSource is { } expected)
+			{
+				try
+				{
+					_options.FileOperationsHooks?.BeforeDeleteEntry?.Invoke(item.TrashedPath);
+					if (!PosixNative.SameEntry(expected, PosixNative.StatAt(files.Descriptor, name, item.TrashedPath)))
+						throw new IOException("The trashed item changed while it was being restored.");
+					files.DeleteEntry(name);
+				}
+				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or OperationCanceledException)
+				{
+					warning = "The item was restored, but a copy remains in the trash: " + ex.Message;
+				}
+			}
+			try
+			{
+				PosixNative.UnlinkAt(info.Descriptor, infoName, 0, infoPath);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				warning = (warning is null ? "The item was restored, but trash metadata cleanup failed: " : warning + " Metadata cleanup failed: ") + ex.Message;
 			}
 			new DirectorySizesCache(location.Root, trashRoot).Remove([name]);
 
-			return TrashOperationResult.Success(item.TrashedPath, destination);
+			// Successful restores may carry a cleanup warning in ErrorMessage; ResultPath remains usable.
+			return new TrashOperationResult(item.TrashedPath, true, warning, destination);
 		}
 
 		private TrashOperationResult DeleteOne(TrashItem item)

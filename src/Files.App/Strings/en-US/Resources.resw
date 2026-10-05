@@ -4967,4 +4967,8 @@
     <value>"{0}" could not be installed. Make sure it is a valid font file.</value>
     <comment>Shown when installing a font on Linux.</comment>
   </data>
+  <data name="LinuxAppDisplayName" xml:space="preserve">
+    <value>LinuxFiles</value>
+    <comment>Display name of the Linux port, shown in the window title and About page on Linux.</comment>
+  </data>
 </root>

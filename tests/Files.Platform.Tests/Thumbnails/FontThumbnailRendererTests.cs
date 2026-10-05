@@ -59,10 +59,10 @@ namespace Files.Platform.Tests.Thumbnails
 		{
 			var font = new[] { "/usr/share/fonts", "/usr/share/fonts/truetype" }
 				.Where(Directory.Exists)
-				.SelectMany(d => Directory.EnumerateFiles(d, "*.ttf", SearchOption.AllDirectories).Take(1))
-				.FirstOrDefault();
+				.SelectMany(d => Directory.EnumerateFiles(d, "*.ttf", SearchOption.AllDirectories).Take(20))
+				.FirstOrDefault(FontThumbnailRenderer.IsSystemInstalledFontPath);
 			if (font is null)
-				Assert.Inconclusive("No system font installed");
+				Assert.Inconclusive("No trusted system font installed");
 
 			var png = FontThumbnailRenderer.RenderToPng(font, 64);
 			Assert.IsNotNull(png);

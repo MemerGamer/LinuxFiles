@@ -5,6 +5,7 @@
         <TargetFramework>$(BaseTargetFramework)</TargetFramework>
         <IsPackable>false</IsPackable>
         <Nullable>enable</Nullable>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <Configurations>Debug;Release</Configurations>
         <DefineConstants>$(DefineConstants);DESKTOP</DefineConstants>
         <Platforms>x86;x64;arm64</Platforms>

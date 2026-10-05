@@ -1,4 +1,4 @@
-commit: 4b3cf79e6
+commit: 8d4ccd67b
 date: 2026-10-05
 captured: home
 captured: folder-details

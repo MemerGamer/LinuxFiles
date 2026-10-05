@@ -17,7 +17,7 @@ namespace Files.App.Storage
 
 		public TaskbarManager()
 		{
-			// LINUX-TODO(taskbar): no taskbar progress on Linux (could map to the Unity LauncherEntry D-Bus API)
+			// LINUX-TODO(taskbar): no-op on Linux; real future work is emitting com.canonical.Unity.LauncherEntry.Update over the Platform DBus session (needs an HWND-free progress abstraction)
 			if (!OperatingSystem.IsWindows())
 				return;
 

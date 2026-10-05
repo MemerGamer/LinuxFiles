@@ -11,6 +11,7 @@ namespace Files.App.Actions
 		private readonly DrivesViewModel drivesViewModel = Ioc.Default.GetRequiredService<DrivesViewModel>();
 
 		public override bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			SidebarContext.IsItemRightClicked &&
 			SidebarContext.RightClickedItem is not null &&
 			SidebarContext.RightClickedItem.Path is not null &&

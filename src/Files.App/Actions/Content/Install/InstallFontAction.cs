@@ -24,6 +24,7 @@ namespace Files.App.Actions
 			=> ActionCategory.Install;
 
 		public bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			context.SelectedItems.Any() &&
 			context.SelectedItems.All(x => FileExtensionHelpers.IsFontFile(x.FileExtension)) &&
 			context.PageType != ContentPageTypes.RecycleBin &&

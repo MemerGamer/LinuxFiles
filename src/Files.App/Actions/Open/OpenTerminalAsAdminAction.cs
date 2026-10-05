@@ -15,6 +15,9 @@ namespace Files.App.Actions
 		public override HotKey HotKey
 			=> new(Keys.Oem3, KeyModifiers.CtrlShift);
 
+		public override bool IsExecutable
+			=> OperatingSystem.IsWindows() && base.IsExecutable;
+
 		protected override ProcessStartInfo? GetProcessStartInfo(string[] paths)
 		{
 			var startInfo = base.GetProcessStartInfo(paths);

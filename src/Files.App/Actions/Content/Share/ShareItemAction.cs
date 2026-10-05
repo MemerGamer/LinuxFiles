@@ -30,7 +30,7 @@ namespace Files.App.Actions
 
 		public bool IsExecutable =>
 			IsContextPageTypeAdaptedToCommand() &&
-			DataTransferManager.IsSupported() &&
+			ShareItemHelpers.IsSupported() &&
 			context.SelectedItems.Any() &&
 			context.SelectedItems.All(ShareItemHelpers.IsItemShareable);
 

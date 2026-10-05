@@ -22,6 +22,7 @@ namespace Files.App.Actions
 			=> new("\uEE3F");
 
 		public override bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			base.IsExecutable &&
 			ContentPageContext.SelectedItem is not null;
 

@@ -389,6 +389,7 @@ namespace Files.App.Data.Factories
 					IsVisible = currentInstanceViewModel.IsPageTypeRecycleBin && itemsSelected,
 				}.Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.OpenItem).Build(),
+				new ContextMenuFlyoutItemViewModelBuilder(Commands.OpenArchiveAsFolder).Build(),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.OpenItemWithApplicationPicker)
 				{
 					Tag = "OpenWith",

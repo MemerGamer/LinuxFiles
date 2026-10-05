@@ -49,6 +49,7 @@ namespace Files.App.Actions
 			return
 				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IPlatformCapabilities>().SupportsShortcutFiles &&
 				App.AppModel.IsPasteEnabled &&
+				context.PageType != ContentPageTypes.ZipFolder &&
 				context.PageType != ContentPageTypes.Home &&
 				context.PageType != ContentPageTypes.RecycleBin &&
 				context.PageType != ContentPageTypes.SearchResults &&

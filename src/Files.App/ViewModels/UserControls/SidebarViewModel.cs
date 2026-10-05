@@ -1304,7 +1304,8 @@ namespace Files.App.ViewModels.UserControls
 					(hasStorageItems && (storageItems.AreItemsAlreadyInFolder(path!) || storageItems.ContainsDestinationOrAncestor(path))) ||
 					path!.StartsWith("Home", StringComparison.OrdinalIgnoreCase) ||
 					path.StartsWith("ReleaseNotes", StringComparison.OrdinalIgnoreCase) ||
-					path.StartsWith("Settings", StringComparison.OrdinalIgnoreCase))
+					path.StartsWith("Settings", StringComparison.OrdinalIgnoreCase) ||
+					ZipStorageFolder.IsZipPath(path))
 				{
 					rawEvent.AcceptedOperation = DataPackageOperation.None;
 				}

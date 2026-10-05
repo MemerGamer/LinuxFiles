@@ -1159,7 +1159,11 @@ namespace Files.App.Views.Layouts
 					// Dropping onto an executable or a script opens the dragged items with it, so only the item itself is rejected there
 					var isOpenWithTarget = item.IsExecutable || item.IsScriptFile;
 
-					if (isOpenWithTarget
+					if (ZipStorageFolder.IsZipPath(item.ItemPath))
+					{
+						e.AcceptedOperation = DataPackageOperation.None;
+					}
+					else if (isOpenWithTarget
 						? draggedItems.ContainsDestinationPath(item.ItemPath)
 						: draggedItems.ContainsDestinationOrAncestor(item.ItemPath))
 					{

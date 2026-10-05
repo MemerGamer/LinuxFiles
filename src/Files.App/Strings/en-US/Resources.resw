@@ -4971,4 +4971,11 @@
     <value>LinuxFiles</value>
     <comment>Display name of the Linux port, shown in the window title and About page on Linux.</comment>
   </data>
+  <data name="OpenArchiveAsFolder" xml:space="preserve">
+    <value>Open as folder</value>
+    <comment>Context menu entry on Linux that browses an archive like a folder.</comment>
+  </data>
+  <data name="OpenArchiveAsFolderDescription" xml:space="preserve">
+    <value>Browse the contents of the selected archive like a folder</value>
+  </data>
 </root>

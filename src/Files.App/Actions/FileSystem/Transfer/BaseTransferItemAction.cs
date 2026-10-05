@@ -10,7 +10,7 @@ namespace Files.App.Actions
 		protected readonly IContentPageContext ContentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
 		protected readonly StatusCenterViewModel StatusCenterViewModel = Ioc.Default.GetRequiredService<StatusCenterViewModel>();
 
-		public bool IsExecutable
+		public virtual bool IsExecutable
 			=> ContentPageContext.HasSelection;
 
 		public BaseTransferItemAction()
@@ -25,7 +25,7 @@ namespace Files.App.Actions
 
 		private void ContentPageContext_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
-			if (e.PropertyName is nameof(IContentPageContext.HasSelection))
+			if (e.PropertyName is nameof(IContentPageContext.HasSelection) or nameof(IContentPageContext.PageType))
 				OnPropertyChanged(nameof(IsExecutable));
 		}
 	}

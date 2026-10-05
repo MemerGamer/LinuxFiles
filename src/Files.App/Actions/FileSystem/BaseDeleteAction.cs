@@ -16,6 +16,7 @@ namespace Files.App.Actions
 
 		public override bool IsExecutable =>
 			context.HasSelection &&
+			context.PageType != ContentPageTypes.ZipFolder &&
 			(!context.ShellPage?.SlimContentPage?.IsRenamingItem ?? false) &&
 			UIHelpers.CanShowDialog;
 
@@ -47,7 +48,7 @@ namespace Files.App.Actions
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
-			if (e.PropertyName is nameof(IContentPageContext.HasSelection))
+			if (e.PropertyName is nameof(IContentPageContext.HasSelection) or nameof(IContentPageContext.PageType))
 				OnPropertyChanged(nameof(IsExecutable));
 		}
 	}

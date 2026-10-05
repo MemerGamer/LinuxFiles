@@ -30,38 +30,21 @@ namespace Files.App.Utils.Storage
 		}
 
 		public static bool VerifyFtpPath(string path)
-		{
-			var authority = GetFtpAuthority(path);
-			var index = authority.IndexOf(':', StringComparison.Ordinal);
-
-			return index == -1 || ushort.TryParse(authority.AsSpan(index + 1), out _);
-		}
+			=> Files.App.Storage.FtpUrl.TryParse(path, out _);
 
 		public static string GetFtpHost(string path)
-		{
-			var authority = GetFtpAuthority(path);
-			var index = authority.IndexOf(':', StringComparison.Ordinal);
-
-			return index == -1 ? authority : authority.Substring(0, index);
-		}
+			=> Files.App.Storage.FtpUrl.Parse(path).Host;
 
 		public static ushort GetFtpPort(string path)
-		{
-			var authority = GetFtpAuthority(path);
-			var index = authority.IndexOf(':', StringComparison.Ordinal);
-
-			if (index == -1)
-				return path.StartsWith("ftps://", StringComparison.OrdinalIgnoreCase) ? (ushort)990 : (ushort)21;
-
-			return ushort.Parse(authority.Substring(index + 1));
-		}
+			=> Files.App.Storage.FtpUrl.Parse(path).Port;
 
 		public static string GetFtpAuthority(string path)
 		{
-			path = path.Replace('\\', '/');
-			if (Uri.TryCreate(path, UriKind.Absolute, out var uri))
-				return uri.Authority;
-			return string.Empty;
+			if (!Files.App.Storage.FtpUrl.TryParse(path, out var url))
+				return string.Empty;
+
+			var host = url.Host.Contains(':') ? $"[{url.Host}]" : url.Host;
+			return url.ExplicitPort is { } port ? $"{host}:{port}" : host;
 		}
 
 		public static string GetFtpPath(string path)

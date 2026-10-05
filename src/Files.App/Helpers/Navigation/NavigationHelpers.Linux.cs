@@ -45,9 +45,23 @@ namespace Files.App.Helpers
 						return true;
 					}
 
-					// LINUX-TODO(archives): open archive members by extracting them to a private temporary copy first
-					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
-					return false;
+					if (resolved.Item is not OwlCore.Storage.IFile member)
+					{
+						await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
+						return false;
+					}
+
+					// Extract only this entry (size and ratio limits apply in the archive service) and open the private copy,
+					// so the usual confirmation gates see a real file
+					var temporaryPath = await ExtractArchiveMemberAsync(member);
+					if (temporaryPath is null)
+						return false;
+
+					var openedMember = await OpenFileLinuxAsync(temporaryPath, openViaApplicationPicker);
+					if (!openedMember)
+						await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
+
+					return openedMember;
 				}
 
 				if (!File.Exists(path))
@@ -64,10 +78,46 @@ namespace Files.App.Helpers
 
 				return opened;
 			}
-			catch (Exception ex) when (ex is not OperationCanceledException)
+			catch (OperationCanceledException)
+			{
+				return true;
+			}
+			catch (Exception ex)
 			{
 				App.Logger.LogWarning(ex, "Failed to open {Path}", path);
 				return false;
+			}
+		}
+
+		private static async Task<string?> ExtractArchiveMemberAsync(OwlCore.Storage.IFile member)
+		{
+			var name = member is Files.App.Storage.Archives.ArchiveEntryFile entry ? entry.Entry.Path : member.Name;
+			string? target = null;
+			try
+			{
+				target = ArchiveOpenTempStore.CreateFilePath(name);
+				await using var input = await member.OpenReadAsync();
+				await using var output = new FileStream(target, new FileStreamOptions
+				{
+					Mode = FileMode.CreateNew,
+					Access = FileAccess.Write,
+					UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+				});
+				await input.CopyToAsync(output);
+				return target;
+			}
+			catch (OperationCanceledException)
+			{
+				// Password prompt cancelled by the user
+				if (target is not null)
+					ArchiveOpenTempStore.Discard(target);
+				return null;
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Failed to extract archive member {Name}", DisplaySanitizer.Field(name));
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(name)));
+				return null;
 			}
 		}
 

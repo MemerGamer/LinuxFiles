@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Regenerate packaging/linux/icons/hicolor from the Files logo tiles (no SVG source exists in the repo),
+# Regenerate packaging/linux/icons/hicolor from the Files logo tile (no SVG source of the base icon exists in the repo),
 # with a small penguin badge in the bottom-right corner so LinuxFiles is distinct from the official Files icon.
-# Requires ImageMagick (`convert` or `magick`).
+# Requires ImageMagick (`convert` or `magick`) and rsvg-convert.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -11,33 +11,25 @@ name="io.github.memergamer.LinuxFiles.png"
 im="magick"
 command -v magick >/dev/null || im="convert"
 
-# Native small sizes shipped by the app.
-for s in 16 24 32 48 256; do
+# Every size is downscaled from the 600x600 tile with a high-quality filter (the shipped small tiles are paletted and look pixelated).
+# The tile has wide transparent padding: trim it, then re-pad to a square with a small margin so the glyph fills the icon.
+base="$(mktemp --suffix=.png)"
+trap 'rm -f "$base"' EXIT
+$im "$src/Square150x150Logo.scale-400.png" -trim +repage -background none -gravity center -extent "%[fx:max(w,h)]x%[fx:max(w,h)]" \
+  -bordercolor none -border 4% "$base"
+for s in 16 24 32 48 64 128 256 512; do
   mkdir -p "$dst/${s}x${s}/apps"
-  cp "$src/Square44x44Logo.targetsize-$s.png" "$dst/${s}x${s}/apps/$name"
+  $im "$base" -filter Lanczos -define filter:blur=0.9 -resize "${s}x${s}" "$dst/${s}x${s}/apps/$name"
 done
 
-# Remaining sizes downscaled from the 600x600 tile.
-for s in 64 128 512; do
-  mkdir -p "$dst/${s}x${s}/apps"
-  $im "$src/Square150x150Logo.scale-400.png" -filter Lanczos -resize "${s}x${s}" "$dst/${s}x${s}/apps/$name"
-done
-
-# Badge: simple penguin drawn on a 100x100 canvas, composited bottom-right at ~46% of the icon size.
-badge="$(mktemp --suffix=.png)"
-trap 'rm -f "$badge"' EXIT
-$im -size 100x100 xc:none \
-  -fill '#ffffff' -stroke '#1b1b1b' -strokewidth 4 -draw 'circle 50,50 50,3' \
-  -stroke none -fill '#1b1b1b' -draw 'ellipse 50,56 24,34 0,360' \
-  -fill '#ffffff' -draw 'ellipse 50,62 14,25 0,360' \
-  -fill '#ffffff' -draw 'circle 41,34 41,28' -draw 'circle 59,34 59,28' \
-  -fill '#1b1b1b' -draw 'circle 42,34 42,31' -draw 'circle 58,34 58,31' \
-  -fill '#f5a623' -draw 'polygon 43,42 57,42 50,50' \
-  -draw 'ellipse 38,88 11,5 0,360' -draw 'ellipse 62,88 11,5 0,360' \
-  "$badge"
-
+# Badge: vector penguin (packaging/linux/icons/penguin-badge.svg) rasterised directly at its final pixel size, so it stays crisp.
+# Icons up to 24px use a simplified badge; small icons get a proportionally larger badge to keep it readable.
 for f in "$dst"/*/apps/"$name"; do
   s="$(basename "$(dirname "$(dirname "$f")")")"; s="${s%%x*}"
-  b=$(( s * 46 / 100 ))
-  $im "$f" \( "$badge" -filter Lanczos -resize "${b}x${b}" \) -gravity southeast -compose over -composite "$f"
+  if (( s <= 32 )); then b=$(( s * 56 / 100 )); else b=$(( s * 46 / 100 )); fi
+  badge="$(mktemp --suffix=.png)"
+  svg=penguin-badge.svg; (( s <= 24 )) && svg=penguin-badge-small.svg
+  rsvg-convert -w "$b" -h "$b" "$root/packaging/linux/icons/$svg" -o "$badge"
+  $im "$f" "$badge" -gravity southeast -compose over -composite "PNG32:$f"
+  rm -f "$badge"
 done

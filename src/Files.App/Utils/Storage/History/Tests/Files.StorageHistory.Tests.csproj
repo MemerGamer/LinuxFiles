@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>$(BaseTargetFramework)</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<UseAppHost>false</UseAppHost>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<DefineConstants>$(DefineConstants);STORAGE_HISTORY_TESTS</DefineConstants>
+		<IsPackable>false</IsPackable>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="MSTest.TestAdapter" />
+		<PackageReference Include="MSTest.TestFramework" />
+		<PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
+		<PackageReference Include="Microsoft.Extensions.Logging" />
+		<PackageReference Include="CommunityToolkit.Mvvm" />
+		<PackageReference Include="Uno.WinUI" />
+		<ProjectReference Include="../../../../../Files.Platform.Linux/Files.Platform.Linux.csproj" />
+		<ProjectReference Include="../../../../../Files.Core.Storage/Files.Core.Storage.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Include="../IStorageHistory*.cs;../StorageHistory.cs;../StorageHistoryOperations.cs;../StorageHistoryWrapper.cs" LinkBase="History" />
+		<Compile Include="../../Operations/IFilesystem*.cs;../../Operations/LinuxFilesystemOperations.cs;../../Operations/FilesystemOperationsFactory.cs" LinkBase="Operations" />
+		<Compile Include="../../Helpers/IStorageItemWithPath.cs;../../Helpers/StorableWithPath.cs;../../Helpers/ErrorCodeConverter.cs" LinkBase="Helpers" />
+		<Compile Include="../../../../Helpers/IntervalSampler.cs;../../../../Helpers/EnumConversionHelpers.cs" LinkBase="Helpers" />
+		<Compile Include="../../../StatusCenter/StatusCenterItemProgressModel.cs" Link="StatusCenterItemProgressModel.cs" />
+		<Compile Include="../../../../Data/Enums/FileOperationType.cs;../../../../Data/Enums/FilesystemItemType.cs;../../../../Data/Enums/FileNameConflictResolveOptionType.cs;../../../../Data/Enums/FileSystemStatusCode.cs;../../../../Data/Enums/ReturnResult.cs;../../../../Data/Enums/DeleteConfirmationPolicy.cs" LinkBase="Enums" />
+	</ItemGroup>
+</Project>

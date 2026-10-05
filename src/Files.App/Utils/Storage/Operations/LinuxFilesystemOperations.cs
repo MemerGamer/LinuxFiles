@@ -15,14 +15,21 @@ namespace Files.App.Utils.Storage
 	/// </summary>
 	public sealed class LinuxFilesystemOperations : IFilesystemOperations
 	{
-		private readonly IFileOperationsService _fileOperations = Ioc.Default.GetRequiredService<IFileOperationsService>();
+		private readonly IFileOperationsService _fileOperations;
 
-		private readonly ITrashService _trash = Ioc.Default.GetRequiredService<ITrashService>();
+		private readonly ITrashService _trash;
 
 		private readonly IShellPage? _associatedInstance;
 
 		public LinuxFilesystemOperations(IShellPage? associatedInstance)
+			: this(Ioc.Default.GetRequiredService<IFileOperationsService>(), Ioc.Default.GetRequiredService<ITrashService>(), associatedInstance)
 		{
+		}
+
+		internal LinuxFilesystemOperations(IFileOperationsService fileOperations, ITrashService trash, IShellPage? associatedInstance = null)
+		{
+			_fileOperations = fileOperations;
+			_trash = trash;
 			_associatedInstance = associatedInstance;
 		}
 
@@ -107,7 +114,7 @@ namespace Files.App.Utils.Storage
 		}
 
 		private static IStorageItemWithPath FromResult(string path, FilesystemItemType type)
-			=> StorageHelpers.FromPathAndType(path, type);
+			=> new StorableWithPath(path, type);
 
 		private async Task RemoveFromViewAsync(string path)
 		{
@@ -124,6 +131,7 @@ namespace Files.App.Utils.Storage
 			}
 		}
 
+		// LINUX-TODO(storage): migrate the creation result with UIFilesystemHelpers in P4-H.
 		public async Task<(IStorageHistory?, IStorageItem?)> CreateAsync(IStorageItemWithPath source, IProgress<StatusCenterItemProgressModel> process, CancellationToken cancellationToken, bool asAdmin = false)
 		{
 			StatusCenterItemProgressModel fsProgress = new(process, true, FileSystemStatusCode.InProgress, 1);
@@ -202,28 +210,36 @@ namespace Files.App.Utils.Storage
 			return new StorageHistory(FileOperationType.CreateLink, createdSources, createdDestination);
 		}
 
+#if WINDOWS
 		public Task<IStorageHistory?> CopyAsync(IStorageItem source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> CopyAsync(source.FromStorageItem() ?? throw new InvalidOperationException("The storage item could not be converted for copying."), destination, collision, progress, cancellationToken);
+#endif
 
 		public Task<IStorageHistory?> CopyAsync(IStorageItemWithPath source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> CopyItemsAsync(source.CreateList(), destination.CreateList(), collision.ConvertBack().CreateList(), progress, cancellationToken);
 
+#if WINDOWS
 		public async Task<IStorageHistory?> CopyItemsAsync(IList<IStorageItem> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> await CopyItemsAsync(await source.Select(item => item.FromStorageItem()
 				?? throw new InvalidOperationException("A storage item could not be converted for copying.")).ToListAsync(), destination, collisions, progress, cancellationToken);
+#endif
 
 		public Task<IStorageHistory?> CopyItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken, bool asAdmin = false)
 			=> TransferAsync(false, source, destination, collisions, progress, cancellationToken);
 
+#if WINDOWS
 		public Task<IStorageHistory?> MoveAsync(IStorageItem source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> MoveAsync(source.FromStorageItem() ?? throw new InvalidOperationException("The storage item could not be converted for moving."), destination, collision, progress, cancellationToken);
+#endif
 
 		public Task<IStorageHistory?> MoveAsync(IStorageItemWithPath source, string destination, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> MoveItemsAsync(source.CreateList(), destination.CreateList(), collision.ConvertBack().CreateList(), progress, cancellationToken);
 
+#if WINDOWS
 		public async Task<IStorageHistory?> MoveItemsAsync(IList<IStorageItem> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> await MoveItemsAsync(await source.Select(item => item.FromStorageItem()
 				?? throw new InvalidOperationException("A storage item could not be converted for moving.")).ToListAsync(), destination, collisions, progress, cancellationToken);
+#endif
 
 		public Task<IStorageHistory?> MoveItemsAsync(IList<IStorageItemWithPath> source, IList<string> destination, IList<FileNameConflictResolveOptionType> collisions, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken, bool asAdmin = false)
 			=> TransferAsync(true, source, destination, collisions, progress, cancellationToken);
@@ -347,15 +363,19 @@ namespace Files.App.Utils.Storage
 			return new StorageHistory(move ? FileOperationType.Move : FileOperationType.Copy, doneSources, doneDestinations);
 		}
 
+#if WINDOWS
 		public Task<IStorageHistory?> DeleteAsync(IStorageItem source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken cancellationToken)
 			=> DeleteAsync(source.FromStorageItem() ?? throw new InvalidOperationException("The storage item could not be converted for deletion."), progress, permanently, cancellationToken);
+#endif
 
 		public Task<IStorageHistory?> DeleteAsync(IStorageItemWithPath source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken cancellationToken)
 			=> DeleteItemsAsync(source.CreateList(), progress, permanently, cancellationToken);
 
+#if WINDOWS
 		public async Task<IStorageHistory?> DeleteItemsAsync(IList<IStorageItem> source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken cancellationToken)
 			=> await DeleteItemsAsync(await source.Select(item => item.FromStorageItem()
 				?? throw new InvalidOperationException("A storage item could not be converted for deletion.")).ToListAsync(), progress, permanently, cancellationToken);
+#endif
 
 		public async Task<IStorageHistory?> DeleteItemsAsync(IList<IStorageItemWithPath> source, IProgress<StatusCenterItemProgressModel> progress, bool permanently, CancellationToken cancellationToken, bool asAdmin = false)
 		{
@@ -446,17 +466,22 @@ namespace Files.App.Utils.Storage
 			return new StorageHistory(FileOperationType.Delete, succeeded.Select(s => s.Src).ToList(), null);
 		}
 
+#if WINDOWS
 		public Task<IStorageHistory?> RenameAsync(IStorageItem source, string newName, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> RenameAsync(source.FromStorageItem() ?? throw new InvalidOperationException("The storage item could not be converted for renaming."), newName, collision, progress, cancellationToken);
+#endif
 
 		public async Task<IStorageHistory?> RenameAsync(IStorageItemWithPath source, string newName, NameCollisionOption collision, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken, bool asAdmin = false)
 		{
 			StatusCenterItemProgressModel fsProgress = new(progress, true, FileSystemStatusCode.InProgress);
 			fsProgress.Report();
 
-			var options = collision == NameCollisionOption.ReplaceExisting
-				? OptionsFor(FileNameConflictResolveOptionType.ReplaceExisting, null)
-				: null;
+			var options = collision switch
+			{
+				NameCollisionOption.ReplaceExisting => OptionsFor(FileNameConflictResolveOptionType.ReplaceExisting, null),
+				NameCollisionOption.GenerateUniqueName => OptionsFor(FileNameConflictResolveOptionType.GenerateNewName, null),
+				_ => null,
+			};
 
 			var result = await _fileOperations.RenameAsync(source.Path, newName, options, cancellationToken);
 			if (!result.Succeeded || result.ResultPath is null)
@@ -477,12 +502,16 @@ namespace Files.App.Utils.Storage
 			return new StorageHistory(FileOperationType.Rename, source, FromResult(result.ResultPath, source.ItemType));
 		}
 
+#if WINDOWS
 		public Task<IStorageHistory?> RestoreItemsFromTrashAsync(IList<IStorageItem> source, IList<string> destination, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> RestoreItemsFromTrashAsync(source.Select(item => item.FromStorageItem()
 				?? throw new InvalidOperationException("A storage item could not be converted for restoration.")).ToList(), destination, progress, cancellationToken);
+#endif
 
+#if WINDOWS
 		public Task<IStorageHistory?> RestoreFromTrashAsync(IStorageItem source, string destination, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> RestoreFromTrashAsync(source.FromStorageItem() ?? throw new InvalidOperationException("The storage item could not be converted for restoration."), destination, progress, cancellationToken);
+#endif
 
 		public Task<IStorageHistory?> RestoreFromTrashAsync(IStorageItemWithPath source, string destination, IProgress<StatusCenterItemProgressModel> progress, CancellationToken cancellationToken)
 			=> RestoreItemsFromTrashAsync(source.CreateList(), destination.CreateList(), progress, cancellationToken);

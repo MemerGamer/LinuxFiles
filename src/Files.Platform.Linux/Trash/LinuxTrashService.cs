@@ -5,6 +5,7 @@
 #pragma warning disable CA1416
 
 using Files.Platform.Abstractions.Trash;
+using Files.Platform.Linux.Native;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -427,48 +428,61 @@ namespace Files.Platform.Linux.Trash
 			if (!TryGetItemLocation(item, out var location, out var name, out var infoPath))
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
-			if (!EntryExists(item.TrashedPath))
+			using var trashRoot = DirectoryHandle.OpenPath(Path.Combine(RealPath(Path.GetDirectoryName(location.Root)!), Path.GetFileName(location.Root)));
+			using var files = DirectoryHandle.OpenChild(trashRoot.Descriptor, FilesDirectoryName, location.FilesDirectory);
+			using var info = DirectoryHandle.OpenChild(trashRoot.Descriptor, InfoDirectoryName, location.InfoDirectory);
+			if (!files.EntryExists(name))
 				return TrashOperationResult.Failure(item.TrashedPath, "The trashed item no longer exists.");
 
-			// The destination is always re-derived from the .trashinfo; the caller-supplied item is not trusted.
-			if (!TrashInfoFile.TryParse(File.ReadAllText(infoPath), out var storedPath, out _))
+			// Re-derive the destination from the pinned .trashinfo, never from the caller-supplied item.
+			using var infoStream = PosixNative.OpenFileAt(info.Descriptor, name + TrashInfoFile.Extension, infoPath, false);
+			using var reader = new StreamReader(infoStream);
+			if (!TrashInfoFile.TryParse(reader.ReadToEnd(), out var storedPath, out _))
 				return TrashOperationResult.Failure(item.TrashedPath, "The .trashinfo file is invalid.");
 
 			var destination = ResolveOriginalPath(location, storedPath, out var invalidReason);
 			if (destination is null)
 				return TrashOperationResult.Failure(item.TrashedPath, invalidReason!);
 
-			var parent = Path.GetDirectoryName(destination)!;
-			if (location.TopDirectory is not null &&
-				!MountInfoMountResolver.IsUnder(RealPath(parent), RealPath(location.TopDirectory)))
-			{
+			var parentPath = RealPath(Path.GetDirectoryName(destination)!);
+			var topPath = location.TopDirectory is null ? null : RealPath(location.TopDirectory);
+			if (topPath is not null && !MountInfoMountResolver.IsUnder(parentPath, topPath))
 				return TrashOperationResult.Failure(item.TrashedPath, OutsideVolumeMessage);
-			}
 
-			if (EntryExists(destination))
+			using var top = topPath is null ? null : DirectoryHandle.OpenPath(topPath);
+			using var parent = top is null
+				? DirectoryHandle.OpenPath(parentPath, create: true)
+				: top.OpenRelativePath(Path.GetRelativePath(topPath!, parentPath), create: true);
+			if (top is not null && (!PosixNative.TryStat(top.Descriptor, out var topStat) || !parent.IsSameOrInside(topStat)))
+				return TrashOperationResult.Failure(item.TrashedPath, OutsideVolumeMessage);
+
+			var destinationName = Path.GetFileName(destination);
+			if (parent.EntryExists(destinationName))
 			{
 				switch (conflictBehavior)
 				{
 					case TrashRestoreConflictBehavior.Replace:
-						DeleteEntry(destination);
+						parent.DeleteEntry(destinationName);
 						break;
 					case TrashRestoreConflictBehavior.KeepBoth:
-						destination = GetUniqueDestination(destination);
+						destination = GetUniqueDestination(destination, parent);
+						destinationName = Path.GetFileName(destination);
 						break;
 					default:
 						return TrashOperationResult.Failure(item.TrashedPath, "The destination already exists.");
 				}
 			}
 
-			Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-
-			if (IsDirectoryEntry(item.TrashedPath))
-				Directory.Move(item.TrashedPath, destination);
-			else
-				File.Move(item.TrashedPath, destination);
-
-			TryDelete(infoPath);
-			new DirectorySizesCache(location.Root).Remove([name]);
+			_options.BeforeRestoreMove?.Invoke(item.TrashedPath, destination);
+			PosixNative.RenameAt(files.Descriptor, name, parent.Descriptor, destinationName, false, destination);
+			try
+			{
+				PosixNative.UnlinkAt(info.Descriptor, name + TrashInfoFile.Extension, 0, infoPath);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+			}
+			new DirectorySizesCache(location.Root, trashRoot).Remove([name]);
 
 			return TrashOperationResult.Success(item.TrashedPath, destination);
 		}
@@ -552,7 +566,7 @@ namespace Files.Platform.Linux.Trash
 			return candidate;
 		}
 
-		private static string GetUniqueDestination(string destination)
+		private static string GetUniqueDestination(string destination, DirectoryHandle parent)
 		{
 			var directory = Path.GetDirectoryName(destination)!;
 			var stem = Path.GetFileNameWithoutExtension(destination);
@@ -561,7 +575,7 @@ namespace Files.Platform.Linux.Trash
 			for (var i = 2; i < MaxUniqueNameAttempts; i++)
 			{
 				var candidate = Path.Combine(directory, $"{stem} ({i.ToString(CultureInfo.InvariantCulture)}){extension}");
-				if (!EntryExists(candidate))
+				if (!parent.EntryExists(Path.GetFileName(candidate)))
 					return candidate;
 			}
 

@@ -38,6 +38,9 @@ namespace Files.Platform.Linux.Trash
 		/// </summary>
 		public Func<DateTime> LocalNow { get; set; } = () => DateTime.Now;
 
+		/// <summary>Diagnostic seam invoked with both parents pinned, immediately before a restore acts.</summary>
+		public Action<string, string>? BeforeRestoreMove { get; set; }
+
 		private static string GetDefaultDataHome()
 		{
 			var xdg = Environment.GetEnvironmentVariable("XDG_DATA_HOME");

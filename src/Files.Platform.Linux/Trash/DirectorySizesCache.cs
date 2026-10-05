@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Linux.Native;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -18,10 +19,12 @@ namespace Files.Platform.Linux.Trash
 		private static readonly object Gate = new();
 
 		private readonly string _path;
+		private readonly DirectoryHandle? _directory;
 
-		public DirectorySizesCache(string trashRoot)
+		public DirectorySizesCache(string trashRoot, DirectoryHandle? directory = null)
 		{
 			_path = Path.Combine(trashRoot, "directorysizes");
+			_directory = directory;
 		}
 
 		public bool TryGet(string name, long infoMtime, out long size)
@@ -86,10 +89,12 @@ namespace Files.Platform.Linux.Trash
 
 			try
 			{
-				if (!File.Exists(_path))
+				if (_directory is null && !File.Exists(_path))
 					return entries;
 
-				foreach (var line in File.ReadLines(_path))
+				using var stream = _directory is null ? File.OpenRead(_path) : PosixNative.OpenFileAt(_directory.Descriptor, "directorysizes", _path, false);
+				using var reader = new StreamReader(stream);
+				while (reader.ReadLine() is { } line)
 				{
 					var parts = line.Split(' ', 3);
 					if (parts.Length == 3 &&
@@ -124,8 +129,39 @@ namespace Files.Platform.Linux.Trash
 				}
 
 				var temp = _path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-				File.WriteAllText(temp, builder.ToString(), new UTF8Encoding(false));
-				File.Move(temp, _path, overwrite: true);
+				if (_directory is null)
+				{
+					File.WriteAllText(temp, builder.ToString(), new UTF8Encoding(false));
+					File.Move(temp, _path, overwrite: true);
+				}
+				else
+				{
+					var name = Path.GetFileName(temp);
+					var created = false;
+					try
+					{
+						using (var output = PosixNative.OpenFileAt(_directory.Descriptor, name, temp, true))
+						{
+							created = true;
+							using var writer = new StreamWriter(output, new UTF8Encoding(false));
+							writer.Write(builder.ToString());
+						}
+						PosixNative.RenameAt(_directory.Descriptor, name, _directory.Descriptor, "directorysizes", true, _path);
+					}
+					finally
+					{
+						if (created)
+						{
+							try
+							{
+								PosixNative.UnlinkAt(_directory.Descriptor, name, 0, temp);
+							}
+							catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+							{
+							}
+						}
+					}
+				}
 			}
 			catch (IOException)
 			{

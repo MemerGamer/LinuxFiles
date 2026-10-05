@@ -163,6 +163,8 @@ namespace Files.Platform.Linux.Native
 			var names = new List<string>();
 			try
 			{
+				// dup shares the directory offset; repeated listings must start at the beginning.
+				rewinddir(stream);
 				while (true)
 				{
 					var entry = readdir(stream);
@@ -217,6 +219,9 @@ namespace Files.Platform.Linux.Native
 
 		[LibraryImport("libc", EntryPoint = "closedir")]
 		private static partial int closedir(nint stream);
+
+		[LibraryImport("libc", EntryPoint = "rewinddir")]
+		private static partial void rewinddir(nint stream);
 	}
 
 	/// <summary>
@@ -247,6 +252,150 @@ namespace Files.Platform.Linux.Native
 		}
 
 		public List<string> ListNames() => PosixNative.ListNames(_fd, Path);
+
+		/// <summary>Walks an already resolved absolute path, refusing links in every component.</summary>
+		public static DirectoryHandle OpenPath(string resolvedPath, bool create = false)
+		{
+			using var root = OpenChild(PosixNative.AtFdCwd, "/", "/");
+			return root.OpenRelativePath(System.IO.Path.GetFullPath(resolvedPath).TrimStart('/'), create);
+		}
+
+		public DirectoryHandle OpenRelativePath(string relativePath, bool create = false)
+		{
+			if (System.IO.Path.IsPathRooted(relativePath))
+				throw new ArgumentException("A relative path is required.", nameof(relativePath));
+			var names = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+			if (Array.Exists(names, name => name == ".."))
+				throw new ArgumentException("The path cannot escape its parent.", nameof(relativePath));
+			var current = OpenChild(_fd, ".", Path);
+			try
+			{
+				foreach (var name in names)
+				{
+					if (name == ".")
+						continue;
+					var path = System.IO.Path.Combine(current.Path, name);
+					var next = TryOpen(current.Descriptor, name, path, true, out var errno);
+					if (next is null && create && PosixNative.IsNotFound(errno))
+					{
+						try
+						{
+							PosixNative.MkdirAt(current.Descriptor, name, 0x1ED, path); // 0755, filtered by umask
+						}
+						catch (IOException ex) when (ex.HResult == 17)
+						{
+							// Another creator won; the no-follow open still validates its entry.
+						}
+						next = TryOpen(current.Descriptor, name, path, true, out errno);
+					}
+					if (next is null)
+						throw PosixNative.CreateException(errno, path);
+					current.Dispose();
+					current = next;
+				}
+				return current;
+			}
+			catch
+			{
+				current.Dispose();
+				throw;
+			}
+		}
+
+		public static DirectoryHandle OpenChild(int parentFd, string name, string displayPath)
+			=> TryOpen(parentFd, name, displayPath, true, out var errno) ?? throw PosixNative.CreateException(errno, displayPath);
+
+		public bool EntryExists(string name)
+		{
+			try
+			{
+				_ = PosixNative.StatAt(_fd, name, System.IO.Path.Combine(Path, name));
+				return true;
+			}
+			catch (FileNotFoundException)
+			{
+				return false;
+			}
+		}
+
+		/// <summary>Removes a consented restore conflict without following directory links.</summary>
+		public void DeleteEntry(string name)
+		{
+			var displayPath = System.IO.Path.Combine(Path, name);
+			var stat = PosixNative.StatAt(_fd, name, displayPath);
+			if (stat.IsDirectory)
+			{
+				using var child = OpenForRemoval(name, stat, displayPath);
+				if (!child.IsSameEntry(stat))
+					throw new IOException($"'{displayPath}' changed while it was being removed.");
+				try
+				{
+					foreach (var childName in child.ListNames())
+						child.DeleteEntry(childName);
+				}
+				catch (UnauthorizedAccessException)
+				{
+					PosixNative.ChangeModeOfDescriptor(child.Descriptor, false, (stat.Mode & 0xFFF) | 0x1C0, displayPath);
+					foreach (var childName in child.ListNames())
+						child.DeleteEntry(childName);
+				}
+				if (!PosixNative.SameEntry(stat, PosixNative.StatAt(_fd, name, displayPath)))
+					throw new IOException($"'{displayPath}' changed while it was being removed.");
+			}
+			PosixNative.UnlinkAt(_fd, name, stat.IsDirectory ? PosixNative.AtRemoveDir : 0, displayPath);
+		}
+
+		private DirectoryHandle OpenForRemoval(string name, PosixStat stat, string displayPath)
+		{
+			var child = TryOpen(_fd, name, displayPath, true, out var errno);
+			if (child is not null)
+				return child;
+			if (errno is not (1 or 13))
+				throw PosixNative.CreateException(errno, displayPath);
+
+			var descriptor = PosixNative.OpenPathAt(_fd, name, out errno);
+			if (descriptor < 0)
+				throw PosixNative.CreateException(errno, displayPath);
+			try
+			{
+				if (!PosixNative.TryStat(descriptor, out var current) || !PosixNative.SameEntry(stat, current))
+					throw new IOException($"'{displayPath}' changed while it was being removed.");
+				PosixNative.ChangeModeOfDescriptor(descriptor, true, (stat.Mode & 0xFFF) | 0x1C0, displayPath);
+			}
+			finally
+			{
+				PosixNative.Close(descriptor);
+			}
+			return OpenChild(_fd, name, displayPath);
+		}
+
+		public bool IsSameEntry(PosixStat stat)
+			=> PosixNative.TryStat(_fd, out var current) && PosixNative.SameEntry(current, stat);
+
+		public bool IsSameOrInside(PosixStat ancestor)
+		{
+			var current = OpenChild(_fd, ".", Path);
+			try
+			{
+				while (true)
+				{
+					if (!PosixNative.TryStat(current.Descriptor, out var stat))
+						throw new IOException($"Cannot inspect '{Path}'.");
+					if (PosixNative.SameEntry(stat, ancestor))
+						return true;
+					var parent = OpenChild(current.Descriptor, "..", Path);
+					var root = parent.IsSameEntry(stat);
+					current.Dispose();
+					current = parent;
+					if (root)
+						return false;
+				}
+			}
+			finally
+			{
+				current.Dispose();
+			}
+		}
 
 		public void Dispose()
 		{

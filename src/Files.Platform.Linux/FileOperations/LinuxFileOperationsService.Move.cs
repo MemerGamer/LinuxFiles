@@ -14,87 +14,72 @@ namespace Files.Platform.Linux.FileOperations
 {
 	public sealed partial class LinuxFileOperationsService
 	{
-		private async Task<Outcome> MoveTopLevelAsync(string source, string destinationDirectory, FileOperationContext context, Func<string, string, bool> isSameDevice)
+		private async Task<Outcome> MoveTopLevelAsync(string source, string destinationDirectory, FileOperationContext context, Func<string, string, bool> isSameDevice, DirectoryHandle sourceParent, DirectoryHandle destinationParent)
 		{
-			var sourceKind = FileSystemEntry.GetKind(source);
-			if (sourceKind == EntryKind.None)
-				return Outcome.Fail(FileOperationErrorKind.NotFound, "The source does not exist.", source);
-
-			var destinationCanonical = FileSystemEntry.Canonicalize(destinationDirectory);
-			if (sourceKind == EntryKind.Directory && FileSystemEntry.IsSameOrInside(destinationCanonical, FileSystemEntry.CanonicalizeEntry(source)))
+			var stat = PosixNative.StatAt(sourceParent.Descriptor, Path.GetFileName(source), source);
+			if (stat.IsDirectory && destinationParent.IsSameOrInside(stat))
 				return Outcome.Fail(FileOperationErrorKind.InvalidDestination, "A folder cannot be moved into itself.", destinationDirectory);
 
-			if (FileSystemEntry.Canonicalize(Path.GetDirectoryName(source)!) == destinationCanonical)
+			if (PosixNative.TryStat(sourceParent.Descriptor, out var parentStat) && destinationParent.IsSameEntry(parentStat))
 			{
-				// Moving into the folder that already contains the item changes nothing
 				context.ItemDone(source);
 				return Outcome.Success(source);
 			}
 
-			return await MoveEntryAsync(source, Path.Combine(destinationDirectory, Path.GetFileName(source)), context, isSameDevice).ConfigureAwait(false);
+			return await MoveEntryAsync(source, Path.Combine(destinationDirectory, Path.GetFileName(source)), sourceParent, destinationParent, context, isSameDevice).ConfigureAwait(false);
 		}
 
-		private async Task<Outcome> MoveEntryAsync(string source, string destination, FileOperationContext context, Func<string, string, bool> isSameDevice)
+		private async Task<Outcome> MoveEntryAsync(string source, string destination, DirectoryHandle sourceParent, DirectoryHandle destinationParent, FileOperationContext context, Func<string, string, bool> isSameDevice)
 		{
 			context.CancellationToken.ThrowIfCancellationRequested();
-
-			var sourceKind = FileSystemEntry.GetKind(source);
-			if (sourceKind == EntryKind.None)
-				return Outcome.Fail(FileOperationErrorKind.NotFound, "The source does not exist.", source);
-
 			try
 			{
+				var name = Path.GetFileName(source);
+				var stat = PosixNative.StatAt(sourceParent.Descriptor, name, source);
+				var sourceKind = FileSystemEntry.FromStat(stat);
 				ThrowIfInvalidName(destination);
-
-				var sourceIsDirectory = sourceKind == EntryKind.Directory;
-				var destinationKind = FileSystemEntry.GetKind(destination);
-				var resolved = await ResolveConflictAsync(context, source, destination, sourceIsDirectory, destinationKind).ConfigureAwait(false);
+				var destinationKind = FileSystemEntry.GetKindAt(destinationParent.Descriptor, Path.GetFileName(destination));
+				var resolved = await ResolveConflictAsync(context, source, destination, stat.IsDirectory, destinationKind, destinationParent).ConfigureAwait(false);
 				if (resolved.Early is { } early)
 					return early;
 
 				destination = resolved.Destination;
 				ThrowIfInvalidName(destination);
-
+				var destinationName = Path.GetFileName(destination);
 				var sameDevice = isSameDevice(source, destination);
-				if (!sourceIsDirectory)
+				context.Hooks?.BeforeMoveEntry?.Invoke(source, destination);
+				context.CancellationToken.ThrowIfCancellationRequested();
+
+				if (sameDevice && (!stat.IsDirectory || !resolved.Replace))
 				{
-					if (sameDevice)
+					if (PosixNative.TryRenameAt(sourceParent.Descriptor, name, destinationParent.Descriptor, destinationName, resolved.Replace, out var errno))
 					{
-						var length = sourceKind == EntryKind.File ? new FileInfo(source).Length : 0;
-						MoveLeaf(source, destination, sourceKind, resolved.Replace);
-						context.AddBytes(length, source);
+						context.AddBytes(stat.IsRegularFile ? (long)stat.Size : 0, source);
 						context.ItemDone(source);
 						return Outcome.Success(destination);
 					}
-
-					if (sourceKind == EntryKind.Special)
-						throw new FileOperationException(FileOperationErrorKind.UnsupportedFileType, "FIFOs, sockets and device files cannot be moved across file systems.", source);
-
-					var copy = sourceKind == EntryKind.Symlink
-						? CopyLink(source, destination, resolved.Replace, context, null)
-						: await CopyFileAsync(source, destination, resolved.Replace, context, verifySource: true).ConfigureAwait(false);
-
-					if (copy.Status == FileOperationStatus.Succeeded)
-						File.Delete(source);
-
-					return copy;
+					if (!PosixNative.IsCrossDevice(errno))
+						throw PosixNative.CreateException(errno, destination);
 				}
 
-				if (!resolved.Replace && FileSystemEntry.GetKind(destination) == EntryKind.None && sameDevice)
+				if (stat.IsDirectory)
+					return await MoveDirectoryContentsAsync(source, destination, stat, resolved.Replace, sourceParent, destinationParent, context, isSameDevice).ConfigureAwait(false);
+
+				if (stat.IsSpecial)
+					throw new FileOperationException(FileOperationErrorKind.UnsupportedFileType, "FIFOs, sockets and device files cannot be moved across file systems.", source);
+
+				VerifyMoveSource(sourceParent, name, stat, source);
+				var copy = sourceKind == EntryKind.Symlink
+					? CopyLink(source, destination, resolved.Replace, context, sourceParent, destinationParent)
+					: await CopyFileAsync(source, destination, resolved.Replace, context, verifySource: true, sourceParent, destinationParent).ConfigureAwait(false);
+				if (copy.Status == FileOperationStatus.Succeeded)
 				{
-					try
-					{
-						Directory.Move(source, destination);
-						context.ItemDone(source);
-						return Outcome.Success(destination);
-					}
-					catch (IOException) when (FileSystemEntry.GetKind(source) == EntryKind.Directory && FileSystemEntry.GetKind(destination) == EntryKind.None)
-					{
-						// rename(2) was refused (for example EXDEV); continue with a verified copy and delete
-					}
+					context.Hooks?.BeforeDeleteEntry?.Invoke(source);
+					context.CancellationToken.ThrowIfCancellationRequested();
+					VerifyMoveSource(sourceParent, name, stat, source);
+					PosixNative.UnlinkAt(sourceParent.Descriptor, name, 0, source);
 				}
-
-				return await MoveDirectoryContentsAsync(source, destination, context, isSameDevice).ConfigureAwait(false);
+				return copy;
 			}
 			catch (OperationCanceledException)
 			{
@@ -106,36 +91,45 @@ namespace Files.Platform.Linux.FileOperations
 			}
 		}
 
-		/// <summary>Moves a folder entry by entry (merge or cross-device); the source folder is removed only once it is empty.</summary>
-		private async Task<Outcome> MoveDirectoryContentsAsync(string source, string destination, FileOperationContext context, Func<string, string, bool> isSameDevice)
+		/// <summary>Both trees stay descriptor-relative throughout a merge or cross-device move.</summary>
+		private async Task<Outcome> MoveDirectoryContentsAsync(string source, string destination, PosixStat stat, bool merge, DirectoryHandle sourceParent, DirectoryHandle destinationParent, FileOperationContext context, Func<string, string, bool> isSameDevice)
 		{
-			var created = FileSystemEntry.GetKind(destination) == EntryKind.None;
-			var metadata = DirectoryMetadata.Capture(source);
+			using var sourceDirectory = OpenSourceDirectory(source, sourceParent, context);
+			if (!sourceDirectory.IsSameEntry(stat))
+				throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source folder changed while it was being moved.", source);
+			var destinationName = Path.GetFileName(destination);
+			var created = !destinationParent.EntryExists(destinationName);
+			if (!created && !merge)
+				throw PosixNative.CreateException(17, destination);
 			if (created)
 			{
-				UnixMode.CreatePrivateDirectory(destination);
+				PosixNative.MkdirAt(destinationParent.Descriptor, destinationName, 0x1C0, destination); // 0700
 				context.Hooks?.DirectoryCreated?.Invoke(destination);
 			}
+			using var destinationDirectory = DirectoryHandle.OpenChild(destinationParent.Descriptor, destinationName, destination);
 
 			var result = Outcome.Success(destination);
-			foreach (var child in Directory.EnumerateFileSystemEntries(source, "*", FileSystemEntry.AllEntries).ToList())
+			foreach (var name in sourceDirectory.ListNames())
 			{
-				var childOutcome = await MoveEntryAsync(child, Path.Combine(destination, Path.GetFileName(child)), context, isSameDevice).ConfigureAwait(false);
+				var childOutcome = await MoveEntryAsync(Path.Combine(source, name), Path.Combine(destination, name), sourceDirectory, destinationDirectory, context, isSameDevice).ConfigureAwait(false);
 				result = result.Combine(childOutcome, destination);
 			}
 
 			if (created)
-				metadata.ApplyTo(destination);
+				ApplyDirectoryMetadata(destinationDirectory, stat, destination);
 
 			if (result.Status == FileOperationStatus.Succeeded)
 			{
+				context.Hooks?.BeforeDeleteEntry?.Invoke(source);
+				context.CancellationToken.ThrowIfCancellationRequested();
+				VerifyMoveSource(sourceParent, Path.GetFileName(source), stat, source);
 				try
 				{
-					Directory.Delete(source, false);
+					PosixNative.UnlinkAt(sourceParent.Descriptor, Path.GetFileName(source), PosixNative.AtRemoveDir, source);
 				}
-				catch (IOException) when (Directory.EnumerateFileSystemEntries(source, "*", FileSystemEntry.AllEntriesLenient).Any())
+				catch (IOException ex) when (ex.HResult == 39 && sourceDirectory.ListNames().Count > 0)
 				{
-					// Items the user chose to skip remain in the source folder
+					// Items the user chose to skip remain in the source folder.
 				}
 			}
 
@@ -143,36 +137,14 @@ namespace Files.Platform.Linux.FileOperations
 			return result;
 		}
 
-		/// <summary>Renames a file or link; links to folders need Directory.Move, which cannot replace, so the consented destination is removed first.</summary>
-		private static void MoveLeaf(string source, string destination, EntryKind sourceKind, bool replace)
+		private static void VerifyMoveSource(DirectoryHandle parent, string name, PosixStat expected, string source)
 		{
-			if (sourceKind == EntryKind.Symlink && Directory.Exists(source))
-			{
-				if (replace)
-					File.Delete(destination);
-
-				Directory.Move(source, destination);
-				return;
-			}
-
-			MoveFile(source, destination, replace);
+			if (!PosixNative.SameEntry(expected, PosixNative.StatAt(parent.Descriptor, name, source)))
+				throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being moved.", source);
 		}
 
-		private static Task<Outcome> DeleteEntryAsync(string path, FileOperationContext context)
-			=> Task.FromResult(DeleteTopLevel(path, context));
-
-		private static Outcome DeleteTopLevel(string path, FileOperationContext context)
-		{
-			context.CancellationToken.ThrowIfCancellationRequested();
-
-			// The folder holding the item is opened following links (the user navigated there); everything below is handle-relative
-			var parentPath = Path.GetDirectoryName(path)!;
-			using var parent = DirectoryHandle.TryOpen(PosixNative.AtFdCwd, parentPath, parentPath, false, out var errno);
-			if (parent is null)
-				return Outcome.FromException(PosixNative.CreateException(errno, parentPath), path);
-
-			return DeleteChild(parent, Path.GetFileName(path), path, context);
-		}
+		private static Task<Outcome> DeleteEntryAsync(string path, FileOperationContext context, DirectoryHandle parent)
+			=> Task.FromResult(DeleteChild(parent, Path.GetFileName(path), path, context));
 
 		/// <summary>
 		/// Deletes <paramref name="name"/> inside <paramref name="parent"/> using descriptor-relative calls with O_NOFOLLOW, so a folder replaced
@@ -234,46 +206,35 @@ namespace Files.Platform.Linux.FileOperations
 			if (source is null)
 				return Outcome.Fail(FileOperationErrorKind.InvalidName, "The path is not valid or refers to the root.", path);
 
-			var sourceKind = FileSystemEntry.GetKind(source);
-			if (sourceKind == EntryKind.None)
-				return Outcome.Fail(FileOperationErrorKind.NotFound, "The item does not exist.", source);
-
-			var parent = Path.GetDirectoryName(source)!;
-			var destination = Path.Combine(parent, newName);
+			var parentPath = Path.GetDirectoryName(source)!;
+			using var parent = DirectoryHandle.OpenPath(FileSystemEntry.Canonicalize(parentPath));
+			var sourceName = Path.GetFileName(source);
+			var stat = PosixNative.StatAt(parent.Descriptor, sourceName, source);
+			var destination = Path.Combine(parentPath, newName);
 			if (destination == source)
 				return Outcome.Success(source);
+			var destinationKind = FileSystemEntry.GetKindAt(parent.Descriptor, newName);
 
-			var sourceIsDirectory = sourceKind == EntryKind.Directory;
-			var destinationKind = FileSystemEntry.GetKind(destination);
-
-			// A case-only rename on a case-insensitive volume finds "itself" at the destination
 			if (destinationKind != EntryKind.None
 				&& string.Equals(destination, source, StringComparison.OrdinalIgnoreCase)
-				&& !Directory.EnumerateFileSystemEntries(parent, "*", FileSystemEntry.AllEntriesLenient).Any(e => Path.GetFileName(e) == newName))
+				&& !parent.ListNames().Contains(newName))
 			{
-				var temporary = TemporaryPathNextTo(destination);
-				Move(source, temporary, sourceIsDirectory, false);
-				Move(temporary, destination, sourceIsDirectory, false);
+				var temporary = Path.GetFileName(TemporaryPathNextTo(destination));
+				PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, temporary, false, destination);
+				PosixNative.RenameAt(parent.Descriptor, temporary, parent.Descriptor, newName, false, destination);
 				return Outcome.Success(destination);
 			}
 
-			var resolved = await ResolveConflictAsync(context, source, destination, sourceIsDirectory, destinationKind).ConfigureAwait(false);
+			var resolved = await ResolveConflictAsync(context, source, destination, stat.IsDirectory, destinationKind, parent).ConfigureAwait(false);
 			if (resolved.Early is { } early)
 				return early;
-
-			if (resolved.Replace && sourceIsDirectory)
+			if (resolved.Replace && stat.IsDirectory)
 				return Outcome.Fail(FileOperationErrorKind.AlreadyExists, "A folder cannot be merged by renaming.", resolved.Destination);
 
-			Move(source, resolved.Destination, sourceIsDirectory, resolved.Replace);
+			context.Hooks?.BeforeMoveEntry?.Invoke(source, resolved.Destination);
+			context.CancellationToken.ThrowIfCancellationRequested();
+			PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, Path.GetFileName(resolved.Destination), resolved.Replace, resolved.Destination);
 			return Outcome.Success(resolved.Destination);
-
-			static void Move(string from, string to, bool directory, bool overwrite)
-			{
-				if (directory)
-					Directory.Move(from, to);
-				else
-					MoveLeaf(from, to, FileSystemEntry.GetKind(from), overwrite);
-			}
 		}
 	}
 }

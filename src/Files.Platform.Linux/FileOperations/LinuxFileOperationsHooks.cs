@@ -19,6 +19,9 @@ namespace Files.Platform.Linux.FileOperations
 		/// <summary>Invoked after a source file or folder was classified and right before it is opened for copying.</summary>
 		public Action<string>? BeforeOpenSource { get; init; }
 
+		/// <summary>Invoked after both parents are opened and conflicts resolved, before a move acts.</summary>
+		public Action<string, string>? BeforeMoveEntry { get; init; }
+
 		/// <summary>Invoked after an entry was classified and right before it is deleted or descended into.</summary>
 		public Action<string>? BeforeDeleteEntry { get; init; }
 	}

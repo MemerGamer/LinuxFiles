@@ -3,10 +3,7 @@
 
 using System;
 using System.Buffers;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.FileOperations;
 using Files.Platform.Linux.Native;
@@ -18,10 +15,10 @@ namespace Files.Platform.Linux.FileOperations
 	{
 		private const int CopyBufferSize = 1024 * 1024;
 
-		private async Task<Outcome> CopyTopLevelAsync(string source, string destinationDirectory, FileOperationContext context)
+		private async Task<Outcome> CopyTopLevelAsync(string source, string destinationDirectory, FileOperationContext context, DirectoryHandle sourceParent, DirectoryHandle destinationParent)
 		{
 			var name = Path.GetFileName(source);
-			var sourceKind = FileSystemEntry.GetKind(source);
+			var sourceKind = FileSystemEntry.GetKindAt(sourceParent.Descriptor, name);
 			if (sourceKind == EntryKind.None)
 				return Outcome.Fail(FileOperationErrorKind.NotFound, "The source does not exist.", source);
 
@@ -36,19 +33,18 @@ namespace Files.Platform.Linux.FileOperations
 			}
 
 			var destination = Path.Combine(destinationDirectory, name);
-			var sourceParent = FileSystemEntry.Canonicalize(Path.GetDirectoryName(source)!);
-			if (sourceParent == destinationCanonical)
+			if (PosixNative.TryStat(sourceParent.Descriptor, out var parentStat) && destinationParent.IsSameEntry(parentStat))
 			{
 				// Copying next to the original always keeps both
-				var unique = FileNameGenerator.GenerateUniqueName(destinationDirectory, name, followedKind == EntryKind.Directory);
+				var unique = FileNameGenerator.GenerateUniqueName(name, followedKind == EntryKind.Directory, destinationParent.EntryExists);
 				destination = Path.Combine(destinationDirectory, unique);
 			}
 
-			return await CopyEntryAsync(source, destination, context, verifySource: false).ConfigureAwait(false);
+			return await CopyEntryAsync(source, destination, context, verifySource: false, destinationParent, sourceParent).ConfigureAwait(false);
 		}
 
 		/// <summary>Copies one entry (recursively for folders) to <paramref name="destination"/>, applying the conflict policy.</summary>
-		private async Task<Outcome> CopyEntryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle? parent = null)
+		private async Task<Outcome> CopyEntryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle destinationParent, DirectoryHandle? parent = null)
 		{
 			context.CancellationToken.ThrowIfCancellationRequested();
 
@@ -67,7 +63,7 @@ namespace Files.Platform.Linux.FileOperations
 				ThrowIfInvalidName(destination);
 
 				var sourceIsDirectory = sourceKind == EntryKind.Directory;
-				var resolved = await ResolveConflictAsync(context, source, destination, sourceIsDirectory, FileSystemEntry.GetKind(destination)).ConfigureAwait(false);
+				var resolved = await ResolveConflictAsync(context, source, destination, sourceIsDirectory, FileSystemEntry.GetKindAt(destinationParent.Descriptor, Path.GetFileName(destination)), destinationParent).ConfigureAwait(false);
 				if (resolved.Early is { } early)
 					return early;
 
@@ -76,9 +72,9 @@ namespace Files.Platform.Linux.FileOperations
 
 				return sourceKind switch
 				{
-					EntryKind.Directory => await CopyDirectoryAsync(source, destination, context, verifySource, parent).ConfigureAwait(false),
-					EntryKind.Symlink => CopyLink(source, destination, resolved.Replace, context, parent),
-					_ => await CopyFileAsync(source, destination, resolved.Replace, context, verifySource, parent).ConfigureAwait(false),
+					EntryKind.Directory => await CopyDirectoryAsync(source, destination, context, verifySource, parent, destinationParent, resolved.Replace).ConfigureAwait(false),
+					EntryKind.Symlink => CopyLink(source, destination, resolved.Replace, context, parent, destinationParent),
+					_ => await CopyFileAsync(source, destination, resolved.Replace, context, verifySource, parent, destinationParent).ConfigureAwait(false),
 				};
 			}
 			catch (OperationCanceledException)
@@ -91,7 +87,7 @@ namespace Files.Platform.Linux.FileOperations
 			}
 		}
 
-		private async Task<Outcome> CopyDirectoryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle? parent)
+		private async Task<Outcome> CopyDirectoryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle? parent, DirectoryHandle destinationParent, bool merge)
 		{
 			string? canonical = null;
 			if (context.FollowSymlinks)
@@ -103,24 +99,31 @@ namespace Files.Platform.Linux.FileOperations
 
 			try
 			{
-				var created = FileSystemEntry.GetKind(destination) == EntryKind.None;
 				using var handle = OpenSourceDirectory(source, parent, context);
-				var metadata = DirectoryMetadata.Capture(source);
+				if (!PosixNative.TryStat(handle.Descriptor, out var metadata))
+					throw new IOException($"Cannot inspect '{source}'.");
+				if (destinationParent.IsSameOrInside(metadata))
+					return Outcome.Fail(FileOperationErrorKind.InvalidDestination, "A folder cannot be copied into itself.", destination);
+				var destinationName = Path.GetFileName(destination);
+				var created = !destinationParent.EntryExists(destinationName);
+				if (!created && !merge)
+					throw PosixNative.CreateException(17, destination);
 				if (created)
 				{
-					UnixMode.CreatePrivateDirectory(destination);
+					PosixNative.MkdirAt(destinationParent.Descriptor, destinationName, 0x1C0, destination);
 					context.Hooks?.DirectoryCreated?.Invoke(destination);
 				}
+				using var destinationHandle = DirectoryHandle.OpenChild(destinationParent.Descriptor, destinationName, destination);
 
 				var result = Outcome.Success(destination);
 				foreach (var name in handle.ListNames())
 				{
-					var childOutcome = await CopyEntryAsync(Path.Combine(source, name), Path.Combine(destination, name), context, verifySource, context.FollowSymlinks ? null : handle).ConfigureAwait(false);
+					var childOutcome = await CopyEntryAsync(Path.Combine(source, name), Path.Combine(destination, name), context, verifySource, destinationHandle, context.FollowSymlinks ? null : handle).ConfigureAwait(false);
 					result = result.Combine(childOutcome, destination);
 				}
 
 				if (created)
-					metadata.ApplyTo(destination);
+					ApplyDirectoryMetadata(destinationHandle, metadata, destination);
 
 				context.ItemDone(source);
 				return result;
@@ -132,23 +135,15 @@ namespace Files.Platform.Linux.FileOperations
 			}
 		}
 
-		private readonly record struct DirectoryMetadata(UnixFileMode Mode, DateTime LastWriteUtc)
+		private static void ApplyDirectoryMetadata(DirectoryHandle destination, PosixStat metadata, string displayPath)
 		{
-			/// <summary>Reads the metadata before the folder content is touched, since moving content changes the source time.</summary>
-			public static DirectoryMetadata Capture(string path)
-				=> new(UnixMode.Get(path), Directory.GetLastWriteTimeUtc(path));
-
-			public void ApplyTo(string path)
+			try
 			{
-				try
-				{
-					UnixMode.Set(path, Mode);
-					Directory.SetLastWriteTimeUtc(path, LastWriteUtc);
-				}
-				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-				{
-					// Metadata is best effort for folders; the content was copied
-				}
+				PosixNative.SetMetadata(destination.Descriptor, metadata, displayPath);
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				// Directory metadata is best effort; the content was copied.
 			}
 		}
 
@@ -200,27 +195,23 @@ namespace Files.Platform.Linux.FileOperations
 			return new FileStream(new SafeFileHandle(descriptor, true), FileAccess.Read, 1, false);
 		}
 
-		private static Outcome CopyLink(string source, string destination, bool replace, FileOperationContext context, DirectoryHandle? parent)
+		private static Outcome CopyLink(string source, string destination, bool replace, FileOperationContext context, DirectoryHandle? parent, DirectoryHandle destinationParent)
 		{
 			var target = parent is not null
 				? PosixNative.ReadLinkAt(parent.Descriptor, Path.GetFileName(source), source)
 				: new FileInfo(source).LinkTarget ?? throw new FileNotFoundException("The link no longer exists.", source);
-			if (!replace)
+			var name = replace ? Path.GetFileName(TemporaryPathNextTo(destination)) : Path.GetFileName(destination);
+			PosixNative.SymlinkAt(target, destinationParent.Descriptor, name, destination);
+			if (replace)
 			{
-				File.CreateSymbolicLink(destination, target);
-			}
-			else
-			{
-				var temporary = TemporaryPathNextTo(destination);
 				try
 				{
-					File.CreateSymbolicLink(temporary, target);
-					File.Move(temporary, destination, true);
+					context.CancellationToken.ThrowIfCancellationRequested();
+					PosixNative.RenameAt(destinationParent.Descriptor, name, destinationParent.Descriptor, Path.GetFileName(destination), true, destination);
 				}
 				finally
 				{
-					if (FileSystemEntry.GetKind(temporary) != EntryKind.None)
-						TryDelete(temporary);
+					TryUnlinkTemporary(destinationParent, name, destination);
 				}
 			}
 
@@ -228,37 +219,23 @@ namespace Files.Platform.Linux.FileOperations
 			return Outcome.Success(destination);
 		}
 
-		private static async Task<Outcome> CopyFileAsync(string source, string destination, bool replace, FileOperationContext context, bool verifySource, DirectoryHandle? parent = null)
+		private static async Task<Outcome> CopyFileAsync(string source, string destination, bool replace, FileOperationContext context, bool verifySource, DirectoryHandle? parent, DirectoryHandle destinationParent)
 		{
 			var temporary = TemporaryPathNextTo(destination);
 			long length = 0;
 			long copied = 0;
-			long sourceSizeAfter = -1;
 			var completed = false;
+			var temporaryCreated = false;
 
 			try
 			{
 				var input = OpenSourceFile(source, parent, context, out var sourceStat);
 				length = (long)sourceStat.Size;
-				var sourceTime = sourceStat.ModifiedUtc;
-				var sourceMode = (UnixFileMode)(sourceStat.Mode & 0xFFF);
 
 				await using (input.ConfigureAwait(false))
 				{
-					// Owner-only until the final mode is applied, so a secret is never briefly readable by others
-					var outputOptions = new FileStreamOptions
-					{
-						Mode = FileMode.CreateNew,
-						Access = FileAccess.Write,
-						Share = FileShare.None,
-						BufferSize = 1,
-						Options = FileOptions.Asynchronous,
-					};
-
-					if (!OperatingSystem.IsWindows())
-						outputOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-
-					var output = new FileStream(temporary, outputOptions);
+					var output = PosixNative.OpenFileAt(destinationParent.Descriptor, Path.GetFileName(temporary), temporary, true);
+					temporaryCreated = true;
 					await using (output.ConfigureAwait(false))
 					{
 						context.Hooks?.TemporaryFileCreated?.Invoke(temporary);
@@ -280,71 +257,37 @@ namespace Files.Platform.Linux.FileOperations
 
 						await output.FlushAsync(context.CancellationToken).ConfigureAwait(false);
 						output.Flush(true);
+						if (output.Length != copied)
+							throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The copied file does not have the expected size.", destination);
+						if (verifySource && (!PosixNative.TryStat((int)input.SafeFileHandle.DangerousGetHandle(), out var after) || (long)after.Size != copied))
+							throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being copied.", source);
+						PosixNative.SetMetadata((int)output.SafeFileHandle.DangerousGetHandle(), sourceStat, temporary);
 					}
-
-					if (PosixNative.TryStat((int)input.SafeFileHandle.DangerousGetHandle(), out var after))
-						sourceSizeAfter = (long)after.Size;
 				}
 
-				if (new FileInfo(temporary).Length != copied)
-					throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The copied file does not have the expected size.", destination);
-
-				if (verifySource && sourceSizeAfter != copied)
-					throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being copied.", source);
-
-				UnixMode.Set(temporary, sourceMode);
-				File.SetLastWriteTimeUtc(temporary, sourceTime);
-
 				context.CancellationToken.ThrowIfCancellationRequested();
-				MoveFile(temporary, destination, replace);
+				PosixNative.RenameAt(destinationParent.Descriptor, Path.GetFileName(temporary), destinationParent.Descriptor, Path.GetFileName(destination), replace, destination);
 				completed = true;
 				return Outcome.Success(destination);
 			}
 			finally
 			{
-				if (!completed)
-					TryDelete(temporary);
+				if (!completed && temporaryCreated)
+					TryUnlinkTemporary(destinationParent, Path.GetFileName(temporary), temporary);
 
 				context.AddBytes(Math.Max(0, length - copied), source);
 				context.ItemDone(source);
 			}
 		}
 
-		/// <summary>
-		/// Moves a file without ever replacing an existing destination unless asked. When the source cannot be unlinked, .NET may leave a
-		/// hard link at the destination; that leftover is removed so a failed move has no side effect.
-		/// </summary>
-		private static void MoveFile(string source, string destination, bool replace)
-		{
-			var destinationExisted = FileSystemEntry.GetKind(destination) != EntryKind.None;
-			try
-			{
-				File.Move(source, destination, replace);
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-			{
-				if (!replace
-					&& !destinationExisted
-					&& FileOperationErrors.Classify(ex) != FileOperationErrorKind.AlreadyExists
-					&& FileSystemEntry.GetKind(source) == EntryKind.File
-					&& FileSystemEntry.GetKind(destination) == EntryKind.File)
-				{
-					TryDelete(destination);
-				}
-
-				throw;
-			}
-		}
-
-		private static void TryDelete(string path)
+		private static void TryUnlinkTemporary(DirectoryHandle parent, string name, string displayPath)
 		{
 			try
 			{
-				File.Delete(path);
+				PosixNative.UnlinkAt(parent.Descriptor, name, 0, displayPath);
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
-				// Nothing more can be done for a leftover temporary file
 			}
 		}
 	}

@@ -4,7 +4,11 @@
 using Files.Platform.Abstractions.Enumeration;
 using Files.Platform.Abstractions.Trash;
 using Files.Platform.Abstractions.Watching;
+using Files.Platform.Linux.Enumeration;
+using Files.Platform.Linux.Mime;
+using Files.Platform.Linux.Watching;
 using Microsoft.Extensions.Logging;
+using System.Globalization;
 using System.IO;
 using Windows.Storage;
 using FileAttributes = System.IO.FileAttributes;
@@ -22,6 +26,9 @@ namespace Files.App.ViewModels
 		private readonly List<Files.Platform.Abstractions.Watching.IFolderWatcher> _linuxRepositoryWatchers = [];
 		private Action? _linuxTrashUnsubscribe;
 		private CancellationTokenSource? _linuxGitDebounce;
+		private readonly FolderChangeBatch _linuxChangeBatch = new();
+		private CancellationTokenSource? _linuxChangeCts;
+		private int _linuxChangePending;
 
 		/// <summary>
 		/// Lists <paramref name="path"/> into <c>filesAndFolders</c>. Returns 3 on success and -1 on failure.
@@ -298,10 +305,10 @@ namespace Files.App.ViewModels
 				folder.ItemPath = entry.FullPath;
 				folder.FileSize = null;
 				folder.FileSizeBytes = 0;
+				ApplyLinuxLinkInfo(folder, entry);
 				return folder;
 			}
 
-			// LINUX-TODO(shortcuts): symlinks and .desktop files are listed as plain files
 			string itemType = Strings.File.GetLocalizedResource();
 			string? extension = null;
 			if (entry.Name.Contains('.'))
@@ -326,7 +333,32 @@ namespace Files.App.ViewModels
 			item.ItemPath = entry.FullPath;
 			item.FileSize = entry.Length.ToSizeString();
 			item.FileSizeBytes = entry.Length;
+			ApplyLinuxLinkInfo(item, entry);
+
+			// Display only: the name comes from the strictly parsed entry; opening goes through the launcher confirmation
+			if (!entry.IsBrokenSymlink && DesktopEntryDisplay.IsDesktopFile(entry.Name) &&
+				DesktopEntryDisplay.TryRead(entry.FullPath, CultureInfo.CurrentUICulture) is { } desktop)
+			{
+				item.DisplayNameOverride = desktop.Name;
+				item.ItemType = Strings.Application.GetLocalizedResource();
+			}
+
 			return item;
+		}
+
+		// Symlinks stay plain files/folders (so sorting and opening behave as for their targets) and carry the raw target
+		private static void ApplyLinkInfoCore(ListedItem item, string? linkTarget, bool broken)
+		{
+			item.SymLinkTarget = linkTarget;
+			item.IsBrokenSymLink = broken;
+			if (broken)
+				item.ItemType = Strings.LinuxBrokenLink.GetLocalizedResource();
+		}
+
+		private static void ApplyLinuxLinkInfo(ListedItem item, FileSystemEntryInfo entry)
+		{
+			if (entry.IsSymlink)
+				ApplyLinkInfoCore(item, entry.LinkTarget ?? string.Empty, entry.IsBrokenSymlink);
 		}
 
 		private void WatchForLinuxFolderChanges(string path)
@@ -338,15 +370,38 @@ namespace Files.App.ViewModels
 
 			try
 			{
-				var watcherInstance = Ioc.Default.GetRequiredService<IFolderWatcherFactory>().Create(path, new FolderWatcherOptions { Debounce = TimeSpan.FromMilliseconds(250) });
+				var folders = Ioc.Default.GetRequiredService<IUserSettingsService>().FoldersSettingsService;
+				var watcherInstance = Ioc.Default.GetRequiredService<IFolderWatcherFactory>().Create(path, new FolderWatcherOptions
+				{
+					Debounce = TimeSpan.FromMilliseconds(50),
+					IncludeHidden = folders.ShowHiddenItems || folders.ShowDotFiles,
+				});
 
-				void OnChanged(object? s, EventArgs e) => _ = RefreshAfterLinuxChangeAsync();
+				var folder = path.Length > 1 ? path.TrimEnd(Path.DirectorySeparatorChar) : path;
 
-				watcherInstance.Created += OnChanged;
-				watcherInstance.Deleted += OnChanged;
-				watcherInstance.Changed += OnChanged;
-				watcherInstance.Renamed += OnChanged;
-				watcherInstance.RescanRequired += OnChanged;
+				void OnPath(object? s, FolderChangeEventArgs e)
+				{
+					if (string.Equals(e.FullPath, folder, StringComparison.Ordinal))
+						_linuxChangeBatch.RequestFullRefresh();
+					else
+						_linuxChangeBatch.Add(e.FullPath);
+
+					ScheduleLinuxChanges(folder);
+				}
+
+				watcherInstance.Created += OnPath;
+				watcherInstance.Deleted += OnPath;
+				watcherInstance.Changed += OnPath;
+				watcherInstance.Renamed += (_, e) =>
+				{
+					_linuxChangeBatch.AddRename(e.OldFullPath, e.FullPath);
+					ScheduleLinuxChanges(folder);
+				};
+				watcherInstance.RescanRequired += (_, _) =>
+				{
+					_linuxChangeBatch.RequestFullRefresh();
+					ScheduleLinuxChanges(folder);
+				};
 				watcherInstance.Start();
 
 				_linuxWatcher = watcherInstance;
@@ -357,7 +412,7 @@ namespace Files.App.ViewModels
 			}
 		}
 
-		// LINUX-TODO(watcher): refreshes the whole listing; map Created/Deleted/Renamed onto the incremental AddFileOrFolder/RemoveFileOrFolder paths
+		// Used by the trash, whose changes always reload the whole listing
 		private async Task RefreshAfterLinuxChangeAsync()
 		{
 			_linuxRefreshDebounce?.Cancel();
@@ -372,6 +427,201 @@ namespace Files.App.ViewModels
 			{
 			}
 		}
+
+		// The first event of a burst opens a short window; everything arriving inside it is applied together
+		private void ScheduleLinuxChanges(string folder)
+		{
+			if (Interlocked.Exchange(ref _linuxChangePending, 1) == 1)
+				return;
+
+			var cts = new CancellationTokenSource();
+			Interlocked.Exchange(ref _linuxChangeCts, cts)?.Cancel();
+
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					await Task.Delay(150, cts.Token);
+					Interlocked.Exchange(ref _linuxChangePending, 0);
+					await ApplyLinuxChangesAsync(folder, cts.Token);
+				}
+				catch (OperationCanceledException)
+				{
+				}
+				catch (Exception ex)
+				{
+					App.Logger.LogWarning(ex, "Could not apply the changes of {Path}", folder);
+					await dispatcherQueue.EnqueueOrInvokeAsync(() => RefreshItems(null));
+				}
+			});
+		}
+
+		/// <summary>
+		/// Applies a burst of watcher events as add, remove, rename and update operations on the existing items. Falls back to a
+		/// full reload when events were lost or the burst was too large.
+		/// </summary>
+		private async Task ApplyLinuxChangesAsync(string folder, CancellationToken cancellationToken)
+		{
+			var snapshot = _linuxChangeBatch.Drain();
+			if (cancellationToken.IsCancellationRequested || isDisposed)
+				return;
+
+			if (snapshot.FullRefresh)
+			{
+				await dispatcherQueue.EnqueueOrInvokeAsync(() => RefreshItems(null));
+				return;
+			}
+
+			// Only direct children of the folder belong to this listing
+			var paths = snapshot.Paths.Where(p => string.Equals(Path.GetDirectoryName(p), folder, StringComparison.Ordinal)).ToHashSet(StringComparer.Ordinal);
+			var folders = Ioc.Default.GetRequiredService<IUserSettingsService>().FoldersSettingsService;
+			var includeHidden = folders.ShowHiddenItems || folders.ShowDotFiles;
+
+			var entries = new Dictionary<string, FileSystemEntryInfo>(StringComparer.Ordinal);
+			foreach (var path in paths)
+			{
+				if (FileSystemEntryReader.TryRead(path) is { } entry && (includeHidden || !entry.IsHidden))
+					entries[path] = entry;
+			}
+
+			var items = filesAndFolders.ToList().Where(i => i.ItemPath is not null).GroupBy(i => i.ItemPath!, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+			var ops = FolderChangeReconciler.Plan(
+				new FolderChangeSnapshot(false, paths, snapshot.Renames.Where(r => paths.Contains(r.Key) && paths.Contains(r.Value)).ToDictionary(r => r.Key, r => r.Value, StringComparer.Ordinal)),
+				items.ContainsKey,
+				entries.ContainsKey);
+
+			if (ops.Count == 0)
+				return;
+
+			var iconCache = Ioc.Default.GetRequiredService<IIconCacheService>();
+			var iconSize = GetPreloadIconSize();
+			var added = new List<ListedItem>();
+			var removedAny = false;
+
+			try
+			{
+				await enumFolderSemaphore.WaitAsync(semaphoreCTS.Token);
+			}
+			catch (OperationCanceledException)
+			{
+				return;
+			}
+
+			try
+			{
+				foreach (var op in ops)
+				{
+					if (cancellationToken.IsCancellationRequested)
+						return;
+
+					switch (op.Kind)
+					{
+						case FolderChangeKind.Remove:
+							if (items.TryGetValue(op.Path, out var gone) && filesAndFolders.Remove(gone))
+								removedAny = true;
+							break;
+
+						case FolderChangeKind.Rename:
+							var renamed = items[op.Path];
+							var target = entries[op.NewPath!];
+							if (CanRenameLinuxItemInPlace(renamed, target))
+							{
+								await dispatcherQueue.EnqueueOrInvokeAsync(() =>
+								{
+									renamed.ItemPath = target.FullPath;
+									renamed.ItemNameRaw = target.Name;
+									if (renamed.PrimaryItemAttribute == StorageItemTypes.File)
+										renamed.FileExtension = Path.GetExtension(target.Name);
+									renamed.IsHiddenItem = target.IsHidden;
+								});
+							}
+							else
+							{
+								filesAndFolders.Remove(renamed);
+								removedAny = true;
+								if (await TryCreateLinuxItemAsync(target, iconCache, iconSize) is { } recreated)
+									added.Add(recreated);
+							}
+							break;
+
+						case FolderChangeKind.Update:
+							var existing = items[op.Path];
+							var fresh = entries[op.Path];
+							if (IsSameLinuxItemKind(existing, fresh))
+							{
+								await dispatcherQueue.EnqueueOrInvokeAsync(() =>
+								{
+									existing.ItemDateModifiedReal = fresh.LastWriteTimeUtc.ToLocalTime();
+									existing.ItemDateAccessedReal = fresh.LastAccessTimeUtc.ToLocalTime();
+									if (!fresh.IsDirectory)
+									{
+										existing.FileSizeBytes = fresh.Length;
+										existing.FileSize = fresh.Length.ToSizeString();
+									}
+								});
+
+								if (!fresh.IsDirectory)
+									_ = LoadThumbnailAsync(existing, addFilesCTS.Token, scheduleTimerRetry: false).ContinueWith(static _ => { }, TaskScheduler.Default);
+							}
+							else
+							{
+								filesAndFolders.Remove(existing);
+								removedAny = true;
+								if (await TryCreateLinuxItemAsync(fresh, iconCache, iconSize) is { } replaced)
+									added.Add(replaced);
+							}
+							break;
+
+						case FolderChangeKind.Add:
+							if (await TryCreateLinuxItemAsync(entries[op.Path], iconCache, iconSize) is { } created)
+								added.Add(created);
+							break;
+					}
+				}
+
+				if (added.Count > 0)
+					filesAndFolders.AddRange(added);
+			}
+			finally
+			{
+				enumFolderSemaphore.Release();
+			}
+
+			if (added.Count > 0 || removedAny)
+			{
+				await OrderFilesAndFoldersAsync();
+				await ApplyFilesAndFoldersChangesAsync();
+
+				if (added.Count == 1)
+					await RequestSelectionAsync(added);
+			}
+		}
+
+		private async Task<ListedItem?> TryCreateLinuxItemAsync(FileSystemEntryInfo entry, IIconCacheService iconCache, uint iconSize)
+		{
+			try
+			{
+				var item = CreateLinuxListedItem(entry);
+				try { item.PreloadedIconData = await iconCache.GetIconAsync(item.ItemPath, item.FileExtension, entry.IsDirectory, iconSize); } catch (Exception ex) { App.Logger.LogWarning(ex, "Could not load icon for {Path}", item.ItemPath); }
+				return item;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return null;
+			}
+		}
+
+		// A rename keeps the item (and its position) only when nothing derived from the name changes
+		private static bool CanRenameLinuxItemInPlace(ListedItem item, FileSystemEntryInfo target)
+			=> IsSameLinuxItemKind(item, target) &&
+				string.Equals(Path.GetExtension(item.ItemPath), Path.GetExtension(target.Name), StringComparison.OrdinalIgnoreCase) &&
+				item.IsHiddenItem == target.IsHidden;
+
+		private static bool IsSameLinuxItemKind(ListedItem item, FileSystemEntryInfo entry)
+			=> item.IsFolder == entry.IsDirectory &&
+				item.IsBrokenSymLink == entry.IsBrokenSymlink &&
+				item.SymLinkTarget == (entry.IsSymlink ? entry.LinkTarget ?? string.Empty : null) &&
+				item.DisplayNameOverride is null;
 
 		// Raises GitDirectoryUpdated when the repository metadata changes (commit, checkout, stage, fetch) so the status columns refresh
 		private void WatchForLinuxRepositoryChanges()
@@ -484,6 +734,9 @@ namespace Files.App.ViewModels
 			DisposeLinuxRepositoryWatchers();
 			Interlocked.Exchange(ref _linuxGitDebounce, null)?.Cancel();
 			_linuxRefreshDebounce?.Cancel();
+			Interlocked.Exchange(ref _linuxChangeCts, null)?.Cancel();
+			Interlocked.Exchange(ref _linuxChangePending, 0);
+			_linuxChangeBatch.Drain();
 			_linuxWatcher?.Dispose();
 			_linuxWatcher = null;
 			Interlocked.Exchange(ref _linuxTrashUnsubscribe, null)?.Invoke();

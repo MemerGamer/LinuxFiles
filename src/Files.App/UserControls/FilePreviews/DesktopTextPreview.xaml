@@ -16,10 +16,7 @@
 		</Grid.RowDefinitions>
 
 		<ScrollViewer Grid.Row="0">
-			<RichTextBlock
-				x:Name="ContentBlock"
-				IsTextSelectionEnabled="True"
-				TextWrapping="Wrap" />
+			<StackPanel x:Name="ContentPanel" />
 		</ScrollViewer>
 
 		<TextBlock

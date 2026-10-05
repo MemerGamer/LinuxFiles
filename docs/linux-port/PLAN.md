@@ -41,9 +41,9 @@ The owner decided to focus on Linux first. Windows support is revisited only aft
 |---|---|---|
 | 0 | Toolchain, CI, Uno spike, research. Extra spikes: **P0-PERF** (10k/100k items) and **P0-DND** (outbound XDND + file clipboard prototype) | parallel |
 | 1 | Abstraction skeleton (`Files.Platform.*`, tests, DI) | serial, small |
-| 2 | **Linux bring-up: make `Files.App` compile and launch on Uno `net10.0-desktop`.** Retarget Controls + App to Uno. Exclude Windows-only folders (`Compile Remove`). Replace Win32/WinRT calls with interface calls, backed by stub or simple Linux implementations. Fix compile errors folder by folder. | parallel by folder ownership |
+| 2 | **Linux bring-up: make `Files.App` compile and launch on Uno `net10.0-desktop`.** Retarget Controls + App to Uno. Exclude Windows-only folders (`Compile Remove`). Replace Win32/WinRT calls with interface calls, backed by stub or simple Linux implementations. Fix compile errors folder by folder. **✅ Done (2026-10-05):** the app compiles, launches and runs on Linux; the compat-off criterion moved to Phase 4. | parallel by folder ownership |
 | 3 | Real Linux backends per interface (enumeration, watcher, file ops, trash, launcher, thumbnails, drives, clipboard…), with unit tests | parallel, one agent per interface |
-| 4 | Replace the legacy WinRT storage layer (`BaseStorageFile`/`Folder`) with OwlCore storables | single owner |
+| 4 | Replace the legacy WinRT storage layer (`BaseStorageFile`/`Folder`) with OwlCore storables, then switch Win32 compat mode off (moved from Phase 2) | parallel work packages (see Phase 4 plan, Revision 3) |
 | 5 | UI blockers and UX parity: L-DND, SpeedGraph, StickyHeader, title bar, previews, single instance | parallel |
 | 6 | Desktop integration and packaging (FileManager1 D-Bus, `.desktop`, Flatpak/AppImage/AUR) | parallel |
 | 7 | Hardening (performance, HiDPI, themes, localisation) | parallel |
@@ -53,7 +53,7 @@ The Phase 2 workstreams in §7.3 still define folder ownership. Their goal is no
 not "Windows code wrapped without behaviour change".
 
 ### Phase 2 build decisions (2026-10-04)
-- **Win32 compat mode is the default** (`FilesWin32Compat=true` in `Directory.Build.props`). Existing Win32/Shell code compiles on Linux against the CsWin32 assembly, which is built automatically for Platform=x64. It cannot run on Linux, so any call that is reached at runtime must be replaced by a `Files.Platform` service. Phase 2 exit criterion: compat mode switched off.
+- **Win32 compat mode is the default** (`FilesWin32Compat=true` in `Directory.Build.props`). Existing Win32/Shell code compiles on Linux against the CsWin32 assembly, which is built automatically for Platform=x64. It cannot run on Linux, so any call that is reached at runtime must be replaced by a `Files.Platform` service. Switching compat mode off was Phase 2's exit criterion; since 2026-10-05 it is Phase 4's (P4-Z), because it depends on removing the legacy storage layer.
 - **Nullable diagnostics are warnings on `-desktop`**, because Uno's annotations differ from WinUI's. Re-enable once the build is clean.
 - Stubbed behaviour is tagged `// LINUX-TODO(<area>)`. Use `rg -n LINUX-TODO src` to find the backlog.
 

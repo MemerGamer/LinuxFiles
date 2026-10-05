@@ -91,14 +91,24 @@ namespace Files.Platform.Linux.Native
 			if (errno == 0)
 				return true;
 
+			if (IsNotFound(errno))
+				return false;
+
 			// A failed source unlink is a failed move. Roll back only our hardlink, never a replacement.
-			if (TryStat(destinationFd, destination, AtSymlinkNofollow, out var linked, out var rollbackError))
+			if (TryStat(sourceFd, source, AtSymlinkNofollow, out var currentSource, out _) && SameEntry(stat, currentSource))
 			{
-				if (stat.Inode != 0 && SameEntry(stat, linked) && TryRenameUnlink(destinationFd, destination, hooks) == 0)
+				if (TryStat(destinationFd, destination, AtSymlinkNofollow, out var linked, out var rollbackError))
+				{
+					if (stat.Inode != 0 && SameEntry(stat, linked) && TryRenameUnlink(destinationFd, destination, hooks) == 0)
+						return false;
+				}
+				else if (IsNotFound(rollbackError))
 					return false;
 			}
-			else if (IsNotFound(rollbackError))
+			else
+			{
 				return false;
+			}
 
 			throw new IOException($"Source removal failed with errno {errno}; rollback could not safely remove '{destination}'. Both names may remain.");
 		}

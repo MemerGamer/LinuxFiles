@@ -314,8 +314,8 @@
 					</wctcontrols:SettingsCard>
 
 					<!--  Open in Windows Terminal  -->
-					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowOpenTerminal}">
-						<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=ShowOpenTerminal}" IsOn="{x:Bind ViewModel.ShowOpenTerminal, Mode=TwoWay}" />
+					<wctcontrols:SettingsCard Header="{x:Bind ViewModel.ShowOpenTerminalText}">
+						<ToggleSwitch AutomationProperties.Name="{x:Bind ViewModel.ShowOpenTerminalText}" IsOn="{x:Bind ViewModel.ShowOpenTerminal, Mode=TwoWay}" />
 					</wctcontrols:SettingsCard>
 
 					<!--  Edit tags  -->

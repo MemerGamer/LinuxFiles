@@ -572,6 +572,28 @@ namespace Files.Platform.Tests.Thumbnails
 			Assert.IsEmpty(Directory.GetDirectories(Path.Combine(_root, "tmp-root")));
 		}
 
+		[TestMethod]
+		public async Task VideoFallbackRendersFrameThroughFfmpeg()
+		{
+			if (!BubblewrapSandbox.IsAvailable() || !File.Exists("/usr/bin/ffmpeg"))
+				Assert.Inconclusive("Video integration requires bubblewrap and ffmpeg.");
+			var path = Path.Combine(_files, "clip.mp4");
+			var ffmpeg = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("/usr/bin/ffmpeg", ["-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=c=red:s=320x240:d=1:r=5", "-pix_fmt", "yuv420p", path]))!;
+			await ffmpeg.WaitForExitAsync();
+			if (!File.Exists(path))
+				Assert.Inconclusive("ffmpeg could not create a test clip.");
+			using var service = CreateService(o =>
+			{
+				o.MimeTypeResolver = _ => "video/mp4";
+				o.SandboxExternalThumbnailers = true;
+			});
+			var bytes = await service.GetThumbnailAsync(path, 128);
+			Assert.IsNotNull(bytes);
+			using var image = SKBitmap.Decode(bytes);
+			Assert.IsTrue(image.Width <= 128 && image.Height <= 128 && image.Width > 0);
+			Assert.IsTrue(image.GetPixel(image.Width / 2, image.Height / 2).Red > 200);
+		}
+
 		private sealed class FakeRunner : IThumbnailerProcessRunner
 		{
 			public string? FileName { get; private set; }

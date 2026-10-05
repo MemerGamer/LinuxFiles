@@ -72,10 +72,13 @@ namespace Files.App.UserControls.TabBar
 		public TabBar()
 		{
 			InitializeComponent();
-			Loaded += (_, _) => InitializeLinuxCaptionButtons();
-			SizeChanged += (_, _) => UpdateTitleBarInsets();
-			TabBarAddNewTabButton.SizeChanged += (_, _) => UpdateTitleBarInsets();
-			DragAreaRectangle.SizeChanged += (_, _) => UpdateTitleBarInsets();
+			if (OperatingSystem.IsLinux())
+			{
+				Loaded += (_, _) => InitializeLinuxCaptionButtons();
+				SizeChanged += (_, _) => UpdateTitleBarInsets();
+				TabBarAddNewTabButton.SizeChanged += (_, _) => UpdateTitleBarInsets();
+				DragAreaRectangle.SizeChanged += (_, _) => UpdateTitleBarInsets();
+			}
 			InitializeTabFlyoutCommands();
 
 			tabHoverTimer.Interval = TimeSpan.FromMilliseconds(Constants.DragAndDrop.HoverToOpenTimespan);

@@ -71,7 +71,8 @@ namespace Files.App.UserControls.TabBar
 			if (App.AppModel.TabStripSelectedIndex >= 0 && App.AppModel.TabStripSelectedIndex < Items.Count)
 			{
 				CurrentSelectedAppInstance = GetCurrentSelectedTabInstance();
-				_ = NavigationHelpers.UpdateInstancePropertiesAsync(Items[App.AppModel.TabStripSelectedIndex].NavigationParameter?.NavigationParameter);
+				if (OperatingSystem.IsLinux())
+					_ = NavigationHelpers.UpdateInstancePropertiesAsync(Items[App.AppModel.TabStripSelectedIndex].NavigationParameter?.NavigationParameter);
 
 				if (CurrentSelectedAppInstance is not null)
 				{

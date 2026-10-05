@@ -36,7 +36,7 @@ namespace Files.App
 		{
 			InitializeComponent();
 
-			#if WINDOWS
+#if WINDOWS
 			ExtendsContentIntoTitleBar = true;
 #else
 			ExtendsContentIntoTitleBar = UseClientSideDecorations;

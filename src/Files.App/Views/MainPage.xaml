@@ -167,7 +167,7 @@
 			<controls:SidebarView.InnerContent>
 				<Grid
 					x:Name="RootGrid"
-					Padding="0,0,8,8"
+					Padding="0,0,0,8"
 					PreviewKeyDown="RootGrid_PreviewKeyDown"
 					SizeChanged="RootGrid_SizeChanged">
 					<Grid.RowDefinitions>

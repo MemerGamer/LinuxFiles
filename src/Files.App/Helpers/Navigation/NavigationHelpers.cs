@@ -281,7 +281,8 @@ namespace Files.App.Helpers
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.OrdinalIgnoreCase))
 			{
 				tabLocationHeader = Strings.RecycleBin.GetLocalizedResource();
-				iconSource = new FontIconSource { Glyph = "\uE74D" };
+				if (OperatingSystem.IsLinux())
+					iconSource = new FontIconSource { Glyph = "\uE74D" };
 			}
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.MyComputerPath, StringComparison.OrdinalIgnoreCase))
 				tabLocationHeader = Strings.ThisPC.GetLocalizedResource();
@@ -357,8 +358,9 @@ namespace Files.App.Helpers
 		public static async Task UpdateInstancePropertiesAsync(object? navigationArg)
 		{
 			var selectedTab = SelectedWindowTab;
-			navigationArg = selectedTab?.TabItemContent?.TabBarItemParameter?.NavigationParameter
-				?? selectedTab?.NavigationParameter?.NavigationParameter ?? navigationArg;
+			if (OperatingSystem.IsLinux())
+				navigationArg = selectedTab?.TabItemContent?.TabBarItemParameter?.NavigationParameter
+					?? selectedTab?.NavigationParameter?.NavigationParameter ?? navigationArg;
 			var version = Interlocked.Increment(ref _titleUpdateVersion);
 			await SafetyExtensions.IgnoreExceptions(async () =>
 			{
@@ -377,13 +379,17 @@ namespace Files.App.Helpers
 				else if (navigationArg is string pathArgs)
 					(windowTitle, _, _) = await GetSelectedTabInfoAsync(pathArgs, !OperatingSystem.IsLinux());
 
-				if (version == _titleUpdateVersion && selectedTab == SelectedWindowTab)
+				var isCurrent = OperatingSystem.IsLinux()
+					? version == _titleUpdateVersion && selectedTab == SelectedWindowTab
+					: navigationArg == MainPageViewModel.SelectedTabItem?.NavigationParameter?.NavigationParameter;
+				if (isCurrent)
 				{
 					var title = $"{windowTitle} - {(OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : "Files")}";
-					MainWindow.Instance.AppWindow.Title = title;
 #if !WINDOWS
+					title = Files.Platform.Linux.Windowing.X11WindowChrome.SanitizeTitle(title);
 					MainWindow.Instance.UpdateLinuxWindowTitle(title);
 #endif
+					MainWindow.Instance.AppWindow.Title = title;
 				}
 			});
 		}
@@ -397,7 +403,7 @@ namespace Files.App.Helpers
 			if (matchingTabItem is null)
 				return;
 
-			if (matchingTabItem == SelectedWindowTab)
+			if (OperatingSystem.IsLinux() && matchingTabItem == SelectedWindowTab)
 				await UpdateInstancePropertiesAsync(e.NavigationParameter);
 			await UpdateTabInfoAsync(matchingTabItem, e.NavigationParameter);
 		}

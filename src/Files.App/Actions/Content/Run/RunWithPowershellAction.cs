@@ -23,6 +23,7 @@ namespace Files.App.Actions
 			=> new("\uE756");
 
 		public bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			context.SelectedItem is not null &&
 			context.PageType != ContentPageTypes.RecycleBin &&
 			FileExtensionHelpers.IsPowerShellFile(context.SelectedItem.FileExtension);

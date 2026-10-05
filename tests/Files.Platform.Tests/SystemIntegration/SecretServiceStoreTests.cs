@@ -31,6 +31,21 @@ namespace Files.Platform.Tests.SystemIntegration
 		}
 
 		[TestMethod]
+		public void UnconfirmedDelete_NeverResurrectsAndDoesNotEatReplacement()
+		{
+			using var bus = PrivateBus.Start();
+			var store = new SecretServiceStore(bus.Address);
+
+			store.Save("r", "a", "old");
+			store.Delete("r", "a");
+			Assert.IsNull(store.Get("r", "a"));
+
+			store.Save("r", "a", "new");
+			Assert.AreEqual("new", store.Get("r", "a"));
+			Assert.AreEqual("new", store.Get("r", "a")); // a stale tombstone retry must not remove the replacement
+		}
+
+		[TestMethod]
 		public void WithKeyring_RoundTripsThroughSecretService()
 		{
 			using var bus = PrivateBus.Start();

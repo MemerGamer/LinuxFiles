@@ -176,35 +176,42 @@ namespace Files.Platform.Tests.Search
 
 		[TestMethod]
 		[SupportedOSPlatform("linux")]
-		public void TrustedNativeDirectory_RejectsWritableCacheRootsAndCreatesPrivateDirectories()
+		public void TrustedNativeDirectory_RejectsUnsafeInputsAndLoadsThroughDescriptor()
 		{
 			var root = Path.Combine(AppContext.BaseDirectory, "trust-" + Guid.NewGuid().ToString("N"));
 			Directory.CreateDirectory(root);
 			try
 			{
-				AssertTrustedDirectory(root);
+				var rootOwned = "/bin/sh";
+				var userOwned = Path.Combine(root, "lib.so");
+				File.WriteAllText(userOwned, "x");
+
+				// A library the user (or anyone else) could have written is never linked
+				Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(root, ["Files", "native"], "git2-x.so", userOwned));
+				Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare("relative/cache", ["Files"], "x.so", rootOwned));
+
+				// A group-writable cache root is rejected
+				File.SetUnixFileMode(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupWrite);
+				Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(root, ["Files", "native"], "git2-x.so", rootOwned));
+				File.SetUnixFileMode(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+
+				// A symlinked component of the cache path is not followed
+				var real = Path.Combine(root, "real");
+				Directory.CreateDirectory(real);
+				File.CreateSymbolicLink(Path.Combine(root, "linked"), real);
+				Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(Path.Combine(root, "linked"), ["Files"], "git2-x.so", rootOwned));
+
+				// A missing cache root is created, and the link is reachable through the returned descriptor path
+				var dir = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(Path.Combine(root, "newcache"), ["Files", "native"], "git2-x.so", rootOwned);
+				Assert.IsNotNull(dir);
+				StringAssert.StartsWith(dir, "/proc/self/fd/");
+				Assert.AreEqual(rootOwned, new FileInfo(Path.Combine(dir, "git2-x.so")).LinkTarget);
+				Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Path.Combine(root, "newcache", "Files", "native")));
 			}
 			finally
 			{
 				Directory.Delete(root, recursive: true);
 			}
-		}
-
-		[SupportedOSPlatform("linux")]
-		private static void AssertTrustedDirectory(string _root)
-		{
-			var source = Path.Combine(_root, "lib.so");
-			File.WriteAllText(source, "x");
-			File.SetUnixFileMode(_root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupWrite);
-			Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(_root, ["Files", "native"], "git2-x.so", source));
-
-			File.SetUnixFileMode(_root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-			var dir = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(_root, ["Files", "native"], "git2-x.so", source);
-			Assert.IsNotNull(dir);
-			Assert.AreEqual(source, new FileInfo(Path.Combine(dir, "git2-x.so")).LinkTarget);
-			Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(dir));
-
-			Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare("relative/cache", ["Files"], "x.so", source));
 		}
 
 		[TestMethod]

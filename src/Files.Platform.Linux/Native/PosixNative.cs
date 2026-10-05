@@ -125,6 +125,22 @@ namespace Files.Platform.Linux.Native
 
 		public static void Close(int fd) => _ = close(fd);
 
+		/// <summary>Creates a directory with mode 0700 relative to <paramref name="dirfd"/>; false (errno set) on failure.</summary>
+		public static bool MakeDirectoryAt(int dirfd, string name, out int errno)
+		{
+			var ok = mkdirat(dirfd, name, 0x1C0) == 0;
+			errno = ok ? 0 : Marshal.GetLastPInvokeError();
+			return ok;
+		}
+
+		/// <summary>Creates a symbolic link <paramref name="name"/> to <paramref name="target"/> relative to <paramref name="dirfd"/>.</summary>
+		public static bool SymlinkAt(string target, int dirfd, string name, out int errno)
+		{
+			var ok = symlinkat(target, dirfd, name) == 0;
+			errno = ok ? 0 : Marshal.GetLastPInvokeError();
+			return ok;
+		}
+
 		/// <summary>Removes a file, link or (with <see cref="AtRemoveDir"/>) empty directory relative to <paramref name="dirfd"/>.</summary>
 		public static void UnlinkAt(int dirfd, string name, int flags, string displayPath)
 		{
@@ -196,6 +212,12 @@ namespace Files.Platform.Linux.Native
 
 		[LibraryImport("libc", EntryPoint = "openat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int openat(int dirfd, string pathname, int flags, uint mode);
+
+		[LibraryImport("libc", EntryPoint = "mkdirat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial int mkdirat(int dirfd, string pathname, uint mode);
+
+		[LibraryImport("libc", EntryPoint = "symlinkat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial int symlinkat(string target, int newdirfd, string linkpath);
 
 		[LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
 		private static partial int close(int fd);

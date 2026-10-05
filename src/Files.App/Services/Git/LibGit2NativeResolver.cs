@@ -45,21 +45,23 @@ namespace Files.App.Services.Git
 				if (match is not { Success: true })
 					return;
 
-				var source = FindSource();
-				if (source is null)
-					return;
-
-				// XDG_CACHE_HOME is only honoured when absolute; the directory chain is verified before anything gets loaded from it
+				// XDG_CACHE_HOME is only honoured when absolute. The link directory is reached through an fd chain and loaded via
+				// /proc/self/fd, and only root-owned libraries are linked, so nothing user- or world-writable can be swapped in.
 				var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 				var cache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME") is { Length: > 0 } xdg && Path.IsPathRooted(xdg)
 					? xdg
 					: Path.Combine(home, ".cache");
-				var directory = TrustedNativeDirectory.Prepare(cache, ["Files", "native"], $"git2-{match.Groups[1].Value}.so", Path.GetFullPath(source));
-				if (directory is null)
-					return;
 
-				GlobalSettings.NativeLibraryPath = directory;
-				LinkedLibrary = source;
+				foreach (var source in Candidates())
+				{
+					var directory = TrustedNativeDirectory.Prepare(cache, ["Files", "native"], $"git2-{match.Groups[1].Value}.so", source);
+					if (directory is null)
+						continue;
+
+					GlobalSettings.NativeLibraryPath = directory;
+					LinkedLibrary = source;
+					return;
+				}
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or NotSupportedException)
 			{
@@ -67,18 +69,21 @@ namespace Files.App.Services.Git
 			}
 		}
 
-		private static string? FindSource()
+		private static IEnumerable<string> Candidates()
 		{
 			var rid = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "linux-arm64" : "linux-x64";
 			var bundled = Path.Combine(AppContext.BaseDirectory, "runtimes", rid, "native");
 			if (Directory.Exists(bundled))
 			{
-				var file = Directory.EnumerateFiles(bundled, "libgit2*.so*").FirstOrDefault();
-				if (file is not null)
-					return file;
+				foreach (var file in Directory.EnumerateFiles(bundled, "libgit2*.so*"))
+					yield return file;
 			}
 
-			return SystemCandidates.FirstOrDefault(File.Exists);
+			foreach (var candidate in SystemCandidates)
+			{
+				if (File.Exists(candidate))
+					yield return candidate;
+			}
 		}
 
 		[GeneratedRegex(@"libgit2-([0-9a-f]+)")]

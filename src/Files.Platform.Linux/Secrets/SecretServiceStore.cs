@@ -32,6 +32,7 @@ namespace Files.Platform.Linux.Secrets
 		private readonly string? busAddress;
 		private readonly ConcurrentDictionary<(string, string), string> memory = new();
 		private readonly ConcurrentDictionary<(string, string), byte> tombstones = new();
+		private readonly ConcurrentDictionary<(string, string), object> locks = new();
 
 		/// <summary>
 		/// Creates the store. <paramref name="busAddress"/> null means the user's session bus.
@@ -48,30 +49,37 @@ namespace Files.Platform.Linux.Secrets
 		public void Save(string resource, string account, string secret)
 		{
 			var key = (resource, account);
-			memory[key] = secret;
-			tombstones.TryRemove(key, out _);
-			// LINUX-TODO(secrets): prompts to unlock a locked keyring are not shown; a locked collection falls back to memory only.
-			// Get prefers the in-memory value, so a failed update never lets the stale persisted secret win in this process.
-			IsPersistent = Run(c => SaveAsync(c, resource, account, secret));
+			lock (LockFor(key))
+			{
+				memory[key] = secret;
+				tombstones.TryRemove(key, out _);
+				// LINUX-TODO(secrets): prompts to unlock a locked keyring are not shown; a locked collection falls back to memory only.
+				// Get prefers the in-memory value, so a failed update never lets the stale persisted secret win in this process.
+				IsPersistent = Run(c => SaveAsync(c, resource, account, secret));
+			}
 		}
 
 		/// <inheritdoc/>
 		public string? Get(string resource, string account)
 		{
 			var key = (resource, account);
-			if (memory.TryGetValue(key, out var value))
-				return value;
-
-			if (tombstones.ContainsKey(key))
+			lock (LockFor(key))
 			{
-				// A delete that did not reach the service is retried; the persisted copy must not come back meanwhile
-				if (RunDelete(resource, account, out _) is not "failed")
-					tombstones.TryRemove(key, out _);
-				return null;
-			}
+				if (memory.TryGetValue(key, out var value))
+					return value;
 
-			var stored = Run(c => GetAsync(c, resource, account), out var found);
-			return found ? stored : null;
+				if (tombstones.ContainsKey(key))
+				{
+					// A delete that was not confirmed is retried; the persisted copy must not come back meanwhile. The per-key lock
+					// guarantees no newer Save can be running, so the retry never removes a replacement.
+					if (RunDelete(resource, account, out _) is "deleted" or "absent")
+						tombstones.TryRemove(key, out _);
+					return null;
+				}
+
+				var stored = Run(c => GetAsync(c, resource, account), out var found);
+				return found ? stored : null;
+			}
 		}
 
 		/// <inheritdoc/>
@@ -79,23 +87,26 @@ namespace Files.Platform.Linux.Secrets
 		public bool Delete(string resource, string account)
 		{
 			var key = (resource, account);
-			var removedMemory = memory.TryRemove(key, out _);
-			var outcome = RunDelete(resource, account, out var reachable);
-			if (!reachable)
-				return removedMemory;
-
-			if (outcome is "failed")
+			lock (LockFor(key))
 			{
-				tombstones[key] = 0;
-				return false;
-			}
+				var removedMemory = memory.TryRemove(key, out _);
+				var outcome = RunDelete(resource, account, out _);
+				if (outcome is "deleted" or "absent")
+				{
+					// Only a live service that confirmed the item is gone (or never existed) clears the marker
+					tombstones.TryRemove(key, out _);
+					return removedMemory || outcome is "deleted";
+				}
 
-			tombstones.TryRemove(key, out _);
-			return removedMemory || outcome is "deleted";
+				tombstones[key] = 0;
+				return outcome is "unavailable" && removedMemory;
+			}
 		}
 
-		private string? RunDelete(string resource, string account, out bool reachable)
-			=> Run(c => DeleteAsync(c, resource, account), out reachable) ?? "failed";
+		private object LockFor((string, string) key) => locks.GetOrAdd(key, static _ => new object());
+
+		private string RunDelete(string resource, string account, out bool reachable)
+			=> Run(c => DeleteAsync(c, resource, account), out reachable) ?? (reachable ? "failed" : "unavailable");
 
 		private bool Run(Func<DBusConnection, Task<bool>> action)
 			=> Run(async c => await action(c).ConfigureAwait(false) ? "1" : null, out _) is not null;
@@ -274,11 +285,11 @@ namespace Files.Platform.Linux.Secrets
 			}
 			catch (DBusErrorReplyException ex) when (ex.ErrorName is "org.freedesktop.DBus.Error.ServiceUnknown" or "org.freedesktop.DBus.Error.NameHasNoOwner")
 			{
-				return "absent"; // no Secret Service on this bus: nothing persisted that could come back
+				return "unavailable"; // no Secret Service answered: the delete is unconfirmed
 			}
 
 			if (item is null)
-				return "absent";
+				return "absent"; // a live service answered: there is no such item
 
 			MessageBuffer message;
 			using (var writer = bus.GetMessageWriter())

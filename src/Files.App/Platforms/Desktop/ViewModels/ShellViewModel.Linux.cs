@@ -21,6 +21,7 @@ namespace Files.App.ViewModels
 		private CancellationTokenSource? _linuxRefreshDebounce;
 		private readonly List<Files.Platform.Abstractions.Watching.IFolderWatcher> _linuxRepositoryWatchers = [];
 		private Action? _linuxTrashUnsubscribe;
+		private CancellationTokenSource? _linuxGitDebounce;
 
 		/// <summary>
 		/// Lists <paramref name="path"/> into <c>filesAndFolders</c>. Returns 3 on success and -1 on failure.
@@ -387,21 +388,37 @@ namespace Files.App.ViewModels
 			try
 			{
 				var factory = Ioc.Default.GetRequiredService<IFolderWatcherFactory>();
-				var paths = string.Equals(gitDir, commonDir, StringComparison.Ordinal) ? [gitDir] : new[] { gitDir, commonDir };
 
-				void OnChanged(object? s, EventArgs e) => _ = dispatcherQueue.EnqueueOrInvokeAsync(async () =>
+				// HEAD/index/packed-refs live directly in the git and common dirs; branch tips and their reflogs are nested in
+				// refs/** and logs/**. objects/ is deliberately not watched.
+				var targets = new List<(string Path, bool Recursive)>
 				{
-					await ReloadLinuxGitPropertiesAsync();
-					GitDirectoryUpdated?.Invoke(null, null!);
-				});
+					(gitDir, false),
+					(Path.Combine(gitDir, "logs"), true),
+					(commonDir, false),
+					(Path.Combine(commonDir, "refs"), true),
+					(Path.Combine(commonDir, "logs"), true),
+				};
 
-				foreach (var path in paths)
+				void OnChanged(object? s, FolderChangeEventArgs e)
 				{
-					var watcherInstance = factory.Create(path, new FolderWatcherOptions { Debounce = TimeSpan.FromMilliseconds(400) });
+					// Lock files appear and vanish around every Git write; the final rename is what matters
+					if (e.Name.EndsWith(".lock", StringComparison.Ordinal) || e.FullPath.Contains("/objects/", StringComparison.Ordinal))
+						return;
+
+					ScheduleLinuxGitRefresh();
+				}
+
+				foreach (var (path, recursive) in targets.DistinctBy(t => t.Path))
+				{
+					if (!Directory.Exists(path))
+						continue;
+
+					var watcherInstance = factory.Create(path, new FolderWatcherOptions { IncludeSubdirectories = recursive, Debounce = TimeSpan.FromMilliseconds(200) });
 					watcherInstance.Created += OnChanged;
 					watcherInstance.Deleted += OnChanged;
 					watcherInstance.Changed += OnChanged;
-					watcherInstance.Renamed += OnChanged;
+					watcherInstance.Renamed += (s, e) => OnChanged(s, e);
 					watcherInstance.Start();
 					_linuxRepositoryWatchers.Add(watcherInstance);
 				}
@@ -412,23 +429,39 @@ namespace Files.App.ViewModels
 			}
 		}
 
+		// Several watchers fire for one Git command; coalesce them into one reload
+		private void ScheduleLinuxGitRefresh()
+		{
+			var cts = new CancellationTokenSource();
+			Interlocked.Exchange(ref _linuxGitDebounce, cts)?.Cancel();
+
+			_ = Task.Delay(TimeSpan.FromMilliseconds(400), cts.Token).ContinueWith(
+				_ => dispatcherQueue.EnqueueOrInvokeAsync(async () =>
+				{
+					await ReloadLinuxGitPropertiesAsync();
+					GitDirectoryUpdated?.Invoke(null, null!);
+				}),
+				cts.Token, TaskContinuationOptions.OnlyOnRanToCompletion, TaskScheduler.Default);
+		}
+
 		// The Git columns are loaded once per item; after the repository changed they are stale, so reset the flags and reload
 		private async Task ReloadLinuxGitPropertiesAsync()
 		{
 			if (isDisposed || !IsValidGitDirectory)
 				return;
 
-			var items = filesAndFolders.OfType<IGitItem>().ToList();
+			var items = filesAndFolders.OfType<GitItem>().ToList();
 			foreach (var item in items)
-			{
-				item.StatusPropertiesInitialized = false;
-				item.CommitPropertiesInitialized = false;
-			}
+				item.ResetGitProperties();
 
 			try
 			{
+				// The first screens reload now; the rest reload when scrolled into view because ItemPropertiesInitialized was reset
 				foreach (var item in items.Take(300))
+				{
+					item.ItemPropertiesInitialized = true;
 					await LoadGitPropertiesAsync(item);
+				}
 			}
 			catch (Exception ex) when (ex is not OutOfMemoryException)
 			{
@@ -446,6 +479,7 @@ namespace Files.App.ViewModels
 		private void CloseLinuxWatcher()
 		{
 			DisposeLinuxRepositoryWatchers();
+			Interlocked.Exchange(ref _linuxGitDebounce, null)?.Cancel();
 			_linuxRefreshDebounce?.Cancel();
 			_linuxWatcher?.Dispose();
 			_linuxWatcher = null;

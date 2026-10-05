@@ -31,7 +31,7 @@ namespace Files.App.ViewModels.Previews
 			{
 				using var timeout = CancellationTokenSource.CreateLinkedTokenSource(LoadCancelledTokenSource.Token);
 				timeout.CancelAfter(TimeSpan.FromSeconds(5));
-				using var source = Files.Platform.Linux.Previews.PreviewFile.OpenRead(Item.ItemPath!, timeout.Token);
+				using var source = await OpenPreviewReadAsync(timeout.Token);
 				using var snapshot = await MediaPreviewInput.ReadAsync(source, Item.FileExtension?.ToLowerInvariant(), timeout.Token);
 				using var input = new PreviewReadStream(snapshot, MediaPreviewInput.MaxBytes, timeout.Token);
 				using var file = OpenMedia(new ReadOnlyMediaFile(Item.ItemPath!, input), Item.FileExtension?.ToLowerInvariant());

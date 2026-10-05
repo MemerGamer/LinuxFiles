@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MPL-2.0
 
 using System.Collections.Concurrent;
+#if WINDOWS
 using Windows.Win32;
 using Windows.Win32.Storage.FileSystem;
 using Windows.Win32.UI.Shell;
+#endif
 
 namespace Files.App.Utils.Storage
 {
@@ -25,6 +27,7 @@ namespace Files.App.Utils.Storage
 			if (!OperatingSystem.IsWindows())
 				return string.Empty;
 
+#if WINDOWS
 			if (typeNameCache.TryGetValue(extension, out var cached))
 				return cached;
 
@@ -47,6 +50,9 @@ namespace Files.App.Utils.Storage
 
 			typeNameCache[extension] = typeName;
 			return typeName;
+#else
+			return string.Empty;
+#endif
 		}
 	}
 }

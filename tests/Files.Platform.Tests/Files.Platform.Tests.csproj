@@ -41,4 +41,8 @@
         <Compile Include="../../src/Files.App/Utils/Storage/Helpers/StorableWithPath.cs" Link="Storables/StorableWithPath.cs" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Compile Include="../../src/Files.App.Storage/Archives/*.cs" LinkBase="Archives/Storables" />
+        <Compile Include="../../src/Files.Shared/Helpers/FileExtensionHelpers.cs" Link="Archives/FileExtensionHelpers.cs" />
+    </ItemGroup>
 </Project>

@@ -8,6 +8,7 @@ namespace Files.App.Extensions
 {
 	public static class ShellNewEntryExtensions
 	{
+#if WINDOWS || FILES_WIN32_COMPAT
 		public static async Task<List<ShellNewEntry>> GetNewContextMenuEntries()
 		{
 			var shellEntryList = new List<ShellNewEntry>();
@@ -25,6 +26,7 @@ namespace Files.App.Extensions
 		{
 			return await SafetyExtensions.IgnoreExceptions(() => ShellNewMenuHelper.GetNewContextMenuEntryForType(extension), App.Logger);
 		}
+#endif
 
 		public static async Task<FilesystemResult<BaseStorageFile>> Create(this ShellNewEntry shellEntry, string filePath, IShellPage associatedInstance)
 		{

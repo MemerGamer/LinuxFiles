@@ -21,13 +21,30 @@ namespace Files.App.Utils.Storage
 		public override string Name => File.Name;
 		public override string DisplayName => File.DisplayName;
 		public override string ContentType => File.ContentType;
+#if WINDOWS
 		public override string DisplayType => File.DisplayType;
+#else
+		// Uno does not implement these members and throws
+		public override string DisplayType => string.Empty;
+#endif
 		public override string FileType => File.FileType;
+#if WINDOWS
 		public override string FolderRelativeId => File.FolderRelativeId;
+#else
+		public override string FolderRelativeId => string.Empty;
+#endif
 
 		public override DateTimeOffset DateCreated => File.DateCreated;
+#if WINDOWS
 		public override Windows.Storage.FileAttributes Attributes => File.Attributes;
+#else
+		public override Windows.Storage.FileAttributes Attributes => default;
+#endif
+#if WINDOWS
 		public override IStorageItemExtraProperties Properties => File.Properties;
+#else
+		public override IStorageItemExtraProperties Properties => null!;
+#endif
 
 		public SystemStorageFile(StorageFile file)
 		{
@@ -108,6 +125,7 @@ namespace Files.App.Utils.Storage
 						return destFile;
 					}
 				}
+#if WINDOWS
 				catch (UnauthorizedAccessException) // shortcuts & .url
 				{
 					if (!string.IsNullOrEmpty(destFolder.Path))
@@ -128,6 +146,12 @@ namespace Files.App.Utils.Storage
 					}
 					throw;
 				}
+#else
+				catch (UnauthorizedAccessException)
+				{
+					throw;
+				}
+#endif
 			});
 		}
 

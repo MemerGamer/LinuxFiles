@@ -226,21 +226,7 @@ namespace Files.App.Services
 		{
 			try
 			{
-				var listing = await ArchiveService.ListAsync(archiveFilePath, string.IsNullOrEmpty(password) ? null : password);
-				string? first = null;
-				foreach (var entry in listing.Entries)
-				{
-					var segment = entry.Path.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(s => s is not ".");
-					if (segment is null)
-						continue;
-
-					if (first is null)
-						first = segment;
-					else if (segment != first)
-						return true;
-				}
-
-				return false;
+				return await ArchiveService.HasMultipleTopLevelEntriesAsync(archiveFilePath, string.IsNullOrEmpty(password) ? null : password);
 			}
 			catch (Exception)
 			{

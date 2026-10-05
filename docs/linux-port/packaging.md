@@ -115,6 +115,14 @@ files, which is how the package was build-tested with `makepkg` here (resulting 
 installed on the dev box, so the package is not linted. `aur/linuxfiles/PKGBUILD` (from source) is unchanged and
 unbuilt.
 
+## Nightly builds
+
+`.github/workflows/nightly-linux.yml` builds the tarball and AppImage on every push to `main` and replaces the
+single rolling pre-release at https://github.com/MemerGamer/LinuxFiles/releases/tag/nightly (stable asset names
+`LinuxFiles-nightly-linux-x64.tar.gz` and `LinuxFiles-nightly-x86_64.AppImage`; the Flatpak is only built for
+`linux-v*` tags). Pull requests targeting `main` get the same files as workflow artifacts with a read-only token.
+Try it: `curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/LinuxFiles-nightly-x86_64.AppImage && chmod +x LinuxFiles-nightly-x86_64.AppImage && ./LinuxFiles-nightly-x86_64.AppImage`
+
 ## Becoming the default file manager (Phase 6, not done yet)
 
 1. `inode/directory`: already in the desktop entry's `MimeType=`. Users (or the installer's post-install hook)

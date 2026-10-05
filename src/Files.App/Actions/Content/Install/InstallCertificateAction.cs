@@ -36,10 +36,11 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync(object? parameter = null)
-		{
-			await ContextMenu.InvokeVerb("add", context.SelectedItems.Select(x => x.ItemPath).ToArray());
-		}
+#if !WINDOWS
+		// LINUX-TODO(install): this Windows command is hidden on Linux.
+		public Task ExecuteAsync(object? parameter = null)
+			=> Task.CompletedTask;
+#endif
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

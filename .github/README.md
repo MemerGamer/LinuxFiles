@@ -32,6 +32,14 @@ cd LinuxFiles
 scripts/linux/install-local.sh
 ```
 
+### Nightly builds
+
+Every merge to `main` publishes a tarball and AppImage to the rolling [nightly pre-release](https://github.com/MemerGamer/LinuxFiles/releases/tag/nightly). Run it with:
+
+```sh
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/LinuxFiles-nightly-x86_64.AppImage && chmod +x LinuxFiles-nightly-x86_64.AppImage && ./LinuxFiles-nightly-x86_64.AppImage
+```
+
 See [docs/linux-port/packaging.md](../docs/linux-port/packaging.md) for packaging details and [docs/linux-port/PLAN.md](../docs/linux-port/PLAN.md) for the roadmap.
 
 ## Reporting bugs

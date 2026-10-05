@@ -25,7 +25,7 @@ namespace Files.App.Utils.Storage
 			Arguments = item.Arguments;
 			WorkingDirectory = item.WorkingDirectory;
 			RunAsAdmin = item.RunAsAdmin;
-			ShowWindowCommand = item.ShowWindowCommand;
+			ShowWindowCommand = (Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD)item.ShowWindowCommand;
 		}
 	}
 

@@ -1,0 +1,119 @@
+# Copyright (c) Files Community
+# Licensed under the MIT License.
+
+# Abstract:
+#   Builds the self-contained linux-x64 tarball and AppImage on every push to main and publishes them to
+#   one rolling "nightly" GitHub pre-release with stable asset names. Pull requests targeting main get the
+#   same build as workflow artifacts only (read-only token). The Flatpak is left to package-linux.yml.
+
+name: Nightly Linux
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'nightly' }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  build-linux-x64:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Checkout the repository
+      uses: actions/checkout@v6
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+
+    - name: Cache NuGet packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.nuget/packages
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+        restore-keys: |
+          ${{ runner.os }}-nuget-
+
+    - name: Publish self-contained linux-x64
+      run: scripts/linux/publish.sh --rid linux-x64 --tarball
+
+    - name: Build AppImage
+      run: packaging/linux/appimage/build-appimage.sh
+
+    - name: Stage assets with stable names
+      run: |
+        mkdir -p dist
+        cp artifacts/files-linux-x64.tar.gz dist/LinuxFiles-nightly-linux-x64.tar.gz
+        cp artifacts/Files-x86_64.AppImage dist/LinuxFiles-nightly-x86_64.AppImage
+
+    - name: Upload packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: linuxfiles-nightly-linux-x64
+        path: dist/*
+        if-no-files-found: error
+
+  publish-nightly:
+
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: build-linux-x64
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+
+    - name: Checkout the repository
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Download packages
+      uses: actions/download-artifact@v4
+      with:
+        name: linuxfiles-nightly-linux-x64
+        path: dist
+
+    - name: Replace the nightly release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.sha }}
+      run: |
+        short="${SHA:0:7}"
+
+        # Commit list since the previous nightly (falls back to the last 20 commits).
+        prev="$(gh api "repos/$REPO/git/ref/tags/nightly" --jq '.object.sha' 2>/dev/null || true)"
+        if [ -n "$prev" ] && git cat-file -e "$prev^{commit}" 2>/dev/null; then
+          range="$prev..$SHA"
+        else
+          range="-20 $SHA"
+        fi
+        {
+          echo "Rolling build of \`main\` at $SHA. Replaced on every push; not for production use."
+          echo
+          echo "Run the AppImage: \`chmod +x LinuxFiles-nightly-x86_64.AppImage && ./LinuxFiles-nightly-x86_64.AppImage\`"
+          echo
+          echo "### Changes since the previous nightly"
+          # shellcheck disable=SC2086
+          git log --no-merges --format='- %h %s' $range
+        } > notes.md
+
+        gh release delete nightly -R "$REPO" --cleanup-tag --yes 2>/dev/null || true
+        gh release create nightly -R "$REPO" --target "$SHA" --prerelease \
+          --title "Nightly (main @ $short)" --notes-file notes.md \
+          dist/LinuxFiles-nightly-linux-x64.tar.gz dist/LinuxFiles-nightly-x86_64.AppImage

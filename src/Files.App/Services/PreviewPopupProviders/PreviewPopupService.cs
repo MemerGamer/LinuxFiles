@@ -10,8 +10,10 @@ namespace Files.App.Services.PreviewPopupProviders
 		{			
 			if (await QuickLookProvider.Instance.DetectAvailability())
 				return await Task.FromResult<IPreviewPopupProvider>(QuickLookProvider.Instance);
+#if WINDOWS
 			if (await SeerProProvider.Instance.DetectAvailability())
 				return await Task.FromResult<IPreviewPopupProvider>(SeerProProvider.Instance);
+#endif
 			if (await PowerToysPeekProvider.Instance.DetectAvailability())
 				return await Task.FromResult<IPreviewPopupProvider>(PowerToysPeekProvider.Instance);
 			else

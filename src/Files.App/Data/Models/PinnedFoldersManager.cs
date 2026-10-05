@@ -138,12 +138,17 @@ namespace Files.App.Data.Models
 
 		private static string? GetLibraryDisplayName(string libraryPath)
 		{
+#if !WINDOWS
+			// Windows libraries (.library-ms) don't exist on Linux
+			return null;
+#else
 			using var storable = WindowsStorable.TryParse(libraryPath);
 			if (storable is null)
 				return null;
 
 			var displayName = storable.GetDisplayName(SIGDN.SIGDN_NORMALDISPLAY);
 			return string.IsNullOrEmpty(displayName) ? null : displayName;
+#endif
 		}
 
 		private async Task LoadIconForLocationItemAsync(LocationItem locationItem, string path, bool isFolder = true)

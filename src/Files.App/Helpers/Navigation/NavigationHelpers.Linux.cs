@@ -7,6 +7,7 @@ using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
+using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.IO;
@@ -31,6 +32,22 @@ namespace Files.App.Helpers
 					var foldersSettings = Ioc.Default.GetRequiredService<IUserSettingsService>().FoldersSettingsService;
 					await OpenPath(forceOpenInNewTab, foldersSettings.OpenFoldersInNewTab, path, associatedInstance, selectItems);
 					return true;
+				}
+
+				// Members of an archive being browsed; the archive file itself still opens with its default application
+				if (FileExtensionHelpers.IsZipPath(path, includeRoot: false))
+				{
+					var resolved = await Ioc.Default.GetRequiredService<Files.Core.Storage.Contracts.IStorableResolver>().TryGetAsync(path);
+					if (resolved.Item is OwlCore.Storage.IFolder)
+					{
+						var foldersSettings = Ioc.Default.GetRequiredService<IUserSettingsService>().FoldersSettingsService;
+						await OpenPath(forceOpenInNewTab, foldersSettings.OpenFoldersInNewTab, path, associatedInstance, selectItems);
+						return true;
+					}
+
+					// LINUX-TODO(archives): open archive members by extracting them to a private temporary copy first
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
+					return false;
 				}
 
 				if (!File.Exists(path))
@@ -184,6 +201,34 @@ namespace Files.App.Helpers
 				return await LinuxOpenWithDialog.ShowAsync(path);
 
 			return await ExecutePlanAsync(path, await PlanAsync(path));
+		}
+
+		/// <summary>
+		/// Runs an executable with the dropped items as arguments. The complete argv (target and every item) is shown and
+		/// exactly that argv is run; anything that is not a confirmable executable, or too large to show in full, is refused.
+		/// </summary>
+		internal static async Task<bool> RunWithItemsLinuxAsync(string executablePath, IReadOnlyList<string> arguments)
+		{
+			var plan = await PlanAsync(executablePath);
+			var argv = new List<string>(arguments.Count + 1) { plan.Target };
+			argv.AddRange(arguments);
+
+			if (!OpenDecision.NeedsRunConfirmation(plan.Action) || DisplaySanitizer.FullArguments(argv) is not { } lines)
+			{
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(DisplaySanitizer.Field(plan.Target)));
+				return false;
+			}
+
+			var confirmed = await DialogDisplayHelper.ShowDialogAsync(
+				Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(plan.Target), 60)),
+				Strings.LinuxWouldRun.GetLocalizedResource() + "\n" + string.Join('\n', lines),
+				Strings.Run.GetLocalizedResource(),
+				Strings.Cancel.GetLocalizedResource());
+
+			if (!confirmed)
+				return true;
+
+			return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(argv[0], argv.Skip(1).ToList(), Path.GetDirectoryName(argv[0])) : false;
 		}
 
 		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan)

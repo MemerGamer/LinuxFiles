@@ -8,7 +8,6 @@ using System.Net;
 using System.Text;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using Windows.Win32.UI.WindowsAndMessaging;
 
 namespace Files.App.Helpers
 {
@@ -330,7 +329,7 @@ namespace Files.App.Helpers
 		/// <summary>
 		/// Updates ListedItem properties for a shortcut
 		/// </summary>
-		public static void UpdateShortcutItemProperties(IShortcutItem item, string? targetPath, string? arguments, string? workingDir, bool runAsAdmin, SHOW_WINDOW_CMD showWindowCommand)
+		public static void UpdateShortcutItemProperties(IShortcutItem item, string? targetPath, string? arguments, string? workingDir, bool runAsAdmin, ShowWindowCommand showWindowCommand)
 		{
 			ArgumentNullException.ThrowIfNull(targetPath);
 			item.TargetPath = Environment.ExpandEnvironmentVariables(targetPath);
@@ -347,6 +346,7 @@ namespace Files.App.Helpers
 
 			var credentialDialogViewModel = new CredentialDialogViewModel() { CanBeAnonymous = isFtp, PasswordOnly = !isFtp };
 
+#if WINDOWS
 			if (sender is ZipStorageFolder zipFolder)
 			{
 				credentialDialogViewModel.PasswordValidator = async (password) =>
@@ -356,6 +356,7 @@ namespace Files.App.Helpers
 				};
 			}
 
+#endif
 			IDialogService dialogService = Ioc.Default.GetRequiredService<IDialogService>();
 			var dialogResult = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
 				dialogService.ShowDialogAsync(credentialDialogViewModel));

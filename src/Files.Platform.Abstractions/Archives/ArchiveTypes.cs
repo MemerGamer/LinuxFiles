@@ -77,7 +77,8 @@ namespace Files.Platform.Abstractions.Archives
 	/// <param name="Entries">The entries.</param>
 	/// <param name="IsEncrypted">Whether at least one entry is encrypted.</param>
 	/// <param name="IsSolid">Whether the archive is solid.</param>
-	public sealed record ArchiveListing(IReadOnlyList<ArchiveEntryInfo> Entries, bool IsEncrypted, bool IsSolid);
+	/// <param name="IsTruncated">Whether listing stopped at an entry, name, byte or time cap, so <paramref name="Entries"/> is partial (too large to list).</param>
+	public sealed record ArchiveListing(IReadOnlyList<ArchiveEntryInfo> Entries, bool IsEncrypted, bool IsSolid, bool IsTruncated = false);
 
 	/// <summary>
 	/// Zip bomb guards. A value of zero or less disables that guard.
@@ -110,7 +111,7 @@ namespace Files.Platform.Abstractions.Archives
 	/// <summary>
 	/// Describes an item of the extraction that already exists at the destination.
 	/// </summary>
-	/// <param name="EntryPath">The entry path relative to the destination.</param>
+	/// <param name="EntryPath">The entry path relative to the destination, escaped for display. Use DestinationPath for file operations.</param>
 	/// <param name="DestinationPath">The existing path.</param>
 	/// <param name="IsDirectory">Whether the incoming item is a folder.</param>
 	public sealed record ArchiveConflict(string EntryPath, string DestinationPath, bool IsDirectory);

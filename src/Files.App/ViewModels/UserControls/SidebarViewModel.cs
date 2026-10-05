@@ -1338,7 +1338,7 @@ namespace Files.App.ViewModels.UserControls
 						// Some applications such as Edge can't raise the drop event by the Move flag (#14008), so we set the Copy flag as well.
 						operationType = DataPackageOperation.Move | DataPackageOperation.Copy;
 					}
-					else if (storageItems.Any(x => x.Item is ZipStorageFile || x.Item is ZipStorageFolder)
+					else if (storageItems.Any(x => x.IsArchiveMember())
 						|| ZipStorageFolder.IsZipPath(locationItem.Path))
 					{
 						captionText = string.Format(Strings.CopyToFolderCaptionText.GetLocalizedResource(), locationItem.Text);
@@ -1494,7 +1494,11 @@ namespace Files.App.ViewModels.UserControls
 				if (!filesTags.Contains(fileTag.Uid))
 				{
 					filesTags = [.. filesTags, fileTag.Uid];
+#if WINDOWS
 					var fileFRN = await FileTagsHelper.GetFileFRN(item.Item);
+#else
+					var fileFRN = FileTagsHelper.GetFileFRN(path);
+#endif
 					dbInstance.SetTags(path, fileFRN, filesTags);
 					await FileTagsHelper.WriteFileTagAsync(path, filesTags);
 					pathToTags[path] = filesTags;

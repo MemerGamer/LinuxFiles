@@ -53,7 +53,11 @@ namespace Files.App.Utils
 		DateTimeOffset ItemDateCreatedReal { get; set; }
 		string? ItemDateModified { get; }
 		DateTimeOffset ItemDateModifiedReal { get; set; }
+#if WINDOWS
 		BaseStorageFile? ItemFile { get; set; }
+#else
+		IFile? ItemFile { get; set; }
+#endif
 		string? ItemNameRaw { get; set; }
 		string? ItemPath { get; set; }
 		ObservableCollection<FileProperty>? ItemProperties { get; set; }

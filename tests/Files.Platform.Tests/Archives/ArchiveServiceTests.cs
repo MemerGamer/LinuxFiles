@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.Archives;
+using Files.App.Storage.Archives;
 using Files.Platform.Abstractions.FileOperations;
 using Files.Platform.Linux.Archives;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -681,6 +682,19 @@ namespace Files.Platform.Tests.Archives
 			await Assert.ThrowsExactlyAsync<ArchivePasswordException>(() => service.ExtractAsync(archive, Out, new ArchiveExtractOptions { Password = "wrong" }));
 			Assert.AreEqual(0, Directory.GetFileSystemEntries(Out).Length);
 
+			await Assert.ThrowsExactlyAsync<ArchivePasswordException>(() => service.OpenEntryAsync(archive, "Documents/a.txt"));
+			await Assert.ThrowsExactlyAsync<ArchivePasswordException>(() => service.OpenEntryAsync(archive, "Documents/a.txt", "wrong"));
+			using (var stream = await service.OpenEntryAsync(archive, "Documents/a.txt", "s3cret"))
+			using (var reader = new StreamReader(stream))
+				Assert.AreEqual("alpha", await reader.ReadToEndAsync());
+
+			var prompt = new TestPasswordPrompt();
+			var route = new ArchiveStorableRoute(service, prompt);
+			var member = (ArchiveEntryFile)(await route.TryGetAsync(archive + "/Documents/a.txt")).Item!;
+			using (var stream = await member.OpenStreamAsync(FileAccess.Read))
+				Assert.AreEqual(5, stream.Length);
+			Assert.AreEqual(2, prompt.Requests);
+
 			var ok = await service.ExtractAsync(archive, Out, new ArchiveExtractOptions { Password = "s3cret" });
 			Assert.IsTrue(ok.Succeeded, ok.Error);
 			Assert.AreEqual("alpha", File.ReadAllText(Path.Combine(Out, "Documents", "a.txt")));
@@ -754,6 +768,16 @@ namespace Files.Platform.Tests.Archives
 			catch (System.ComponentModel.Win32Exception)
 			{
 				return false;
+			}
+		}
+
+		private sealed class TestPasswordPrompt : IArchivePasswordPrompt
+		{
+			public int Requests { get; private set; }
+			public Task<string?> RequestPasswordAsync(string archivePath, bool retry, CancellationToken cancellationToken = default)
+			{
+				Assert.AreEqual(Requests > 0, retry);
+				return Task.FromResult<string?>(++Requests == 1 ? "wrong" : "s3cret");
 			}
 		}
 

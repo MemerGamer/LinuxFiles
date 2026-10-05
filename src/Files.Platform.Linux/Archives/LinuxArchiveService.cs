@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.Archives;
+using Files.Platform.Linux.Previews;
 using SharpCompress.Common;
 using SharpCompress.Readers;
 
@@ -24,8 +25,14 @@ namespace Files.Platform.Linux.Archives
 		[
 			".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tar.lz",
 			".tgz", ".tbz2", ".tbz", ".txz", ".tzst",
-			".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".lz",
+			".zip", ".jar", ".mrpack", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".lz",
 		];
+
+		private sealed record ScanLimits(int Entries, long NameBytes, long HeaderBytes, long StreamBytes, TimeSpan Time);
+
+		// Header bytes bound zip/7z/rar directories; stream bytes bound the decompressed scan of tar and single-file formats
+		private static readonly ScanLimits ListScan = new(100_000, 16L * 1024 * 1024, 128L * 1024 * 1024, 16L * 1024 * 1024 * 1024, TimeSpan.FromSeconds(60));
+		private static readonly ScanLimits QuickScan = new(10_000, 2L * 1024 * 1024, 32L * 1024 * 1024, 1L * 1024 * 1024 * 1024, TimeSpan.FromSeconds(10));
 
 		private readonly ISevenZipRunner sevenZip;
 
@@ -82,45 +89,128 @@ namespace Files.Platform.Linux.Archives
 		}
 
 		/// <inheritdoc/>
-		public Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
+		public async Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
 		{
-			return Task.Run(() =>
+			var fallback = GetDefaultExtractFolderName(archivePath);
+			var entries = new List<ArchiveEntryInfo>();
+			var encrypted = false;
+			var (truncated, solid) = await ScanHeadersAsync(archivePath, password, fileNameEncoding, entry =>
 			{
-				using var archive = OpenArchive(archivePath, password, fileNameEncoding);
-				var fallback = GetDefaultExtractFolderName(archivePath);
-				var entries = new List<ArchiveEntryInfo>();
-				var encrypted = false;
+				encrypted |= entry.IsEncrypted;
+				entries.Add(ToInfo(entry, fallback));
+				return true;
+			}, ListScan, cancellationToken).ConfigureAwait(false);
 
-				foreach (var (entry, _) in archive.Entries())
-				{
-					cancellationToken.ThrowIfCancellationRequested();
-					encrypted |= entry.IsEncrypted;
-					entries.Add(new ArchiveEntryInfo(
-						(entry.Key ?? fallback).Replace('\\', '/'),
-						entry.IsDirectory,
-						Math.Max(entry.Size, 0),
-						Math.Max(entry.CompressedSize, 0),
-						entry.Modified,
-						entry.IsEncrypted,
-						entry.LinkTarget));
-				}
-
-				return new ArchiveListing(entries, encrypted, archive.IsSolid);
-			}, cancellationToken);
+			return new ArchiveListing(entries, encrypted, solid, truncated);
 		}
+
+		/// <inheritdoc/>
+		public async Task<bool> HasMultipleTopLevelEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
+		{
+			string? first = null;
+			var multiple = false;
+			try
+			{
+				var (truncated, _) = await ScanHeadersAsync(archivePath, password, null, entry =>
+				{
+					var segment = (entry.Key ?? string.Empty).Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(s => s is not ".");
+					if (segment is null)
+						return true;
+					if (first is null)
+						first = segment;
+					else if (segment != first)
+						multiple = true;
+					return !multiple;
+				}, QuickScan, cancellationToken).ConfigureAwait(false);
+
+				// Too large to tell: extracting into a child folder is the safe choice
+				return multiple || truncated;
+			}
+			catch (ArchivePasswordException)
+			{
+				return true;
+			}
+		}
+
+		/// <inheritdoc/>
+		public async Task<ArchiveListing> ListForBrowsingAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
+		{
+			// Browsing only needs the header caps; the decompressed-size and ratio guards apply per entry in OpenEntryAsync
+			var listing = await ListAsync(archivePath, password, fileNameEncoding, cancellationToken).ConfigureAwait(false);
+			if (listing.IsTruncated)
+				throw new ArchiveSecurityException("The archive is too large to browse.");
+
+			return listing;
+		}
+
+		private static ArchiveEntryInfo ToInfo(EntryData entry, string fallback) => new(
+			(entry.Key ?? fallback).Replace('\\', '/'),
+			entry.IsDirectory,
+			Math.Max(entry.Size, 0),
+			Math.Max(entry.CompressedSize, 0),
+			entry.Modified,
+			entry.IsEncrypted,
+			IsLink(entry) ? entry.LinkTarget ?? string.Empty : null);
 
 		/// <inheritdoc/>
 		public async Task<bool> IsEncryptedAsync(string archivePath, CancellationToken cancellationToken = default)
 		{
+			// Tar and single-file compression formats have no encryption
+			var name = Path.GetFileName(archivePath).ToLowerInvariant();
+			if (ArchiveSource.TarCodec(name) is not null || ArchiveSource.SingleFileCodec(name) is not null)
+				return false;
+
+			var found = false;
 			try
 			{
-				return (await ListAsync(archivePath, null, null, cancellationToken).ConfigureAwait(false)).IsEncrypted;
+				await ScanHeadersAsync(archivePath, null, null, entry => !(found = entry.IsEncrypted), QuickScan, cancellationToken).ConfigureAwait(false);
+				return found;
 			}
 			catch (ArchivePasswordException)
 			{
 				// Encrypted headers
 				return true;
 			}
+		}
+
+		/// <summary>Streams entry headers without buffering content. Hitting a cap ends the scan and reports it as truncated instead of failing.</summary>
+		private Task<(bool Truncated, bool Solid)> ScanHeadersAsync(string archivePath, string? password, Encoding? encoding, Func<EntryData, bool> visit, ScanLimits limits, CancellationToken cancellationToken)
+		{
+			return Task.Run(() =>
+			{
+				using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+				timeout.CancelAfter(limits.Time);
+				var solid = false;
+				try
+				{
+					var name = Path.GetFileName(archivePath).ToLowerInvariant();
+					var inputCap = ArchiveSource.TarCodec(name) is not null || ArchiveSource.SingleFileCodec(name) is not null ? limits.StreamBytes : limits.HeaderBytes;
+					using var archive = OpenArchive(archivePath, password, encoding, inputCap, timeout.Token);
+					solid = archive.IsSolid;
+					var count = 0;
+					long nameBytes = 0;
+					foreach (var (entry, _) in archive.Entries(headersOnly: true))
+					{
+						timeout.Token.ThrowIfCancellationRequested();
+						nameBytes += Encoding.UTF8.GetByteCount(entry.Key ?? string.Empty);
+						if (count >= limits.Entries || nameBytes > limits.NameBytes)
+							return (true, solid);
+						count++;
+						if (!visit(entry))
+							break;
+					}
+
+					return (false, solid);
+				}
+				catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+				{
+					return (true, solid);
+				}
+				catch (InvalidDataException ex) when (ex.Message == PreviewReadStream.LimitMessage)
+				{
+					return (true, solid);
+				}
+			}, cancellationToken);
 		}
 
 		private static string? FindExtension(string path)
@@ -135,11 +225,11 @@ namespace Files.Platform.Linux.Archives
 			return null;
 		}
 
-		private static ArchiveSource OpenArchive(string path, string? password, Encoding? encoding)
+		private static ArchiveSource OpenArchive(string path, string? password, Encoding? encoding, long? maxBytes = null, CancellationToken cancellationToken = default)
 		{
 			try
 			{
-				return ArchiveSource.Open(path, password, encoding);
+				return ArchiveSource.Open(path, password, encoding, maxBytes, cancellationToken);
 			}
 			catch (Exception ex) when (ex is CryptographicException or System.Security.Cryptography.CryptographicException)
 			{

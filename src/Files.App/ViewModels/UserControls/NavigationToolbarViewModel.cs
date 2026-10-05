@@ -14,8 +14,6 @@ using System.IO;
 using System.Windows.Input;
 using Windows.ApplicationModel.DataTransfer;
 using WinRT;
-using Windows.Win32;
-using Windows.Win32.Storage.FileSystem;
 
 namespace Files.App.ViewModels.UserControls
 {
@@ -493,9 +491,7 @@ namespace Files.App.ViewModels.UserControls
 			}
 
 			// Copy be default when dragging from zip
-			else if (storageItems.Any(x =>
-					x.Item is ZipStorageFile ||
-					x.Item is ZipStorageFolder) ||
+			else if (storageItems.Any(x => x.IsArchiveMember()) ||
 					ZipStorageFolder.IsZipPath(pathBoxItem.Path))
 			{
 				e.DragUIOverride.Caption = string.Format(Strings.CopyToFolderCaptionText.GetLocalizedResource(), pathBoxItem.Title);
@@ -712,7 +708,11 @@ namespace Files.App.ViewModels.UserControls
 			var path = pathItem.Path
 				?? throw new InvalidOperationException("The path box item does not have a path.");
 
+#if WINDOWS
 			var childFolders = OperatingSystem.IsWindows() ? GetSubfolders(path) : await GetSubfoldersAsync(path);
+#else
+			var childFolders = await GetSubfoldersAsync(path);
+#endif
 
 			// Fall back to StorageFolder API for non-filesystem paths (e.g. FTP)
 			if (childFolders is null)
@@ -825,56 +825,6 @@ namespace Files.App.ViewModels.UserControls
 			{
 				return null;
 			}
-		}
-
-		/// <summary>
-		/// Enumerates subfolders using Win32 API, including hidden folders based on user settings.
-		/// Returns null if the path cannot be enumerated with Win32.
-		/// </summary>
-		private unsafe List<(string Name, string Path, bool IsHidden)>? GetSubfolders(string parentPath)
-		{
-			WIN32_FIND_DATAW findData = default;
-			using FindCloseSafeHandle hFile = PInvoke.FindFirstFileEx(
-				$"{parentPath}{Path.DirectorySeparatorChar}*.*",
-				FINDEX_INFO_LEVELS.FindExInfoBasic,
-				&findData,
-				FINDEX_SEARCH_OPS.FindExSearchNameMatch,
-				FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
-
-			if (hFile.IsInvalid)
-				return null;
-
-			var showHidden = UserSettingsService.FoldersSettingsService.ShowHiddenItems;
-			var showSystem = UserSettingsService.FoldersSettingsService.ShowProtectedSystemFiles;
-			var showDot = UserSettingsService.FoldersSettingsService.ShowDotFiles;
-			var folders = new List<(string Name, string Path, bool IsHidden)>();
-
-			do
-			{
-				if (((FileAttributes)findData.dwFileAttributes & FileAttributes.Directory) == 0)
-					continue;
-
-				string fileName = findData.cFileName.ToString();
-				if (fileName is "." or "..")
-					continue;
-
-				bool isHidden = ((FileAttributes)findData.dwFileAttributes & FileAttributes.Hidden) != 0;
-				bool isSystem = ((FileAttributes)findData.dwFileAttributes & FileAttributes.System) != 0;
-
-				if (isHidden && (!showHidden || (isSystem && !showSystem)))
-					continue;
-
-				if (fileName.StartsWith('.') && !showDot)
-					continue;
-
-				folders.Add((fileName, Path.Combine(parentPath, fileName), isHidden));
-			}
-			while (PInvoke.FindNextFile(hFile, out findData));
-
-			var naturalComparer = NaturalStringComparer.GetForProcessor();
-			folders.Sort((a, b) => naturalComparer.Compare(a.Name, b.Name));
-
-			return folders;
 		}
 
 		private async Task LoadFlyoutItemIconAsync(MenuFlyoutItem flyoutItem, string path)
@@ -1056,10 +1006,15 @@ namespace Files.App.ViewModels.UserControls
 
 		private static async Task<bool> LaunchApplicationFromPath(string currentInput, string workingDir)
 		{
+#if !WINDOWS
+			// LINUX-TODO(launch): running commands typed into the address bar; the input is reported as an invalid path
+			return await Task.FromResult(false);
+#else
 			var args = CommandLineParser.SplitArguments(currentInput);
 			return await LaunchHelper.LaunchAppAsync(
 				args.FirstOrDefault("").Trim('"'), string.Join(' ', args.Skip(1)), workingDir
 			);
+#endif
 		}
 
 		public async Task PopulateOmnibarSuggestionsForPathMode()

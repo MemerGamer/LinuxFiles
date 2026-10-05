@@ -1,13 +1,14 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if !WINDOWS
 using Files.App.Dialogs;
 using Files.Shared.Helpers;
 using Microsoft.UI.Xaml.Controls;
 using System.IO;
 using System.Text;
-using Windows.Foundation.Metadata;
-using Windows.Storage;
+
+
 
 namespace Files.App.Actions
 {
@@ -42,22 +43,20 @@ namespace Files.App.Actions
 			if (string.IsNullOrEmpty(archivePath))
 				return;
 
-			BaseStorageFile? archive = await StorageHelpers.ToStorageItem<BaseStorageFile>(archivePath);
-
-			if (archive?.Path is null)
+			if (!File.Exists(archivePath))
 				return;
 
-			var isArchiveEncrypted = await FilesystemTasks.Wrap(() => StorageArchiveService.IsEncryptedAsync(archive.Path));
-			var isArchiveEncodingUndetermined = await FilesystemTasks.Wrap(() => StorageArchiveService.IsEncodingUndeterminedAsync(archive.Path));
+			var isArchiveEncrypted = await FilesystemTasks.Wrap(() => StorageArchiveService.IsEncryptedAsync(archivePath));
+			var isArchiveEncodingUndetermined = await FilesystemTasks.Wrap(() => StorageArchiveService.IsEncodingUndeterminedAsync(archivePath));
 			Encoding? detectedEncoding = null;
 			if (isArchiveEncodingUndetermined)
 			{
-				detectedEncoding = await FilesystemTasks.Wrap(() => StorageArchiveService.DetectEncodingAsync(archive.Path));
+				detectedEncoding = await FilesystemTasks.Wrap(() => StorageArchiveService.DetectEncodingAsync(archivePath));
 			}
 			var password = string.Empty;
 			Encoding? encoding = null;
 
-			DecompressArchiveDialogViewModel decompressArchiveViewModel = new(archive)
+			DecompressArchiveDialogViewModel decompressArchiveViewModel = new(archivePath)
 			{
 				IsArchiveEncrypted = isArchiveEncrypted,
 				IsArchiveEncodingUndetermined = isArchiveEncodingUndetermined,
@@ -66,8 +65,7 @@ namespace Files.App.Actions
 			};
 			DecompressArchiveDialog decompressArchiveDialog = new() { ViewModel = decompressArchiveViewModel };
 
-			if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
-				decompressArchiveDialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
+			decompressArchiveDialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
 
 			ContentDialogResult option = await decompressArchiveDialog.TryShowAsync();
 			if (option != ContentDialogResult.Primary)
@@ -79,27 +77,18 @@ namespace Files.App.Actions
 			encoding = decompressArchiveViewModel.SelectedEncoding.Encoding;
 
 			// Check if archive still exists
-			if (!StorageHelpers.Exists(archive.Path))
+			if (!File.Exists(archivePath))
 				return;
 
-			BaseStorageFolder? destinationFolder = decompressArchiveViewModel.DestinationFolder;
 			string destinationFolderPath = decompressArchiveViewModel.DestinationFolderPath;
 
 			// Save extraction location for future use
 			SaveExtractionLocation(destinationFolderPath);
 
-			if (destinationFolder is null)
-			{
-				BaseStorageFolder? parentFolder = await StorageHelpers.ToStorageItem<BaseStorageFolder>(Path.GetDirectoryName(archive.Path) ?? string.Empty);
-				if (parentFolder is null)
-					return;
-
-				destinationFolder = await FilesystemTasks.WrapNullable(() => parentFolder.CreateFolderAsync(Path.GetFileName(destinationFolderPath), CreationCollisionOption.GenerateUniqueName).AsTask());
-			}
 
 			// Operate decompress
 			var result = await FilesystemTasks.Wrap(() =>
-				StorageArchiveService.DecompressAsync(archive.Path, destinationFolder?.Path ?? string.Empty, password, encoding));
+				StorageArchiveService.DecompressAsync(archivePath, destinationFolderPath, password, encoding));
 
 			if (decompressArchiveViewModel.OpenDestinationFolderOnCompletion)
 				await NavigationHelpers.OpenPath(destinationFolderPath, context.ShellPage, FilesystemItemType.Directory);
@@ -143,3 +132,5 @@ namespace Files.App.Actions
 		}
 	}
 }
+
+#endif

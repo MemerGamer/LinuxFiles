@@ -190,9 +190,7 @@ namespace Files.App.ViewModels.Layouts
 							// Some applications such as Edge can't raise the drop event by the Move flag (#14008), so we set the Copy flag as well.
 							e.AcceptedOperation = DataPackageOperation.Move | DataPackageOperation.Copy;
 						}
-						else if (draggedItems.Any(x =>
-							x.Item is ZipStorageFile ||
-							x.Item is ZipStorageFolder) ||
+						else if (draggedItems.Any(x => x.IsArchiveMember()) ||
 							ZipStorageFolder.IsZipPath(workingDirectory))
 						{
 							e.DragUIOverride.Caption = string.Format(Strings.CopyToFolderCaptionText.GetLocalizedResource(), folderName);

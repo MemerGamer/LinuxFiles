@@ -58,4 +58,35 @@ namespace Files.App.Services.Desktop
 
 		public Task<IEnumerable<string>> GetFoldersAsync() => Task.FromResult<IEnumerable<string>>([]);
 	}
+
+	// LINUX-TODO(pickers): open file/folder choosers through the xdg-desktop-portal FileChooser; until then pickers report "cancelled"
+	internal sealed class DesktopCommonDialogService : ICommonDialogService
+	{
+		public bool Open_FileOpenDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath, Guid? clientGuid = null)
+		{
+			filePath = string.Empty;
+			return false;
+		}
+
+		public bool Open_FileSaveDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath)
+		{
+			filePath = string.Empty;
+			return false;
+		}
+
+		public bool Open_NetworkConnectionDialog(nint hWnd, bool hideRestoreConnectionCheckBox = false, bool persistConnectionAtLogon = false, bool readOnlyPath = false, string? remoteNetworkName = null, bool useMostRecentPath = false) => false;
+	}
+
+	// Linux has no Start Menu pins
+	internal sealed class DesktopStartMenuService : IStartMenuService
+	{
+		[Obsolete("Use IsPinnedAsync instead. This method is used for a workaround in ListedItem class to avoid major refactoring.")]
+		public bool IsPinned(string itemPath) => false;
+
+		public Task<bool> IsPinnedAsync(IStorable storable) => Task.FromResult(false);
+
+		public Task PinAsync(IStorable storable, string? displayName = null) => Task.CompletedTask;
+
+		public Task UnpinAsync(IStorable storable) => Task.CompletedTask;
+	}
 }

@@ -11,6 +11,8 @@ namespace Files.Platform.Linux.Previews
 	/// <summary>Limits cumulative reads, including rereads after seeking, from untrusted preview input.</summary>
 	public sealed class PreviewReadStream : Stream
 	{
+		public const string LimitMessage = "The preview read limit was exceeded.";
+
 		private readonly Stream source;
 		private readonly CancellationToken cancellationToken;
 		private long remaining;
@@ -33,7 +35,7 @@ namespace Files.Platform.Linux.Previews
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			if (count > 0 && remaining == 0 && !(source.CanSeek && source.Position >= source.Length))
-				throw new InvalidDataException("The preview read limit was exceeded.");
+				throw new InvalidDataException(LimitMessage);
 			return (int)Math.Min(count, remaining);
 		}
 

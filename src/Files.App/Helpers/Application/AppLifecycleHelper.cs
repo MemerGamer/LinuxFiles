@@ -369,7 +369,11 @@ namespace Files.App.Helpers
 #endif
 					.AddSingleton<IAppThemeModeService, AppThemeModeService>()
 					.AddSingleton<IDialogService, DialogService>()
+#if WINDOWS
 					.AddSingleton<ICommonDialogService, CommonDialogService>()
+#else
+					.AddSingleton<ICommonDialogService, Files.App.Services.Desktop.DesktopCommonDialogService>()
+#endif
 					.AddSingleton<IImageService, ImagingService>()
 					.AddSingleton<IThreadingService, ThreadingService>()
 					.AddSingleton<ILocalizationService, LocalizationService>()
@@ -404,7 +408,11 @@ namespace Files.App.Helpers
 #endif
 					.AddSingleton<IRemovableDrivesService, RemovableDrivesService>()
 					.AddSingleton<INetworkService, NetworkService>()
+#if WINDOWS
 					.AddSingleton<IStartMenuService, StartMenuService>()
+#else
+					.AddSingleton<IStartMenuService, Files.App.Services.Desktop.DesktopStartMenuService>()
+#endif
 					.AddSingleton<IStorageCacheService, StorageCacheService>()
 					.AddSingleton<IIconCacheService, IconCacheService>()
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
@@ -441,6 +449,10 @@ namespace Files.App.Helpers
 			// Storable path resolution
 			services.AddStorables();
 			services.AddFtpStorables();
+#if !WINDOWS
+			Files.App.Storage.Archives.ArchiveServiceCollectionExtensions.AddArchiveStorables(services);
+			services.AddSingleton<Files.Platform.Abstractions.Archives.IArchivePasswordPrompt, Files.App.Actions.ArchivePasswordPrompt>();
+#endif
 
 			// Conditional DI
 #if WINDOWS

@@ -1,11 +1,12 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if !WINDOWS
 using Files.App.Dialogs;
 using Microsoft.UI.Xaml.Controls;
 using System.Text;
-using Windows.Foundation.Metadata;
-using Windows.Storage;
+
+
 
 namespace Files.App.Actions
 {
@@ -34,24 +35,21 @@ namespace Files.App.Actions
 			{
 				var password = string.Empty;
 
-				var archive = await StorageHelpers.ToStorageItem<BaseStorageFile>(selectedItem.ItemPath!);
+				var archivePath = selectedItem.ItemPath;
 				var currentFolderPath = context.ShellPage?.ShellViewModel?.CurrentFolder?.ItemPath;
-				if (archive?.Path is null)
+				if (string.IsNullOrEmpty(archivePath) || !SystemIO.File.Exists(archivePath) || string.IsNullOrEmpty(currentFolderPath))
 					return;
 
-				var currentFolder = await StorageHelpers.ToStorageItem<BaseStorageFolder>(currentFolderPath ?? string.Empty);
-
-				if (await FilesystemTasks.Wrap(() => StorageArchiveService.IsEncryptedAsync(archive.Path)))
+				if (await FilesystemTasks.Wrap(() => StorageArchiveService.IsEncryptedAsync(archivePath)))
 				{
-					DecompressArchiveDialogViewModel decompressArchiveViewModel = new(archive)
+					DecompressArchiveDialogViewModel decompressArchiveViewModel = new(archivePath)
 					{
 						IsArchiveEncrypted = true,
 						ShowPathSelection = false
 					};
 					DecompressArchiveDialog decompressArchiveDialog = new() { ViewModel = decompressArchiveViewModel };
 
-					if (ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
-						decompressArchiveDialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
+					decompressArchiveDialog.XamlRoot = MainWindow.Instance.Content.XamlRoot;
 
 					ContentDialogResult option = await decompressArchiveDialog.TryShowAsync();
 					if (option != ContentDialogResult.Primary)
@@ -60,17 +58,12 @@ namespace Files.App.Actions
 					password = Encoding.UTF8.GetString(decompressArchiveViewModel.Password!);
 				}
 
-				BaseStorageFolder? destinationFolder = null;
-				if (currentFolder is not null)
-				{
-					var destinationResult = await FilesystemTasks.WrapNullable(() =>
-						currentFolder.CreateFolderAsync(SystemIO.Path.GetFileNameWithoutExtension(archive.Path), CreationCollisionOption.GenerateUniqueName).AsTask());
-					destinationFolder = destinationResult.Result;
-				}
+				var destinationFolderPath = SystemIO.Path.Combine(currentFolderPath,
+					Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().GetDefaultExtractFolderName(archivePath));
 
 				// Operate decompress
 				await FilesystemTasks.Wrap(() =>
-					StorageArchiveService.DecompressAsync(selectedItem.ItemPath!, destinationFolder?.Path ?? string.Empty, password));
+					StorageArchiveService.DecompressAsync(selectedItem.ItemPath!, destinationFolderPath, password));
 			}
 		}
 
@@ -109,3 +102,5 @@ namespace Files.App.Actions
 		}
 	}
 }
+
+#endif

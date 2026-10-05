@@ -32,6 +32,33 @@ namespace Files.Platform.Tests.Launching
 			=> Assert.AreEqual(OpenAction.Refuse, OpenDecision.Decide(DesktopState.None, false, true, ExecutableKind.None, mime));
 
 		[TestMethod]
+		[DataRow(OpenAction.RunBinaryWithConfirm, true)]
+		[DataRow(OpenAction.RunScriptWithConfirm, true)]
+		[DataRow(OpenAction.OpenDefault, false)]
+		[DataRow(OpenAction.Refuse, false)]
+		[DataRow(OpenAction.LaunchDesktopTrusted, false)]
+		public void OnlyConfirmedActionsMayRunAFile(OpenAction action, bool expected)
+			=> Assert.AreEqual(expected, OpenDecision.NeedsRunConfirmation(action));
+
+		[TestMethod]
+		public async System.Threading.Tasks.Task DryRunStarter_SpawnsNothing()
+		{
+			var writer = new StringWriter();
+			var previous = System.Console.Error;
+			System.Console.SetError(writer);
+			try
+			{
+				await new DryRunProcessStarter().StartDetachedAsync(new ProcessLaunch("/nonexistent/evil", ["a"], null));
+			}
+			finally
+			{
+				System.Console.SetError(previous);
+			}
+
+			StringAssert.Contains(writer.ToString(), "[launch-dryrun] /nonexistent/evil a");
+		}
+
+		[TestMethod]
 		public void Desktop_TrustedOnlyInApplicationsDirectory_ExecBitIsNotTrust()
 		{
 			Assert.AreEqual(OpenAction.LaunchDesktopTrusted, OpenDecision.Decide(DesktopState.Valid, true, false, ExecutableKind.None));

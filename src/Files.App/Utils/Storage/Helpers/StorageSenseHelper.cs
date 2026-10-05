@@ -10,6 +10,10 @@ namespace Files.App.Utils.Storage
 	{
 		public static async Task OpenStorageSenseAsync(string path)
 		{
+#if !WINDOWS
+			// LINUX-TODO(storage-sense): no system storage cleanup page to open
+			await Task.CompletedTask;
+#else
 			if (!path.StartsWith(Constants.UserEnvironmentPaths.SystemDrivePath, StringComparison.OrdinalIgnoreCase)
 				&& ApiInformation.IsApiContractPresent("Windows.Foundation.UniversalApiContract", 8))
 			{
@@ -19,6 +23,7 @@ namespace Files.App.Utils.Storage
 			{
 				await Launcher.LaunchUriAsync(new Uri("ms-settings:storagesense"));
 			}
+#endif
 		}
 	}
 }

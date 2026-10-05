@@ -24,6 +24,9 @@ namespace Files.App.Actions
 		public ActionCategory Category
 			=> ActionCategory.Start;
 
+		public bool IsExecutable
+			=> OperatingSystem.IsWindows() && context.ShellPage is not null;
+
 		public UnpinFromStartAction()
 		{
 			context = Ioc.Default.GetRequiredService<IContentPageContext>();
@@ -31,6 +34,9 @@ namespace Files.App.Actions
 
 		public async Task ExecuteAsync(object? parameter = null)
 		{
+			if (!IsExecutable)
+				return;
+
 			if (context.SelectedItems.Count > 0)
 			{
 				var selectedItems = context.ShellPage?.SlimContentPage?.SelectedItems

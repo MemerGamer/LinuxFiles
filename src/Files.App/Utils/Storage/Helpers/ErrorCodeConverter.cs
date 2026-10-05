@@ -1,10 +1,21 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Core.Storage.Enums;
+
 namespace Files.App.Utils.Storage
 {
 	public static class ErrorCodeConverter
 	{
+		public static FileSystemStatusCode ToFileSystemStatusCode(this StorableStatus status) => status switch
+		{
+			StorableStatus.Success => FileSystemStatusCode.Success,
+			StorableStatus.NotFound => FileSystemStatusCode.NotFound,
+			StorableStatus.AccessDenied => FileSystemStatusCode.Unauthorized,
+			StorableStatus.NotMine or StorableStatus.Error => FileSystemStatusCode.Generic,
+			_ => FileSystemStatusCode.Generic,
+		};
+
 		public static ReturnResult ToStatus(this FileSystemStatusCode errorCode)
 		{
 			switch (errorCode)

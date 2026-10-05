@@ -266,7 +266,11 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 		private void ExecuteFormatDriveCommand(WidgetDriveCardItem? item)
 		{
+#if !WINDOWS
+			_ = DriveHelpers.OpenFormatDialogAsync(item?.Path);
+#else
 			Win32Helper.OpenFormatDriveDialog(item?.Path ?? string.Empty);
+#endif
 		}
 
 		private void ExecuteOpenPropertiesCommand(WidgetDriveCardItem? item)

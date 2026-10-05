@@ -19,12 +19,29 @@ namespace Files.App.Utils.Storage
 		public override string Path => Folder.Path;
 		public override string Name => Folder.Name;
 		public override string DisplayName => Folder.DisplayName;
+#if WINDOWS
 		public override string DisplayType => Folder.DisplayType;
+#else
+		// Uno does not implement these members and throws
+		public override string DisplayType => string.Empty;
+#endif
+#if WINDOWS
 		public override string FolderRelativeId => Folder.FolderRelativeId;
+#else
+		public override string FolderRelativeId => string.Empty;
+#endif
 
 		public override DateTimeOffset DateCreated => Folder.DateCreated;
+		#if WINDOWS
 		public override FileAttributes Attributes => Folder.Attributes;
+#else
+		public override FileAttributes Attributes => default;
+#endif
+#if WINDOWS
 		public override IStorageItemExtraProperties Properties => Folder.Properties;
+#else
+		public override IStorageItemExtraProperties Properties => null!;
+#endif
 
 		public SystemStorageFolder(StorageFolder folder)
 		{
@@ -34,6 +51,7 @@ namespace Files.App.Utils.Storage
 
 		public static IAsyncOperation<BaseStorageFolder> FromPathAsync(string path)
 		{
+#if WINDOWS
 			if (path.EndsWith(ShellLibraryItem.EXTENSION))
 			{
 				try
@@ -56,6 +74,7 @@ namespace Files.App.Utils.Storage
 					App.Logger.LogWarning(e, null);
 				}
 			}
+#endif
 
 			return AsyncInfo.Run<BaseStorageFolder>(async (cancellationToken) => new SystemStorageFolder(await StorageFolder.GetFolderFromPathAsync(path)));
 		}

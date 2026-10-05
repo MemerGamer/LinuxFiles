@@ -44,9 +44,14 @@ namespace Files.App.Utils.Cloud
 			yield return new GoogleDriveCloudDetector();
 			yield return new DropBoxCloudDetector();
 			yield return new BoxCloudDetector();
+#if WINDOWS
+			// Registry and executable icon based
 			yield return new GenericCloudDetector();
+#endif
 			yield return new SynologyDriveCloudDetector();
+#if WINDOWS
 			yield return new OXDriveCloudDetector();
+#endif
 		}
 	}
 }

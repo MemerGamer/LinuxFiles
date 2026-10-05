@@ -1,13 +1,18 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.App.Storage.Archives;
+using Files.Core.Storage.Contracts;
+using Files.Core.Storage.Enums;
 using Files.Platform.Abstractions.Enumeration;
 using Files.Platform.Abstractions.Trash;
 using Files.Platform.Abstractions.Watching;
 using Files.Platform.Linux.Enumeration;
 using Files.Platform.Linux.Mime;
 using Files.Platform.Linux.Watching;
+using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
+using OwlCore.Storage;
 using System.Globalization;
 using System.IO;
 using Windows.Storage;
@@ -30,6 +35,9 @@ namespace Files.App.ViewModels
 		private CancellationTokenSource? _linuxChangeCts;
 		private int _linuxChangePending;
 
+		// The listed location as a storable; set for archive folders, which have no WinRT equivalent
+		private StorableWithPath? currentStorable;
+
 		/// <summary>
 		/// Lists <paramref name="path"/> into <c>filesAndFolders</c>. Returns 3 on success and -1 on failure.
 		/// </summary>
@@ -37,6 +45,10 @@ namespace Files.App.ViewModels
 		{
 			if (path.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal))
 				return await EnumerateLinuxTrashAsync(path, cancellationToken);
+
+			currentStorable = null;
+			if (FileExtensionHelpers.IsZipPath(path))
+				return await EnumerateLinuxArchiveAsync(path, cancellationToken, library);
 
 			if (!Directory.Exists(path))
 			{
@@ -146,6 +158,127 @@ namespace Files.App.ViewModels
 
 			IsLocationUnavailable = false;
 			return 3;
+		}
+
+		/// <summary>
+		/// Lists an archive root or a folder inside an archive through <see cref="IStorableResolver"/> (read-only, no watcher).
+		/// Returns 5 on success and -1 on failure.
+		/// </summary>
+		private async Task<int> EnumerateLinuxArchiveAsync(string path, CancellationToken cancellationToken, LibraryItem? library)
+		{
+			HasNoWatcher = true;
+
+			StorableResult resolved;
+			try
+			{
+				resolved = await Ioc.Default.GetRequiredService<IStorableResolver>().TryGetAsync(path, cancellationToken);
+			}
+			catch (OperationCanceledException)
+			{
+				// Not our token: the password prompt was dismissed
+				if (!cancellationToken.IsCancellationRequested)
+					ShowLocationUnavailable(LocationUnavailableKind.PasswordRequired);
+				return -1;
+			}
+
+			if (resolved.Item is not ArchiveFolder folder)
+			{
+				if (resolved.Status is StorableStatus.Error)
+					ShowLocationUnavailable(LocationUnavailableKind.DriveUnplugged);
+				else
+					ShowLocationInaccessibleOrMissing(path);
+				return -1;
+			}
+
+			currentStorable = StorableWithPath.FromStorable(path, folder);
+
+			var containerPath = FileExtensionHelpers.GetArchiveContainerPath(path) ?? path;
+			var containerModified = File.GetLastWriteTime(containerPath);
+			CurrentFolder = library ?? new ListedItem(null)
+			{
+				PrimaryItemAttribute = StorageItemTypes.Folder,
+				ItemPropertiesInitialized = true,
+				ItemNameRaw = folder.Name,
+				ItemDateModifiedReal = containerModified,
+				ItemDateCreatedReal = containerModified,
+				ItemType = folderTypeTextLocalized,
+				FileImage = null,
+				LoadFileIcon = false,
+				ItemPath = path,
+				FileSize = null,
+				FileSizeBytes = 0,
+			};
+
+			var iconCache = Ioc.Default.GetRequiredService<IIconCacheService>();
+			var iconSize = GetPreloadIconSize();
+			var fileTypeText = Strings.File.GetLocalizedResource();
+
+			try
+			{
+				await Task.Run(async () =>
+				{
+					var items = new List<ListedItem>();
+					await foreach (var child in folder.GetItemsAsync(StorableType.All, cancellationToken))
+					{
+						var isFolder = child is IFolder;
+						var modified = child is ArchiveEntryFile { Entry.Modified: { } entryModified } ? entryModified.ToLocalTime() : containerModified;
+						var item = new ListedItem(null)
+						{
+							PrimaryItemAttribute = isFolder ? StorageItemTypes.Folder : StorageItemTypes.File,
+							ItemNameRaw = child.Name,
+							ItemDateModifiedReal = modified,
+							ItemDateCreatedReal = modified,
+							FileImage = null,
+							Opacity = 1d,
+							LoadFileIcon = false,
+							ItemPath = child.Id,
+							FileSize = null,
+							FileSizeBytes = 0,
+							ItemType = folderTypeTextLocalized,
+						};
+
+						if (child is ArchiveEntryFile file)
+						{
+							item.FileExtension = Path.GetExtension(child.Name);
+							var localizedType = string.IsNullOrEmpty(item.FileExtension) ? null : FileTypesHelper.GetLocalizedTypeName(item.FileExtension);
+							item.ItemType = !string.IsNullOrEmpty(localizedType) ? localizedType
+								: string.IsNullOrEmpty(item.FileExtension) ? fileTypeText : item.FileExtension.Trim('.') + " " + fileTypeText;
+							item.FileSizeBytes = file.Entry.Size;
+							item.FileSize = file.Entry.Size.ToSizeString();
+						}
+
+						try { item.PreloadedIconData = await iconCache.GetIconAsync(item.ItemPath, item.FileExtension, isFolder, iconSize); }
+						catch (Exception ex) { App.Logger.LogWarning(ex, "Could not load icon for an archive entry"); }
+
+						items.Add(item);
+					}
+
+					if (cancellationToken.IsCancellationRequested)
+						return;
+
+					filesAndFolders.AddRange(items);
+					await OrderFilesAndFoldersAsync();
+					await ApplyFilesAndFoldersChangesAsync();
+				}, cancellationToken);
+			}
+			catch (OperationCanceledException)
+			{
+				if (!cancellationToken.IsCancellationRequested)
+					ShowLocationUnavailable(LocationUnavailableKind.PasswordRequired);
+				return -1;
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not list an archive");
+				ShowLocationUnavailable(LocationUnavailableKind.DriveUnplugged);
+				return -1;
+			}
+
+			if (cancellationToken.IsCancellationRequested)
+				return -1;
+
+			IsLocationUnavailable = false;
+			return 5;
 		}
 
 		private async Task LoadLinuxRepositoryPropertiesAsync(CancellationToken cancellationToken)
@@ -538,6 +671,41 @@ namespace Files.App.ViewModels
 					await dispatcherQueue.EnqueueOrInvokeAsync(() => RefreshItems(null));
 				}
 			});
+		}
+
+		/// <summary>
+		/// Brings <see cref="FilesAndFolders"/> to <paramref name="desired"/> with individual remove and insert notifications when only
+		/// a few items differ and the rest keep their order. Returns false when the caller must rebuild the list instead.
+		/// </summary>
+		private bool TryApplyIncrementalDisplayChanges(List<ListedItem> desired)
+		{
+			const int MaxIncrementalChanges = 64;
+
+			if (folderSettings.DirectoryGroupOption != GroupOption.None || FilesAndFolders.Count == 0)
+				return false;
+
+			var current = FilesAndFolders.ToList();
+			var currentSet = new HashSet<ListedItem>(current);
+			var desiredSet = new HashSet<ListedItem>(desired);
+			var removed = current.Where(i => !desiredSet.Contains(i)).ToList();
+			var added = desired.Count(i => !currentSet.Contains(i));
+			if (removed.Count + added > MaxIncrementalChanges)
+				return false;
+
+			// Items present on both sides must already be in the same relative order (no sort change)
+			if (!current.Where(desiredSet.Contains).SequenceEqual(desired.Where(currentSet.Contains)))
+				return false;
+
+			foreach (var item in removed)
+				FilesAndFolders.Remove(item);
+
+			for (var i = 0; i < desired.Count; i++)
+			{
+				if (!currentSet.Contains(desired[i]))
+					FilesAndFolders.Insert(i, desired[i]);
+			}
+
+			return true;
 		}
 
 		/// <summary>

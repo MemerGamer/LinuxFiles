@@ -525,6 +525,7 @@ namespace Files.App.Views.Layouts
 
 			// Re-focus selected list item
 			listViewItem?.Focus(FocusState.Programmatic);
+			SyncContainerTheme(listViewItem);
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]

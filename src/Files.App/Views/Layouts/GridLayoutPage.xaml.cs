@@ -452,6 +452,7 @@ namespace Files.App.Views.Layouts
 			if (FileList.ContainerFromItem(RenamingItem) is not GridViewItem gridViewItem)
 				return;
 
+			SyncContainerTheme(gridViewItem);
 			if (gridViewItem.FindDescendant("ItemName") is not TextBlock textBlock)
 				return;
 
@@ -550,6 +551,7 @@ namespace Files.App.Views.Layouts
 		protected override void EndRename(TextBox textBox)
 		{
 			GridViewItem? gridViewItem = FileList.ContainerFromItem(RenamingItem) as GridViewItem;
+			SyncContainerTheme(gridViewItem);
 
 			if (textBox is null || gridViewItem is null)
 			{

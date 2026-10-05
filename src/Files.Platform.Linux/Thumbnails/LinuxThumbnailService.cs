@@ -180,6 +180,22 @@ namespace Files.Platform.Linux.Thumbnails
 				if (cached is not null)
 					return cached;
 
+				// Another file manager may already have thumbnailed this file in a different size bucket.
+				var borrowed = TryReadOtherBucket(bucket, hash, uri, mtime, info.Length);
+				if (borrowed is not null)
+				{
+					// Only our own bucket is written, with the same attributes a generated entry carries.
+					var stored = PngTextChunks.Insert(borrowed,
+					[
+						new("Thumb::URI", uri),
+						new("Thumb::MTime", mtime.ToString(CultureInfo.InvariantCulture)),
+						new("Thumb::Size", info.Length.ToString(CultureInfo.InvariantCulture)),
+					]);
+					try { WriteAtomically(cachePath, stored); }
+					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+					return stored;
+				}
+
 				if (TryReadValid(failPath, uri, mtime, null) is not null)
 					return null;
 			}
@@ -241,6 +257,83 @@ namespace Files.Platform.Linux.Thumbnails
 				return null;
 
 			return bytes;
+		}
+
+		// Larger buckets scale down cleanly, so they are tried first; the largest is last because decoding it is the most expensive.
+		private static readonly string[] FallbackBucketOrder = ["x-large", "large", "normal", "xx-large"];
+
+		/// <summary>
+		/// Looks for a valid cached thumbnail in another size bucket and returns it scaled in memory to fit the requested bucket.
+		/// The entry must pass the same URI/mtime/size checks as a same-bucket hit and is never upscaled or modified on disk.
+		/// </summary>
+		private byte[]? TryReadOtherBucket(string requestedBucket, string hash, string uri, long mtime, long size)
+		{
+			var maxSize = XdgThumbnailNaming.GetBucketSize(requestedBucket);
+			foreach (var other in FallbackBucketOrder)
+			{
+				if (other == requestedBucket)
+					continue;
+
+				var file = Path.Combine(_thumbnailRoot, other, hash + ".png");
+				var bytes = TryReadValid(file, uri, mtime, size);
+				if (bytes is null)
+					continue;
+
+				var otherMax = XdgThumbnailNaming.GetBucketSize(other);
+				if (!PngTextChunks.TryReadDimensions(bytes, out var width, out var height) || width <= 0 || height <= 0 ||
+					width > otherMax || height > otherMax || (long)width * height > _options.MaxImagePixels)
+					continue;
+
+				var scaled = width <= maxSize && height <= maxSize
+					? Reencode(bytes, width, height)
+					: ScaleDown(bytes, width, height, maxSize);
+				if (scaled is not null)
+					return scaled;
+			}
+
+			return null;
+		}
+
+		// Decodes the entry so a truncated or corrupt PNG with plausible metadata is never promoted to a cache hit.
+		private static byte[]? Reencode(byte[] png, int width, int height)
+		{
+			try
+			{
+				using var bitmap = SKBitmap.Decode(png);
+				return bitmap is not null && bitmap.Width == width && bitmap.Height == height ? png : null;
+			}
+			catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+			{
+				return null;
+			}
+		}
+
+		private static byte[]? ScaleDown(byte[] png, int width, int height, int maxSize)
+		{
+			try
+			{
+				using var source = SKBitmap.Decode(png);
+				if (source is null || source.Width != width || source.Height != height)
+					return null;
+
+				var scale = Math.Min((float)maxSize / width, (float)maxSize / height);
+				var targetW = Math.Max(1, (int)Math.Round(width * scale));
+				var targetH = Math.Max(1, (int)Math.Round(height * scale));
+				using var target = new SKBitmap(new SKImageInfo(targetW, targetH, SKColorType.Rgba8888, SKAlphaType.Premul));
+				using (var canvas = new SKCanvas(target))
+				{
+					canvas.Clear(SKColors.Transparent);
+					using var image = SKImage.FromBitmap(source);
+					canvas.DrawImage(image, new SKRect(0, 0, targetW, targetH), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+				}
+
+				using var encoded = SKImage.FromBitmap(target).Encode(SKEncodedImageFormat.Png, 100);
+				return encoded?.ToArray();
+			}
+			catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+			{
+				return null;
+			}
 		}
 
 		private async Task<byte[]?> GenerateAsync(string fullPath, string uri, string bucket, string cachePath, CancellationToken cancellationToken)

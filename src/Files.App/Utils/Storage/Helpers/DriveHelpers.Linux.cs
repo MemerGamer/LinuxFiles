@@ -24,9 +24,6 @@ namespace Files.App.Utils.Storage
 	{
 		private const string MountInfoPath = "/proc/self/mountinfo";
 
-		// Set only by scripts/linux/headless-run.sh so sandboxed runs and screenshots never list the real machine's drives
-		private const string MountInfoOverrideVariable = "FILES_HEADLESS_MOUNTINFO";
-
 		private static readonly HashSet<string> _networkFs = new(StringComparer.Ordinal)
 		{
 			"nfs", "nfs4", "cifs", "smb3", "smbfs", "afs", "ceph", "9p", "davfs", "fuse.sshfs", "fuse.rclone",
@@ -39,11 +36,15 @@ namespace Files.App.Utils.Storage
 		/// </summary>
 		public static IReadOnlyList<LinuxMount> GetMounts()
 		{
+			// Synthetic drives of a sandboxed headless run (null in normal use)
+			if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Current is { } synthetic)
+				return synthetic.Select((d, i) => new LinuxMount(d.MountPoint, d.FileSystem, $"/dev/headless{i}", $"headless:{i}")).ToList();
+
 			var result = new List<LinuxMount>();
 			var seenDevices = new HashSet<string>(StringComparer.Ordinal);
 
 			string[] lines;
-			try { lines = SystemIO.File.ReadAllLines(Environment.GetEnvironmentVariable(MountInfoOverrideVariable) is { Length: > 0 } overridePath ? overridePath : MountInfoPath); }
+			try { lines = SystemIO.File.ReadAllLines(MountInfoPath); }
 			catch { return result; }
 
 			foreach (var line in lines)

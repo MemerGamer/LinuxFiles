@@ -1,9 +1,9 @@
-commit: 96267634c
+commit: 4b3cf79e6
 date: 2026-10-05
 captured: home
-captured: context-menu
-not yet working: folder-details
-not yet working: folder-grid
-not yet working: properties
-not yet working: recycle-bin
+captured: folder-details
+captured: folder-grid
+captured: recycle-bin
 captured: settings
+captured: context-menu
+captured: properties

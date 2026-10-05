@@ -12,7 +12,7 @@ Read this first, then `PLAN.md` §0, then `CLAUDE.md`.
 - At most one app build or test run at a time per agent (`-m:2` caps CPU). Avoid needless full rebuilds.
 
 ## Privacy
-- Only commit screenshots made with the sandboxed HOME. headless-run.sh gives the app an empty mount table (`FILES_HEADLESS_MOUNTINFO`), so real drive labels no longer appear; still view every PNG before committing. `scripts/linux/showcase.sh` regenerates the showcase shots.
+- Only commit screenshots made with the sandboxed HOME. headless-run.sh gives the app synthetic drives (`FILES_SANDBOX_DRIVES`, honoured only in sandboxed headless mode), so real drive labels no longer appear; still view every PNG before committing. `scripts/linux/showcase.sh` regenerates the showcase shots.
 - Never commit anything from the real home directory.
 
 ## Git / GitHub

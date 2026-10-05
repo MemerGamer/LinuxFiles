@@ -1,15 +1,16 @@
 # Linux port showcase
 
 Files running natively on Linux (Uno Platform, Skia, X11). The screenshots are taken headlessly from a sandboxed
-home directory with an empty mount table, so they never show the real machine's files, drives or user name.
+home directory with synthetic drives (random labels, made-up sizes), so they never show the real machine's files, drives or user name.
 
-Last updated: commit `96267634c`, 2026-10-05 (see `showcase/captured.txt` for the exact shot list).
+Last updated: commit `4b3cf79e6`, 2026-10-05 (see `showcase/captured.txt` for the exact shot list).
 
 ## What works today
 
 Taken from the merged state of `linux/main` and [PLAN.md](PLAN.md).
 
 - [x] App launches on Linux with the full Files shell: Home page, sidebar, tabs, toolbar, Settings
+- [x] Folder listing in Details and Grid/Cards layouts, with sorting and selection
 - [x] File operations through `IFileOperationsService` (copy, move, rename with Linux name rules)
 - [x] Trash backend (XDG trash spec) and archives (SharpCompress, hardened extraction)
 - [x] Hardened launching: no auto-running executables or untrusted `.desktop` files, exact-argv confirmation dialogs
@@ -20,31 +21,43 @@ Taken from the merged state of `linux/main` and [PLAN.md](PLAN.md).
 
 ## Not working yet
 
-- [ ] Folder listings do not render on `linux/main` (fix is in PR #28), so Details and Grid layouts cannot be shown
-- [ ] Recycle Bin view shows "Did you delete this folder?" instead of the trashed items
-- [ ] Properties from a file selection (depends on folder listings)
 - [ ] Some UI text still says "Windows" (for example "Open in Windows Terminal")
+- [ ] Grid layout shows a single row that scrolls sideways, with oversized icons
+- [ ] Network locations stay empty without a GVfs session
 - [ ] No native Wayland (runs through XWayland), no AT-SPI accessibility
 
 ## Screenshots
 
 ![Home page](showcase/home.png)
 
-Home page with Quick access. The Drives and Network widgets are empty because the sandbox has no mounts.
+Home page: Quick access, and the Drives widget with usage bars. The drives are synthetic (random labels, made-up sizes).
 
-![Context menu](showcase/context-menu.png)
+![Folder in Details layout](showcase/folder-details.png)
 
-Right-click menu on a Quick access card.
+A folder in Details layout.
+
+![Folder in Cards layout](showcase/folder-grid.png)
+
+The same folder in the Cards layout, chosen from the layout menu.
+
+![Recycle Bin](showcase/recycle-bin.png)
+
+The Recycle Bin listing the trashed item from the XDG trash.
 
 ![Settings](showcase/settings.png)
 
 Settings page.
 
-Not yet captured (marked "not yet working" in `showcase/captured.txt`): folder in Details layout, folder in Grid
-layout, Properties, Recycle Bin.
+![Context menu](showcase/context-menu.png)
+
+Right-click menu on a file.
+
+![Properties](showcase/properties.png)
+
+Properties window of a file (a separate window; parts of the main window behind it are stale because the headless X server has no window manager).
 
 ## How to regenerate
 
 Run `scripts/linux/showcase.sh` (add `--no-build` to reuse the existing build). It uses `scripts/linux/headless-run.sh`,
-so nothing touches the real display, and rewrites `docs/linux-port/showcase/`. When the missing features land, remove
-them from the `broken` list in the script (or run once with `SHOWCASE_TRY_ALL=1`) and add the new images above.
+so nothing touches the real display, and rewrites `docs/linux-port/showcase/`. The synthetic drives come from `scripts/linux/showcase-drives.txt`.
+Set `SHOWCASE_SKIP="name name"` to record a regressed shot as "not yet working".

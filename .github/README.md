@@ -17,7 +17,7 @@ Files is a modern file manager that helps users organize their files and folders
 
 ## Linux port: current state
 
-This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. Folder listings are the main missing piece. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.
+This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.
 
 <p align="center">
   <img alt="Files on Linux: Home page" src="../docs/linux-port/showcase/home.png" width="720" />

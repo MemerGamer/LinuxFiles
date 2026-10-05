@@ -4,8 +4,11 @@
 #
 # Usage: scripts/linux/showcase.sh [--no-build] [-s startup-seconds]
 #   --no-build   reuse the existing build in src/Files.App/bin/Debug/net10.0-desktop
-# Shots known broken on this build are recorded as "not yet working" (SHOWCASE_TRY_ALL=1 tries them anyway); a shot identical to the previous frame is skipped too.
+# A shot that is missing or identical to the previous frame is recorded as "not yet working".
 set -euo pipefail
+
+# Never capture the real home or drives: always run in sandbox mode
+unset FILES_REAL_HOME
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 out="$repo/docs/linux-port/showcase"
@@ -23,7 +26,9 @@ if [[ "$build" == 1 ]]; then
 	(cd "$repo" && MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet build src/Files.App -f net10.0-desktop -nodeReuse:false -m:2 -v:quiet -clp:ErrorsOnly)
 fi
 
-work="$(mktemp -d "${TMPDIR:-/tmp}/files-showcase.XXXXXX")"
+work="${TMPDIR:-/tmp}/files-showcase"
+rm -rf "$work"
+mkdir -p "$work"
 trap 'rm -rf "$work"' EXIT
 shots="$work/shots"
 mkdir -p "$shots"
@@ -52,6 +57,11 @@ if command -v ffmpeg >/dev/null; then
 	ffmpeg -loglevel error -y -f lavfi -i "gradients=s=640x420:c0=#11998e:c1=#38ef7d:seed=2:duration=1:speed=0" -frames:v 1 "$pics/forest.png" || true
 	ffmpeg -loglevel error -y -f lavfi -i "gradients=s=640x420:c0=#f7971e:c1=#7f00ff:seed=3:duration=1:speed=0" -frames:v 1 "$pics/dusk.jpg" || true
 fi
+# Content for the synthetic drives (see showcase-drives.txt)
+for m in disk1 disk2 disk3 usb; do mkdir -p "$home/mnt/$m"; done
+mkdir -p "$home/mnt/disk1"/{Games,Projects,Backups} "$home/mnt/usb/Photos"
+printf 'Level data\n' >"$home/mnt/disk1/Games/save01.dat"
+printf 'Holiday album\n' >"$home/mnt/usb/Photos/readme.txt"
 # One trashed item (XDG trash spec) in the sandbox trash
 t="$home/.local/share/Trash"
 mkdir -p "$t/files" "$t/info"
@@ -68,53 +78,57 @@ actions="$work/actions.txt"
 cat >"$actions" <<A
 sleep 6
 shot home
-# Context menu of the Documents quick access card
-mousemove 900 420 click 1
+# Documents folder, Details then Grid layout
+mousemove 113 253 click 1
+sleep 5
+mousemove 1210 116 click 1
 sleep 1
-mousemove 683 180 click 3
-sleep 2
-shot context-menu
+mousemove 892 224 click 1
+sleep 1
 key Escape
+sleep 2
+shot folder-details
+mousemove 1210 116 click 1
 sleep 1
+mousemove 1060 224 click 1
+sleep 1
+key Escape
+sleep 3
+shot folder-grid
+mousemove 1210 116 click 1
+sleep 1
+mousemove 892 224 click 1
+sleep 1
+key Escape
+sleep 2
+# Recycle Bin
+mousemove 112 381 click 1
+sleep 5
+shot recycle-bin
 # Settings
 mousemove 86 780 click 1
 sleep 4
 shot settings
-mousemove 60 114 click 1
-sleep 3
-A
-if [[ "${SHOWCASE_TRY_ALL:-0}" == 1 ]]; then
-	# Shots known broken on current builds; the app may crash here, so they run last
-	cat >>"$actions" <<A
+# Back in Documents: context menu of a file, then Properties (the wrench in its top row).
+# Properties is last: it is a separate window and the bare X server does not repaint what it covered.
 mousemove 113 253 click 1
-sleep 4
-key ctrl+shift+1
+sleep 5
+mousemove 400 528 click 3
 sleep 2
-shot folder-details
-key ctrl+shift+4
-sleep 3
-shot folder-grid
-key ctrl+shift+1
+shot context-menu
+mousemove 624 552 click 1
+sleep 5
+focus
 sleep 1
-mousemove 400 190 click 1
-key alt+Return
-sleep 3
 shot properties
-key Escape
-sleep 1
-mousemove 112 381 click 1
-sleep 4
-shot recycle-bin
 A
-fi
 
-XVFB_SIZE="${XVFB_SIZE:-1280x800}" FILES_SANDBOX_SEED="$seed" "$repo/scripts/linux/headless-run.sh" -s "$seconds" -o "$shots" -a "$actions"
+XVFB_SIZE="${XVFB_SIZE:-1280x800}" FILES_SANDBOX_DRIVES="$repo/scripts/linux/showcase-drives.txt" FILES_SANDBOX_SEED="$seed" "$repo/scripts/linux/headless-run.sh" -s "$seconds" -o "$shots" -a "$actions"
 
 # The runner's home is gone after the run; names below are fixed, so verify each shot
-names=(home context-menu folder-details folder-grid properties recycle-bin settings)
-# Known broken on current linux/main (folder listings and trash view are empty until the file listing work lands).
-# SHOWCASE_TRY_ALL=1 captures them anyway; use it once those features are merged and drop them from this list.
-broken=" folder-details folder-grid properties recycle-bin "
+names=(home folder-details folder-grid recycle-bin settings context-menu properties)
+# SHOWCASE_SKIP="name name" forces shots to be recorded as "not yet working" when a feature regresses.
+broken=" ${SHOWCASE_SKIP:-} "
 mkdir -p "$out"
 commit="$(git -C "$repo" rev-parse --short HEAD)"
 {
@@ -125,7 +139,7 @@ prev=""
 for n in "${names[@]}"; do
 	f="$shots/$n.png"
 	ok=0
-	if [[ "$broken" == *" $n "* && "${SHOWCASE_TRY_ALL:-0}" != 1 ]]; then
+	if [[ "$broken" == *" $n "* ]]; then
 		rm -f "$out/$n.png"
 		echo "not yet working: $n" >>"$work/manifest.txt"
 		prev="$f"

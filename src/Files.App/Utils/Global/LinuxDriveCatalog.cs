@@ -79,6 +79,9 @@ namespace Files.App.Utils
 
 		public static async Task<IFolder?> CreateMountedAsync(LinuxMount mount, VolumeInfo? volume)
 		{
+			if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Find(mount.MountPoint) is { } synthetic)
+				return await CreateSyntheticAsync(synthetic).ConfigureAwait(false);
+
 			try
 			{
 				var drive = new DriveInfo(mount.MountPoint);
@@ -119,6 +122,16 @@ namespace Files.App.Utils
 				App.Logger.LogWarning(ex, $"Failed to load the drive {mount.MountPoint}");
 				return null;
 			}
+		}
+
+		private static async Task<IFolder?> CreateSyntheticAsync(Files.Platform.Linux.Volumes.HeadlessDrive drive)
+		{
+			var res = await FilesystemTasks.Wrap(() => StorageFolder.GetFolderFromPathAsync(drive.MountPoint).AsTask());
+			if (!res)
+				return null;
+
+			var type = drive.IsRemovable ? Data.Items.DriveType.Removable : Data.Items.DriveType.Fixed;
+			return await DriveItem.CreateFromPropertiesAsync(res.Result!, drive.MountPoint, drive.Label, type);
 		}
 
 		private static Data.Items.DriveType ClassifyDrive(DriveInfo drive, VolumeInfo? volume)

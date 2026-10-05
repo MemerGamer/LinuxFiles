@@ -244,7 +244,7 @@
 					FocusVisualSecondaryThickness="0"
 					IsDoubleTapEnabled="True"
 					IsTabStop="True"
-					ItemsSource="{x:Bind CollectionViewSource.View, Mode=OneWay}"
+					ItemsSource="{x:Bind LayoutItemsSource, Mode=OneWay}"
 					Loaded="FileList_Loaded"
 					LosingFocus="FileList_LosingFocus"
 					PreviewKeyDown="FileList_PreviewKeyDown"

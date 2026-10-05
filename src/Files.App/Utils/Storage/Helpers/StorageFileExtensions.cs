@@ -142,6 +142,16 @@ namespace Files.App.Utils.Storage
 		{
 			List<PathBoxItem> pathBoxItems = [];
 
+#if !WINDOWS
+			// trash:/// is a single virtual location, not a directory chain
+			if (value.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal))
+				return [GetPathItem(Constants.UserEnvironmentPaths.RecycleBinPath, Constants.UserEnvironmentPaths.RecycleBinPath)];
+
+			// POSIX paths start at the root directory, which the separator scan below would skip
+			if (value.StartsWith('/'))
+				pathBoxItems.Add(new PathBoxItem() { Title = "/", Path = "/", ChevronToolTip = string.Format(Strings.BreadcrumbBarChevronButtonToolTip.GetLocalizedResource(), "/") });
+#endif
+
 			if (value.Contains('/', StringComparison.Ordinal))
 			{
 				if (!value.EndsWith('/'))
@@ -188,6 +198,10 @@ namespace Files.App.Utils.Storage
 					item.Title = Strings.ReleaseNotes.GetLocalizedResource();
 				else if (item.Path == "Settings")
 					item.Title = Strings.Settings.GetLocalizedResource();
+				else if (item.Path is "/" || item.Path == Constants.UserEnvironmentPaths.RecycleBinPath)
+				{
+					// Virtual or root locations keep their fixed titles
+				}
 				else
 				{
 					var path = item.Path!;

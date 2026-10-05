@@ -2171,7 +2171,18 @@ namespace Files.App.ViewModels
 			stopwatch.Start();
 
 			var isRecycleBin = path.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal);
-			var enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesCTS.Token, library);
+			var addFilesToken = addFilesCTS.Token;
+#if WINDOWS
+			var enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesToken, library);
+#else
+			int enumerated;
+			try { enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesToken, library); }
+			catch (OperationCanceledException) { enumerated = -1; }
+
+			// Abandoned requests must not register watchers for a location we've navigated away from
+			if (addFilesToken.IsCancellationRequested)
+				enumerated = -1;
+#endif
 
 			// Hide progressbar after enumeration
 			IsLoadingItems = false;
@@ -2216,6 +2227,13 @@ namespace Files.App.ViewModels
 					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs() { IsTypeCloudDrive = false, IsTypeGitRepository = IsValidGitDirectory });
 					if (!HasNoWatcher)
 						WatchForLinuxFolderChanges(path);
+					break;
+
+				// Trash listed through IStorageTrashBinService (Linux)
+				case 4:
+					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs() { IsTypeCloudDrive = false, IsTypeRecycleBin = true });
+					if (!HasNoWatcher)
+						WatchForLinuxTrashChanges();
 					break;
 
 				// Enumeration failed

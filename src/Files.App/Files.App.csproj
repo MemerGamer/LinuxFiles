@@ -59,6 +59,9 @@
         <!--  XAML cannot see generator output on Uno; ICommandManager is checked in under Platforms/Desktop/Generated  -->
         <FilesPregeneratedICommandManager Condition="'$(FilesPregeneratedICommandManager)' == ''">true</FilesPregeneratedICommandManager>
         <DefineConstants>$(DefineConstants);DESKTOP</DefineConstants>
+        <!--  Precompile (ReadyToRun) published Linux builds: roughly 25-30% faster cold start. Composite stays off (self-contained Uno assemblies)  -->
+        <PublishReadyToRun Condition="'$(Configuration)' != 'Debug' and '$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
+        <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
     </PropertyGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
@@ -174,6 +177,7 @@
         <PackageReference Include="Uno.WinUI" />
         <PackageReference Include="Uno.WinUI.Runtime.Skia.X11" />
         <PackageReference Include="Uno.Microsoft.Xaml.Behaviors.WinUI.Managed" />
+        <ProjectReference Include="..\Files.App.UnoVirtualization\Files.App.UnoVirtualization.csproj" />
     </ItemGroup>
 
     <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">

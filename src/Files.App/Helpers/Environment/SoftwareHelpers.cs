@@ -14,6 +14,9 @@ namespace Files.App.Helpers
 
 		public static bool IsVSCodeInstalled()
 		{
+			if (OperatingSystem.IsLinux())
+				return Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>().Locate("code") is not null;
+
 			try
 			{
 				return

@@ -12,6 +12,8 @@ namespace Files.App.ViewModels.Settings
 		private readonly IDevToolsSettingsService DevToolsSettingsService = Ioc.Default.GetRequiredService<IDevToolsSettingsService>();
 		private readonly ICommonDialogService CommonDialogService = Ioc.Default.GetRequiredService<ICommonDialogService>();
 
+		public bool IsWindows => OperatingSystem.IsWindows();
+
 		public Dictionary<OpenInIDEOption, string> OpenInIDEOptions { get; private set; } = [];
 		public ICommand RemoveCredentialsCommand { get; }
 		public ICommand ConnectToGitHubCommand { get; }
@@ -61,10 +63,8 @@ namespace Files.App.ViewModels.Settings
 			{
 				if (SetProperty(ref _IDEPath, value))
 				{
-					IsIDEPathValid =
-						!string.IsNullOrWhiteSpace(value) &&
-						!value.Contains('\"') &&
-						!value.Contains('\'') &&
+					IsIDEPathValid = !string.IsNullOrWhiteSpace(value) &&
+						(OperatingSystem.IsLinux() || (!value.Contains('\"') && !value.Contains('\''))) &&
 						CheckPathExists();
 
 					OnPropertyChanged(nameof(CanSaveIDEChanges));
@@ -98,7 +98,8 @@ namespace Files.App.ViewModels.Settings
 			IsIDEPathValid = true;
 			IsIDENameValid = true;
 
-			IsLogoutEnabled = GitHelpers.GetSavedCredentials() != string.Empty;
+			// LINUX-TODO(devtools): Enable GitHub sign-in when Linux credential storage is available.
+			IsLogoutEnabled = IsWindows && GitHelpers.GetSavedCredentials() != string.Empty;
 
 			RemoveCredentialsCommand = new RelayCommand(DoRemoveCredentials);
 			ConnectToGitHubCommand = new RelayCommand(DoConnectToGitHubAsync);
@@ -157,11 +158,21 @@ namespace Files.App.ViewModels.Settings
 
 		private void DoStartEditingIDE()
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				IsIDEPathValid = CheckPathExists();
+				IsIDENameValid = !string.IsNullOrEmpty(IDEName);
+				OnPropertyChanged(nameof(CanSaveIDEChanges));
+			}
 			IsEditingIDEConfig = true;
 		}
 
 		private void DoOpenFilePickerForIDE()
 		{
+			// LINUX-TODO(devtools): Add a Linux executable picker; paths and aliases can be entered directly.
+			if (OperatingSystem.IsLinux())
+				return;
+
 			var res = CommonDialogService.Open_FileOpenDialog(
 				MainWindow.Instance.WindowHandle,
 				false,
@@ -176,6 +187,13 @@ namespace Files.App.ViewModels.Settings
 
 		private async void DoTestIDE()
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				IsIDEPathValid = await Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>().StartAsync(IDEPath, []);
+				OnPropertyChanged(nameof(CanSaveIDEChanges));
+				return;
+			}
+
 			IsIDEPathValid = await Win32Helper.RunPowershellCommandAsync(
 				$"& {Win32Helper.ToPowerShellStringLiteral(IDEPath)}",
 				PowerShellExecutionOptions.Hidden
@@ -184,6 +202,9 @@ namespace Files.App.ViewModels.Settings
 
 		private bool CheckPathExists()
 		{
+			if (OperatingSystem.IsLinux())
+				return Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.IExecutableService>().Locate(IDEPath) is not null;
+
 			if (Path.Exists(IDEPath))
 				return true;
 

@@ -157,6 +157,7 @@
 
 								<SplitButton
 									x:Name="PickIDEExe"
+									Visibility="{x:Bind ViewModel.IsWindows, Converter={StaticResource BoolVisibilityConverter}}"
 									Height="32"
 									VerticalAlignment="Bottom"
 									Command="{x:Bind ViewModel.OpenFilePickerForIDECommand, Mode=OneWay}"
@@ -172,6 +173,11 @@
 										</MenuFlyout>
 									</SplitButton.Flyout>
 								</SplitButton>
+								<Button
+									Command="{x:Bind ViewModel.TestIDECommand}"
+									Content="{helpers:ResourceString Key=TestIntegration}"
+									IsEnabled="{x:Bind ViewModel.IsIDEPathValid, Mode=OneWay}"
+									Visibility="{x:Bind ViewModel.IsWindows, Converter={StaticResource InvertedBoolVisibilityConverter}}" />
 							</StackPanel>
 
 							<!--  Edit  -->
@@ -212,6 +218,7 @@
 			<!--  Connect to GitHub  -->
 			<wctcontrols:SettingsCard
 				x:Name="ConnectToGitHubSection"
+				Visibility="{x:Bind ViewModel.IsWindows, Converter={StaticResource BoolVisibilityConverter}}"
 				x:Load="{x:Bind ViewModel.IsLogoutEnabled, Converter={StaticResource BoolNegationConverter}, Mode=OneWay}"
 				Header="{helpers:ResourceString Key=ConnectToGitHub}">
 				<wctcontrols:SettingsCard.HeaderIcon>
@@ -223,6 +230,7 @@
 			<!--  Remove credentials  -->
 			<wctcontrols:SettingsCard
 				x:Name="RemoveCredentialsSection"
+				Visibility="{x:Bind ViewModel.IsWindows, Converter={StaticResource BoolVisibilityConverter}}"
 				x:Load="{x:Bind ViewModel.IsLogoutEnabled, Mode=OneWay}"
 				Header="{helpers:ResourceString Key=ConnectedToGitHub}">
 				<wctcontrols:SettingsCard.HeaderIcon>

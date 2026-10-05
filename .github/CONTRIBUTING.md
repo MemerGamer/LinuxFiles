@@ -1,8 +1,16 @@
-# Contributing to Files
+# Contributing to LinuxFiles
+LinuxFiles is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files); it is not affiliated with the Files Community. The guidance below is adapted from upstream's contributing guide and still applies unless noted.
+
+- Issues and pull requests for the **Linux port** go to this repository. Issues about the Windows app belong [upstream](https://github.com/files-community/Files/issues).
+- Please read [docs/linux-port/PLAN.md](../docs/linux-port/PLAN.md) and [docs/linux-port/AGENT-RULES.md](../docs/linux-port/AGENT-RULES.md) first. Linux code lives in `*.Linux.cs` files and the Linux platform projects; keep Windows code paths unchanged.
+- Upstream's "Ready to build" label and Windows-only tooling (Appium, WinAppDriver, the Files.Package) do not apply to this fork. Open an issue to discuss larger changes first.
+- Do not copy code from upstream without keeping its MIT notice, and do not claim upstream work as your own. Changes that are not Linux-specific are best sent upstream too.
+- Security issues: see [SECURITY.md](./SECURITY.md).
+
 Files thrives off of the contributions and input from users. There are several ways you can get involved.
 
 We are happy to hear your feedback for the future of Files. Check the
-[issues tab](https://github.com/files-community/Files/issues) to see if others have
+[issues tab](https://github.com/MemerGamer/LinuxFiles/issues) to see if others have
 submitted similar feedback. You can add your feedback to existing issues or you can open a new issue.
 
 We always look at your feedback when we decide what to work on next and we look forward to hearing your ideas. Remember that

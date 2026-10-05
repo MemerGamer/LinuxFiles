@@ -1,4 +1,4 @@
-# Flatpak manifest for Files (Linux port).
+# Flatpak manifest for LinuxFiles (Files for Linux; based on Files by the Files Community).
 #
 # Repackages the self-contained publish tarball (scripts/linux/publish.sh --tarball), so the build needs
 # neither the .NET SDK nor network access. Build with scripts/linux/build-flatpak.sh, or by hand:

@@ -1,5 +1,5 @@
 name: Bug Report
-description: Create a bug report to help improve Files.
+description: Report a bug in LinuxFiles, the unofficial Linux port of Files.
 type: 'Bug'
 title: 'Bug: '
 body:
@@ -8,6 +8,9 @@ body:
   - type: markdown
     attributes:
       value: |
+        > [!NOTE]
+        > This tracker is for the Linux port. Windows-only bugs belong in the [upstream Files tracker](https://github.com/files-community/Files/issues), and only if reproducible in the official Windows app.
+
         > [!TIP]
         > Have you checked for similar issues? There's a possibility the bug you are experiencing has already been reported. Please do a thorough search before creating a new issue.
 

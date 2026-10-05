@@ -1,59 +1,68 @@
 <p align="center">
-  <img alt="Files hero image" src="./assets/ReadmeHero.png" />
+  <img alt="LinuxFiles on Linux: Home page" src="../docs/linux-port/showcase/home.png" width="820" />
 </p>
 
-<p align="center">
-  <a style="text-decoration:none" href="https://files.community/">
-    <img src="https://img.shields.io/badge/Files-Website-F9B81F" alt="Files Website" /></a>
-  <a style="text-decoration:none" href="https://github.com/files-community/Files/actions/workflows/ci.yml">
-    <img src="https://github.com/files-community/Files/actions/workflows/ci.yml/badge.svg" alt="Files CI Status" /></a>
-  <a style="text-decoration:none" href="https://crowdin.com/project/files-app">
-    <img src="https://badges.crowdin.net/files-app/localized.svg" alt="Files Localization Status" /></a>
-  <a style="text-decoration:none" href="https://discord.gg/files">
-    <img src="https://img.shields.io/discord/725513575971684472?label=Discord&color=7289da" alt="Files Discord" /></a>
-</p>
+# LinuxFiles: Files for Linux
 
-Files is a modern file manager that helps users organize their files and folders. Our mission with Files is to build the best file manager for Windows, and we’re proud to be building it out in the open so everyone can participate. User feedback helps shape the features we work on, & the bug reports on GitHub help to make Files more reliable. Built and maintained by the open-source community, Files features robust multitasking experiences, file tags, deep integrations, and an intuitive design.
+**LinuxFiles, Files for Linux, based on Files by the Files Community, is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files) by the Files Community. It is not affiliated with or endorsed by the Files Community.**
+
+Files is created and maintained by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors). This fork builds on their work and keeps their MIT-licensed code, history and credit. The Linux port itself (Uno Platform, Skia, X11, and the Linux platform layer) is the work of the LinuxFiles contributors. See [Credits](#credits) and [NOTICE.md](../NOTICE.md).
+
+> [!WARNING]
+> **Status: alpha.** Expect missing features and rough edges, and do not rely on it for data you cannot afford to lose. The official, supported Files for Windows is at [files.community](https://files.community/).
 
 ## Linux port: current state
 
 This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.
 
-<p align="center">
-  <img alt="Files on Linux: Home page" src="../docs/linux-port/showcase/home.png" width="720" />
-</p>
+## Installing LinuxFiles
 
-## Installing and running Files
+Packages are coming soon; until then, install from a local build:
 
-Files is a community-driven project that depends on your support to grow and improve. Please consider purchasing Files through the Microsoft Store or supporting us on GitHub if you use the classic installer.
+| Method | Status |
+|---|---|
+| AppImage | coming soon |
+| Flatpak (`io.github.memergamer.LinuxFiles`) | coming soon |
+| AUR `linuxfiles-bin` | coming soon |
+| `scripts/linux/install-local.sh` | available now |
 
-You can also use the preview version alongside the stable release to get early access to new features and improvements.
+```sh
+git clone https://github.com/MemerGamer/LinuxFiles.git
+cd LinuxFiles
+scripts/linux/install-local.sh
+```
 
-<p align="left">
-  <!-- Store Badge -->
-  <a style="text-decoration:none" href="https://apps.microsoft.com/detail/9NGHP3DX8HDX?launch=true&mode=full">
-    <picture>
-      <source media="(prefers-color-scheme: light)" srcset="./assets/StoreBadge-dark.png" height="80" />
-      <img src="./assets/StoreBadge-light.png" height="80" /></picture></a>
-  &ensp;
-  <!-- Classic Installer Badge -->
-  <a style="text-decoration:none" href="https://files.community/download">
-    <picture>
-      <source media="(prefers-color-scheme: light)" srcset="./assets/ClassicInstallerBadge-dark.png" height="80" />
-      <img src="./assets/ClassicInstallerBadge-light.png" height="80" /></picture></a>
-</p>
+See [docs/linux-port/packaging.md](../docs/linux-port/packaging.md) for packaging details and [docs/linux-port/PLAN.md](../docs/linux-port/PLAN.md) for the roadmap.
 
-## Building from source
+## Reporting bugs
 
-Instructions for building the source code can be found on our [documentation site](https://files.community/docs/contributing/building-from-source).
+- **Linux bugs and Linux feature requests:** open an issue in [this fork](https://github.com/MemerGamer/LinuxFiles/issues).
+- **Windows bugs:** report them to [upstream Files](https://github.com/files-community/Files/issues) only if you can reproduce them in the official Windows app. Please do not report LinuxFiles problems upstream.
+- **Security issues:** use this fork's private [Security Advisories](https://github.com/MemerGamer/LinuxFiles/security/advisories/new). See [SECURITY.md](./SECURITY.md).
 
+## About upstream Files
 
-## Contributing to Files
+The text and images in this section describe the upstream project and are the Files Community's work, not ours.
 
-Want to contribute to this project? Let us know with an [issue](https://github.com/files-community/Files/issues) that communicates your intent to create a [pull request](https://github.com/files-community/Files/pulls). Also, view our [contributing guidelines](https://github.com/files-community/Files/blob/main/.github/CONTRIBUTING.md) to make sure you're up to date on the coding conventions.
+![Upstream Files screenshot (Windows)](./assets/FilesScreenshot.png)
 
-Looking for a place to start? Check out the [task board](https://github.com/orgs/files-community/projects/3/views/2), where you can sort tasks by size and priority.
+Files is a modern file manager that helps users organize their files and folders. The upstream mission is to build the best file manager for Windows, built in the open by the community, with robust multitasking, file tags, deep integrations and an intuitive design. See the [upstream repository](https://github.com/files-community/Files) and [website](https://files.community/).
 
-## Screenshots
+For the official Windows app, use the upstream distribution channels (Microsoft Store and classic installer from [files.community/download](https://files.community/download)); this fork does not distribute Windows builds.
 
-![Files](./assets/FilesScreenshot.png)
+## Contributing
+
+Contributions to the Linux port are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). Contributions to the Windows app belong in the [upstream repository](https://github.com/files-community/Files).
+
+## Credits
+
+- **[Files Community](https://github.com/files-community)** and all [upstream contributors](https://github.com/files-community/Files/graphs/contributors): the Files app, its design, code and translations (via [Crowdin](https://crowdin.com/project/files-app)) that this port is built on. Files is MIT licensed, Copyright (c) 2018 - present Files Community.
+- **[Uno Platform](https://platform.uno/)**: WinUI on Skia/X11 for Linux, which makes this port possible.
+- **[SkiaSharp](https://github.com/mono/SkiaSharp)**, **[Selawik](https://github.com/microsoft/Selawik)** (UI font) and **Uno.Fonts.Fluent** (icons).
+- **[Tmds.DBus](https://github.com/tmds/Tmds.DBus)**, **[TagLibSharp](https://github.com/mono/taglib-sharp)**, **[Markdig](https://github.com/xoofx/markdig)**, **[ColorCode](https://github.com/CommunityToolkit/ColorCode-Universal)**, **[LibGit2Sharp](https://github.com/libgit2/libgit2sharp)**, **[FluentFTP](https://github.com/robinrodricks/FluentFTP)**, **[SharpCompress](https://github.com/adamhathcock/sharpcompress)**, **[7-Zip](https://www.7-zip.org/)** and the .NET Community Toolkit.
+
+The full list of third-party components and licenses is in [NOTICE.md](../NOTICE.md) and [.github/NOTICE.md](./NOTICE.md). "Files" and its logo are the Files Community's; they are used here to identify the upstream project and its Linux port, with no endorsement implied.
+
+## License
+
+[MIT](../LICENSE-MIT). Copyright (c) 2018 - present Files Community; Copyright (c) 2026 LinuxFiles contributors (modifications for Linux).

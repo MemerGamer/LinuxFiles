@@ -13,17 +13,25 @@ namespace Files.Platform.Linux.Previews
 	public static class PreviewFile
 	{
 		private const int ONoctty = 0x100;
+		private const int OPath = 0x200000;
+		private const int OCloexec = 0x80000;
 
 		public static FileStream OpenRead(string path, CancellationToken cancellationToken = default)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
-			// Check the (followed) target before opening: opening a device can have side effects even with O_NONBLOCK.
-			if (!PosixNative.TryStat(PosixNative.AtFdCwd, path, 0, out var expected, out var errno))
+
+			// Opening a device can have side effects even with O_NONBLOCK. An O_PATH descriptor pins the (followed)
+			// target without invoking any driver, so the type check below can't be raced by swapping the path.
+			var pathFd = PosixNative.OpenAt(PosixNative.AtFdCwd, path, OPath | OCloexec, out var errno);
+			if (pathFd < 0)
 				throw PosixNative.CreateException(errno, path);
-			if (!expected.IsRegularFile)
+
+			using var pathHandle = new SafeFileHandle((IntPtr)pathFd, ownsHandle: true);
+			if (!PosixNative.TryStat(pathFd, out var pinned) || !pinned.IsRegularFile)
 				throw new IOException("Only regular files can be previewed.");
 
-			var fd = PosixNative.OpenAt(PosixNative.AtFdCwd, path,
+			// Reopening through the magic link reaches the pinned inode, not whatever the path names now.
+			var fd = PosixNative.OpenAt(PosixNative.AtFdCwd, $"/proc/self/fd/{pathFd}",
 				PosixNative.NonBlockingFlags | ONoctty, out errno);
 			if (fd < 0)
 				throw PosixNative.CreateException(errno, path);
@@ -31,8 +39,7 @@ namespace Files.Platform.Linux.Previews
 			var handle = new SafeFileHandle((IntPtr)fd, ownsHandle: true);
 			try
 			{
-				// Reject a target swapped between the check and the open.
-				if (!PosixNative.TryStat(fd, out var opened) || !opened.IsRegularFile || !PosixNative.SameEntry(expected, opened))
+				if (!PosixNative.TryStat(fd, out var opened) || !opened.IsRegularFile || !PosixNative.SameEntry(pinned, opened))
 					throw new IOException("Only regular files can be previewed.");
 				PosixNative.ClearNonBlocking(fd);
 				cancellationToken.ThrowIfCancellationRequested();

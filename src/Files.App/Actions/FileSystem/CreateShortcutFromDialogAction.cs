@@ -30,6 +30,7 @@ namespace Files.App.Actions
 			=> new("\uE71B");
 
 		public override bool IsExecutable =>
+			Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IPlatformCapabilities>().SupportsShortcutFiles &&
 			context.CanCreateItem &&
 			UIHelpers.CanShowDialog;
 
@@ -42,6 +43,9 @@ namespace Files.App.Actions
 
 		public Task ExecuteAsync(object? parameter = null)
 		{
+			if (!IsExecutable)
+				return Task.CompletedTask;
+
 			return UIFilesystemHelpers.CreateShortcutFromDialogAsync(context.ShellPage!);
 		}
 

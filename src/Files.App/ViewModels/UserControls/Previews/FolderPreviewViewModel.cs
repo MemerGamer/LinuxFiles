@@ -4,6 +4,8 @@
 using Files.App.ViewModels.Properties;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.IO;
+using Files.Core.Storage.Contracts;
+using OwlCore.Storage.System.IO;
 
 namespace Files.App.ViewModels.Previews
 {
@@ -14,8 +16,6 @@ namespace Files.App.ViewModels.Previews
 
 		public BitmapImage? Thumbnail { get; set; } = new();
 
-		private BaseStorageFolder? Folder { get; set; }
-
 		public FolderPreviewViewModel(ListedItem item)
 			=> Item = item;
 
@@ -25,11 +25,15 @@ namespace Files.App.ViewModels.Previews
 		private async Task LoadPreviewAndDetailsAsync()
 		{
 			var itemPath = Item.ItemPath!;
+#if WINDOWS
 			var rootItem = await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(itemPath));
 			var folder = await StorageFileExtensions.DangerousGetFolderFromPathAsync(itemPath, rootItem.Result)
 				?? throw new InvalidOperationException("The preview folder could not be opened.");
-
-			Folder = folder;
+#else
+			var resolved = await Ioc.Default.GetRequiredService<IStorableResolver>().TryGetAsync(itemPath);
+			if (resolved.Item is not IFolder)
+				throw new IOException("The preview folder could not be resolved.");
+#endif
 
 			var result = await FileThumbnailHelper.GetIconAsync(
 				Item.ItemPath,
@@ -46,20 +50,28 @@ namespace Files.App.ViewModels.Previews
 			if (Item.IsDriveRoot || infoPaneViewModel?.SelectedDriveItem is not null)
 				return;
 
+#if WINDOWS
 			var info = await folder.GetBasicPropertiesAsync();
+			var dateModified = info.DateModified;
+			var dateCreated = info.DateCreated;
+#else
+			var localInfo = resolved.Item is SystemFolder ? new DirectoryInfo(itemPath) : null;
+			var dateModified = localInfo is null ? Item.ItemDateModifiedReal : new DateTimeOffset(localInfo.LastWriteTime);
+			var dateCreated = localInfo is null ? Item.ItemDateCreatedReal : new DateTimeOffset(localInfo.CreationTime);
+#endif
 
 			Item.FileDetails =
 			[
 				GetFileProperty("PropertyItemCount", infoPaneViewModel?.DirectoryItemCount),
-				GetFileProperty("PropertyDateModified", info.DateModified),
-				GetFileProperty("PropertyDateCreated", info.DateCreated),
-				GetFileProperty("PropertyParsingPath", folder.Path),
+				GetFileProperty("PropertyDateModified", dateModified),
+				GetFileProperty("PropertyDateCreated", dateCreated),
+				GetFileProperty("PropertyParsingPath", itemPath),
 			];
 
 			if (GitHelpers.IsRepositoryEx(Item.ItemPath, out var repoPath) &&
 				!string.IsNullOrEmpty(repoPath))
 			{
-				var gitDirectory = GitHelpers.GetGitRepositoryPath(folder.Path, Path.GetPathRoot(folder.Path));
+				var gitDirectory = GitHelpers.GetGitRepositoryPath(itemPath, Path.GetPathRoot(itemPath));
 				var headName = (await GitHelpers.GetRepositoryHead(gitDirectory))?.Name ?? string.Empty;
 				var repositoryName = GitHelpers.GetOriginRepositoryName(gitDirectory);
 

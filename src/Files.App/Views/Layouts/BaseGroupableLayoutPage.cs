@@ -422,6 +422,66 @@ namespace Files.App.Views.Layouts
 
 #if DESKTOP
 		/// <summary>
+		/// Arrow keys follow the rows and columns of the virtualizing wrap grid (Uno's list controls would step by one item).
+		/// </summary>
+		protected bool TryHandleWrapGridArrowKey(KeyRoutedEventArgs e)
+		{
+			if (e.Key is not (VirtualKey.Up or VirtualKey.Down or VirtualKey.Left or VirtualKey.Right) ||
+				ListViewBase.ItemsPanelRoot is not Files.App.UnoVirtualization.VirtualizingWrapGrid panel ||
+				ListViewBase.Items.Count == 0 ||
+				FocusManager.GetFocusedElement(MainWindow.Instance.Content.XamlRoot) is TextBox ||
+				InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down) ||
+				InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down))
+				return false;
+
+			var perLine = panel.ItemsPerRow;
+			var withinLine = panel.PanelScrollOrientation == Orientation.Vertical ? 1 : perLine;
+			var acrossLines = panel.PanelScrollOrientation == Orientation.Vertical ? perLine : 1;
+			var step = e.Key switch
+			{
+				VirtualKey.Left => -withinLine,
+				VirtualKey.Right => withinLine,
+				VirtualKey.Up => -acrossLines,
+				_ => acrossLines,
+			};
+
+			// Horizontal-scroll layouts fill columns top to bottom, so Up/Down move within a column and Left/Right across columns
+			if (panel.PanelScrollOrientation == Orientation.Horizontal)
+			{
+				step = e.Key switch
+				{
+					VirtualKey.Up => -1,
+					VirtualKey.Down => 1,
+					VirtualKey.Left => -perLine,
+					_ => perLine,
+				};
+			}
+
+			var count = ListViewBase.Items.Count;
+			var current = ListViewBase.SelectedIndex;
+			if (current < 0)
+				current = 0;
+			else
+				current += step;
+
+			if (current < 0 || current >= count)
+			{
+				e.Handled = true;
+				return true;
+			}
+
+			if (ListViewBase.Items[current] is ListedItem item)
+			{
+				ItemManipulationModel.SetSelectedItem(item);
+				ItemManipulationModel.ScrollIntoView(item);
+				ItemManipulationModel.FocusSelectedItems();
+			}
+
+			e.Handled = true;
+			return true;
+		}
+
+		/// <summary>
 		/// Home, End, Page Up and Page Down don't move the selection in Uno's list controls.
 		/// </summary>
 		protected bool TryHandleListJumpKey(KeyRoutedEventArgs e)

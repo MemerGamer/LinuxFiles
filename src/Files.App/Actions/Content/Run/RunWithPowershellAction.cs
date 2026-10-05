@@ -35,15 +35,11 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
+#if !WINDOWS
+		// LINUX-TODO(launching): this Windows command is hidden on Linux.
 		public Task ExecuteAsync(object? parameter = null)
-		{
-			var itemPath = context.ShellPage?.SlimContentPage?.SelectedItem?.ItemPath;
-			return Win32Helper.RunPowershellCommandAsync(
-				$"& {Win32Helper.ToPowerShellStringLiteral(itemPath)}",
-				PowerShellExecutionOptions.None,
-				context.Folder?.ItemPath
-			);
-		}
+			=> Task.CompletedTask;
+#endif
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

@@ -23,6 +23,7 @@ namespace Files.App.Actions
 			=> new("\uE70F");
 
 		public bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			context.SelectedItems.Any() &&
 			context.PageType != ContentPageTypes.RecycleBin &&
 			context.PageType != ContentPageTypes.ZipFolder &&
@@ -35,10 +36,11 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
+#if !WINDOWS
+		// LINUX-TODO(launching): this Windows command is hidden on Linux.
 		public Task ExecuteAsync(object? parameter = null)
-		{
-			return Task.WhenAll(context.SelectedItems.Select(item => Win32Helper.RunPowershellCommandAsync($"& 'notepad.exe' {Win32Helper.ToPowerShellStringLiteral(item.ItemPath)}", PowerShellExecutionOptions.Hidden)));
-		}
+			=> Task.CompletedTask;
+#endif
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

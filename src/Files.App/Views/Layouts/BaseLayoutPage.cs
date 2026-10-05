@@ -181,7 +181,13 @@ namespace Files.App.Views.Layouts
 
 				if (collectionViewSource.View is not null)
 					collectionViewSource.View.VectorChanged += View_VectorChanged;
+
+				OnCollectionViewSourceChanged();
 			}
+		}
+
+		protected virtual void OnCollectionViewSourceChanged()
+		{
 		}
 
 		private bool isItemSelected = false;

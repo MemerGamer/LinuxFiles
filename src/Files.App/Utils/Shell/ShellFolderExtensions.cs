@@ -125,7 +125,7 @@ namespace Files.App.Utils.Shell
 				// which can block on unreachable network locations
 				IsFolder = linkItem.StoredTargetIsFolder() ?? linkItem.IsTargetFolder(targetPath),
 				RunAsAdmin = linkItem.RunAsAdministrator,
-				ShowWindowCommand = (Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD)linkItem.ShowState,
+				ShowWindowCommand = (Files.App.Data.Enums.ShowWindowCommand)linkItem.ShowState,
 				Arguments = linkItem.Arguments,
 				WorkingDirectory = Environment.ExpandEnvironmentVariables(linkItem.WorkingDirectory),
 				TargetPath = targetPath

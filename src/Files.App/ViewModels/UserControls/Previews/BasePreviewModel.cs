@@ -2,6 +2,10 @@
 // Licensed under the MIT License.
 
 using System.IO;
+using Files.Core.Storage.Contracts;
+#if !WINDOWS
+using OwlCore.Storage.System.IO;
+#endif
 using Files.App.ViewModels.Properties;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -14,7 +18,11 @@ namespace Files.App.ViewModels.Previews
 
 		public ListedItem Item { get; }
 
+#if WINDOWS
 		protected BaseStorageFile PreviewFile
+#else
+		protected IFile PreviewFile
+#endif
 			=> Item.ItemFile ?? throw new InvalidOperationException("The preview file has not been loaded.");
 
 		private BitmapImage? fileImage;
@@ -42,8 +50,37 @@ namespace Files.App.ViewModels.Previews
 			return temp.LoadAsync();
 		}
 
+#if WINDOWS
 		public static Task<string> ReadFileAsTextAsync(BaseStorageFile file, int maxLength = 10 * 1024 * 1024)
 			=> file.ReadTextAsync(maxLength);
+#else
+		protected static async Task<IFile?> ResolvePreviewFileAsync(ListedItem item, CancellationToken cancellationToken)
+		{
+			if (item.ItemFile is null)
+			{
+				var result = await Ioc.Default.GetRequiredService<IStorableResolver>().TryGetAsync(item.GetRequiredPath(), cancellationToken);
+				item.ItemFile = result.Item as IFile;
+			}
+
+			return item.ItemFile;
+		}
+
+		protected static Task<Stream> OpenPreviewReadAsync(IFile file, CancellationToken cancellationToken)
+		{
+			// Local streams must pin and stat the inode before opening it, including symlink targets.
+			if (file is SystemFile)
+				return Task.FromResult<Stream>(Files.Platform.Linux.Previews.PreviewFile.OpenRead(file.Id, cancellationToken));
+
+			return file.OpenStreamAsync(FileAccess.Read, cancellationToken);
+		}
+
+		protected async Task<Stream> OpenPreviewReadAsync(CancellationToken cancellationToken)
+		{
+			var file = await ResolvePreviewFileAsync(Item, cancellationToken)
+				?? throw new IOException("The preview file could not be resolved.");
+			return await OpenPreviewReadAsync(file, cancellationToken);
+		}
+#endif
 
 		/// <summary>
 		/// Call this function when you are ready to load the preview and details.
@@ -56,9 +93,13 @@ namespace Files.App.ViewModels.Previews
 
 			if (Item.ItemFile is null)
 			{
+#if WINDOWS
 				var itemPath = Item.ItemPath!;
 				var rootItem = await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(itemPath));
 				Item.ItemFile = await StorageFileExtensions.DangerousGetFileFromPathAsync(itemPath, rootItem.Result);
+#else
+				await ResolvePreviewFileAsync(Item, LoadCancelledTokenSource.Token);
+#endif
 			}
 
 			await Task.Run(async () =>
@@ -117,35 +158,7 @@ namespace Files.App.ViewModels.Previews
 		protected static FileProperty GetFileProperty(string nameResource, object? value)
 			=> new() { NameResource = nameResource, Value = value };
 
-		private async Task<List<FileProperty>?> GetSystemFilePropertiesAsync()
-		{
-			if (Item.IsShortcut)
-				return null;
-			if (Item.ItemFile is null)
-				throw new InvalidOperationException("The preview item could not be opened as a file.");
 
-			var list = await FileProperty.RetrieveAndInitializePropertiesAsync(Item.ItemFile,
-				Constants.ResourceFilePaths.PreviewPaneDetailsPropertiesJsonPath);
-
-			var address = list.Find(x => x.ID is "address")
-				?? throw new InvalidDataException("The preview property definition is missing the address field.");
-			var latitude = list.Find(x => x.Property is "System.GPS.LatitudeDecimal")
-				?? throw new InvalidDataException("The preview property definition is missing the latitude field.");
-			var longitude = list.Find(x => x.Property is "System.GPS.LongitudeDecimal")
-				?? throw new InvalidDataException("The preview property definition is missing the longitude field.");
-			address.Value = await LocationHelpers.GetAddressFromCoordinatesAsync(
-				(double?)latitude.Value,
-				(double?)longitude.Value);
-
-			// Adds the value for the file tag
-			var fileTag = list.FirstOrDefault(x => x.ID is "filetag")
-				?? throw new InvalidDataException("The preview property definition is missing the file tag field.");
-			fileTag.Value = Item.FileTagsUI is not null
-				? string.Join(',', Item.FileTagsUI.Select(x => x.Name))
-				: null;
-
-			return list.Where(i => i.ValueText is not null).ToList();
-		}
 
 #if DESKTOP
 		private List<FileProperty> GetBasicFileDetails()

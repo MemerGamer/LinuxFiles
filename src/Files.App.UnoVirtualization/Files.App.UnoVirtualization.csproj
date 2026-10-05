@@ -1,0 +1,23 @@
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<Project Sdk="Uno.Sdk">
+
+    <!--  Linux/Uno only. Kept apart from Files.App because publicizing Uno.UI breaks the Uno XAML generator for the project that compiles XAML  -->
+    <PropertyGroup>
+        <TargetFramework>$(DesktopTargetFramework)</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Configurations>Debug;Release</Configurations>
+        <Platforms>x86;x64;arm64</Platforms>
+        <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
+        <UnoSingleProject>false</UnoSingleProject>
+        <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Uno.WinUI" />
+        <!--  Also emits IgnoresAccessChecksTo so the runtime lets the layout subclass Uno.UI's internal types  -->
+        <PackageReference Include="Krafs.Publicizer" PrivateAssets="all" />
+        <Publicize Include="Uno.UI;Uno.Foundation" IncludeVirtualMembers="true" />
+    </ItemGroup>
+
+</Project>

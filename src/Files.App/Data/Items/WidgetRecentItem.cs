@@ -7,7 +7,7 @@ using Windows.Win32.UI.Shell;
 namespace Files.App.Data.Items
 {
 	/// <summary>
-	/// Represents an item for recent item of File Explorer on Windows.
+	/// Represents a recently used file.
 	/// </summary>
 	public sealed partial class RecentItem : WidgetCardItem, IEquatable<RecentItem>, IDisposable
 	{
@@ -32,12 +32,9 @@ namespace Files.App.Data.Items
 		public required DateTime LastModified { get; set; }
 
 		/// <summary>
-		/// Gets or initializes PIDL of the recent item.
+		/// Gets or initializes the Windows shell item of the recent item; unused on Linux.
 		/// </summary>
-		/// <remarks>
-		/// This has to be removed in the future.
-		/// </remarks>
-		public required IShellItem ShellItem { get; init; }
+		public IShellItem? ShellItem { get; init; }
 
 		/// <summary>
 		/// Loads thumbnail icon of the recent item.
@@ -47,9 +44,12 @@ namespace Files.App.Data.Items
 		{
 			var result = await FileThumbnailHelper.GetIconAsync(Path, Constants.ShellIconSizes.Small, false, IconOptions.None);
 
-			var bitmapImage = await result.ToBitmapAsync();
-			if (bitmapImage is not null)
-				Icon = bitmapImage;
+			await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
+			{
+				var bitmapImage = await result.ToBitmapAsync();
+				if (bitmapImage is not null)
+					Icon = bitmapImage;
+			});
 		}
 
 		public override int GetHashCode() => (Path, Name).GetHashCode();

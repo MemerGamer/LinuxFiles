@@ -36,10 +36,11 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync(object? parameter = null)
-		{
-			await Task.WhenAll(context.SelectedItems.Select(selectedItem => Win32Helper.InstallInf(selectedItem.ItemPath)));
-		}
+#if !WINDOWS
+		// LINUX-TODO(install): this Windows command is hidden on Linux.
+		public Task ExecuteAsync(object? parameter = null)
+			=> Task.CompletedTask;
+#endif
 
 		public void Context_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{

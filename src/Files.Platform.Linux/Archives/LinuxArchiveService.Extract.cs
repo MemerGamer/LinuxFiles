@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.Archives;
@@ -48,7 +49,7 @@ namespace Files.Platform.Linux.Archives
 				{
 					ct.ThrowIfCancellationRequested();
 					entryCount++;
-					declaredBytes += Math.Max(entry.Size, 0);
+					declaredBytes = checked(declaredBytes + Math.Max(entry.Size, 0));
 
 					if (extract)
 						ArchivePathValidator.NormalizeEntryName(entry.Key);
@@ -57,6 +58,7 @@ namespace Files.Platform.Linux.Archives
 						throw new ArchivePasswordException("The archive is encrypted and the password is missing.");
 
 					guard.CheckEntryCount(entryCount);
+					guard.CheckDeclared(declaredBytes);
 				}
 
 				guard.CheckDeclared(declaredBytes);
@@ -90,7 +92,7 @@ namespace Files.Platform.Linux.Archives
 						if (entry.IsEncrypted && string.IsNullOrEmpty(options.Password))
 							throw new ArchivePasswordException("The archive is encrypted and the password is missing.");
 
-						options.Progress?.Report(new ArchiveProgress(processed, entryCount, bytesDone, declaredBytes, relative));
+						options.Progress?.Report(new ArchiveProgress(processed, entryCount, bytesDone, declaredBytes, ArchivePathValidator.Printable(relative)));
 
 						if (!extract)
 						{
@@ -122,8 +124,8 @@ namespace Files.Platform.Linux.Archives
 
 						if (entry.LinkTarget is not null)
 						{
-							// Only relative links that stay inside the extracted tree are created
-							if (!ArchivePathValidator.IsSafeLinkTarget(relative, entry.LinkTarget) || FileSystemEntry.GetKind(full) != EntryKind.None)
+							// Parent segments could escape through another archive link; accept only downward relative targets.
+							if (!ArchivePathValidator.IsSafeLinkTarget(relative, entry.LinkTarget) || entry.LinkTarget.Split('/').Contains("..", StringComparer.Ordinal) || FileSystemEntry.GetKind(full) != EntryKind.None)
 							{
 								skipped++;
 								continue;
@@ -178,7 +180,7 @@ namespace Files.Platform.Linux.Archives
 				if (!extract)
 					return new ArchiveResult(true, false, processed, skipped);
 
-				var state = new MergeState(options, ct);
+				var state = new MergeState(options, ct, destination!);
 				Merge(staging!, destination!, string.Empty, state);
 				skipped += state.Skipped;
 
@@ -195,18 +197,18 @@ namespace Files.Platform.Linux.Archives
 			}
 			catch (ArchiveSecurityException ex)
 			{
-				return new ArchiveResult(false, false, processed, skipped, ex.Message);
+				return new ArchiveResult(false, false, processed, skipped, ArchivePathValidator.Printable(ex.Message));
 			}
 			catch (Exception ex) when (ex is CryptographicException or System.Security.Cryptography.CryptographicException)
 			{
 				throw new ArchivePasswordException("The password is wrong.", ex);
 			}
-			catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or ArchiveException or InvalidDataException or NotSupportedException or ArgumentException)
+			catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException or ArchiveException or InvalidDataException or NotSupportedException or ArgumentException or OverflowException)
 			{
 				if (!string.IsNullOrEmpty(options.Password) && ex is not IOException and not UnauthorizedAccessException)
 					throw new ArchivePasswordException("The archive could not be read, the password may be wrong.", ex);
 
-				return new ArchiveResult(false, false, processed, skipped, ex.Message);
+				return new ArchiveResult(false, false, processed, skipped, ArchivePathValidator.Printable(ex.Message));
 			}
 			finally
 			{
@@ -225,7 +227,7 @@ namespace Files.Platform.Linux.Archives
 		private static void VerifyCrc(EntryData entry, uint actual)
 		{
 			if (!entry.IsTar && entry.Crc != 0 && (uint)entry.Crc != actual)
-				throw new InvalidDataException($"CRC mismatch, the archive is corrupt or the password is wrong: '{entry.Key}'.");
+				throw new InvalidDataException($"CRC mismatch, the archive is corrupt or the password is wrong: '{ArchivePathValidator.Printable(entry.Key ?? string.Empty)}'.");
 		}
 
 		private static void ApplyMode(string path, EntryData entry)
@@ -256,13 +258,16 @@ namespace Files.Platform.Linux.Archives
 			private readonly ArchiveExtractOptions options;
 			private ConflictResolution? sticky;
 
-			public MergeState(ArchiveExtractOptions options, CancellationToken cancellationToken)
+			public MergeState(ArchiveExtractOptions options, CancellationToken cancellationToken, string root)
 			{
 				this.options = options;
 				CancellationToken = cancellationToken;
+				Root = root;
 			}
 
 			public CancellationToken CancellationToken { get; }
+
+			public string Root { get; }
 
 			public long Skipped { get; set; }
 
@@ -296,6 +301,22 @@ namespace Files.Platform.Linux.Archives
 				var targetKind = FileSystemEntry.GetKind(target);
 				var isDirectory = sourceKind == EntryKind.Directory;
 
+				if (sourceKind == EntryKind.Symlink)
+				{
+					try
+					{
+						var linkTarget = new FileInfo(child).LinkTarget!;
+						var resolved = Path.GetFullPath(Path.Combine(destination, linkTarget));
+						ArchivePathValidator.ResolveInside(state.Root, Path.GetRelativePath(state.Root, resolved));
+						ArchivePathValidator.EnsureNoLinkInPath(state.Root, resolved);
+					}
+					catch (ArchiveSecurityException)
+					{
+						state.Skipped++;
+						continue;
+					}
+				}
+
 				if (targetKind == EntryKind.None)
 				{
 					MoveItem(child, target, isDirectory);
@@ -308,7 +329,7 @@ namespace Files.Platform.Linux.Archives
 					continue;
 				}
 
-				switch (state.Resolve(new ArchiveConflict(relativePath, target, isDirectory)))
+				switch (state.Resolve(new ArchiveConflict(ArchivePathValidator.Printable(relativePath), target, isDirectory)))
 				{
 					case ConflictAction.Cancel:
 						throw new OperationCanceledException();

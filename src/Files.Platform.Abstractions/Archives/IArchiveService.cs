@@ -1,8 +1,11 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,6 +41,25 @@ namespace Files.Platform.Abstractions.Archives
 		/// Lists the entries. Fails with <see cref="ArchivePasswordException"/> if the headers are encrypted and the password is missing or wrong.
 		/// </summary>
 		Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default);
+
+		/// <summary>Whether the archive has more than one top-level entry, reading only the first headers. Archives too large to tell count as having several.</summary>
+		async Task<bool> HasMultipleTopLevelEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
+		{
+			var listing = await ListAsync(archivePath, password, null, cancellationToken).ConfigureAwait(false);
+			return listing.IsTruncated || listing.Entries
+				.Select(e => e.Path.Split('/', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault(s => s is not "."))
+				.Where(s => s is not null).Distinct().Skip(1).Any();
+		}
+
+		/// <summary>Lists headers for in-app browsing, applying the fixed browsing size, ratio and entry limits. Use <see cref="ListAsync"/> for encryption and structure checks.</summary>
+		Task<ArchiveListing> ListForBrowsingAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
+			=> ListAsync(archivePath, password, fileNameEncoding, cancellationToken);
+
+		/// <summary>Opens one safe entry as a caller-owned, read-only stream with fixed browsing size and ratio limits.</summary>
+		Task<Stream> OpenEntryAsync(string archivePath, string entryPath, string? password = null, CancellationToken cancellationToken = default);
+
+		/// <summary>Whether existing archives can be modified through this service.</summary>
+		bool CanWriteEntries => false;
 
 		/// <summary>Lists untrusted preview headers with bounded input, expanded bytes and entry count, without extracting files.</summary>
 		Task<ArchiveListing> ListPreviewAsync(string archivePath, CancellationToken cancellationToken = default);

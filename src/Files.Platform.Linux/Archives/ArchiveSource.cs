@@ -4,8 +4,11 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Formats.Tar;
 using System.IO.Compression;
 using System.Text;
+using System.Threading;
+using Files.Platform.Linux.Previews;
 using Files.Platform.Abstractions.Archives;
 using SharpCompress.Archives;
 using SharpCompress.Common;
@@ -29,13 +32,13 @@ namespace Files.Platform.Linux.Archives
 		public abstract bool IsSolid { get; }
 
 		/// <summary>Enumerates the entries. Each call starts over. The stream factory is only valid while the enumerator is on that entry.</summary>
-		public abstract IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries();
+		public abstract IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries(bool headersOnly = false);
 
 		public virtual void Dispose()
 		{
 		}
 
-		public static ArchiveSource Open(string path, string? password, Encoding? encoding)
+		public static ArchiveSource Open(string path, string? password, Encoding? encoding, long? maxBytes = null, CancellationToken cancellationToken = default)
 		{
 			var options = new ReaderOptions { Password = string.IsNullOrEmpty(password) ? null : password };
 			if (encoding is not null)
@@ -44,13 +47,21 @@ namespace Files.Platform.Linux.Archives
 			var name = Path.GetFileName(path).ToLowerInvariant();
 			var codec = TarCodec(name);
 			if (codec is not null)
-				return new TarSource(path, codec.Value, options);
+				return new TarSource(path, codec.Value, options, maxBytes, cancellationToken);
 
 			var single = SingleFileCodec(name);
 			if (single is not null)
-				return new SingleFileSource(path, single.Value);
+				return new SingleFileSource(path, single.Value, maxBytes, cancellationToken);
 
-			return new ZipLikeSource(ArchiveFactory.Open(path, options));
+			var input = OpenInput(path, maxBytes, cancellationToken);
+			try { return new ZipLikeSource(ArchiveFactory.Open(input, options), input); }
+			catch { input.Dispose(); throw; }
+		}
+
+		private static Stream OpenInput(string path, long? maxBytes, CancellationToken cancellationToken)
+		{
+			var file = PreviewFile.OpenRead(path, cancellationToken);
+			return maxBytes is { } limit ? new PreviewReadStream(file, limit, cancellationToken) : file;
 		}
 
 		internal static Codec? TarCodec(string lowerName)
@@ -69,7 +80,7 @@ namespace Files.Platform.Linux.Archives
 			return null;
 		}
 
-		private static Codec? SingleFileCodec(string lowerName)
+		internal static Codec? SingleFileCodec(string lowerName)
 		{
 			if (lowerName.EndsWith(".gz", StringComparison.Ordinal))
 				return Codec.GZip;
@@ -105,17 +116,19 @@ namespace Files.Platform.Linux.Archives
 		private sealed class ZipLikeSource : ArchiveSource
 		{
 			private readonly IArchive archive;
+			private readonly Stream input;
 
-			public ZipLikeSource(IArchive archive)
+			public ZipLikeSource(IArchive archive, Stream input)
 			{
 				this.archive = archive;
+				this.input = input;
 			}
 
 			public override bool IsSolid => archive.IsSolid || archive.Type == ArchiveType.SevenZip;
 
-			public override IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries()
+			public override IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries(bool headersOnly = false)
 			{
-				if (IsSolid)
+				if (IsSolid && !headersOnly)
 				{
 					using var reader = archive.ExtractAllEntries();
 					while (reader.MoveToNextEntry())
@@ -134,33 +147,56 @@ namespace Files.Platform.Linux.Archives
 				}
 			}
 
-			public override void Dispose() => archive.Dispose();
+			public override void Dispose()
+			{
+				try { archive.Dispose(); }
+				finally { input.Dispose(); }
+			}
 		}
 
 		private sealed class TarSource : ArchiveSource
 		{
+			private const int MaxSkippedTarEntries = 10_000;
+
 			private readonly string path;
 			private readonly Codec codec;
 			private readonly ReaderOptions options;
+			private readonly long? maxBytes;
+			private readonly CancellationToken cancellationToken;
 
-			public TarSource(string path, Codec codec, ReaderOptions options)
+			public TarSource(string path, Codec codec, ReaderOptions options, long? maxBytes, CancellationToken cancellationToken)
 			{
 				this.path = path;
 				this.codec = codec;
 				this.options = options;
+				this.maxBytes = maxBytes;
+				this.cancellationToken = cancellationToken;
 			}
 
 			public override bool IsSolid => true;
 
-			public override IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries()
+			public override IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries(bool headersOnly = false)
 			{
-				using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-				using var decompressed = Decompress(file, codec);
-				using var reader = ReaderFactory.Open(decompressed, options);
-				while (reader.MoveToNextEntry())
+				using var file = OpenInput(path, maxBytes, cancellationToken);
+				using var codecStream = Decompress(file, codec);
+				using var decompressed = maxBytes is { } limit ? new PreviewReadStream(codecStream, limit, cancellationToken) : codecStream;
+				using var reader = new TarReader(decompressed);
+				TarEntry? entry;
+				var skipped = 0;
+				while ((entry = reader.GetNextEntry()) is not null)
 				{
-					var entry = reader.Entry;
-					yield return (Map(entry, true), () => reader.OpenEntryStream());
+					cancellationToken.ThrowIfCancellationRequested();
+					var current = entry;
+					var link = entry.EntryType is TarEntryType.SymbolicLink or TarEntryType.HardLink ? entry.LinkName : null;
+					if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile or TarEntryType.Directory or TarEntryType.SymbolicLink or TarEntryType.HardLink))
+					{
+						// Pax global/extended headers carry metadata only; fifos, devices and the like are never created. Skip them, bounded.
+						if (++skipped > MaxSkippedTarEntries)
+							throw new ArchiveSecurityException("The tar contains too many unsupported entries.");
+						continue;
+					}
+					yield return (new EntryData(entry.Name, entry.EntryType == TarEntryType.Directory, entry.Length, 0,
+						entry.ModificationTime.UtcDateTime, false, link, 0, (int)entry.Mode, true), () => current.DataStream ?? Stream.Null);
 				}
 			}
 		}
@@ -170,19 +206,24 @@ namespace Files.Platform.Linux.Archives
 			private readonly string path;
 			private readonly Codec codec;
 
-			public SingleFileSource(string path, Codec codec)
+			private readonly long? maxBytes;
+			private readonly CancellationToken cancellationToken;
+
+			public SingleFileSource(string path, Codec codec, long? maxBytes, CancellationToken cancellationToken)
 			{
 				this.path = path;
 				this.codec = codec;
+				this.maxBytes = maxBytes;
+				this.cancellationToken = cancellationToken;
 			}
 
 			public override bool IsSolid => false;
 
-			public override IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries()
+			public override IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries(bool headersOnly = false)
 			{
 				var name = Path.GetFileNameWithoutExtension(path);
 				var info = new FileInfo(path);
-				using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+				using var file = OpenInput(path, maxBytes, cancellationToken);
 				using var decompressed = Decompress(file, codec);
 				yield return (new EntryData(name, false, 0, info.Length, info.LastWriteTime, false, null, 0, null, false), () => decompressed);
 			}

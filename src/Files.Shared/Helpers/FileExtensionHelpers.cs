@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Linq;
+using System.Globalization;
+using System.Text;
 
 namespace Files.Shared.Helpers
 {
@@ -133,15 +135,6 @@ namespace Files.Shared.Helpers
 
 		public static bool IsBrowsableZipFile(string? filePath, [NotNullWhen(true)] out string? ext)
 		{
-			// LINUX-TODO(archives): browsing archives as folders (ZipStorageFolder) is built on 7z.dll and '\\' paths; on Linux archives are
-			// plain files that the Extract actions (IArchiveService) handle.
-			if (!OperatingSystem.IsWindows())
-			{
-				ext = null;
-
-				return false;
-			}
-
 			if (string.IsNullOrWhiteSpace(filePath))
 			{
 				ext = null;
@@ -149,11 +142,49 @@ namespace Files.Shared.Helpers
 				return false;
 			}
 
-			// Only extensions we want to browse
-			ext = new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".lzh", ".mrpack", ".jar" }
-				.FirstOrDefault(x => filePath.Contains(x, StringComparison.OrdinalIgnoreCase));
+			if (OperatingSystem.IsWindows())
+			{
+				// Windows keeps the original substring matching
+				ext = new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".lzh", ".mrpack", ".jar" }
+					.FirstOrDefault(x => filePath.Contains(x, StringComparison.OrdinalIgnoreCase));
 
+				return ext is not null;
+			}
+
+			ext = null;
+			foreach (var component in filePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries))
+			{
+				var candidate = Path.GetExtension(component);
+				if (new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".tgz", ".tbz2", ".txz", ".tzst", ".mrpack", ".jar" }.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+				{
+					ext = candidate;
+					break;
+				}
+			}
 			return ext is not null;
+		}
+
+		/// <summary>Finds a browsable archive component, skipping real directories with archive extensions.</summary>
+		public static string? GetArchiveContainerPath(string path)
+		{
+			for (var end = 1; end <= path.Length; end++)
+			{
+				if (end < path.Length && path[end] is not ('/' or '\\'))
+					continue;
+				var candidate = path[..end];
+				var name = candidate[(Math.Max(candidate.LastIndexOf('/'), candidate.LastIndexOf('\\')) + 1)..];
+				if (IsBrowsableZipFile(name, out _) && !Directory.Exists(candidate))
+					return candidate;
+			}
+			return null;
+		}
+
+		/// <summary>Checks for an archive root or a member path using either separator.</summary>
+		public static bool IsZipPath([NotNullWhen(true)] string? path, bool includeRoot = true)
+		{
+			if (string.IsNullOrEmpty(path) || GetArchiveContainerPath(path) is not { } container)
+				return false;
+			return container.Length == path.TrimEnd('/', '\\').Length ? includeRoot : !Path.Exists(path);
 		}
 
 		/// <summary>
@@ -387,6 +418,23 @@ namespace Files.Shared.Helpers
 		public static bool IsImagePreviewFile(string? fileExtensionToCheck)
 		{
 			return HasExtension(fileExtensionToCheck, ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tiff", ".ico", ".webp", ".jxr");
+		}
+	}
+
+	/// <summary>Escapes untrusted archive names without changing the identifier used to open an entry.</summary>
+	public static class ArchiveDisplayName
+	{
+		public static string Escape(string value)
+		{
+			var result = new StringBuilder(value.Length);
+			foreach (var character in value)
+			{
+				if (char.IsControl(character) || char.GetUnicodeCategory(character) is UnicodeCategory.Format or UnicodeCategory.LineSeparator or UnicodeCategory.ParagraphSeparator || character is '\\' or '\u034F' or '\u180B' or '\u180C' or '\u180D')
+					result.Append("\\u").Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
+				else
+					result.Append(character);
+			}
+			return result.ToString();
 		}
 	}
 }

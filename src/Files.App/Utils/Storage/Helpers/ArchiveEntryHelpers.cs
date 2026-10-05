@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
+#if WINDOWS
 using SevenZip;
 using IO = System.IO;
 
@@ -38,3 +39,5 @@ namespace Files.App.Utils.Storage
 		}
 	}
 }
+
+#endif

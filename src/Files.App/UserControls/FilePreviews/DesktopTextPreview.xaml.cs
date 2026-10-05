@@ -23,31 +23,57 @@ namespace Files.App.UserControls.FilePreviews
 
 		private void BuildContent()
 		{
-			ContentBlock.Blocks.Clear();
+			ContentPanel.Children.Clear();
 			var model = ViewModel.RenderModel;
 			if (model is null)
 				return;
 			var dark = ActualTheme == ElementTheme.Dark
 				|| (ActualTheme == ElementTheme.Default && Application.Current?.RequestedTheme == ApplicationTheme.Dark);
 
+			// RichTextBlock draws nothing on Uno Skia, so the paragraphs are built in a detached block
+			// collection and each one is shown in its own wrapping TextBlock.
+			var blocks = new RichTextBlock().Blocks;
 			switch (ViewModel.Kind)
 			{
 				case TextPreviewKind.Markdown:
-					PreviewTextRenderer.AddMarkdownBlocks(ContentBlock.Blocks, model, dark);
+					PreviewTextRenderer.AddMarkdownBlocks(blocks, model, dark);
 					break;
 				default:
 				{
 					// Monospace keeps code, logs and archive listings aligned.
-					ContentBlock.FontFamily = PreviewTextRenderer.GetMonospaceFont();
-					ContentBlock.FontSize = 12;
-					var paragraph = new Paragraph();
+					var paragraph = new Paragraph
+					{
+						FontFamily = PreviewTextRenderer.GetMonospaceFont(),
+						FontSize = 12,
+					};
 					if (ViewModel.Kind is TextPreviewKind.Code)
 						PreviewTextRenderer.AddCodeInlines(paragraph, model, dark);
 					else
 						PreviewTextRenderer.AddPlainInlines(paragraph.Inlines, model.Text);
-					ContentBlock.Blocks.Add(paragraph);
+					blocks.Add(paragraph);
 					break;
 				}
+			}
+
+			foreach (var block in blocks.OfType<Paragraph>())
+			{
+				var textBlock = new TextBlock
+				{
+					IsTextSelectionEnabled = true,
+					TextWrapping = TextWrapping.Wrap,
+					Margin = block.Margin,
+					FontFamily = block.FontFamily,
+					FontSize = block.FontSize,
+					FontWeight = block.FontWeight,
+					FontStyle = block.FontStyle,
+				};
+				foreach (var inline in block.Inlines.ToList())
+				{
+					block.Inlines.Remove(inline);
+					textBlock.Inlines.Add(inline);
+				}
+
+				ContentPanel.Children.Add(textBlock);
 			}
 
 			if (!string.IsNullOrEmpty(ViewModel.Footer))

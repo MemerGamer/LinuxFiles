@@ -57,6 +57,16 @@ if command -v ffmpeg >/dev/null; then
 	ffmpeg -loglevel error -y -f lavfi -i "gradients=s=640x420:c0=#11998e:c1=#38ef7d:seed=2:duration=1:speed=0" -frames:v 1 "$pics/forest.png" || true
 	ffmpeg -loglevel error -y -f lavfi -i "gradients=s=640x420:c0=#f7971e:c1=#7f00ff:seed=3:duration=1:speed=0" -frames:v 1 "$pics/dusk.jpg" || true
 fi
+# Small media and archive samples for the preview pane (generated here, nothing is committed)
+music="$home/Music"
+mkdir -p "$music"
+if command -v ffmpeg >/dev/null; then
+	ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=440:duration=2" -metadata title="Sample Tone" -metadata artist="Files Test" -metadata album="Showcase" "$music/tone.mp3" || true
+	ffmpeg -loglevel error -y -f lavfi -i "sine=frequency=660:duration=2" -metadata title="Sample Flac" -metadata artist="Files Test" -metadata album="Showcase" "$music/tone.flac" || true
+fi
+if command -v zip >/dev/null; then
+	(cd "$d" && zip -q -r "$d/Projects.zip" Projects Reports) || true
+fi
 # Content for the synthetic drives (see showcase-drives.txt)
 for m in disk1 disk2 disk3 usb; do mkdir -p "$home/mnt/$m"; done
 mkdir -p "$home/mnt/disk1"/{Games,Projects,Backups} "$home/mnt/usb/Photos"

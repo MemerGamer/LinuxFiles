@@ -831,6 +831,10 @@ namespace Files.App.ViewModels.UserControls
 
 		private static string NormalizePathInput(string currentInput, bool isFtp)
 		{
+			// POSIX paths are already normalized; the Windows separator rewrite would corrupt them.
+			if (!OperatingSystem.IsWindows())
+				return currentInput;
+
 			if (currentInput.Contains('/') && !isFtp)
 				currentInput = currentInput.Replace('/', '\\');
 

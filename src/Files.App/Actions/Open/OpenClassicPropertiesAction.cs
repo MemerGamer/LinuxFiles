@@ -28,6 +28,8 @@ namespace Files.App.Actions
 			=> new(Keys.Enter, KeyModifiers.AltShift);
 
 		public bool IsExecutable =>
+			// Opens the Windows shell's properties dialog; there's no equivalent on Linux.
+			OperatingSystem.IsWindows() &&
 			context.PageType is not ContentPageTypes.Home &&
 			context.PageType is not ContentPageTypes.ReleaseNotes &&
 			context.PageType is not ContentPageTypes.Settings &&

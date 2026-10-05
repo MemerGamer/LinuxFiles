@@ -14,9 +14,15 @@ namespace Files.App.ViewModels.Previews
 
 		public async override Task<List<FileProperty>> LoadPreviewAndDetailsAsync()
 		{
+#if WINDOWS
 			Stream = await PreviewFile.OpenReadAsync();
 
 			return [];
+#else
+			// LINUX-TODO(preview): no RTF renderer on desktop
+			await Task.CompletedTask;
+			throw new NotSupportedException();
+#endif
 		}
 	}
 }

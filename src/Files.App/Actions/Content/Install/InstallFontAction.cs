@@ -47,19 +47,22 @@ namespace Files.App.Actions
 			banner.IsCancelable = false;
 
 			var paths = context.SelectedItems.Select(item => item.ItemPath!).ToArray();
+			var outcome = ReturnResult.Success;
+			var installed = (long)context.SelectedItems.Count;
 			if (OperatingSystem.IsWindows())
 				await Win32Helper.InstallFontsAsync(paths, false);
 			else
-				await InstallForCurrentUserAsync(paths);
+				(outcome, installed) = await InstallForCurrentUserAsync(paths);
 
 			StatusCenterViewModel.RemoveItem(banner);
 			var currentWorkingDirectory = context.ShellPage.GetRequiredShellViewModel().WorkingDirectory!;
-			StatusCenterHelper.AddCard_InstallFont(currentWorkingDirectory.CreateEnumerable(), ReturnResult.Success, context.SelectedItems.Count);
+			StatusCenterHelper.AddCard_InstallFont(currentWorkingDirectory.CreateEnumerable(), outcome, installed);
 		}
 
 		// Per-user install into ~/.local/share/fonts; "for all users" stays Windows-only
-		private static async Task InstallForCurrentUserAsync(string[] paths)
+		private static async Task<(ReturnResult Outcome, long Installed)> InstallForCurrentUserAsync(string[] paths)
 		{
+			long installedCount = 0, cancelledCount = 0, failedCount = 0;
 			var installer = Ioc.Default.GetRequiredService<IFontInstallService>();
 			foreach (var path in paths)
 			{
@@ -77,13 +80,20 @@ namespace Files.App.Actions
 					};
 
 					if (await replace.TryShowAsync() != ContentDialogResult.Primary)
+					{
+						cancelledCount++;
 						continue;
+					}
 
 					result = await installer.InstallAsync(path, overwrite: true);
 				}
 
+				if (result is FontInstallResult.Installed)
+					installedCount++;
+
 				if (result is FontInstallResult.NotAFont or FontInstallResult.Failed)
 				{
+					failedCount++;
 					var error = new ContentDialog()
 					{
 						Title = Strings.InstallFont.GetLocalizedResource(),
@@ -95,6 +105,12 @@ namespace Files.App.Actions
 					await error.TryShowAsync();
 				}
 			}
+
+			// A failure is never reported as success; skipping every font by cancelling is a cancellation
+			var outcome = failedCount > 0 ? ReturnResult.Failed
+				: installedCount == 0 ? ReturnResult.Cancelled
+				: ReturnResult.Success;
+			return (outcome, installedCount);
 		}
 
 		public void Context_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

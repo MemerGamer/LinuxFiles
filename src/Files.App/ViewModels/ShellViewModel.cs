@@ -2172,10 +2172,15 @@ namespace Files.App.ViewModels
 
 			var isRecycleBin = path.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal);
 			var addFilesToken = addFilesCTS.Token;
+#if WINDOWS
 			var enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesToken, library);
-#if !WINDOWS
+#else
+			int enumerated;
+			try { enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesToken, library); }
+			catch (OperationCanceledException) { enumerated = -1; }
+
 			// Abandoned requests must not register watchers for a location we've navigated away from
-			if (IsLoadingCancelled || addFilesToken.IsCancellationRequested)
+			if (addFilesToken.IsCancellationRequested)
 				enumerated = -1;
 #endif
 

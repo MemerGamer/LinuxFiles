@@ -2,10 +2,12 @@
 // Licensed under the MIT License.
 
 using System.IO;
+#if WINDOWS
 using Windows.Win32;
 using Windows.Win32.Storage.FileSystem;
 using static Files.App.Helpers.Win32Helper;
 using static Files.App.Helpers.Win32PInvoke;
+#endif
 
 namespace Files.App.Utils.Serialization.Implementation
 {

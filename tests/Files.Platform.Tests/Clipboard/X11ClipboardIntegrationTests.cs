@@ -18,8 +18,15 @@ namespace Files.Platform.Tests.Clipboard
 	/// connection, like another application) reads it.
 	/// </summary>
 	[TestClass]
-	public sealed class X11ClipboardIntegrationTests
+	public sealed partial class X11ClipboardIntegrationTests
 	{
+		// Environment.SetEnvironmentVariable does not reach the native environment libX11 reads.
+		[System.Runtime.InteropServices.LibraryImport("libc", EntryPoint = "setenv", StringMarshalling = System.Runtime.InteropServices.StringMarshalling.Utf8)]
+		private static partial int SetNativeEnv(string name, string value, int overwrite);
+
+		[System.Runtime.InteropServices.LibraryImport("libc", EntryPoint = "unsetenv", StringMarshalling = System.Runtime.InteropServices.StringMarshalling.Utf8)]
+		private static partial int UnsetNativeEnv(string name);
+
 		private static Process? s_xvfb;
 		private static string? s_previousDisplay;
 
@@ -54,6 +61,7 @@ namespace Files.Platform.Tests.Clipboard
 
 				s_previousDisplay = Environment.GetEnvironmentVariable("DISPLAY");
 				Environment.SetEnvironmentVariable("DISPLAY", $":{display}");
+				SetNativeEnv("DISPLAY", $":{display}", 1);
 				return;
 			}
 		}
@@ -65,6 +73,10 @@ namespace Files.Platform.Tests.Clipboard
 				return;
 
 			Environment.SetEnvironmentVariable("DISPLAY", s_previousDisplay);
+			if (s_previousDisplay is null)
+				UnsetNativeEnv("DISPLAY");
+			else
+				SetNativeEnv("DISPLAY", s_previousDisplay, 1);
 			try
 			{
 				s_xvfb.Kill();

@@ -449,7 +449,7 @@ namespace Files.App.Views.Layouts
 			var selectedCount = FileList.SelectedItems.Count;
 			bool? newState = selectedCount == 0
 				? false
-				: selectedCount == FileList.Items.Count ? true : null;
+				: selectedCount == GetAllItems().Count() ? true : null;
 
 			if (SelectAllCheckbox.IsChecked == newState)
 				return;
@@ -537,7 +537,7 @@ namespace Files.App.Views.Layouts
 				return;
 
 #if DESKTOP
-			if (TryHandleListJumpKey(e))
+			if (TryHandleListJumpKey(e) || TryHandleGroupedArrowKey(e))
 				return;
 #endif
 
@@ -930,19 +930,19 @@ namespace Files.App.Views.Layouts
 			var maxItemLength = columnToResize switch
 			{
 				1 => 40, // Check all items columns
-				2 => FileList.Items.Cast<ListedItem>().Select(x => x.Name?.Length ?? 0).Max(), // file name column
-				4 => FileList.Items.Cast<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitDateHumanized?.Length ?? 0).Max(), // git
-				5 => FileList.Items.Cast<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitMessage?.Length ?? 0).Max(), // git
-				6 => FileList.Items.Cast<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitAuthor?.Length ?? 0).Max(), // git
-				7 => FileList.Items.Cast<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitSha?.Length ?? 0).Max(), // git
-				8 => FileList.Items.Cast<ListedItem>().Select(x => x.FileTagsUI?.Sum(x => x?.Name?.Length ?? 0) ?? 0).Max(), // file tag column
-				9 => FileList.Items.Cast<ListedItem>().Select(x => x.ItemPath?.Length ?? 0).Max(), // path column
-				10 => FileList.Items.Cast<ListedItem>().Select(x => (x as RecycleBinItem)?.ItemOriginalPath?.Length ?? 0).Max(), // original path column
-				11 => FileList.Items.Cast<ListedItem>().Select(x => (x as RecycleBinItem)?.ItemDateDeleted?.Length ?? 0).Max(), // date deleted column
-				12 => FileList.Items.Cast<ListedItem>().Select(x => x.ItemDateModified?.Length ?? 0).Max(), // date modified column
-				13 => FileList.Items.Cast<ListedItem>().Select(x => x.ItemDateCreated?.Length ?? 0).Max(), // date created column
-				14 => FileList.Items.Cast<ListedItem>().Select(x => x.ItemType?.Length ?? 0).Max(), // item type column
-				15 => FileList.Items.Cast<ListedItem>().Select(x => x.FileSize?.Length ?? 0).Max(), // item size column
+				2 => FileList.Items.OfType<ListedItem>().Select(x => x.Name?.Length ?? 0).Max(), // file name column
+				4 => FileList.Items.OfType<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitDateHumanized?.Length ?? 0).Max(), // git
+				5 => FileList.Items.OfType<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitMessage?.Length ?? 0).Max(), // git
+				6 => FileList.Items.OfType<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitAuthor?.Length ?? 0).Max(), // git
+				7 => FileList.Items.OfType<ListedItem>().Select(x => (x as IGitItem)?.GitLastCommitSha?.Length ?? 0).Max(), // git
+				8 => FileList.Items.OfType<ListedItem>().Select(x => x.FileTagsUI?.Sum(x => x?.Name?.Length ?? 0) ?? 0).Max(), // file tag column
+				9 => FileList.Items.OfType<ListedItem>().Select(x => x.ItemPath?.Length ?? 0).Max(), // path column
+				10 => FileList.Items.OfType<ListedItem>().Select(x => (x as RecycleBinItem)?.ItemOriginalPath?.Length ?? 0).Max(), // original path column
+				11 => FileList.Items.OfType<ListedItem>().Select(x => (x as RecycleBinItem)?.ItemDateDeleted?.Length ?? 0).Max(), // date deleted column
+				12 => FileList.Items.OfType<ListedItem>().Select(x => x.ItemDateModified?.Length ?? 0).Max(), // date modified column
+				13 => FileList.Items.OfType<ListedItem>().Select(x => x.ItemDateCreated?.Length ?? 0).Max(), // date created column
+				14 => FileList.Items.OfType<ListedItem>().Select(x => x.ItemType?.Length ?? 0).Max(), // item type column
+				15 => FileList.Items.OfType<ListedItem>().Select(x => x.FileSize?.Length ?? 0).Max(), // item size column
 				_ => 20 // cloud status column
 			};
 

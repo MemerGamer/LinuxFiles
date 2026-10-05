@@ -625,7 +625,7 @@ namespace Files.App.Helpers
 				return new();
 
 #if WINDOWS
-			// LINUX-TODO(listing): Uno's grouped CollectionView renders no rows, so Downloads is not grouped by default on Linux
+			// LINUX-TODO(listing): grouped Grid and Cards layouts are not virtualized on Linux, so a large Downloads folder would stall; not grouped by default
 			if (path == Constants.UserEnvironmentPaths.DownloadsPath)
 			{
 				// Default for downloads folder is to group by date created

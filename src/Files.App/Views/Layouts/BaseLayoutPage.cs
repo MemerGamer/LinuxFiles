@@ -33,7 +33,7 @@ namespace Files.App.Views.Layouts
 	/// <summary>
 	/// Represents the base class which every layout page must derive from
 	/// </summary>
-	public abstract class BaseLayoutPage : Page, IBaseLayoutPage, INotifyPropertyChanged
+	public abstract partial class BaseLayoutPage : Page, IBaseLayoutPage, INotifyPropertyChanged
 	{
 		// Dependency injections
 
@@ -166,14 +166,14 @@ namespace Files.App.Views.Layouts
 		};
 		/// <summary>
 		/// Items source for the layout lists. On Uno the CollectionView built over the bulk-updated collection never
-		/// generates item containers, so the non-grouped list binds to the source collection directly.
+		/// generates item containers, so the Linux lists bind directly to observable sources.
 		/// </summary>
 		// LINUX-TODO(listing): fall back to CollectionViewSource.View once Uno's CollectionView handles bulk Reset
 		public object? LayoutItemsSource
 #if WINDOWS
 			=> CollectionViewSource.View;
 #else
-			=> CollectionViewSource.IsSourceGrouped ? CollectionViewSource.View : CollectionViewSource.Source;
+			=> linuxGroupedItemsSource?.Items ?? CollectionViewSource.Source;
 #endif
 
 		public CollectionViewSource CollectionViewSource
@@ -188,6 +188,9 @@ namespace Files.App.Views.Layouts
 					collectionViewSource.View.VectorChanged -= View_VectorChanged;
 
 				collectionViewSource = value;
+#if !WINDOWS
+				UpdateLinuxGroupedItemsSource();
+#endif
 
 				NotifyPropertyChanged(nameof(CollectionViewSource));
 				NotifyPropertyChanged(nameof(LayoutItemsSource));
@@ -962,6 +965,9 @@ namespace Files.App.Views.Layouts
 			// Remove item jumping handler
 			CharacterReceived -= Page_CharacterReceived;
 			UnhookScrollDeferTracking();
+#if !WINDOWS
+			DisposeLinuxGroupedItemsSource();
+#endif
 			var folderSettings = FolderSettings
 				?? throw new InvalidOperationException("The layout does not have folder settings.");
 			folderSettings.LayoutModeChangeRequested -= BaseFolderSettings_LayoutModeChangeRequested;
@@ -1304,6 +1310,10 @@ namespace Files.App.Views.Layouts
 		protected void FileList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
 		{
 			HookScrollDeferTracking();
+#if !WINDOWS
+			if (args.Item is ContentControl { Content: IGroupedCollectionHeader })
+				return;
+#endif
 			RefreshContainer(args.ItemContainer, args.InRecycleQueue);
 			RefreshItem(args.ItemContainer, args.Item, args.InRecycleQueue, args);
 
@@ -1583,8 +1593,8 @@ namespace Files.App.Views.Layouts
 						if (ItemsControl.Items[i] == last || ItemsControl.Items[i] == hoveredItem)
 							found++;
 
-						if (found != 0 && !selectedItems.Contains(ItemsControl.Items[i]))
-							ItemManipulationModel.AddSelectedItem((ListedItem)ItemsControl.Items[i]);
+						if (found != 0 && ItemsControl.Items[i] is ListedItem rangeItem && !selectedItems.Contains(rangeItem))
+							ItemManipulationModel.AddSelectedItem(rangeItem);
 					}
 				}
 				// Avoid resetting the selection if multiple items are selected
@@ -1676,6 +1686,9 @@ namespace Files.App.Views.Layouts
 			UnhookBaseEvents();
 			UnhookScrollDeferTracking();
 			StatusBarViewModel.Dispose();
+#if !WINDOWS
+			DisposeLinuxGroupedItemsSource();
+#endif
 			dragOverItem = null;
 			hoveredItem = null;
 			preRenamingItem = null;
@@ -1700,7 +1713,11 @@ namespace Files.App.Views.Layouts
 			if (shellViewModel.FilesAndFolders.IsGrouped)
 			{
 				// Replacing the source rebuilds the list from scratch (a visible empty flash), so keep it when unchanged
-				if (CollectionViewSource.IsSourceGrouped && ReferenceEquals(CollectionViewSource.Source, shellViewModel.FilesAndFolders.GroupedCollection))
+				if (CollectionViewSource.IsSourceGrouped && ReferenceEquals(CollectionViewSource.Source, shellViewModel.FilesAndFolders.GroupedCollection)
+#if !WINDOWS
+					&& linuxGroupedItemsSource is not null
+#endif
+				)
 					return;
 
 				var newSource = new CollectionViewSource()

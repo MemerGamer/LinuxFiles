@@ -31,10 +31,10 @@ namespace Files.App.Helpers
 		private const UnixFileMode PrivateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
 
 		/// <summary>
-		/// Creates (or validates) a directory component: it must be a real directory, not a symlink, and (when required) closed to group and others.
+		/// Creates (or validates) a directory component: it must be a real directory, not a symlink, and closed to group and others.
 		/// A directory owned by someone else that passes this is still unusable, since it cannot be written to.
 		/// </summary>
-		private static bool EnsurePrivateDirectory(string path, bool create, bool requirePrivateMode = true)
+		private static bool EnsurePrivateDirectory(string path, bool create)
 		{
 			var info = new DirectoryInfo(path);
 			if (!info.Exists && !File.Exists(path) && info.LinkTarget is null)
@@ -47,7 +47,7 @@ namespace Files.App.Helpers
 
 			return info.LinkTarget is null
 				&& info.Exists
-				&& (!requirePrivateMode || (File.GetUnixFileMode(path) & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) == 0);
+				&& (File.GetUnixFileMode(path) & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute)) == 0;
 		}
 
 		private static bool EnsureRoot(bool create)
@@ -56,7 +56,8 @@ namespace Files.App.Helpers
 			var parent = Path.GetDirectoryName(root)!;
 			if (create)
 				Directory.CreateDirectory(Path.GetDirectoryName(parent)!);
-			return EnsurePrivateDirectory(parent, create, requirePrivateMode: false) && EnsurePrivateDirectory(root, create);
+			// The parent must be private too: an entry in a directory someone else can write to could be swapped for a symlink after it is checked
+			return EnsurePrivateDirectory(parent, create) && EnsurePrivateDirectory(root, create);
 		}
 
 		/// <summary>Creates a fresh private directory and returns the path for a sanitized file name inside it.</summary>

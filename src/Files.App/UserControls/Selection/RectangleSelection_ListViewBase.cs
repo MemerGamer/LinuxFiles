@@ -162,7 +162,7 @@ namespace Files.App.UserControls.Selection
 			foreach (var item in uiElement.Items.ToList().Except(itemsPosition.Keys))
 			{
 				var listViewItem = (FrameworkElement)uiElement.ContainerFromItem(item); // Get ListViewItem
-				if (listViewItem is null)
+				if (listViewItem is null || !listViewItem.IsHitTestVisible)
 				{
 					continue; // Element is not loaded (virtualized list)
 				}

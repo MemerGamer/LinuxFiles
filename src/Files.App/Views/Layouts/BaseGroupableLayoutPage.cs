@@ -227,7 +227,15 @@ namespace Files.App.Views.Layouts
 
 		protected virtual void ItemManipulationModel_SelectAllItemsInvoked(object? sender, EventArgs e)
 		{
+#if WINDOWS
 			ListViewBase.SelectAll();
+#else
+			foreach (var item in GetAllItems())
+			{
+				if (!ListViewBase.SelectedItems.Contains(item))
+					ListViewBase.SelectedItems.Add(item);
+			}
+#endif
 		}
 
 		protected virtual void ItemManipulationModel_ClearSelectionInvoked(object? sender, EventArgs e)
@@ -272,7 +280,11 @@ namespace Files.App.Views.Layouts
 			if (e is not null && e.AddedItems.Count == 0 && e.RemovedItems.Count == 0)
 				return;
 
-			var selectedItems = ListViewBase.SelectedItems.Cast<ListedItem>().Where(x => x is not null).ToList();
+#if !WINDOWS
+			foreach (var header in ListViewBase.SelectedItems.Where(x => x is not ListedItem).ToList())
+				ListViewBase.SelectedItems.Remove(header);
+#endif
+			var selectedItems = ListViewBase.SelectedItems.OfType<ListedItem>().ToList();
 
 			if (SelectedItems is not null && SelectedItems.SequenceEqual(selectedItems))
 				return;
@@ -533,7 +545,11 @@ namespace Files.App.Views.Layouts
 				_ => Math.Min(current + pageSize, count - 1),
 			};
 
-			if (ListViewBase.Items[target] is ListedItem item)
+			var direction = e.Key == VirtualKey.End || (e.Key == VirtualKey.PageUp && target > 0) ? -1 : 1;
+			while (target >= 0 && target < count && ListViewBase.Items[target] is not ListedItem)
+				target += direction;
+
+			if (target >= 0 && target < count && ListViewBase.Items[target] is ListedItem item)
 			{
 				ItemManipulationModel.SetSelectedItem(item);
 				ItemManipulationModel.ScrollIntoView(item);

@@ -358,7 +358,7 @@ namespace Files.App.Views.Layouts
 		}
 
 #if !WINDOWS
-		private (bool Virtualized, FolderLayoutModes? Mode)? _appliedPanelKey;
+		private (bool Grouped, bool Virtualized, FolderLayoutModes? Mode)? _appliedPanelKey;
 		private int _ensureVisibleRequest;
 		private static bool s_loggedPanelFallback;
 
@@ -386,14 +386,22 @@ namespace Files.App.Views.Layouts
 				}
 			}
 
-			var key = (virtualize, (FolderLayoutModes?)folderSettings.LayoutMode);
+			var key = (folderSettings.DirectoryGroupOption != GroupOption.None, virtualize, (FolderLayoutModes?)folderSettings.LayoutMode);
 			if (_appliedPanelKey == key)
 				return;
 
 			_appliedPanelKey = key;
 			if (!virtualize)
 			{
-				FileList.ClearValue(ItemsControl.ItemsPanelProperty);
+				if (folderSettings.DirectoryGroupOption != GroupOption.None)
+				{
+					FileList.ItemsPanel = new ItemsPanelTemplate(() => new LinuxGroupedWrapPanel
+					{
+						Orientation = folderSettings.LayoutMode == FolderLayoutModes.ListView ? Orientation.Vertical : Orientation.Horizontal
+					});
+				}
+				else
+					FileList.ClearValue(ItemsControl.ItemsPanelProperty);
 				return;
 			}
 

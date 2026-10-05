@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Linux.Native;
 using LibGit2Sharp;
 using System.IO;
 using System.Reflection;
@@ -48,20 +49,14 @@ namespace Files.App.Services.Git
 				if (source is null)
 					return;
 
-				var cache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME") is { Length: > 0 } xdg
+				// XDG_CACHE_HOME is only honoured when absolute; the directory chain is verified before anything gets loaded from it
+				var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+				var cache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME") is { Length: > 0 } xdg && Path.IsPathRooted(xdg)
 					? xdg
-					: Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache");
-				var directory = Path.Combine(cache, "Files", "native");
-				Directory.CreateDirectory(directory);
-
-				var link = Path.Combine(directory, $"git2-{match.Groups[1].Value}.so");
-				var existing = new FileInfo(link);
-				if (existing.LinkTarget != source)
-				{
-					if (existing.Exists || existing.LinkTarget is not null)
-						existing.Delete();
-					File.CreateSymbolicLink(link, source);
-				}
+					: Path.Combine(home, ".cache");
+				var directory = TrustedNativeDirectory.Prepare(cache, ["Files", "native"], $"git2-{match.Groups[1].Value}.so", Path.GetFullPath(source));
+				if (directory is null)
+					return;
 
 				GlobalSettings.NativeLibraryPath = directory;
 				LinkedLibrary = source;

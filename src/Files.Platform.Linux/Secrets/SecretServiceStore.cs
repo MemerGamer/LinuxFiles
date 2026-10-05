@@ -31,6 +31,7 @@ namespace Files.Platform.Linux.Secrets
 
 		private readonly string? busAddress;
 		private readonly ConcurrentDictionary<(string, string), string> memory = new();
+		private readonly ConcurrentDictionary<(string, string), byte> tombstones = new();
 
 		/// <summary>
 		/// Creates the store. <paramref name="busAddress"/> null means the user's session bus.
@@ -46,28 +47,55 @@ namespace Files.Platform.Linux.Secrets
 		/// <inheritdoc/>
 		public void Save(string resource, string account, string secret)
 		{
-			memory[(resource, account)] = secret;
-			// LINUX-TODO(secrets): prompts to unlock a locked keyring are not shown; a locked collection falls back to memory only
+			var key = (resource, account);
+			memory[key] = secret;
+			tombstones.TryRemove(key, out _);
+			// LINUX-TODO(secrets): prompts to unlock a locked keyring are not shown; a locked collection falls back to memory only.
+			// Get prefers the in-memory value, so a failed update never lets the stale persisted secret win in this process.
 			IsPersistent = Run(c => SaveAsync(c, resource, account, secret));
 		}
 
 		/// <inheritdoc/>
 		public string? Get(string resource, string account)
 		{
-			var stored = Run(c => GetAsync(c, resource, account), out var found);
-			if (found && stored is not null)
-				return stored;
+			var key = (resource, account);
+			if (memory.TryGetValue(key, out var value))
+				return value;
 
-			return memory.TryGetValue((resource, account), out var value) ? value : null;
+			if (tombstones.ContainsKey(key))
+			{
+				// A delete that did not reach the service is retried; the persisted copy must not come back meanwhile
+				if (RunDelete(resource, account, out _) is not "failed")
+					tombstones.TryRemove(key, out _);
+				return null;
+			}
+
+			var stored = Run(c => GetAsync(c, resource, account), out var found);
+			return found ? stored : null;
 		}
 
 		/// <inheritdoc/>
+		/// <returns><see langword="false"/> when nothing was deleted or when the persisted copy could not be removed (it is then hidden for this process).</returns>
 		public bool Delete(string resource, string account)
 		{
-			var removedMemory = memory.TryRemove((resource, account), out _);
-			var removedRemote = Run(c => DeleteAsync(c, resource, account));
-			return removedMemory || removedRemote;
+			var key = (resource, account);
+			var removedMemory = memory.TryRemove(key, out _);
+			var outcome = RunDelete(resource, account, out var reachable);
+			if (!reachable)
+				return removedMemory;
+
+			if (outcome is "failed")
+			{
+				tombstones[key] = 0;
+				return false;
+			}
+
+			tombstones.TryRemove(key, out _);
+			return removedMemory || outcome is "deleted";
 		}
+
+		private string? RunDelete(string resource, string account, out bool reachable)
+			=> Run(c => DeleteAsync(c, resource, account), out reachable) ?? "failed";
 
 		private bool Run(Func<DBusConnection, Task<bool>> action)
 			=> Run(async c => await action(c).ConfigureAwait(false) ? "1" : null, out _) is not null;
@@ -237,11 +265,20 @@ namespace Files.Platform.Linux.Secrets
 			return prompt == "/";
 		}
 
-		private static async Task<bool> DeleteAsync(DBusConnection bus, string resource, string account)
+		private static async Task<string?> DeleteAsync(DBusConnection bus, string resource, string account)
 		{
-			var item = await FindItemAsync(bus, resource, account).ConfigureAwait(false);
+			string? item;
+			try
+			{
+				item = await FindItemAsync(bus, resource, account).ConfigureAwait(false);
+			}
+			catch (DBusErrorReplyException ex) when (ex.ErrorName is "org.freedesktop.DBus.Error.ServiceUnknown" or "org.freedesktop.DBus.Error.NameHasNoOwner")
+			{
+				return "absent"; // no Secret Service on this bus: nothing persisted that could come back
+			}
+
 			if (item is null)
-				return false;
+				return "absent";
 
 			MessageBuffer message;
 			using (var writer = bus.GetMessageWriter())
@@ -251,7 +288,7 @@ namespace Files.Platform.Linux.Secrets
 			}
 
 			var prompt = await bus.CallMethodAsync(message, static (Message m, object? _) => m.GetBodyReader().ReadObjectPathAsString(), null).ConfigureAwait(false);
-			return prompt == "/";
+			return prompt == "/" ? "deleted" : "failed";
 		}
 	}
 

@@ -18,7 +18,7 @@ namespace Files.App.ViewModels
 	{
 		private Files.Platform.Abstractions.Watching.IFolderWatcher? _linuxWatcher;
 		private CancellationTokenSource? _linuxRefreshDebounce;
-		private Files.Platform.Abstractions.Watching.IFolderWatcher? _linuxRepositoryWatcher;
+		private readonly List<Files.Platform.Abstractions.Watching.IFolderWatcher> _linuxRepositoryWatchers = [];
 
 		/// <summary>
 		/// Lists <paramref name="path"/> into <c>filesAndFolders</c>. Returns 3 on success and -1 on failure.
@@ -254,26 +254,33 @@ namespace Files.App.ViewModels
 			if (isDisposed || string.IsNullOrEmpty(GitDirectory))
 				return;
 
-			_linuxRepositoryWatcher?.Dispose();
-			_linuxRepositoryWatcher = null;
+			DisposeLinuxRepositoryWatchers();
 
-			var metadata = Path.Combine(GitDirectory, ".git");
-			if (!Directory.Exists(metadata))
+			// .git may be a gitfile (linked worktree, submodule); HEAD and the index live in the git dir, refs in the common dir
+			if (Files.Platform.Linux.Search.GitDirectoryResolver.Resolve(GitDirectory) is not var (gitDir, commonDir))
 				return;
 
 			try
 			{
-				var watcherInstance = Ioc.Default.GetRequiredService<IFolderWatcherFactory>().Create(metadata, new FolderWatcherOptions { Debounce = TimeSpan.FromMilliseconds(400) });
+				var factory = Ioc.Default.GetRequiredService<IFolderWatcherFactory>();
+				var paths = string.Equals(gitDir, commonDir, StringComparison.Ordinal) ? [gitDir] : new[] { gitDir, commonDir };
 
-				void OnChanged(object? s, EventArgs e) => _ = dispatcherQueue.EnqueueOrInvokeAsync(() => GitDirectoryUpdated?.Invoke(null, null!));
+				void OnChanged(object? s, EventArgs e) => _ = dispatcherQueue.EnqueueOrInvokeAsync(async () =>
+				{
+					await ReloadLinuxGitPropertiesAsync();
+					GitDirectoryUpdated?.Invoke(null, null!);
+				});
 
-				watcherInstance.Created += OnChanged;
-				watcherInstance.Deleted += OnChanged;
-				watcherInstance.Changed += OnChanged;
-				watcherInstance.Renamed += OnChanged;
-				watcherInstance.Start();
-
-				_linuxRepositoryWatcher = watcherInstance;
+				foreach (var path in paths)
+				{
+					var watcherInstance = factory.Create(path, new FolderWatcherOptions { Debounce = TimeSpan.FromMilliseconds(400) });
+					watcherInstance.Created += OnChanged;
+					watcherInstance.Deleted += OnChanged;
+					watcherInstance.Changed += OnChanged;
+					watcherInstance.Renamed += OnChanged;
+					watcherInstance.Start();
+					_linuxRepositoryWatchers.Add(watcherInstance);
+				}
 			}
 			catch (Exception ex)
 			{
@@ -281,10 +288,40 @@ namespace Files.App.ViewModels
 			}
 		}
 
+		// The Git columns are loaded once per item; after the repository changed they are stale, so reset the flags and reload
+		private async Task ReloadLinuxGitPropertiesAsync()
+		{
+			if (isDisposed || !IsValidGitDirectory)
+				return;
+
+			var items = filesAndFolders.OfType<IGitItem>().ToList();
+			foreach (var item in items)
+			{
+				item.StatusPropertiesInitialized = false;
+				item.CommitPropertiesInitialized = false;
+			}
+
+			try
+			{
+				foreach (var item in items.Take(300))
+					await LoadGitPropertiesAsync(item);
+			}
+			catch (Exception ex) when (ex is not OutOfMemoryException)
+			{
+				App.Logger.LogWarning(ex, "Could not reload the Git columns of {Path}", GitDirectory);
+			}
+		}
+
+		private void DisposeLinuxRepositoryWatchers()
+		{
+			foreach (var w in _linuxRepositoryWatchers)
+				w.Dispose();
+			_linuxRepositoryWatchers.Clear();
+		}
+
 		private void CloseLinuxWatcher()
 		{
-			_linuxRepositoryWatcher?.Dispose();
-			_linuxRepositoryWatcher = null;
+			DisposeLinuxRepositoryWatchers();
 			_linuxRefreshDebounce?.Cancel();
 			_linuxWatcher?.Dispose();
 			_linuxWatcher = null;

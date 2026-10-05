@@ -111,5 +111,100 @@ namespace Files.Platform.Tests.Search
 			var hits = await RunAsync("report");
 			Assert.HasCount(2, hits);
 		}
+
+		[TestMethod]
+		public async Task ContentSearch_DoesNotBlockOnFifos()
+		{
+			using (var mk = System.Diagnostics.Process.Start("mkfifo", Path.Combine(_root, "pipe-needle")))
+				await mk!.WaitForExitAsync();
+
+			var task = RunAsync("needle", new FileSearchOptions { SearchContent = true });
+			Assert.AreSame(task, await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(10))), "search blocked on a FIFO");
+			Assert.DoesNotContain(h => h.EndsWith("pipe-needle", StringComparison.Ordinal), await task);
+		}
+
+		[TestMethod]
+		public async Task ContentSearch_SkipsSymlinkedFiles()
+		{
+			File.CreateSymbolicLink(Path.Combine(_root, "link-to-report"), Path.Combine(_root, "Report.TXT"));
+			var hits = await RunAsync("Needle", new FileSearchOptions { SearchContent = true });
+			Assert.DoesNotContain(h => h.EndsWith("link-to-report", StringComparison.Ordinal), hits);
+		}
+
+		[TestMethod]
+		public void FindInContent_ReadsAtMostTheByteBudget()
+		{
+			var path = Path.Combine(_root, "huge.txt");
+			using (var f = File.Create(path))
+			{
+				var block = new byte[64 * 1024];
+				Array.Fill(block, (byte)'x'); // one enormous line without a newline
+				for (var i = 0; i < 40; i++)
+					f.Write(block);
+				f.Write("needle"u8);
+			}
+
+			Assert.IsNull(LinuxFileSearchService.FindInContent(path, "needle", CancellationToken.None));
+		}
+
+		[TestMethod]
+		public void FindInContent_FindsMatchInsideLongLine()
+		{
+			var path = Path.Combine(_root, "long.txt");
+			File.WriteAllText(path, new string('x', 20000) + "NeEdLe" + new string('y', 20000));
+			Assert.IsNotNull(LinuxFileSearchService.FindInContent(path, "needle", CancellationToken.None));
+		}
+
+		[TestMethod]
+		public void GitDirectoryResolver_HandlesDirectoryAndLinkedWorktree()
+		{
+			var main = Path.Combine(_root, "main");
+			Directory.CreateDirectory(Path.Combine(main, ".git", "worktrees", "wt"));
+			Assert.AreEqual(Path.Combine(main, ".git"), GitDirectoryResolver.Resolve(main)!.Value.GitDir);
+
+			var wt = Path.Combine(_root, "wt");
+			Directory.CreateDirectory(wt);
+			var gitDir = Path.Combine(main, ".git", "worktrees", "wt");
+			File.WriteAllText(Path.Combine(wt, ".git"), "gitdir: " + gitDir + "\n");
+			File.WriteAllText(Path.Combine(gitDir, "commondir"), "../..\n");
+
+			var resolved = GitDirectoryResolver.Resolve(wt)!.Value;
+			Assert.AreEqual(gitDir, resolved.GitDir);
+			Assert.AreEqual(Path.Combine(main, ".git"), resolved.CommonDir);
+			Assert.IsNull(GitDirectoryResolver.Resolve(Path.Combine(_root, "a")));
+		}
+
+		[TestMethod]
+		[SupportedOSPlatform("linux")]
+		public void TrustedNativeDirectory_RejectsWritableCacheRootsAndCreatesPrivateDirectories()
+		{
+			var root = Path.Combine(AppContext.BaseDirectory, "trust-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				AssertTrustedDirectory(root);
+			}
+			finally
+			{
+				Directory.Delete(root, recursive: true);
+			}
+		}
+
+		[SupportedOSPlatform("linux")]
+		private static void AssertTrustedDirectory(string _root)
+		{
+			var source = Path.Combine(_root, "lib.so");
+			File.WriteAllText(source, "x");
+			File.SetUnixFileMode(_root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.GroupWrite);
+			Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(_root, ["Files", "native"], "git2-x.so", source));
+
+			File.SetUnixFileMode(_root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+			var dir = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(_root, ["Files", "native"], "git2-x.so", source);
+			Assert.IsNotNull(dir);
+			Assert.AreEqual(source, new FileInfo(Path.Combine(dir, "git2-x.so")).LinkTarget);
+			Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(dir));
+
+			Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare("relative/cache", ["Files"], "x.so", source));
+		}
 	}
 }

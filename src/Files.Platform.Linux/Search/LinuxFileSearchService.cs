@@ -3,7 +3,9 @@
 
 using Files.Platform.Abstractions.Enumeration;
 using Files.Platform.Abstractions.Search;
+using Files.Platform.Linux.Native;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Win32.SafeHandles;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -155,35 +157,111 @@ namespace Files.Platform.Linux.Search
 			}
 		}
 
+		/// <summary>Most bytes read from one file when searching content.</summary>
+		public const int ContentByteBudget = 1024 * 1024;
+
+		private const int ReadChunkSize = 8192;
+		private const int MinLineWindow = 4096;
+
 		/// <summary>
-		/// Returns the first line containing <paramref name="needle"/> (case-insensitive) of a text file, or <see langword="null"/>
-		/// when there is none or the file looks binary (a NUL in the first 4 KiB).
+		/// Returns the first line containing <paramref name="needle"/> (case-insensitive) of a regular text file, or <see langword="null"/>
+		/// when there is none or the file looks binary (a NUL in the first chunk). The file is opened without following symlinks and
+		/// without blocking, must be a regular file, and at most <see cref="ContentByteBudget"/> bytes are read. Lines are scanned in a
+		/// bounded window, so a file without newlines cannot allocate unbounded memory.
 		/// </summary>
-		internal static string? FindInContent(string path, string needle, CancellationToken token)
+		public static string? FindInContent(string path, string needle, CancellationToken token)
 		{
+			if (string.IsNullOrEmpty(needle))
+				return null;
+
+			var fd = PosixNative.OpenAt(PosixNative.AtFdCwd, path, PosixNative.NonBlockingFlags | PosixNative.ONofollow, out _);
+			if (fd < 0)
+				return null;
+
+			SafeFileHandle handle;
 			try
 			{
-				using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 4096, FileOptions.SequentialScan);
-				var head = new byte[4096];
-				var read = stream.Read(head, 0, head.Length);
-				if (Array.IndexOf(head, (byte)0, 0, read) >= 0)
-					return null;
-
-				stream.Position = 0;
-				using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-				string? line;
-				while ((line = reader.ReadLine()) is not null)
+				if (!PosixNative.TryStat(fd, out var stat) || !stat.IsRegularFile)
 				{
-					token.ThrowIfCancellationRequested();
-					if (line.Contains(needle, StringComparison.OrdinalIgnoreCase))
-						return line.Length > 200 ? line[..200] : line;
+					PosixNative.Close(fd);
+					return null;
+				}
+
+				handle = new SafeFileHandle((IntPtr)fd, ownsHandle: true);
+			}
+			catch
+			{
+				PosixNative.Close(fd);
+				throw;
+			}
+
+			try
+			{
+				using (handle)
+				using (var stream = new FileStream(handle, FileAccess.Read, 1, isAsync: false))
+				{
+					var window = Math.Max(MinLineWindow, needle.Length * 2);
+					var decoder = new UTF8Encoding(false).GetDecoder();
+					var bytes = new byte[ReadChunkSize];
+					var chars = new char[ReadChunkSize + 4];
+					var line = new StringBuilder();
+					var total = 0;
+					var first = true;
+
+					while (total < ContentByteBudget)
+					{
+						token.ThrowIfCancellationRequested();
+						var read = stream.Read(bytes, 0, Math.Min(bytes.Length, ContentByteBudget - total));
+						if (read <= 0)
+							break;
+						total += read;
+
+						if (first)
+						{
+							first = false;
+							if (Array.IndexOf(bytes, (byte)0, 0, read) >= 0)
+								return null;
+						}
+
+						var count = decoder.GetChars(bytes, 0, read, chars, 0);
+						for (var i = 0; i < count; i++)
+						{
+							var c = chars[i];
+							if (c is '\n' or '\r')
+							{
+								if (MatchLine(line, needle) is { } hit)
+									return hit;
+								line.Clear();
+							}
+							else
+							{
+								line.Append(c);
+								if (line.Length >= window)
+								{
+									if (MatchLine(line, needle) is { } hit)
+										return hit;
+									line.Remove(0, line.Length - (needle.Length - 1));
+								}
+							}
+						}
+					}
+
+					return MatchLine(line, needle);
 				}
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
+				return null;
 			}
+		}
 
-			return null;
+		private static string? MatchLine(StringBuilder line, string needle)
+		{
+			if (line.Length < needle.Length)
+				return null;
+
+			var text = line.ToString();
+			return text.Contains(needle, StringComparison.OrdinalIgnoreCase) ? (text.Length > 200 ? text[..200] : text) : null;
 		}
 	}
 

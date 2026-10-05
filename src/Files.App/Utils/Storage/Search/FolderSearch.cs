@@ -15,7 +15,7 @@ using FileAttributes = System.IO.FileAttributes;
 
 namespace Files.App.Utils.Storage
 {
-	public sealed class FolderSearch
+	public sealed partial class FolderSearch
 	{
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 		private DrivesViewModel drivesViewModel = Ioc.Default.GetRequiredService<DrivesViewModel>();
@@ -104,6 +104,12 @@ namespace Files.App.Utils.Storage
 
 		private async Task AddItemsForHomeAsync(IList<ListedItem> results, CancellationToken token)
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				await SearchLinuxAsync("Home", results, token);
+				return;
+			}
+
 			if (IsTagQuery(AQSQuery))
 			{
 				await SearchTagsAsync("", results, token); // Search tags everywhere, not only local drives
@@ -389,6 +395,12 @@ namespace Files.App.Utils.Storage
 
 		private async Task AddItemsAsync(string folder, IList<ListedItem> results, CancellationToken token)
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				await SearchLinuxAsync(folder, results, token);
+				return;
+			}
+
 			if (IsTagQuery(AQSQuery))
 			{
 				await SearchTagsAsync(folder, results, token);

@@ -91,7 +91,7 @@ namespace Files.Platform.Linux.FileOperations
 		public static EntryKind GetKindAt(int directoryDescriptor, string name)
 			=> PosixNative.TryStat(directoryDescriptor, name, PosixNative.AtSymlinkNofollow, out var stat) ? FromStat(stat) : EntryKind.None;
 
-		private static EntryKind FromStat(PosixStat stat)
+		internal static EntryKind FromStat(PosixStat stat)
 			=> stat.IsSymbolicLink ? EntryKind.Symlink
 				: stat.IsDirectory ? EntryKind.Directory
 				: stat.IsSpecial ? EntryKind.Special

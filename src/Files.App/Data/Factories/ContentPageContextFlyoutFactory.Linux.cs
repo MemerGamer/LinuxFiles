@@ -13,7 +13,7 @@ namespace Files.App.Data.Factories
 		/// <summary>
 		/// Builds the "New" submenu from <see cref="ITemplatesService"/>: Folder, Text Document and the files in ~/Templates.
 		/// </summary>
-		private static List<ContextMenuFlyoutItemViewModel> GetLinuxNewItemItems(bool canCreateFileInPage)
+		internal static List<ContextMenuFlyoutItemViewModel> GetLinuxNewItemItems(bool canCreateFileInPage)
 		{
 			var list = new List<ContextMenuFlyoutItemViewModel>()
 			{

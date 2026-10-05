@@ -64,6 +64,8 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	printf '#!/bin/sh\necho hi\n' >"$home/Downloads/script.sh"
 	head -c 2048 /dev/urandom >"$home/Downloads/archive.bin"
 	ln -sf "$home/Documents" "$home/Desktop/Documents link"
+	# Optional: FILES_SANDBOX_SETUP=/path/script.sh runs with HOME pointing at the sandbox (e.g. to create a repository)
+	[[ -n "${FILES_SANDBOX_SETUP:-}" ]] && HOME="$home" bash "$FILES_SANDBOX_SETUP"
 	mkdir -p -m 0700 "$home/.runtime"
 	# Synthetic drives instead of the real mounts (HeadlessDriveFixture; honoured only together with FILES_HEADLESS=1 and this HOME).
 	# FILES_SANDBOX_DRIVES names a fixture file; without it the drive list is empty.

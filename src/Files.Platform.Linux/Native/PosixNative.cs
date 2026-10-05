@@ -12,6 +12,9 @@ namespace Files.Platform.Linux.Native
 	/// <summary>
 	/// The result of a <c>statx</c> call.
 	/// </summary>
+	/// <summary>Mount-related <c>statx</c> fields: attribute bits with their support mask, the mount id (when reported) and the device.</summary>
+	public readonly record struct MountInfo(ulong Attributes, ulong AttributesMask, bool MountIdValid, ulong MountId, uint DevMajor, uint DevMinor);
+
 	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0)
 	{
 		public uint FileType => Mode & 0xF000;
@@ -64,6 +67,9 @@ namespace Files.Platform.Linux.Native
 
 		public static int ReadOnlyFlags => OCloexec;
 
+		/// <summary>Flags for creating a new private read/write file: <c>O_RDWR|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC</c>.</summary>
+		public static int CreateExclusiveFlags => 0x2 | 0x40 | 0x80 | ONofollow | OCloexec;
+
 		public static int NonBlockingFlags => OCloexec | ONonblock;
 
 		public static bool IsNotFollowedError(int errno) => errno is ELOOP or ENOTDIR;
@@ -111,14 +117,48 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 
+		private const uint StatxMntId = 0x1000;
+		internal const ulong StatxAttrMountRoot = 0x2000;
+
+		/// <summary>
+		/// Reads the <c>statx</c> mount information of <paramref name="path"/> relative to <paramref name="dirfd"/>: the attribute bits
+		/// (with their support mask) and the mount id when the kernel reports it (5.8+).
+		/// </summary>
+		public static bool TryGetMountInfo(int dirfd, string path, int flags, out MountInfo info)
+		{
+			info = default;
+			try
+			{
+				var buffer = new byte[StatxBufferSize];
+				fixed (byte* p = buffer)
+				{
+					if (statx(dirfd, path, flags, StatxType | StatxMntId, p) != 0)
+						return false;
+				}
+
+				var returned = BitConverter.ToUInt32(buffer, 0);
+				var mntValid = (returned & StatxMntId) != 0;
+				info = new MountInfo(BitConverter.ToUInt64(buffer, 8), BitConverter.ToUInt64(buffer, 56),
+					mntValid, mntValid ? BitConverter.ToUInt64(buffer, 144) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140));
+				return true;
+			}
+			catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
+			{
+				return false;
+			}
+		}
+
+		/// <summary>Takes an exclusive advisory lock on <paramref name="fd"/> without blocking; false when someone else holds it or on error.</summary>
+		public static bool TryLockExclusive(int fd) => flock(fd, 2 | 4) == 0; // LOCK_EX | LOCK_NB
+
 		/// <summary>Stats an open descriptor.</summary>
 		public static bool TryStat(int fd, out PosixStat stat)
 			=> TryStat(fd, string.Empty, AtEmptyPath, out stat, out _);
 
 		/// <summary>Opens <paramref name="name"/> relative to <paramref name="dirfd"/>; returns -1 with <paramref name="errno"/> set on failure.</summary>
-		public static int OpenAt(int dirfd, string name, int flags, out int errno)
+		public static int OpenAt(int dirfd, string name, int flags, out int errno, uint mode = 0)
 		{
-			var fd = openat(dirfd, name, flags, 0);
+			var fd = openat(dirfd, name, flags, mode);
 			errno = fd < 0 ? Marshal.GetLastPInvokeError() : 0;
 			return fd;
 		}
@@ -136,6 +176,22 @@ namespace Files.Platform.Linux.Native
 		}
 
 		public static void Close(int fd) => _ = close(fd);
+
+		/// <summary>Creates a directory with mode 0700 relative to <paramref name="dirfd"/>; false (errno set) on failure.</summary>
+		public static bool MakeDirectoryAt(int dirfd, string name, out int errno)
+		{
+			var ok = mkdirat(dirfd, name, 0x1C0) == 0;
+			errno = ok ? 0 : Marshal.GetLastPInvokeError();
+			return ok;
+		}
+
+		/// <summary>Creates a symbolic link <paramref name="name"/> to <paramref name="target"/> relative to <paramref name="dirfd"/>.</summary>
+		public static bool SymlinkAt(string target, int dirfd, string name, out int errno)
+		{
+			var ok = symlinkat(target, dirfd, name) == 0;
+			errno = ok ? 0 : Marshal.GetLastPInvokeError();
+			return ok;
+		}
 
 		/// <summary>Removes a file, link or (with <see cref="AtRemoveDir"/>) empty directory relative to <paramref name="dirfd"/>.</summary>
 		public static void UnlinkAt(int dirfd, string name, int flags, string displayPath)
@@ -175,6 +231,8 @@ namespace Files.Platform.Linux.Native
 			var names = new List<string>();
 			try
 			{
+				// dup shares the directory offset; repeated listings must start at the beginning.
+				rewinddir(stream);
 				while (true)
 				{
 					var entry = readdir(stream);
@@ -212,6 +270,9 @@ namespace Files.Platform.Linux.Native
 		[LibraryImport("libc", EntryPoint = "openat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int openat(int dirfd, string pathname, int flags, uint mode);
 
+		[LibraryImport("libc", EntryPoint = "flock", SetLastError = true)]
+		private static partial int flock(int fd, int operation);
+
 		[LibraryImport("libc", EntryPoint = "close", SetLastError = true)]
 		private static partial int close(int fd);
 
@@ -232,6 +293,9 @@ namespace Files.Platform.Linux.Native
 
 		[LibraryImport("libc", EntryPoint = "closedir")]
 		private static partial int closedir(nint stream);
+
+		[LibraryImport("libc", EntryPoint = "rewinddir")]
+		private static partial void rewinddir(nint stream);
 	}
 
 	/// <summary>
@@ -240,10 +304,12 @@ namespace Files.Platform.Linux.Native
 	internal sealed class DirectoryHandle : IDisposable
 	{
 		private int _fd;
+		private readonly bool _pathOnly;
 
-		private DirectoryHandle(int fd, string path)
+		private DirectoryHandle(int fd, string path, bool pathOnly)
 		{
 			_fd = fd;
+			_pathOnly = pathOnly;
 			Path = path;
 		}
 
@@ -254,14 +320,164 @@ namespace Files.Platform.Linux.Native
 		/// <summary>
 		/// Opens a directory. With <paramref name="noFollow"/> a symbolic link in the last component is refused (errno ELOOP/ENOTDIR).
 		/// </summary>
-		public static DirectoryHandle? TryOpen(int parentFd, string name, string displayPath, bool noFollow, out int errno)
+		public static DirectoryHandle? TryOpen(int parentFd, string name, string displayPath, bool noFollow, out int errno, bool pathOnly = false)
 		{
-			var flags = PosixNative.ReadOnlyFlags | PosixNative.ODirectory | (noFollow ? PosixNative.ONofollow : 0);
+			var flags = (pathOnly ? PosixNative.PathFlags : PosixNative.ReadOnlyFlags) | PosixNative.ODirectory | (noFollow ? PosixNative.ONofollow : 0);
 			var fd = PosixNative.OpenAt(parentFd, name, flags, out errno);
-			return fd < 0 ? null : new DirectoryHandle(fd, displayPath);
+			return fd < 0 ? null : new DirectoryHandle(fd, displayPath, pathOnly);
 		}
 
-		public List<string> ListNames() => PosixNative.ListNames(_fd, Path);
+		public List<string> ListNames()
+		{
+			if (!_pathOnly)
+				return PosixNative.ListNames(_fd, Path);
+			using var readable = OpenChild(_fd, ".", Path);
+			return PosixNative.ListNames(readable.Descriptor, Path);
+		}
+
+		/// <summary>Walks an already resolved absolute path, refusing links in every component.</summary>
+		public static DirectoryHandle OpenPath(string resolvedPath, bool create = false)
+		{
+			using var root = OpenChild(PosixNative.AtFdCwd, "/", "/", pathOnly: true);
+			return root.OpenRelativePath(System.IO.Path.GetFullPath(resolvedPath).TrimStart('/'), create);
+		}
+
+		public DirectoryHandle OpenRelativePath(string relativePath, bool create = false)
+		{
+			if (System.IO.Path.IsPathRooted(relativePath))
+				throw new ArgumentException("A relative path is required.", nameof(relativePath));
+			var names = relativePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+			if (Array.Exists(names, name => name == ".."))
+				throw new ArgumentException("The path cannot escape its parent.", nameof(relativePath));
+			var current = OpenChild(_fd, ".", Path, pathOnly: true);
+			try
+			{
+				foreach (var name in names)
+				{
+					if (name == ".")
+						continue;
+					var path = System.IO.Path.Combine(current.Path, name);
+					var next = TryOpen(current.Descriptor, name, path, true, out var errno, pathOnly: true);
+					if (next is null && create && PosixNative.IsNotFound(errno))
+					{
+						try
+						{
+							PosixNative.MkdirAt(current.Descriptor, name, 0x1ED, path); // 0755, filtered by umask
+						}
+						catch (IOException ex) when (ex.HResult == 17)
+						{
+							// Another creator won; the no-follow open still validates its entry.
+						}
+						next = TryOpen(current.Descriptor, name, path, true, out errno, pathOnly: true);
+					}
+					if (next is null)
+						throw PosixNative.CreateException(errno, path);
+					current.Dispose();
+					current = next;
+				}
+				return current;
+			}
+			catch
+			{
+				current.Dispose();
+				throw;
+			}
+		}
+
+		public static DirectoryHandle OpenChild(int parentFd, string name, string displayPath, bool pathOnly = false)
+			=> TryOpen(parentFd, name, displayPath, true, out var errno, pathOnly) ?? throw PosixNative.CreateException(errno, displayPath);
+
+		public bool EntryExists(string name)
+		{
+			try
+			{
+				_ = PosixNative.StatAt(_fd, name, System.IO.Path.Combine(Path, name));
+				return true;
+			}
+			catch (FileNotFoundException)
+			{
+				return false;
+			}
+		}
+
+		/// <summary>Removes a consented restore conflict without following directory links.</summary>
+		public void DeleteEntry(string name)
+		{
+			var displayPath = System.IO.Path.Combine(Path, name);
+			var stat = PosixNative.StatAt(_fd, name, displayPath);
+			if (stat.IsDirectory)
+			{
+				using var child = OpenForRemoval(name, stat, displayPath);
+				if (!child.IsSameEntry(stat))
+					throw new IOException($"'{displayPath}' changed while it was being removed.");
+				try
+				{
+					foreach (var childName in child.ListNames())
+						child.DeleteEntry(childName);
+				}
+				catch (UnauthorizedAccessException)
+				{
+					PosixNative.ChangeModeOfDescriptor(child.Descriptor, false, (stat.Mode & 0xFFF) | 0x1C0, displayPath);
+					foreach (var childName in child.ListNames())
+						child.DeleteEntry(childName);
+				}
+				if (!PosixNative.SameEntry(stat, PosixNative.StatAt(_fd, name, displayPath)))
+					throw new IOException($"'{displayPath}' changed while it was being removed.");
+			}
+			PosixNative.UnlinkAt(_fd, name, stat.IsDirectory ? PosixNative.AtRemoveDir : 0, displayPath);
+		}
+
+		private DirectoryHandle OpenForRemoval(string name, PosixStat stat, string displayPath)
+		{
+			var child = TryOpen(_fd, name, displayPath, true, out var errno);
+			if (child is not null)
+				return child;
+			if (errno is not (1 or 13))
+				throw PosixNative.CreateException(errno, displayPath);
+
+			var descriptor = PosixNative.OpenPathAt(_fd, name, out errno);
+			if (descriptor < 0)
+				throw PosixNative.CreateException(errno, displayPath);
+			try
+			{
+				if (!PosixNative.TryStat(descriptor, out var current) || !PosixNative.SameEntry(stat, current))
+					throw new IOException($"'{displayPath}' changed while it was being removed.");
+				PosixNative.ChangeModeOfDescriptor(descriptor, true, (stat.Mode & 0xFFF) | 0x1C0, displayPath);
+			}
+			finally
+			{
+				PosixNative.Close(descriptor);
+			}
+			return OpenChild(_fd, name, displayPath);
+		}
+
+		public bool IsSameEntry(PosixStat stat)
+			=> PosixNative.TryStat(_fd, out var current) && PosixNative.SameEntry(current, stat);
+
+		public bool IsSameOrInside(PosixStat ancestor)
+		{
+			var current = OpenChild(_fd, ".", Path, pathOnly: true);
+			try
+			{
+				while (true)
+				{
+					if (!PosixNative.TryStat(current.Descriptor, out var stat))
+						throw new IOException($"Cannot inspect '{Path}'.");
+					if (PosixNative.SameEntry(stat, ancestor))
+						return true;
+					var parent = OpenChild(current.Descriptor, "..", Path, pathOnly: true);
+					var root = parent.IsSameEntry(stat);
+					current.Dispose();
+					current = parent;
+					if (root)
+						return false;
+				}
+			}
+			finally
+			{
+				current.Dispose();
+			}
+		}
 
 		public void Dispose()
 		{

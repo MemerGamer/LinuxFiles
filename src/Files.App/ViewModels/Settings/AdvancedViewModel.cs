@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 using Microsoft.Win32;
 using SevenZip;
 using System.IO;
@@ -33,8 +34,11 @@ namespace Files.App.ViewModels.Settings
 
 		public AdvancedViewModel()
 		{
-			IsSetAsDefaultFileManager = DetectIsSetAsDefaultFileManager();
-			IsSetAsOpenFileDialog = DetectIsSetAsOpenFileDialog();
+			if (IsWindows)
+			{
+				IsSetAsDefaultFileManager = DetectIsSetAsDefaultFileManager();
+				IsSetAsOpenFileDialog = DetectIsSetAsOpenFileDialog();
+			}
 
 			SetAsDefaultExplorerCommand = new AsyncRelayCommand(SetAsDefaultExplorerAsync);
 			SetAsOpenFileDialogCommand = new AsyncRelayCommand(SetAsOpenFileDialogAsync);
@@ -43,7 +47,8 @@ namespace Files.App.ViewModels.Settings
 			OpenFilesOnWindowsStartupCommand = new AsyncRelayCommand(OpenFilesOnWindowsStartupAsync);
 			ClearThumbnailCacheCommand = new AsyncRelayCommand(ClearThumbnailCacheAsync);
 
-			_ = DetectOpenFilesAtStartupAsync();
+			if (IsWindows)
+				_ = DetectOpenFilesAtStartupAsync();
 			_ = UpdateCacheSizeAsync();
 		}
 
@@ -212,16 +217,23 @@ namespace Files.App.ViewModels.Settings
 
 			try
 			{
-				var handle = Win32PInvoke.CreateFileFromAppW(
-					filePath,
-					(uint)(FILE_ACCESS_RIGHTS.FILE_GENERIC_READ | FILE_ACCESS_RIGHTS.FILE_GENERIC_WRITE),
-					Win32PInvoke.FILE_SHARE_READ | Win32PInvoke.FILE_SHARE_WRITE,
-					nint.Zero,
-					Win32PInvoke.CREATE_NEW,
-					0,
-					nint.Zero);
+				if (OperatingSystem.IsWindows())
+				{
+					var handle = Win32PInvoke.CreateFileFromAppW(
+						filePath,
+						(uint)(FILE_ACCESS_RIGHTS.FILE_GENERIC_READ | FILE_ACCESS_RIGHTS.FILE_GENERIC_WRITE),
+						Win32PInvoke.FILE_SHARE_READ | Win32PInvoke.FILE_SHARE_WRITE,
+						nint.Zero,
+						Win32PInvoke.CREATE_NEW,
+						0,
+						nint.Zero);
 
-				Win32PInvoke.CloseHandle(handle);
+					Win32PInvoke.CloseHandle(handle);
+				}
+				else
+				{
+					using (new FileStream(filePath, FileMode.CreateNew, FileAccess.ReadWrite)) { }
+				}
 
 				var file = await StorageHelpers.ToStorageItem<BaseStorageFile>(filePath);
 				if (file is null)
@@ -287,6 +299,27 @@ namespace Files.App.ViewModels.Settings
 		{
 			get => isSetAsOpenFileDialog;
 			set => SetProperty(ref isSetAsOpenFileDialog, value);
+		}
+
+		/// <summary>Registry, shell extension and startup-task options only exist on Windows.</summary>
+		public bool IsWindows { get; } = OperatingSystem.IsWindows();
+
+		public Visibility WindowsOnlyVisibility => IsWindows ? Visibility.Visible : Visibility.Collapsed;
+
+		public Visibility LinuxOnlyVisibility => IsWindows ? Visibility.Collapsed : Visibility.Visible;
+
+		/// <summary>Claims org.freedesktop.FileManager1 so other apps' "Show in folder" opens Files (off by default).</summary>
+		public bool UseAsDefaultFileManager
+		{
+			get => UserSettingsService.GeneralSettingsService.UseAsDefaultFileManager;
+			set
+			{
+				if (UserSettingsService.GeneralSettingsService.UseAsDefaultFileManager == value)
+					return;
+
+				UserSettingsService.GeneralSettingsService.UseAsDefaultFileManager = value;
+				OnPropertyChanged();
+			}
 		}
 
 		public bool IsAppEnvironmentDev

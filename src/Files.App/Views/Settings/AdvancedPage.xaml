@@ -73,7 +73,7 @@
 			</wctcontrols:SettingsCard>
 
 			<!--  Open on Windows startup  -->
-			<StackPanel>
+			<StackPanel Visibility="{x:Bind ViewModel.WindowsOnlyVisibility}">
 				<!--  Startup disabled InfoBar  -->
 				<InfoBar
 					x:Name="OpenOnStartupInfoBar"
@@ -123,6 +123,7 @@
 			<!--  Replace File Explorer  -->
 			<wctcontrols:SettingsCard
 				x:Name="SetAsDefaultSettingsBlockControl"
+				Visibility="{x:Bind ViewModel.WindowsOnlyVisibility}"
 				Description="{helpers:ResourceString Key=SettingsSetAsDefaultFileManagerDescription}"
 				Header="{helpers:ResourceString Key=SettingsSetAsDefaultFileManager}">
 				<wctcontrols:SettingsCard.HeaderIcon>
@@ -134,9 +135,21 @@
 					Toggled="SetAsDefaultExplorer_Toggled" />
 			</wctcontrols:SettingsCard>
 
+			<!--  Use Files as default file manager (Linux: FileManager1)  -->
+			<wctcontrols:SettingsCard
+				Description="{helpers:ResourceString Key=SettingsLinuxDefaultFileManagerDescription}"
+				Header="{helpers:ResourceString Key=SettingsLinuxDefaultFileManager}"
+				Visibility="{x:Bind ViewModel.LinuxOnlyVisibility}">
+				<wctcontrols:SettingsCard.HeaderIcon>
+					<FontIcon Glyph="&#xEC50;" />
+				</wctcontrols:SettingsCard.HeaderIcon>
+				<ToggleSwitch AutomationProperties.Name="{helpers:ResourceString Key=SettingsLinuxDefaultFileManager}" IsOn="{x:Bind ViewModel.UseAsDefaultFileManager, Mode=TwoWay}" />
+			</wctcontrols:SettingsCard>
+
 			<!--  Replace Open File Dialog  -->
 			<wctcontrols:SettingsCard
 				x:Name="ReplaceOpenFileDialogSetting"
+				Visibility="{x:Bind ViewModel.WindowsOnlyVisibility}"
 				x:Load="{x:Bind ViewModel.IsAppEnvironmentDev}"
 				Header="{helpers:ResourceString Key=SettingsSetAsOpenDialog}">
 				<wctcontrols:SettingsCard.HeaderIcon>

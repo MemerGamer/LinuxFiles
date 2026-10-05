@@ -235,7 +235,11 @@ namespace Files.App.ViewModels.UserControls.Widgets
 			{
 				var directoryName = Path.GetDirectoryName(path);
 
+#if !WINDOWS
+				_ = NavigationHelpers.OpenPath(path, ContentPageContext.ShellPage!, FilesystemItemType.File);
+#else
 				_ = Win32Helper.InvokeWin32ComponentAsync(path, ContentPageContext.ShellPage!, workingDirectory: directoryName ?? string.Empty);
+#endif
 			}
 			catch (Exception) { }
 		}

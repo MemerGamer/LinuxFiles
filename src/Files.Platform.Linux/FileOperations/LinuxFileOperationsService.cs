@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.FileOperations;
+using Files.Platform.Linux.Native;
 
 namespace Files.Platform.Linux.FileOperations
 {
@@ -60,7 +61,7 @@ namespace Files.Platform.Linux.FileOperations
 				options?.FollowSymlinks ?? false,
 				destinationDirectory,
 				cancellationToken,
-				(source, context) => CopyTopLevelAsync(source, destinationDirectory, context)),
+				(source, context, sourceParent, destinationParent) => CopyTopLevelAsync(source, destinationDirectory, context, sourceParent, destinationParent!)),
 				CancellationToken.None);
 		}
 
@@ -83,7 +84,7 @@ namespace Files.Platform.Linux.FileOperations
 					false,
 					destinationDirectory,
 					cancellationToken,
-					(source, context) => MoveTopLevelAsync(source, destinationDirectory, context, sameDevice));
+					(source, context, sourceParent, destinationParent) => MoveTopLevelAsync(source, destinationDirectory, context, sameDevice, sourceParent, destinationParent!));
 			},
 			CancellationToken.None);
 		}
@@ -102,7 +103,7 @@ namespace Files.Platform.Linux.FileOperations
 				false,
 				null,
 				cancellationToken,
-				(path, context) => DeleteEntryAsync(path, context)),
+				(path, context, sourceParent, _) => DeleteEntryAsync(path, context, sourceParent)),
 				CancellationToken.None);
 		}
 
@@ -169,7 +170,7 @@ namespace Files.Platform.Linux.FileOperations
 			bool follow,
 			string? destinationDirectory,
 			CancellationToken cancellationToken,
-			Func<string, FileOperationContext, Task<Outcome>> operation)
+			Func<string, FileOperationContext, DirectoryHandle, DirectoryHandle?, Task<Outcome>> operation)
 		{
 			var context = new FileOperationContext(options, cancellationToken, _hooks);
 			var results = new List<FileOperationItemResult>(sources.Count);
@@ -192,67 +193,115 @@ namespace Files.Platform.Linux.FileOperations
 				return results;
 			}
 
-			for (var i = 0; i < sources.Count; i++)
+			DirectoryHandle? destinationParent = null;
+			var sourceParents = new DirectoryHandle?[sources.Count];
+			var openedParents = new Dictionary<string, DirectoryHandle>(StringComparer.Ordinal);
+			var preparationFailures = new Outcome?[sources.Count];
+			try
 			{
-				normalized[i] = TryNormalize(sources[i]);
-				if (normalized[i] is null || context.IsCancelled)
-					continue;
-
-				try
+				if (destinationDirectory is not null)
 				{
-					scans[i] = Scan(normalized[i]!, follow, context);
-				}
-				catch (OperationCanceledException)
-				{
-					break;
+					try
+					{
+						destinationParent = DirectoryHandle.OpenPath(FileSystemEntry.Canonicalize(destinationDirectory));
+					}
+					catch (Exception ex) when (ex is not OutOfMemoryException)
+					{
+						foreach (var source in sources)
+							results.Add(ToResult(source, Outcome.FromException(ex, destinationDirectory)));
+						return results;
+					}
 				}
 
-				context.AddTotals(scans[i].Items, scans[i].Bytes);
+				// Pin all parents before scanning or reporting progress, which can run caller code.
+				for (var i = 0; i < sources.Count; i++)
+				{
+					normalized[i] = TryNormalize(sources[i]);
+					if (normalized[i] is not { } path || context.IsCancelled)
+						continue;
+					try
+					{
+						var parentPath = FileSystemEntry.Canonicalize(Path.GetDirectoryName(path)!);
+						if (!openedParents.TryGetValue(parentPath, out var parent))
+						{
+							parent = DirectoryHandle.OpenPath(parentPath);
+							openedParents.Add(parentPath, parent);
+						}
+						sourceParents[i] = parent;
+					}
+					catch (Exception ex) when (ex is not OutOfMemoryException)
+					{
+						preparationFailures[i] = Outcome.FromException(ex, path);
+					}
+				}
+
+				for (var i = 0; i < sources.Count; i++)
+				{
+					if (normalized[i] is null || preparationFailures[i] is not null || context.IsCancelled)
+						continue;
+
+					try
+					{
+						scans[i] = Scan(normalized[i]!, follow, context);
+					}
+					catch (OperationCanceledException)
+					{
+						break;
+					}
+
+					context.AddTotals(scans[i].Items, scans[i].Bytes);
+				}
+
+				context.Report(null);
+
+				long itemsBefore = 0;
+				long bytesBefore = 0;
+				for (var i = 0; i < sources.Count; i++)
+				{
+					var original = sources[i];
+					if (normalized[i] is not { } path)
+					{
+						results.Add(ToResult(original, Outcome.Fail(FileOperationErrorKind.InvalidName, "The path is not valid or refers to the root.", original)));
+						continue;
+					}
+
+					if (context.IsCancelled)
+					{
+						results.Add(ToResult(original, new Outcome(FileOperationStatus.Cancelled)));
+						continue;
+					}
+
+					Outcome outcome;
+					try
+					{
+						outcome = preparationFailures[i] ?? await operation(path, context, sourceParents[i]!, destinationParent).ConfigureAwait(false);
+					}
+					catch (OperationCanceledException)
+					{
+						outcome = new Outcome(FileOperationStatus.Cancelled);
+					}
+					catch (Exception ex) when (ex is not OutOfMemoryException)
+					{
+						outcome = Outcome.FromException(ex, path);
+					}
+
+					itemsBefore += scans[i].Items;
+					bytesBefore += scans[i].Bytes;
+					if (outcome.Status != FileOperationStatus.Cancelled)
+						context.Reconcile(itemsBefore, bytesBefore);
+
+					results.Add(ToResult(original, outcome));
+				}
+
+				context.Report(null);
+				return results;
 			}
-
-			context.Report(null);
-
-			long itemsBefore = 0;
-			long bytesBefore = 0;
-			for (var i = 0; i < sources.Count; i++)
+			finally
 			{
-				var original = sources[i];
-				if (normalized[i] is not { } path)
-				{
-					results.Add(ToResult(original, Outcome.Fail(FileOperationErrorKind.InvalidName, "The path is not valid or refers to the root.", original)));
-					continue;
-				}
-
-				if (context.IsCancelled)
-				{
-					results.Add(ToResult(original, new Outcome(FileOperationStatus.Cancelled)));
-					continue;
-				}
-
-				Outcome outcome;
-				try
-				{
-					outcome = await operation(path, context).ConfigureAwait(false);
-				}
-				catch (OperationCanceledException)
-				{
-					outcome = new Outcome(FileOperationStatus.Cancelled);
-				}
-				catch (Exception ex) when (ex is not OutOfMemoryException)
-				{
-					outcome = Outcome.FromException(ex, path);
-				}
-
-				itemsBefore += scans[i].Items;
-				bytesBefore += scans[i].Bytes;
-				if (outcome.Status != FileOperationStatus.Cancelled)
-					context.Reconcile(itemsBefore, bytesBefore);
-
-				results.Add(ToResult(original, outcome));
+				destinationParent?.Dispose();
+				foreach (var parent in openedParents.Values)
+					parent.Dispose();
 			}
-
-			context.Report(null);
-			return results;
 		}
 
 		private static FileOperationItemResult ToResult(string source, Outcome outcome)
@@ -330,7 +379,8 @@ namespace Files.Platform.Linux.FileOperations
 			string source,
 			string destination,
 			bool sourceIsDirectory,
-			EntryKind destinationKind)
+			EntryKind destinationKind,
+			DirectoryHandle? destinationParent = null)
 		{
 			if (destinationKind == EntryKind.None)
 				return new ConflictOutcome(null, destination, false);
@@ -356,7 +406,9 @@ namespace Files.Platform.Linux.FileOperations
 				case ConflictAction.KeepBoth:
 					{
 						var directory = Path.GetDirectoryName(destination)!;
-						var unique = FileNameGenerator.GenerateUniqueName(directory, Path.GetFileName(destination), sourceIsDirectory);
+						var unique = destinationParent is null
+							? FileNameGenerator.GenerateUniqueName(directory, Path.GetFileName(destination), sourceIsDirectory)
+							: FileNameGenerator.GenerateUniqueName(Path.GetFileName(destination), sourceIsDirectory, destinationParent.EntryExists);
 						return new ConflictOutcome(null, Path.Combine(directory, unique), false);
 					}
 

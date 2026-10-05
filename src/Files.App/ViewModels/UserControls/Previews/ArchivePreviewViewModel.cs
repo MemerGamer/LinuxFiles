@@ -20,7 +20,11 @@ namespace Files.App.ViewModels.Previews
 
 			var zipResult = await FilesystemTasks.WrapNullable<SevenZipExtractor>(async () =>
 			{
+				#if WINDOWS
 				var arch = new SevenZipExtractor(await PreviewFile.OpenStreamForReadAsync());
+#else
+				var arch = new SevenZipExtractor(await OpenPreviewReadAsync(LoadCancelledTokenSource.Token));
+#endif
 
 				// Force load archive (1665013614u)
 				if (arch.ArchiveFileData is null)

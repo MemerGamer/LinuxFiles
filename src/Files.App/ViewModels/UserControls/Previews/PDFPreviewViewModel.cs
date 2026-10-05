@@ -35,6 +35,11 @@ namespace Files.App.ViewModels.Previews
 
 		public async override Task<List<FileProperty>> LoadPreviewAndDetailsAsync()
 		{
+#if !WINDOWS
+			// LINUX-TODO(preview): desktop renders PDFs through ImagePreviewViewModel
+			await Task.CompletedTask;
+			throw new NotSupportedException();
+#else
 			var fileStream = await PreviewFile.OpenReadAsync();
 			var pdf = await PdfDocument.LoadFromStreamAsync(fileStream);
 			_ = TryLoadPagesAsync(pdf, fileStream);
@@ -46,6 +51,7 @@ namespace Files.App.ViewModels.Previews
 			};
 
 			return details;
+#endif
 		}
 
 		public async Task TryLoadPagesAsync(PdfDocument pdf, IRandomAccessStream fileStream)

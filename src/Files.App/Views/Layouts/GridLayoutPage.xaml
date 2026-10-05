@@ -71,7 +71,7 @@
 				</Setter>
 				<!--  VerticalScrollMode is set to Auto because setting it to Disabled here causes an issue. (#14785)  -->
 				<Setter Property="ScrollViewer.VerticalScrollMode" Value="Auto" />
-				<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden" />
+				<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Disabled" />
 				<Setter Property="ScrollViewer.HorizontalScrollMode" Value="Enabled" />
 				<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
 			</Style.Setters>
@@ -89,7 +89,7 @@
 				<Setter Property="ScrollViewer.VerticalScrollMode" Value="Enabled" />
 				<Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
 				<Setter Property="ScrollViewer.HorizontalScrollMode" Value="Disabled" />
-				<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Hidden" />
+				<Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
 			</Style.Setters>
 		</Style>
 

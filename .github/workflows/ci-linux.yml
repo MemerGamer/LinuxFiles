@@ -44,9 +44,18 @@ jobs:
     - name: Install platform test dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends xvfb libx11-6 libfontconfig1 fonts-dejavu-core bubblewrap ffmpeg poppler-utils dbus
+        sudo apt-get install -y --no-install-recommends xvfb xauth x11-utils x11-xkb-utils xkb-data libx11-6 libfontconfig1 fonts-dejavu-core bubblewrap ffmpeg poppler-utils dbus
         # Ubuntu 24.04 runners block unprivileged user namespaces, which bubblewrap needs.
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+    - name: Diagnose Xvfb
+      continue-on-error: true
+      run: |
+        Xvfb :191 -nolisten tcp -screen 0 320x200x24 &
+        sleep 3
+        ls -la /tmp/.X11-unix || true
+        DISPLAY=:191 xdpyinfo | head -5 || true
+        kill %1 || true
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v5

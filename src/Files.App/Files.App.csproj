@@ -261,6 +261,11 @@
         <Compile Remove="Services\PreviewPopupProviders\SeerProProvider.cs" />
     </ItemGroup>
 
+    <!--  Windows-only sources (*.Windows.cs) never build for non-Windows TFMs, compat mode included  -->
+    <ItemGroup Condition="!$(TargetFramework.Contains('-windows'))">
+        <Compile Remove="**\*.Windows.cs" />
+    </ItemGroup>
+
     <!--  Opt-in transitional aid (-p:FilesWin32Compat=true): compiles against the CsWin32-generated Windows.Win32 types (built for
           the Windows TFM with Platform=x64, which works on Linux) so Win32-touching code gets past declaration binding and the compiler
           reports the remaining, Uno-specific errors. Nothing here runs on Linux; replace Win32 usage with Files.Platform interfaces,

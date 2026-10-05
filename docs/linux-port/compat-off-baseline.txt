@@ -1,0 +1,59 @@
+# Compiler error keys of: dotnet build src/Files.App -f net10.0-desktop -p:FilesWin32Compat=false
+# One "file: error CODE: message" per line. Regenerate with scripts/linux/compat-off-check.sh --update.
+src/Files.App/Data/Commands/HotKey/HotKey.cs: error CS0234: The type or namespace name 'Input' does not exist in the namespace 'Windows.Win32.UI' (are you missing an assembly reference?)
+src/Files.App/Data/Contracts/IStorageSecurityService.cs: error CS0122: 'WIN32_ERROR' is inaccessible due to its protection level
+src/Files.App/Data/Factories/ShellContextFlyoutHelper.cs: error CS0246: The type or namespace name 'ContextMenu' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Data/Items/AccessControlPrincipal.cs: error CS0234: The type or namespace name 'Security' does not exist in the namespace 'Windows.Win32' (are you missing an assembly reference?)
+src/Files.App/Data/Items/ContextMenu.cs: error CS0246: The type or namespace name 'MENU_ITEM_TYPE' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Data/Items/ListedItem.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Data/Items/ShellLinkItem.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Data/Items/WidgetFolderCardItem.cs: error CS0246: The type or namespace name 'IWindowsStorable' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Data/Items/WidgetRecentItem.cs: error CS0246: The type or namespace name 'IShellItem' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Data/Models/RemovableDevice.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Data/Models/RemovableDevice.cs: error CS0234: The type or namespace name 'Win32PInvoke' does not exist in the namespace 'Files.App.Helpers' (are you missing an assembly reference?)
+src/Files.App/Data/Models/SelectedItemsPropertiesViewModel.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Data/Models/SignatureInfoItem.cs: error CS0122: 'HWND' is inaccessible due to its protection level
+src/Files.App/Helpers/UI/UIFilesystemHelpers.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Services/SizeProvider/CachedSizeProvider.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Services/Storage/StorageSecurityService.cs: error CS0122: 'WIN32_ERROR' is inaccessible due to its protection level
+src/Files.App/Services/Storage/StorageSecurityService.cs: error CS0234: The type or namespace name 'Security' does not exist in the namespace 'Windows.Win32' (are you missing an assembly reference?)
+src/Files.App/UserControls/Toolbar.xaml.cs: error CS0246: The type or namespace name 'OpenWithMenu' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Serialization/Implementation/DefaultSettingsSerializer.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Utils/Serialization/Implementation/DefaultSettingsSerializer.cs: error CS0234: The type or namespace name 'Win32Helper' does not exist in the namespace 'Files.App.Helpers' (are you missing an assembly reference?)
+src/Files.App/Utils/Serialization/Implementation/DefaultSettingsSerializer.cs: error CS0234: The type or namespace name 'Win32PInvoke' does not exist in the namespace 'Files.App.Helpers' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Enumerators/Win32StorageEnumerator.cs: error CS0246: The type or namespace name 'Win32PInvoke' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/Helpers/FileTypesHelper.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Helpers/FilesystemResult.cs: error CS0122: 'BOOL' is inaccessible due to its protection level
+src/Files.App/Utils/Storage/Helpers/FolderHelpers.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Helpers/StorageHelpers.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Helpers/SyncRootHelpers.cs: error CS0234: The type or namespace name 'WinRT' does not exist in the namespace 'Windows.Win32.System' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0103: The name 'SHOW_WINDOW_CMD' does not exist in the current context
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0122: 'HRESULT' is inaccessible due to its protection level
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0122: 'HWND' is inaccessible due to its protection level
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0234: The type or namespace name 'FILEOPERATION_FLAGS' does not exist in the namespace 'Windows.Win32.UI.Shell' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0234: The type or namespace name 'PROPERTYKEY' does not exist in the namespace 'Windows.Win32.Foundation' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0234: The type or namespace name 'SLR_FLAGS' does not exist in the namespace 'Windows.Win32.UI.Shell' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: The type or namespace name 'Disposable' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: The type or namespace name 'ShellFileOperations2' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: The type or namespace name 'ShellItem' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FileSizeCalculator.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Operations/FilesystemHelpers.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Search/FolderSearch.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/Utils/Storage/Search/FolderSearch.cs: error CS0246: The type or namespace name 'WIN32_FIND_DATAW' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/StorageItems/ShellStorageFile.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/StorageItems/ShellStorageFolder.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Utils/Storage/StorageItems/StreamWithContentType.cs: error CS0122: 'IStream' is inaccessible due to its protection level
+src/Files.App/Utils/Storage/StorageItems/StreamWithContentType.cs: error CS0122: 'STATSTG' is inaccessible due to its protection level
+src/Files.App/Utils/Storage/StorageItems/StreamWithContentType.cs: error CS0122: 'STGMEDIUM' is inaccessible due to its protection level
+src/Files.App/Utils/Storage/StorageItems/VirtualStorageItem.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/ViewModels/Properties/Items/BaseProperties.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/ViewModels/Properties/Items/BaseProperties.cs: error CS0246: The type or namespace name 'FindCloseSafeHandle' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/ViewModels/Properties/Items/BaseProperties.cs: error CS0246: The type or namespace name 'WIN32_FIND_DATAW' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/ViewModels/Settings/AdvancedViewModel.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/ViewModels/ShellViewModel.cs: error CS0234: The type or namespace name 'Win32PInvoke' does not exist in the namespace 'Files.App.Helpers' (are you missing an assembly reference?)
+src/Files.App/ViewModels/UserControls/NavigationToolbarViewModel.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
+src/Files.App/ViewModels/UserControls/StatusCenterViewModel.cs: error CS0234: The type or namespace name 'TaskbarManager' does not exist in the namespace 'Files.App.Storage' (are you missing an assembly reference?)
+src/Files.App/ViewModels/UserControls/Widgets/QuickAccessWidgetViewModel.cs: error CS0234: The type or namespace name 'WinRT' does not exist in the namespace 'Windows.Win32.System' (are you missing an assembly reference?)
+src/Files.App/Views/MainPage.xaml.cs: error CS0246: The type or namespace name 'WindowMessageEventArgs' could not be found (are you missing a using directive or an assembly reference?)
+src/Files.App/Views/MainPage.xaml.cs: error CS0246: The type or namespace name 'WindowMessageMonitor' could not be found (are you missing a using directive or an assembly reference?)

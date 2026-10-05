@@ -26,7 +26,9 @@ namespace Files.App.ViewModels.Properties
 
 			GetBaseProperties();
 
+#if WINDOWS
 			ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+#endif
 		}
 
 		public override void GetBaseProperties()
@@ -50,13 +52,14 @@ namespace Files.App.ViewModels.Properties
 				return;
 			}
 
+#if WINDOWS
 			if (Item.IsShortcut && Item is IShortcutItem shortcutItem)
 			{
 				ViewModel.ShortcutItemType = Strings.Folder.GetLocalizedResource();
 				ViewModel.ShortcutItemPath = shortcutItem.TargetPath;
 				ViewModel.IsShortcutItemPathReadOnly = false;
 				ViewModel.ShortcutItemWorkingDir = shortcutItem.WorkingDirectory;
-				ViewModel.ShowWindowCommand = shortcutItem.ShowWindowCommand;
+				ViewModel.ShowWindowCommand = (ShowWindowCommand)(int)shortcutItem.ShowWindowCommand;
 				ViewModel.ShortcutItemWorkingDirVisibility = false;
 				ViewModel.ShortcutItemArguments = shortcutItem.Arguments;
 				ViewModel.ShortcutItemArgumentsVisibility = false;
@@ -73,6 +76,7 @@ namespace Files.App.ViewModels.Properties
 					return !string.IsNullOrWhiteSpace(ViewModel.ShortcutItemPath);
 				});
 			}
+#endif
 		}
 
 		private void SetupLinuxLink(string itemPath)
@@ -135,6 +139,7 @@ namespace Files.App.ViewModels.Properties
 				return;
 			}
 
+#if WINDOWS
 			var fileAttributes = Win32Helper.GetFileAttributes(itemPath);
 			ViewModel.IsHidden = fileAttributes.HasFlag(FileAttributes.Hidden);
 			ViewModel.CanCompressContent = Win32Helper.CanCompressContent(itemPath);
@@ -224,6 +229,7 @@ namespace Files.App.ViewModels.Properties
 			{
 				_ = GetFolderSizeAsync(folderPath, TokenSource.Token);
 			}
+#endif
 		}
 
 		private async Task GetFolderSizeAsync(string folderPath, CancellationToken token)
@@ -264,6 +270,7 @@ namespace Files.App.ViewModels.Properties
 			SetItemsCountString();
 		}
 
+#if WINDOWS
 		private async void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{
 			if (OperatingSystem.IsLinux())
@@ -295,9 +302,10 @@ namespace Files.App.ViewModels.Properties
 					if (string.IsNullOrWhiteSpace(ViewModel.ShortcutItemPath))
 						return;
 
-					await FileOperationsHelpers.CreateOrUpdateLinkAsync(itemPath, ViewModel.ShortcutItemPath, ViewModel.ShortcutItemArguments, ViewModel.ShortcutItemWorkingDir, shortcutItem.RunAsAdmin, ViewModel.ShowWindowCommand);
+					await FileOperationsHelpers.CreateOrUpdateLinkAsync(itemPath, ViewModel.ShortcutItemPath, ViewModel.ShortcutItemArguments, ViewModel.ShortcutItemWorkingDir, shortcutItem.RunAsAdmin, (Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD)(int)ViewModel.ShowWindowCommand);
 					break;
 			}
 		}
+#endif
 	}
 }

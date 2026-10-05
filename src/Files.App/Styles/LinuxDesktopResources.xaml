@@ -11,13 +11,150 @@
 	<FontFamily x:Key="Files.Linux.IconFontFamily">ms-appx:///Uno.Fonts.Fluent/Fonts/uno-fluentui-assets.ttf#Symbols</FontFamily>
 	<FontFamily x:Key="Files.Linux.MonospaceFontFamily">DejaVu Sans Mono, Liberation Mono, monospace</FontFamily>
 
+	<!--  ListViewItem template: Uno's default presenter paints no selected or hover background, so draw them here  -->
+	<ControlTemplate x:Key="Files.ListViewItemTemplate" TargetType="ListViewItem">
+		<Grid x:Name="RootGrid" Background="Transparent">
+			<Border
+				x:Name="SelectionBackground"
+				Margin="2,1"
+				Background="Transparent"
+				BorderBrush="Transparent"
+				BorderThickness="1"
+				CornerRadius="{TemplateBinding CornerRadius}"
+				IsHitTestVisible="False" />
+			<Border
+				x:Name="SelectionIndicator"
+				Width="3"
+				Height="16"
+				Margin="4,0,0,0"
+				HorizontalAlignment="Left"
+				VerticalAlignment="Center"
+				Background="{ThemeResource Files.Item.AccentBrush}"
+				CornerRadius="1.5"
+				IsHitTestVisible="False"
+				Visibility="Collapsed" />
+			<ContentPresenter
+				x:Name="ContentPresenter"
+				Padding="{TemplateBinding Padding}"
+				HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+				VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+				Background="{TemplateBinding Background}"
+				Content="{TemplateBinding Content}"
+				ContentTemplate="{TemplateBinding ContentTemplate}"
+				ContentTransitions="{TemplateBinding ContentTransitions}" />
+			<VisualStateManager.VisualStateGroups>
+				<VisualStateGroup x:Name="CommonStates">
+					<VisualState x:Name="Normal" />
+					<VisualState x:Name="PointerOver">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundPointerOver}" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="Pressed">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundPressed}" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="Selected">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelected}" />
+							<Setter Target="SelectionIndicator.Visibility" Value="Visible" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="PointerOverSelected">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelectedPointerOver}" />
+							<Setter Target="SelectionIndicator.Visibility" Value="Visible" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="PressedSelected">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelectedPressed}" />
+							<Setter Target="SelectionIndicator.Visibility" Value="Visible" />
+						</VisualState.Setters>
+					</VisualState>
+				</VisualStateGroup>
+			</VisualStateManager.VisualStateGroups>
+		</Grid>
+	</ControlTemplate>
+
+	<!--  GridViewItem template: Uno's default presenter paints no selected or hover background, so draw them here  -->
+	<ControlTemplate x:Key="Files.GridViewItemTemplate" TargetType="GridViewItem">
+		<Grid x:Name="RootGrid" Background="Transparent">
+			<Border
+				x:Name="SelectionBackground"
+				Margin="2,1"
+				Background="Transparent"
+				BorderBrush="Transparent"
+				BorderThickness="1"
+				CornerRadius="{TemplateBinding CornerRadius}"
+				IsHitTestVisible="False" />
+			<ContentPresenter
+				x:Name="ContentPresenter"
+				Padding="{TemplateBinding Padding}"
+				HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+				VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
+				Background="{TemplateBinding Background}"
+				Content="{TemplateBinding Content}"
+				ContentTemplate="{TemplateBinding ContentTemplate}"
+				ContentTransitions="{TemplateBinding ContentTransitions}" />
+			<VisualStateManager.VisualStateGroups>
+				<VisualStateGroup x:Name="CommonStates">
+					<VisualState x:Name="Normal" />
+					<VisualState x:Name="PointerOver">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundPointerOver}" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="Pressed">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundPressed}" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="Selected">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelected}" />
+							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Item.BorderSelected}" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="PointerOverSelected">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelectedPointerOver}" />
+							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Item.BorderSelected}" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="PressedSelected">
+						<VisualState.Setters>
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelectedPressed}" />
+							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Item.BorderSelected}" />
+						</VisualState.Setters>
+					</VisualState>
+				</VisualStateGroup>
+			</VisualStateManager.VisualStateGroups>
+		</Grid>
+	</ControlTemplate>
+
 	<ResourceDictionary.ThemeDictionaries>
 		<!--  No Mica on Linux: the window backdrop is a solid fill equal to the Mica base colour, so the translucent Files layers on top keep their look  -->
 		<ResourceDictionary x:Key="Light">
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#F3F3F3" />
+			<SolidColorBrush x:Key="Files.Item.AccentBrush" Color="{ThemeResource SystemAccentColor}" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.10" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.16" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.22" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.30" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.26" />
+			<SolidColorBrush x:Key="Files.Item.BorderSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.65" />
 		</ResourceDictionary>
 		<ResourceDictionary x:Key="Dark">
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#202020" />
+			<SolidColorBrush x:Key="Files.Item.AccentBrush" Color="{ThemeResource SystemAccentColor}" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.10" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.16" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.22" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.30" />
+			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.26" />
+			<SolidColorBrush x:Key="Files.Item.BorderSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.65" />
 		</ResourceDictionary>
 	</ResourceDictionary.ThemeDictionaries>
 

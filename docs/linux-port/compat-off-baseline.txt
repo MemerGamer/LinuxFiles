@@ -13,13 +13,9 @@ src/Files.App/Data/Models/RemovableDevice.cs: error CS0234: The type or namespac
 src/Files.App/Data/Models/SelectedItemsPropertiesViewModel.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
 src/Files.App/Data/Models/SignatureInfoItem.cs: error CS0122: 'HWND' is inaccessible due to its protection level
 src/Files.App/Helpers/UI/UIFilesystemHelpers.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
-src/Files.App/Services/SizeProvider/CachedSizeProvider.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
 src/Files.App/Services/Storage/StorageSecurityService.cs: error CS0122: 'WIN32_ERROR' is inaccessible due to its protection level
 src/Files.App/Services/Storage/StorageSecurityService.cs: error CS0234: The type or namespace name 'Security' does not exist in the namespace 'Windows.Win32' (are you missing an assembly reference?)
 src/Files.App/UserControls/Toolbar.xaml.cs: error CS0246: The type or namespace name 'OpenWithMenu' could not be found (are you missing a using directive or an assembly reference?)
-src/Files.App/Utils/Serialization/Implementation/DefaultSettingsSerializer.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
-src/Files.App/Utils/Serialization/Implementation/DefaultSettingsSerializer.cs: error CS0234: The type or namespace name 'Win32Helper' does not exist in the namespace 'Files.App.Helpers' (are you missing an assembly reference?)
-src/Files.App/Utils/Serialization/Implementation/DefaultSettingsSerializer.cs: error CS0234: The type or namespace name 'Win32PInvoke' does not exist in the namespace 'Files.App.Helpers' (are you missing an assembly reference?)
 src/Files.App/Utils/Storage/Enumerators/Win32StorageEnumerator.cs: error CS0246: The type or namespace name 'Win32PInvoke' could not be found (are you missing a using directive or an assembly reference?)
 src/Files.App/Utils/Storage/Helpers/FileTypesHelper.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
 src/Files.App/Utils/Storage/Helpers/FilesystemResult.cs: error CS0122: 'BOOL' is inaccessible due to its protection level
@@ -36,7 +32,6 @@ src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: T
 src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: The type or namespace name 'SHOW_WINDOW_CMD' could not be found (are you missing a using directive or an assembly reference?)
 src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: The type or namespace name 'ShellFileOperations2' could not be found (are you missing a using directive or an assembly reference?)
 src/Files.App/Utils/Storage/Operations/FileOperationsHelpers.cs: error CS0246: The type or namespace name 'ShellItem' could not be found (are you missing a using directive or an assembly reference?)
-src/Files.App/Utils/Storage/Operations/FileSizeCalculator.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
 src/Files.App/Utils/Storage/Operations/FilesystemHelpers.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
 src/Files.App/Utils/Storage/Search/FolderSearch.cs: error CS0234: The type or namespace name 'FileSystem' does not exist in the namespace 'Windows.Win32.Storage' (are you missing an assembly reference?)
 src/Files.App/Utils/Storage/Search/FolderSearch.cs: error CS0246: The type or namespace name 'WIN32_FIND_DATAW' could not be found (are you missing a using directive or an assembly reference?)

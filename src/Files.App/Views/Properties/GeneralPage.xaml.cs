@@ -2,13 +2,15 @@
 // Licensed under the MIT License.
 
 using Files.App.ViewModels.Properties;
+using Files.Platform.Abstractions.Permissions;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using Windows.Storage;
-using Windows.Win32;
 using WinRT;
 
 namespace Files.App.Views.Properties
@@ -116,9 +118,9 @@ namespace Files.App.Views.Properties
 			bool SaveDrive(DriveItem drive)
 			{
 				// LINUX-TODO(props): relabeling a volume needs udisks2; the label is read-only for now
-				if (OperatingSystem.IsLinux())
-					return false;
-
+#if !WINDOWS
+				return false;
+#else
 				var fsVM = AppInstance.ShellViewModel;
 				if (!GetNewName(out var newName) || fsVM is null)
 					return false;
@@ -155,6 +157,7 @@ namespace Files.App.Views.Properties
 						await fsVM.SetWorkingDirectoryAsync(workingDirectory);
 				});
 				return true;
+#endif
 			}
 
 			async Task<bool> SaveLibraryAsync(LibraryItem library)
@@ -230,8 +233,10 @@ namespace Files.App.Views.Properties
 					);
 				}
 
-				if (ViewModel.IsUnblockFileSelected && !OperatingSystem.IsLinux())
-					PInvoke.DeleteFileFromApp($"{itemPath}:Zone.Identifier");
+#if WINDOWS
+				if (ViewModel.IsUnblockFileSelected)
+					Windows.Win32.PInvoke.DeleteFileFromApp($"{itemPath}:Zone.Identifier");
+#endif
 
 				if (ViewModel.IsAblumCoverModified)
 				{
@@ -250,13 +255,102 @@ namespace Files.App.Views.Properties
 					ViewModel.IsContentCompressed = ViewModel.IsContentCompressedEditedValue;
 				}
 
-				if (!GetNewName(out var newName))
+				string? newName = null;
+				var hiddenChanged = false;
+				var nameIsComplete = false;
+				if (OperatingSystem.IsLinux())
+				{
+					var (completeName, changed, failed) = await ApplyLinuxAttributesAsync(item, itemPath);
+					if (failed)
+						return false;
+
+					hiddenChanged = changed;
+					if (completeName is not null)
+					{
+						newName = completeName;
+						nameIsComplete = true;
+					}
+					else if (!GetNewName(out newName))
+					{
+						return true;
+					}
+				}
+				else if (!GetNewName(out newName))
+				{
 					return true;
+				}
 
 				var appInstance = AppInstance!;
-				return await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
-					UIFilesystemHelpers.RenameFileItemAsync(item, newName, appInstance, false)
+				var renamed = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
+					UIFilesystemHelpers.RenameFileItemAsync(item, newName, appInstance, false, nameIsComplete)
 				);
+
+				if (renamed && hiddenChanged)
+					ViewModel.IsHidden = ViewModel.IsHiddenEditedValue;
+
+				return renamed;
+			}
+
+			// Applies read-only through the mode bits; a hidden change is a rename, so it is confirmed first and folded into the rename
+			async Task<(string? CompleteName, bool HiddenChanged, bool Failed)> ApplyLinuxAttributesAsync(ListedItem item, string itemPath)
+			{
+				var attributes = Ioc.Default.GetRequiredService<IFileAttributesService>();
+
+				if (ViewModel.IsReadOnlyEnabled && ViewModel.IsReadOnlyEditedValue is bool readOnly && readOnly != ViewModel.IsReadOnly)
+				{
+					try
+					{
+						attributes.SetReadOnly(itemPath, readOnly);
+						ViewModel.IsReadOnly = readOnly;
+					}
+					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+					{
+						App.Logger.LogWarning(ex, ex.Message);
+						ViewModel.IsReadOnlyEditedValue = ViewModel.IsReadOnly;
+						await new ContentDialog
+						{
+							Title = Strings.Permissions.GetLocalizedResource(),
+							Content = ex.Message,
+							CloseButtonText = Strings.Close.GetLocalizedResource(),
+							XamlRoot = XamlRoot,
+						}.ShowAsync();
+						return (null, false, true);
+					}
+				}
+
+				if (ViewModel.IsHiddenEditedValue is not bool hidden || hidden == ViewModel.IsHidden)
+					return (null, false, false);
+
+				// Work on the raw file name: the display name may lack the extension or differ entirely (.desktop files)
+				var currentName = Path.GetFileName(itemPath);
+				if (GetNewName(out var editedName))
+					currentName = string.IsNullOrEmpty(item.Name)
+						? editedName + item.FileExtension
+						: (item.ItemNameRaw ?? currentName).Replace(item.Name, editedName, StringComparison.Ordinal);
+
+				try
+				{
+					var hiddenName = attributes.GetNameWithHiddenState(currentName, hidden);
+					var dialog = new ContentDialog
+					{
+						Title = Strings.PropertiesHiddenRenameDialogTitle.GetLocalizedResource(),
+						Content = Strings.PropertiesHiddenRenameDialogMessage.GetLocalizedFormatResource(currentName, hiddenName),
+						PrimaryButtonText = Strings.Rename.GetLocalizedResource(),
+						CloseButtonText = Strings.Cancel.GetLocalizedResource(),
+						DefaultButton = ContentDialogButton.Close,
+						XamlRoot = XamlRoot,
+					};
+
+					if (await dialog.ShowAsync() == ContentDialogResult.Primary)
+						return (hiddenName, true, false);
+				}
+				catch (ArgumentException ex)
+				{
+					App.Logger.LogWarning(ex, ex.Message);
+				}
+
+				ViewModel.IsHiddenEditedValue = ViewModel.IsHidden;
+				return (null, false, false);
 			}
 		}
 

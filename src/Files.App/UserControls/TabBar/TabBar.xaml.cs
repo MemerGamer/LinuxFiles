@@ -72,6 +72,7 @@ namespace Files.App.UserControls.TabBar
 		public TabBar()
 		{
 			InitializeComponent();
+			InitializeTabFlyoutCommands();
 
 			tabHoverTimer.Interval = TimeSpan.FromMilliseconds(Constants.DragAndDrop.HoverToOpenTimespan);
 			tabHoverTimer.Tick += TabHoverSelected;
@@ -345,6 +346,49 @@ namespace Files.App.UserControls.TabBar
 			}
 
 			e.Handled = true;
+		}
+
+		// x:Bind inside a ResourceDictionary is never initialised on Uno, which left these items without a label,
+		// so the commands are attached here. The array follows the item order of TabFlyout (null = the Move tab item).
+		private void InitializeTabFlyoutCommands()
+		{
+			if (!Resources.TryGetValue("TabFlyout", out var resource) || resource is not MenuFlyout flyout)
+				return;
+
+			IRichCommand?[] commands =
+			[
+				Commands.NewTab,
+				Commands.DuplicateSelectedTab,
+				null,
+				Commands.CloseTabsToTheLeftSelected,
+				Commands.CloseTabsToTheRightSelected,
+				Commands.CloseOtherTabsSelected,
+				Commands.ReopenClosedTab,
+			];
+
+			for (var i = 0; i < commands.Length && i < flyout.Items.Count; i++)
+			{
+				if (commands[i] is not { } command || flyout.Items[i] is not MenuFlyoutItem item)
+					continue;
+
+				item.Command = command;
+				item.Text = command.Label;
+				item.KeyboardAcceleratorTextOverride = command.HotKeyText;
+				if (!string.IsNullOrEmpty(command.Glyph.BaseGlyph))
+					item.Icon = new FontIcon { Glyph = command.Glyph.BaseGlyph };
+			}
+
+			// The tab-actions button that normally hosts the pane commands is not rendered by Uno's TabView header
+			flyout.Items.Add(new MenuFlyoutSeparator());
+			foreach (var command in new IRichCommand[] { Commands.SplitPaneVertically, Commands.SplitPaneHorizontally, Commands.FocusOtherPane, Commands.CloseActivePane })
+			{
+				flyout.Items.Add(new MenuFlyoutItem
+				{
+					Command = command,
+					Text = command.Label,
+					KeyboardAcceleratorTextOverride = command.HotKeyText,
+				});
+			}
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyout))]

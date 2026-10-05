@@ -34,6 +34,7 @@ namespace Files.App.Utils.Storage
 
 		public static IAsyncOperation<BaseStorageFolder> FromPathAsync(string path)
 		{
+#if WINDOWS
 			if (path.EndsWith(ShellLibraryItem.EXTENSION))
 			{
 				try
@@ -56,6 +57,7 @@ namespace Files.App.Utils.Storage
 					App.Logger.LogWarning(e, null);
 				}
 			}
+#endif
 
 			return AsyncInfo.Run<BaseStorageFolder>(async (cancellationToken) => new SystemStorageFolder(await StorageFolder.GetFolderFromPathAsync(path)));
 		}

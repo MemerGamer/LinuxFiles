@@ -108,6 +108,7 @@ namespace Files.App.Utils.Storage
 						return destFile;
 					}
 				}
+#if WINDOWS
 				catch (UnauthorizedAccessException) // shortcuts & .url
 				{
 					if (!string.IsNullOrEmpty(destFolder.Path))
@@ -128,6 +129,12 @@ namespace Files.App.Utils.Storage
 					}
 					throw;
 				}
+#else
+				catch (UnauthorizedAccessException)
+				{
+					throw;
+				}
+#endif
 			});
 		}
 

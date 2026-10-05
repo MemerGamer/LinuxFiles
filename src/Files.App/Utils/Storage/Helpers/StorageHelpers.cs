@@ -15,14 +15,27 @@ namespace Files.App.Helpers
 
 		public static async Task<TRequested?> ToStorageItem<TRequested>(string path) where TRequested : IStorageItem
 		{
-			await GetStorableAsync(path);
-			return default;
+			var result = await GetStorableAsync(path);
+			if (!result)
+				return default;
+
+			IStorageItem? item = result.Result is IFolder
+				? await StorageFileExtensions.OpenLegacyFolderAsync(path)
+				: await StorageFileExtensions.OpenLegacyFileAsync(path);
+			return item is TRequested requested ? requested : default;
 		}
 
 		public static async Task<FilesystemResult<IStorageItem>> ToStorageItemResult(this IStorageItemWithPath item)
 		{
 			var result = await item.ToStorableResult();
-			return new(null, result ? FileSystemStatusCode.Generic : result.ErrorCode);
+			if (!result)
+				return new(null, result.ErrorCode);
+
+			IStorageItem? legacy = item.Item
+				?? (result.Result is IFolder
+					? await StorageFileExtensions.OpenLegacyFolderAsync(item.Path)
+					: await StorageFileExtensions.OpenLegacyFileAsync(item.Path));
+			return new(legacy, legacy is null ? FileSystemStatusCode.Generic : FileSystemStatusCode.Success);
 		}
 
 		public static async Task<long> GetFileSize(this IStorageFile file)

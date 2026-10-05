@@ -166,7 +166,6 @@ namespace Files.App.Utils.Storage
 		public virtual StorageFolderQueryResult? ToStorageFolderQueryResult() => null;
 	}
 
-#if WINDOWS
 	public sealed class SystemStorageItemQueryResult : BaseStorageItemQueryResult
 	{
 		private StorageItemQueryResult StorageItemQueryResult { get; }
@@ -279,5 +278,4 @@ namespace Files.App.Utils.Storage
 
 		public override StorageFolderQueryResult ToStorageFolderQueryResult() => StorageFolderQueryResult;
 	}
-#endif
 }

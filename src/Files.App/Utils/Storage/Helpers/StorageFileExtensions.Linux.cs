@@ -21,14 +21,14 @@ namespace Files.App.Utils.Storage
 			var path = ResolveLegacyPath(value, parentFolder);
 			var result = await StorageHelpers.GetFileAsync(path);
 			ThrowLegacyResolutionError(result.ErrorCode, path);
-			return null;
+			return await OpenLegacyFileAsync(path);
 		}
 
 		public static async Task<StorageFileWithPath> DangerousGetFileWithPathFromPathAsync(string value, StorageFolderWithPath? rootFolder = null, StorageFolderWithPath? parentFolder = null)
 		{
 			var path = ResolveLegacyPath(value, parentFolder);
 			ThrowLegacyResolutionError((await StorageHelpers.GetFileAsync(path)).ErrorCode, path);
-			return new(null, path);
+			return new(await OpenLegacyFileAsync(path), path);
 		}
 
 		public static async Task<BaseStorageFolder?> DangerousGetFolderFromPathAsync(string value, StorageFolderWithPath? rootFolder = null, StorageFolderWithPath? parentFolder = null)
@@ -36,14 +36,27 @@ namespace Files.App.Utils.Storage
 			var path = ResolveLegacyPath(value, parentFolder);
 			var result = await StorageHelpers.GetFolderAsync(path);
 			ThrowLegacyResolutionError(result.ErrorCode, path);
-			return null;
+			return await OpenLegacyFolderAsync(path);
 		}
 
 		public static async Task<StorageFolderWithPath> DangerousGetFolderWithPathFromPathAsync(string value, StorageFolderWithPath? rootFolder = null, StorageFolderWithPath? parentFolder = null)
 		{
 			var path = ResolveLegacyPath(value, parentFolder);
 			ThrowLegacyResolutionError((await StorageHelpers.GetFolderAsync(path)).ErrorCode, path);
-			return new(null, path);
+			return new(await OpenLegacyFolderAsync(path), path);
+		}
+
+		/// <summary>Opens a path the resolver already accepted as a legacy item; null when no legacy type can represent it (e.g. archive members).</summary>
+		internal static async Task<BaseStorageFile?> OpenLegacyFileAsync(string path)
+		{
+			try { return await BaseStorageFile.GetFileFromPathAsync(path); }
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { return null; }
+		}
+
+		internal static async Task<BaseStorageFolder?> OpenLegacyFolderAsync(string path)
+		{
+			try { return await BaseStorageFolder.GetFolderFromPathAsync(path); }
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException) { return null; }
 		}
 
 		private static string ResolveLegacyPath(string path, StorageFolderWithPath? parentFolder)
@@ -52,6 +65,8 @@ namespace Files.App.Utils.Storage
 
 		private static void ThrowLegacyResolutionError(FileSystemStatusCode status, string path)
 		{
+			if (status is FileSystemStatusCode.Success)
+				return;
 			if (status is FileSystemStatusCode.NotFound)
 				throw new FileNotFoundException("The storage item was not found.", path);
 			if (status is FileSystemStatusCode.Unauthorized)

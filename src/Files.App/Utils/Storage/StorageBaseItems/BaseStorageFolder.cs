@@ -31,7 +31,6 @@ namespace Files.App.Utils.Storage
 
 		public abstract IStorageItemExtraProperties Properties { get; }
 
-#if WINDOWS
 		[MaybeNull]
 		StorageItemContentProperties IStorageItemProperties.Properties
 			=> this is SystemStorageFolder folder ? folder.Folder.Properties : null;
@@ -44,12 +43,6 @@ namespace Files.App.Utils.Storage
 					: null;
 		}
 
-#else
-		[MaybeNull]
-		StorageItemContentProperties IStorageItemProperties.Properties
-			=> null;
-
-#endif
 
 		public abstract IAsyncOperation<StorageFolder> ToStorageFolderAsync();
 
@@ -157,7 +150,10 @@ namespace Files.App.Utils.Storage
 #else
 		// LINUX-TODO(storage): remove legacy WinRT resolution after downstream consumers use IStorableResolver.
 		public static IAsyncOperation<BaseStorageFolder?> GetFolderFromPathAsync(string path)
-			=> throw new NotSupportedException("Use IStorableResolver instead of the legacy WinRT storage layer.");
+		{
+			return AsyncInfo.Run<BaseStorageFolder?>(async (cancellationToken)
+				=> await FtpStorageFolder.FromPathAsync(path) ?? await SystemStorageFolder.FromPathAsync(path));
+		}
 #endif
 
 		public abstract IAsyncOperation<IReadOnlyList<BaseStorageFolder>?> GetFoldersAsync();

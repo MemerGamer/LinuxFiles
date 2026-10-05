@@ -509,6 +509,13 @@ namespace Files.App.Utils.Storage
 				movedDestinations.Add(FromResult(result.ResultPath ?? result.Item?.OriginalPath ?? string.Empty, src.ItemType));
 			}
 
+			var warned = results.Where(r => r.Succeeded && !string.IsNullOrEmpty(r.ErrorMessage)).ToList();
+			if (warned.Count > 0)
+			{
+				App.Logger.LogWarning("Trash restore completed with {Count} cleanup warning(s): {Message}", warned.Count, warned[0].ErrorMessage);
+				StatusCenterHelper.AddCard_RestoreWarning(warned.Select(r => r.ResultPath ?? r.Item?.OriginalPath).OfType<string>());
+			}
+
 			fsProgress.ReportStatus(movedSources.Count == results.Count && movedSources.Count > 0 ? FileSystemStatusCode.Success : FileSystemStatusCode.Generic);
 
 			return movedSources.Count == 0 ? null : new StorageHistory(FileOperationType.Restore, movedSources, movedDestinations);

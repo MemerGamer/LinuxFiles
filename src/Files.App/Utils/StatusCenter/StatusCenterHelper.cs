@@ -578,6 +578,19 @@ namespace Files.App.Utils.StatusCenter
 			}
 		}
 
+		/// <summary>Non-blocking notice for a trash restore that succeeded but left a cleanup problem behind.</summary>
+		public static StatusCenterItem AddCard_RestoreWarning(IEnumerable<string>? destination)
+		{
+			return _statusCenterViewModel.AddItem(
+				"StatusCenter_RestoreWarning_Header",
+				"StatusCenter_RestoreWarning_SubHeader",
+				ReturnResult.Success,
+				FileOperationType.Restore,
+				null,
+				destination,
+				false);
+		}
+
 		public static StatusCenterItem AddCard_Prepare()
 		{
 			return _statusCenterViewModel.AddItem(

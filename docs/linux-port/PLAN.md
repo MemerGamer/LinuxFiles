@@ -41,9 +41,9 @@ The owner decided to focus on Linux first. Windows support is revisited only aft
 |---|---|---|
 | 0 | Toolchain, CI, Uno spike, research. Extra spikes: **P0-PERF** (10k/100k items) and **P0-DND** (outbound XDND + file clipboard prototype) | parallel |
 | 1 | Abstraction skeleton (`Files.Platform.*`, tests, DI) | serial, small |
-| 2 | **Linux bring-up: make `Files.App` compile and launch on Uno `net10.0-desktop`.** Retarget Controls + App to Uno. Exclude Windows-only folders (`Compile Remove`). Replace Win32/WinRT calls with interface calls, backed by stub or simple Linux implementations. Fix compile errors folder by folder. | parallel by folder ownership |
+| 2 | **Linux bring-up: make `Files.App` compile and launch on Uno `net10.0-desktop`.** Retarget Controls + App to Uno. Exclude Windows-only folders (`Compile Remove`). Replace Win32/WinRT calls with interface calls, backed by stub or simple Linux implementations. Fix compile errors folder by folder. **✅ Done (2026-10-05):** the app compiles, launches and runs on Linux; the compat-off criterion moved to Phase 4. | parallel by folder ownership |
 | 3 | Real Linux backends per interface (enumeration, watcher, file ops, trash, launcher, thumbnails, drives, clipboard…), with unit tests | parallel, one agent per interface |
-| 4 | Replace the legacy WinRT storage layer (`BaseStorageFile`/`Folder`) with OwlCore storables | single owner |
+| 4 | Replace the legacy WinRT storage layer (`BaseStorageFile`/`Folder`) with OwlCore storables, then switch Win32 compat mode off (moved from Phase 2) | parallel work packages (see Phase 4 plan, Revision 3) |
 | 5 | UI blockers and UX parity: L-DND, SpeedGraph, StickyHeader, title bar, previews, single instance | parallel |
 | 6 | Desktop integration and packaging (FileManager1 D-Bus, `.desktop`, Flatpak/AppImage/AUR) | parallel |
 | 7 | Hardening (performance, HiDPI, themes, localisation) | parallel |
@@ -53,7 +53,7 @@ The Phase 2 workstreams in §7.3 still define folder ownership. Their goal is no
 not "Windows code wrapped without behaviour change".
 
 ### Phase 2 build decisions (2026-10-04)
-- **Win32 compat mode is the default** (`FilesWin32Compat=true` in `Directory.Build.props`). Existing Win32/Shell code compiles on Linux against the CsWin32 assembly, which is built automatically for Platform=x64. It cannot run on Linux, so any call that is reached at runtime must be replaced by a `Files.Platform` service. Phase 2 exit criterion: compat mode switched off.
+- **Win32 compat mode is the default** (`FilesWin32Compat=true` in `Directory.Build.props`). Existing Win32/Shell code compiles on Linux against the CsWin32 assembly, which is built automatically for Platform=x64. It cannot run on Linux, so any call that is reached at runtime must be replaced by a `Files.Platform` service. Switching compat mode off was Phase 2's exit criterion; since 2026-10-05 it is Phase 4's (P4-Z), because it depends on removing the legacy storage layer.
 - **Nullable diagnostics are warnings on `-desktop`**, because Uno's annotations differ from WinUI's. Re-enable once the build is clean.
 - Stubbed behaviour is tagged `// LINUX-TODO(<area>)`. Use `rg -n LINUX-TODO src` to find the backlog.
 
@@ -248,6 +248,48 @@ Each workstream: define its interface methods from real call sites, implement th
   FTP, virtual folders.
 - Kept on a single owner (or a strictly serialized queue), because almost everything touches `ShellViewModel`.
 - **Exit:** `Utils/Storage/StorageItems/*` is no longer referenced by the Linux build.
+
+#### Phase 4 plan, Revision 3 (2026-10-05): drop the legacy storage layer, then switch Win32 compat off
+The two are one project: the legacy items (`Zip*`, `NativeStorageFile`, `VirtualStorageItem`, `Shell*`, `SystemStorageFolder`) call
+Win32 themselves, so compat can only go once they are gone, and `FilesWin32Compat=false` is the proof.
+
+**Inventory (from `d532ee2`, lower bounds):** legacy layer 24 files / 5.7k lines; 57 consumer files (~330 refs) to migrate;
+`Windows.Storage.IStorageItem` 111 refs in 25 files; `DangerousGet*Async` 44 calls. Compat-only code: 41 files / 9k lines in
+Files.App, 26 files / 2.5k lines in Files.App.Storage. Compat off breaks ~109 files / 615 lines outside `#if WINDOWS`;
+public contracts expose CsWin32 types (`SHOW_WINDOW_CMD`, `WIN32_ERROR`, `IWindowsStorable`); Linux fallbacks live inside
+compat-only files (`Win32Helper.Storage.cs` etc.) and must move first. Live Linux hazards: `StorageHelpers.ToStorageItem` (fixed in #45),
+`CachedSizeProvider`/`FileSizeCalculator` (`FindFirstFileEx`), `IsZipPath` assuming `\` (browsing inside archives broken).
+
+**Design:** path-first (`IFileSystemEnumerator` → `ListedItem`, `IFileOperationsService`); OwlCore storables only where a
+hierarchy/stream is needed (archives, FTP, Home, path resolution, preview streams); no WinRT `IStorageItem` on Linux. Windows
+code moves byte-identical into `*.Windows.cs` (excluded on desktop by one glob) or small `#if WINDOWS` blocks. No new Win32 shims.
+Add first, delete last; default build stays green. Contracts (P4-0, then frozen): `IStorableResolver`/`IStorableRoute`,
+`IStorageItemWithPath.Storable` (+ `StorableWithPath`), `ShowWindowCommand`, `FileSecurityResult`; later
+`IArchiveService.OpenEntryAsync`, `IFileStatService.TryGetFileId` (dev:ino replaces FRN), `IFileAttributesService`,
+`IArchivePasswordPrompt`. DI via `services.AddStorables()`.
+
+**Work packages** (one owner per file; shared files append-only; only P4-0/P4-Z touch the compat switch):
+
+| WP | Days | Scope | Depends | Model |
+|---|---|---|---|---|
+| P4-0 | 1–2 | Contracts, local route, `*.Windows.cs` glob, compat-off check script + baseline | – | strong |
+| P4-K | 1–2 | Live hazards: size providers, FileSizeCalculator, layout prefs, tags, `IFileStatService` | 0 | mid |
+| P4-A | 2–3 | Archives: read-only `ArchiveFolder`, `OpenEntryAsync`, Decompress actions, `/` in IsZipPath | 0 | strong |
+| P4-B | 2–3 | Operations + history + status center; Windows ops → Windows-only | 0 | strong |
+| P4-C | 2–3 | Resolution, enumerators, search; `DangerousGet*` → resolver | 0 | mid + strong review |
+| P4-D | 1 | FTP onto `Files.App.Storage/Ftp` | 0 | mid |
+| P4-E | 2–3 | `ShellViewModel` (single owner) + `ShellViewModel.Windows.cs` | C, A | strong |
+| P4-F | 2–3 | Properties + security; `IFileAttributesService` | 0 | mid |
+| P4-G | 2 | Previews (keep #43/#44 hardening), `ListedItem`, layouts, toolbar, Git, helpers | 0 | mid |
+| P4-H | 2–3 | Actions, navigation, factories, libraries, shortcuts; capability-hidden commands | 0 | mid |
+| P4-I | 1–2 | Window chrome, settings UI, tab bar, hotkeys | 0 | cheap/mid |
+| P4-J | 2–3 | Home/widgets/sidebar/drives/cloud; portable widget contract | 0 | mid + strong contract |
+| P4-Z | 1–2 | Flip `FilesWin32Compat=false`, fix leftovers, delete `#if WINDOWS` IStorageItem members, CI job blocking | all | strong |
+
+Order: P4-0 → wave 1a (K, A, B, C, H, I) → wave 1b (F, D, G, J) → E → Z. Critical path ≈ 10 working days.
+Gate after every merge: normal desktop build passes; `-p:FilesWin32Compat=false` error count ratchets down vs
+`docs/linux-port/compat-off-baseline.txt`; `rg --no-ignore 'BaseStorage|StorageItems\.|Windows\.Win32|PInvoke\.|Win32Helper\.'` on the WP's
+files (outside `*.Windows.cs`) → 0. Exit: compat off by default, 0 errors, headless smoke run passes, CI compat-off job blocking.
 
 ### Phase 5 — Uno head (can start after Phase 0 spikes, in parallel with 2–4 on Controls)
 - 5a: Multi-target `Files.App.Controls` (Windows + Uno).

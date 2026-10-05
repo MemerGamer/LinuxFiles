@@ -12,7 +12,9 @@ using System.Windows.Input;
 using Windows.ApplicationModel;
 using Windows.Storage;
 using Windows.Storage.Pickers;
+#if WINDOWS
 using Windows.Win32.Storage.FileSystem;
+#endif
 
 namespace Files.App.ViewModels.Settings
 {
@@ -73,6 +75,7 @@ namespace Files.App.ViewModels.Settings
 				}
 			}
 
+#if WINDOWS
 			var dataPath = Environment.ExpandEnvironmentVariables("%LocalAppData%\\Files");
 			if (IsSetAsDefaultFileManager)
 			{
@@ -90,6 +93,7 @@ namespace Files.App.ViewModels.Settings
 			{
 				await Win32Helper.RunPowershellCommandAsync($"-command \"Remove-Item -LiteralPath {Win32Helper.ToPowerShellStringLiteral(dataPath)} -Recurse -Force\"", PowerShellExecutionOptions.Hidden);
 			}
+#endif
 
 			try
 			{
@@ -217,6 +221,7 @@ namespace Files.App.ViewModels.Settings
 
 			try
 			{
+#if WINDOWS
 				if (OperatingSystem.IsWindows())
 				{
 					var handle = Win32PInvoke.CreateFileFromAppW(
@@ -234,6 +239,9 @@ namespace Files.App.ViewModels.Settings
 				{
 					using (new FileStream(filePath, FileMode.CreateNew, FileAccess.ReadWrite)) { }
 				}
+#else
+				using (new FileStream(filePath, FileMode.CreateNew, FileAccess.ReadWrite)) { }
+#endif
 
 				var file = await StorageHelpers.ToStorageItem<BaseStorageFile>(filePath);
 				if (file is null)

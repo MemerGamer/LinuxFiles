@@ -4,8 +4,10 @@
 using Microsoft.UI.Xaml.Controls;
 using System.Runtime.InteropServices;
 using Windows.ApplicationModel.DataTransfer;
+#if WINDOWS
 using Windows.Win32;
 using Windows.Win32.Foundation;
+#endif
 using WinRT;
 
 namespace Files.App.Data.Models

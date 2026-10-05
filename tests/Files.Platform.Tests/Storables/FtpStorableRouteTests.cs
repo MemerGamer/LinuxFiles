@@ -136,7 +136,66 @@ namespace Files.Platform.Tests.Storables
 		}
 
 		[TestMethod]
-		public void Credentials_PersistThroughSecretStore_ButUrlCredentialsStayInSession()
+		public void Credentials_PersistThroughSecretStore_ScopedBySchemeHostAndPort()
+		{
+			var store = new MemorySecretStore();
+			var previous = FtpManager.SecretStore;
+			FtpManager.SecretStore = store;
+			try
+			{
+				var key = FtpUrl.Parse("ftps://Example.org/x").GetCredentialKey();
+				var cache = new FtpCredentialCache();
+				cache[key] = new NetworkCredential("bob", "pw");
+
+				Assert.AreEqual("ftps://example.org:990", key);
+				Assert.AreEqual("pw", store.Get("Files FTP ftps://example.org:990", "bob"));
+
+				var fresh = new FtpCredentialCache();
+				Assert.IsTrue(fresh.TryGetValue(key, out var credential));
+				Assert.AreEqual("pw", credential.Password);
+
+				// Other scheme or port never sees it
+				Assert.IsFalse(fresh.TryGetValue(FtpUrl.Parse("ftp://example.org").GetCredentialKey(), out _));
+				Assert.IsFalse(fresh.TryGetValue(FtpUrl.Parse("ftps://example.org:2121").GetCredentialKey(), out _));
+				Assert.IsFalse(fresh.TryGetValue("example.org", out _));
+			}
+			finally
+			{
+				FtpManager.SecretStore = previous;
+			}
+		}
+
+		[TestMethod]
+		public void UrlCredentials_AreNeverPersisted_AndNeverOverrideSaved()
+		{
+			var store = new MemorySecretStore();
+			var previous = FtpManager.SecretStore;
+			FtpManager.SecretStore = store;
+			try
+			{
+				var key = FtpUrl.Parse("ftp://h").GetCredentialKey();
+				var cache = new FtpCredentialCache();
+
+				cache.SetFromUrl(key, new NetworkCredential("eve", "typed"));
+				Assert.IsTrue(cache.TryGetValue(key, out var fromUrl));
+				Assert.AreEqual("eve", fromUrl.UserName);
+				Assert.IsFalse(new FtpCredentialCache().TryGetValue(key, out _));
+				Assert.IsFalse(cache.TryGetValue(FtpUrl.Parse("ftp://other").GetCredentialKey(), out _));
+
+				cache[key] = new NetworkCredential("bob", "saved");
+				cache.SetFromUrl(key, new NetworkCredential("eve", "typed"));
+				Assert.IsTrue(cache.TryGetValue(key, out var chosen));
+				Assert.AreEqual("bob", chosen.UserName);
+				Assert.IsNull(store.Get("Files FTP ftp://h:21", "eve"));
+			}
+			finally
+			{
+				FtpManager.SecretStore = previous;
+			}
+		}
+
+		[TestMethod]
+		public void LegacyHostKeys_AreSessionOnly()
 		{
 			var store = new MemorySecretStore();
 			var previous = FtpManager.SecretStore;
@@ -144,23 +203,49 @@ namespace Files.Platform.Tests.Storables
 			try
 			{
 				var cache = new FtpCredentialCache();
-				cache["Example.org"] = new NetworkCredential("bob", "pw");
-				cache.SetSessionOnly("other.org", new NetworkCredential("eve", "typed"));
+				cache["host"] = new NetworkCredential("bob", "pw");
 
-				Assert.AreEqual("pw", store.Get("Files FTP example.org", "bob"));
-				Assert.IsNull(store.Get("Files FTP other.org", "eve"));
-
-				// A fresh cache (new app session) reads the password back from the store
-				var fresh = new FtpCredentialCache();
-				Assert.IsTrue(fresh.TryGetValue("example.org", out var credential));
-				Assert.AreEqual("bob", credential.UserName);
-				Assert.AreEqual("pw", credential.Password);
-				Assert.IsFalse(fresh.TryGetValue("other.org", out _));
+				Assert.IsNull(store.Get("Files FTP host", "bob"));
+				Assert.IsTrue(cache.TryGetValue("host", out _));
 			}
 			finally
 			{
 				FtpManager.SecretStore = previous;
 			}
+		}
+
+		[TestMethod]
+		public void ToString_NeverContainsUserInfo()
+		{
+			var url = FtpUrl.Parse("ftp://user:secret@host/dir");
+
+			Assert.IsFalse(url.ToString().Contains("secret"));
+			Assert.IsFalse(url.ToString().Contains("user"));
+		}
+
+		[TestMethod]
+		public void RequiresTls_NeverFallsBackToCleartextForPasswords()
+		{
+			Assert.IsTrue(FtpManager.RequiresTls(FtpUrl.Parse("ftps://tls1.example"), anonymous: true));
+			Assert.IsTrue(FtpManager.RequiresTls(FtpUrl.Parse("ftpes://tls1.example"), anonymous: true));
+			Assert.IsTrue(FtpManager.RequiresTls(FtpUrl.Parse("ftp://tls1.example"), anonymous: false));
+			Assert.IsFalse(FtpManager.RequiresTls(FtpUrl.Parse("ftp://tls1.example"), anonymous: true));
+
+			FtpManager.ApproveCleartext(FtpUrl.Parse("ftp://tls2.example").GetCredentialKey());
+			Assert.IsFalse(FtpManager.RequiresTls(FtpUrl.Parse("ftp://tls2.example"), anonymous: false));
+			Assert.IsTrue(FtpManager.RequiresTls(FtpUrl.Parse("ftps://tls2.example"), anonymous: false));
+		}
+
+		[TestMethod]
+		public void CleartextApproval_IsPerSchemeHostAndPort()
+		{
+			var key = FtpUrl.Parse("ftp://approve.example:2121").GetCredentialKey();
+			Assert.IsFalse(FtpManager.IsCleartextApproved(key));
+
+			FtpManager.ApproveCleartext(key);
+
+			Assert.IsTrue(FtpManager.IsCleartextApproved(key));
+			Assert.IsFalse(FtpManager.IsCleartextApproved(FtpUrl.Parse("ftp://approve.example").GetCredentialKey()));
 		}
 
 		private sealed class FakeFtpService : IFtpStorageService

@@ -32,16 +32,36 @@ namespace Files.App.Storage
 		public static AsyncFtpClient GetFtpClient(string ftpPath)
 		{
 			var url = FtpUrl.Parse(ftpPath);
-			var credentials = url.GetCredential()
-				?? FtpManager.Credentials.GetValueOrDefault(url.Host)
-				?? FtpManager.Anonymous;
+			var key = url.GetCredentialKey();
+
+			// Saved or session credentials win; credentials embedded in the URL are only a last resort and never replace them.
+			var credentials = FtpManager.Credentials.TryGetValue(key, out var known)
+				? known
+				: FtpManager.Credentials.TryGetValue(url.Host, out var legacy) ? legacy : FtpManager.Anonymous;
+			var isAnonymous = ReferenceEquals(credentials, FtpManager.Anonymous);
 
 			var client = new AsyncFtpClient(url.Host, credentials, url.Port);
 
-			// Prefer TLS: ftps:// is implicit, ftpes:// requires explicit TLS, plain ftp:// upgrades when the server supports it.
-			client.Config.EncryptionMode = url.IsImplicitTls
-				? FtpEncryptionMode.Implicit
-				: url.IsExplicitTls ? FtpEncryptionMode.Explicit : FtpEncryptionMode.Auto;
+			// Certificates are always validated (no accept-all callback is ever attached).
+			client.Config.ValidateAnyCertificate = false;
+
+			if (url.IsImplicitTls)
+			{
+				client.Config.EncryptionMode = FtpEncryptionMode.Implicit;
+				client.Config.DataConnectionEncryption = true;
+			}
+			else if (FtpManager.RequiresTls(url, isAnonymous))
+			{
+				// ftpes:// and any password over plain ftp:// require TLS: no fallback to cleartext
+				// unless the user explicitly approved an unencrypted connection to this host and port.
+				client.Config.EncryptionMode = FtpEncryptionMode.Explicit;
+				client.Config.DataConnectionEncryption = true;
+			}
+			else
+			{
+				// Anonymous or explicitly approved: still use TLS when the server offers it.
+				client.Config.EncryptionMode = FtpEncryptionMode.Auto;
+			}
 
 			return client;
 		}

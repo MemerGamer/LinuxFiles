@@ -56,7 +56,7 @@ namespace Files.App.Storage
 		private static void RememberUrlCredential(FtpUrl url)
 		{
 			if (url.GetCredential() is { } credential)
-				FtpManager.Credentials.SetSessionOnly(url.Host, credential);
+				FtpManager.Credentials.SetFromUrl(url.GetCredentialKey(), credential);
 		}
 	}
 }

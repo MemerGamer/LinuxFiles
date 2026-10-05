@@ -23,6 +23,31 @@ namespace Files.App.Storage
 		/// The store passwords are persisted in. Set once at startup; passwords are never written anywhere else.
 		/// </summary>
 		public static ISecretStore? SecretStore { get; set; }
+
+		private static readonly HashSet<string> _cleartextApproved = new(StringComparer.OrdinalIgnoreCase);
+
+		/// <summary>
+		/// Records that the user explicitly accepted sending a password unencrypted to this scheme+host+port
+		/// (<see cref="FtpUrl.GetCredentialKey"/>), for this session only.
+		/// </summary>
+		public static void ApproveCleartext(string credentialKey)
+		{
+			lock (_cleartextApproved)
+				_cleartextApproved.Add(credentialKey);
+		}
+
+		/// <summary>
+		/// Whether the connection must be encrypted without fallback: always for ftps:// and ftpes://, and for plain ftp://
+		/// whenever a password would be sent, unless the user approved cleartext for this host and port.
+		/// </summary>
+		public static bool RequiresTls(FtpUrl url, bool anonymous)
+			=> url.IsImplicitTls || url.IsExplicitTls || (!anonymous && !IsCleartextApproved(url.GetCredentialKey()));
+
+		public static bool IsCleartextApproved(string credentialKey)
+		{
+			lock (_cleartextApproved)
+				return _cleartextApproved.Contains(credentialKey);
+		}
 	}
 
 	/// <summary>
@@ -33,6 +58,8 @@ namespace Files.App.Storage
 		private const string LastUserAccount = "(last user)";
 
 		private readonly Dictionary<string, NetworkCredential> _session = new(StringComparer.OrdinalIgnoreCase);
+		// Credentials taken from URLs: kept per scope for the session, never persisted and never replacing a saved credential
+		private readonly Dictionary<string, NetworkCredential> _fromUrl = new(StringComparer.OrdinalIgnoreCase);
 		private readonly object _lock = new();
 
 		public NetworkCredential this[string host]
@@ -42,9 +69,14 @@ namespace Files.App.Storage
 		}
 
 		/// <summary>
-		/// Keeps <paramref name="credential"/> for this session only (for example credentials typed into a URL).
+		/// Keeps credentials taken from a URL for this session only. They are never persisted and never override a saved
+		/// credential for the same scope.
 		/// </summary>
-		public void SetSessionOnly(string host, NetworkCredential credential) => Set(host, credential, persist: false);
+		public void SetFromUrl(string credentialKey, NetworkCredential credential)
+		{
+			lock (_lock)
+				_fromUrl[credentialKey] = credential;
+		}
 
 		public NetworkCredential Get(string host, NetworkCredential defaultValue)
 			=> TryGetValue(host, out var credential) ? credential : defaultValue;
@@ -54,6 +86,7 @@ namespace Files.App.Storage
 			lock (_lock)
 			{
 				_session.Remove(host);
+				_fromUrl.Remove(host);
 			}
 
 			if (FtpManager.SecretStore is { } store)
@@ -80,19 +113,18 @@ namespace Files.App.Storage
 					return true;
 			}
 
-			if (FtpManager.SecretStore is { } store)
+			// Legacy bare-host keys have no scheme/port scope and are never persisted or read from the store
+			var scoped = host.Contains("://", StringComparison.Ordinal);
+
+			if (scoped && FtpManager.SecretStore is { } store)
 			{
 				try
 				{
 					var resource = GetResource(host);
 					if (store.Get(resource, LastUserAccount) is { Length: > 0 } user && store.Get(resource, user) is { } password)
 					{
+						// Not cached: the password stays in memory only as long as the caller needs it
 						value = new NetworkCredential(user, password);
-						lock (_lock)
-						{
-							_session[host] = value;
-						}
-
 						return true;
 					}
 				}
@@ -100,6 +132,12 @@ namespace Files.App.Storage
 				{
 					// Secret store unavailable; behave as if nothing was saved
 				}
+			}
+
+			lock (_lock)
+			{
+				if (_fromUrl.TryGetValue(host, out value!))
+					return true;
 			}
 
 			value = null!;
@@ -113,7 +151,7 @@ namespace Files.App.Storage
 				_session[host] = credential;
 			}
 
-			if (!persist || FtpManager.SecretStore is not { } store || string.IsNullOrEmpty(credential.UserName))
+			if (!persist || !host.Contains("://", StringComparison.Ordinal) || FtpManager.SecretStore is not { } store || string.IsNullOrEmpty(credential.UserName))
 				return;
 
 			try

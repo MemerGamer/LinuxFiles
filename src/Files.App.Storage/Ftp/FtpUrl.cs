@@ -58,6 +58,15 @@ namespace Files.App.Storage
 			return $"{Scheme}://{host}{port}{(Path == "/" ? string.Empty : Path)}";
 		}
 
+		/// <summary>
+		/// Scope key for credentials: scheme, host and port, so ftp:// credentials are never used for ftps:// or another port.
+		/// </summary>
+		public string GetCredentialKey()
+			=> $"{Scheme}://{Host.ToLowerInvariant()}:{Port.ToString(CultureInfo.InvariantCulture)}";
+
+		/// <summary>Never includes the user info.</summary>
+		public override string ToString() => ToId();
+
 		public NetworkCredential? GetCredential()
 			=> UserName is null ? null : new NetworkCredential(UserName, Password ?? string.Empty);
 

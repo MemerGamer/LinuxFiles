@@ -19,6 +19,7 @@ namespace Files.App.Actions
 			=> new(themedIconStyle: "App.ThemedIcons.SetSlideshow.16");
 
 		public override bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			base.IsExecutable &&
 			ContentPageContext.SelectedItems.Count > 1;
 

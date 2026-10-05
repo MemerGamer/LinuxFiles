@@ -4956,4 +4956,12 @@
     <value>An item is hidden when its name starts with a dot, so this renames "{0}" to "{1}".</value>
     <comment>{0} is the current name and {1} the new name.</comment>
   </data>
+  <data name="FontAlreadyInstalledPrompt" xml:space="preserve">
+    <value>A font named "{0}" is already installed for your user. Replace it?</value>
+    <comment>Shown when installing a font on Linux.</comment>
+  </data>
+  <data name="FontInstallFailed" xml:space="preserve">
+    <value>"{0}" could not be installed. Make sure it is a valid font file.</value>
+    <comment>Shown when installing a font on Linux.</comment>
+  </data>
 </root>

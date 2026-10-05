@@ -11,7 +11,9 @@ using Microsoft.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using Windows.System;
 using Windows.UI.Core;
+#if WINDOWS
 using Windows.Win32;
+#endif
 using WinRT;
 
 namespace Files.App.Views.Layouts
@@ -23,7 +25,9 @@ namespace Files.App.Views.Layouts
 	{
 		// Constants
 
+#if WINDOWS
 		private const int KEY_DOWN_MASK = 0x8000;
+#endif
 
 		// Fields
 
@@ -451,9 +455,13 @@ namespace Files.App.Views.Layouts
 		protected async void RenameTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
 		{
 			var textBox = (TextBox)sender;
+#if WINDOWS
 			var isShiftPressed = OperatingSystem.IsWindows()
 				? (PInvoke.GetKeyState((int)VirtualKey.Shift) & KEY_DOWN_MASK) != 0
 				: Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+#else
+			var isShiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+#endif
 
 			switch (e.Key)
 			{

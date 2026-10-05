@@ -19,6 +19,7 @@ namespace Files.App.Actions
 			=> new("\uE7EE");
 
 		public override bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			ContentPageContext.SelectedItem is not null &&
 			ContentPageContext.PageType != ContentPageTypes.RecycleBin &&
 			ContentPageContext.PageType != ContentPageTypes.ZipFolder &&

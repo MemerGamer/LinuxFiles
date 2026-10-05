@@ -15,8 +15,10 @@ using System.Runtime.InteropServices;
 using Windows.Foundation.Metadata;
 using Windows.Graphics;
 using Windows.UI.Input;
+#if WINDOWS
 using Windows.Win32;
 using Windows.Win32.Foundation;
+#endif
 using WinRT;
 using GridSplitter = Files.App.Controls.GridSplitter;
 using VirtualKey = Windows.System.VirtualKey;
@@ -33,12 +35,16 @@ namespace Files.App.Views
 		public SidebarViewModel SidebarAdaptiveViewModel { get; }
 		public MainPageViewModel ViewModel { get; }
 
+#if WINDOWS
 		private const int HTCAPTION = 2;
+#endif
 
 		private bool keyReleased = true;
 
 		private DispatcherQueueTimer _updateDateDisplayTimer;
+#if WINDOWS
 		private WindowMessageMonitor? _titleBarMessageMonitor;
+#endif
 
 		private readonly Dictionary<TabBarItem, double> _sidebarScrollByTab = new();
 		private TabBarItem? _previousSidebarTab;
@@ -69,8 +75,10 @@ namespace Files.App.Views
 
 			if (AppLanguageHelper.IsPreferredLanguageRtl)
 			{
+#if WINDOWS
 				if (OperatingSystem.IsWindows())
 					Win32Helper.EnableRtlLayout(MainWindow.Instance.WindowHandle);
+#endif
 				FlowDirection = FlowDirection.RightToLeft;
 			}
 
@@ -147,10 +155,13 @@ namespace Files.App.Views
 		{
 			var height = (int)TabControl.ActualHeight;
 			source.SetRegionRects(NonClientRegionKind.Passthrough, [getScaledRect(this, new RectInt32 { X = 0, Y = 0, Width = (int)(TabControl.ActualWidth + TabControl.Margin.Left - TabControl.DragArea.ActualWidth), Height = height })]);
+#if WINDOWS
 			AttachTitleBarMessageMonitor();
+#endif
 			return height;
 		}
 
+#if WINDOWS
 		// Caption regions live in a dedicated child window
 		private void AttachTitleBarMessageMonitor()
 		{
@@ -177,6 +188,7 @@ namespace Files.App.Views
 			e.Result = 0;
 			e.Handled = true;
 		}
+#endif
 
 		public async void TabItemContent_ContentChanged(object? sender, TabBarItemParameter e)
 		{

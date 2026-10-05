@@ -156,6 +156,8 @@ namespace Files.Platform.Linux.Archives
 
 		private sealed class TarSource : ArchiveSource
 		{
+			private const int MaxSkippedTarEntries = 10_000;
+
 			private readonly string path;
 			private readonly Codec codec;
 			private readonly ReaderOptions options;
@@ -180,13 +182,19 @@ namespace Files.Platform.Linux.Archives
 				using var decompressed = maxBytes is { } limit ? new PreviewReadStream(codecStream, limit, cancellationToken) : codecStream;
 				using var reader = new TarReader(decompressed);
 				TarEntry? entry;
+				var skipped = 0;
 				while ((entry = reader.GetNextEntry()) is not null)
 				{
 					cancellationToken.ThrowIfCancellationRequested();
 					var current = entry;
 					var link = entry.EntryType is TarEntryType.SymbolicLink or TarEntryType.HardLink ? entry.LinkName : null;
 					if (entry.EntryType is not (TarEntryType.RegularFile or TarEntryType.V7RegularFile or TarEntryType.Directory or TarEntryType.SymbolicLink or TarEntryType.HardLink))
-						throw new ArchiveSecurityException("The tar contains an unsupported entry type.");
+					{
+						// Pax global/extended headers carry metadata only; fifos, devices and the like are never created. Skip them, bounded.
+						if (++skipped > MaxSkippedTarEntries)
+							throw new ArchiveSecurityException("The tar contains too many unsupported entries.");
+						continue;
+					}
 					yield return (new EntryData(entry.Name, entry.EntryType == TarEntryType.Directory, entry.Length, 0,
 						entry.ModificationTime.UtcDateTime, false, link, 0, (int)entry.Mode, true), () => current.DataStream ?? Stream.Null);
 				}

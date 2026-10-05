@@ -133,33 +133,14 @@ namespace Files.Platform.Linux.Archives
 		}
 
 		/// <inheritdoc/>
-		public Task<ArchiveListing> ListForBrowsingAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
+		public async Task<ArchiveListing> ListForBrowsingAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
 		{
-			return Task.Run(() =>
-			{
-				using var archive = OpenArchive(archivePath, password, fileNameEncoding, BrowsingLimits.MaxTotalBytes, cancellationToken);
-				var fallback = GetDefaultExtractFolderName(archivePath);
-				var entries = new List<ArchiveEntryInfo>();
-				var encrypted = false;
-				var guard = new ExtractionGuard(BrowsingLimits, null, new FileInfo(archivePath).Length, cancellationToken);
-				long bytes = 0;
-				var nameChars = 0;
+			// Browsing only needs the header caps; the decompressed-size and ratio guards apply per entry in OpenEntryAsync
+			var listing = await ListAsync(archivePath, password, fileNameEncoding, cancellationToken).ConfigureAwait(false);
+			if (listing.IsTruncated)
+				throw new ArchiveSecurityException("The archive is too large to browse.");
 
-				foreach (var (entry, _) in archive.Entries(headersOnly: true))
-				{
-					cancellationToken.ThrowIfCancellationRequested();
-					guard.CheckEntryCount(entries.Count + 1);
-					bytes = checked(bytes + Math.Max(entry.Size, 0));
-					guard.CheckDeclared(bytes);
-					nameChars = checked(nameChars + (entry.Key?.Length ?? fallback.Length));
-					if (nameChars > 1024 * 1024)
-						throw new ArchiveSecurityException("The archive name limit was exceeded.");
-					encrypted |= entry.IsEncrypted;
-					entries.Add(ToInfo(entry, fallback));
-				}
-
-				return new ArchiveListing(entries, encrypted, archive.IsSolid);
-			}, cancellationToken);
+			return listing;
 		}
 
 		private static ArchiveEntryInfo ToInfo(EntryData entry, string fallback) => new(

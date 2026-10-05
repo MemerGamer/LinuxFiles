@@ -101,11 +101,12 @@ namespace Files.Platform.Linux.FileStat
 					if (++state.Entries > state.Options.MaxEntries)
 					{
 						state.Truncated = true;
+						state.EntryLimitHit = true;
 						return false;
 					}
 
 					Visit(name);
-					return !state.Canceled && !state.Truncated;
+					return !state.Canceled && !state.EntryLimitHit;
 				});
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -124,7 +125,7 @@ namespace Files.Platform.Linux.FileStat
 			public FolderScanOptions Options { get; } = options;
 			public CancellationToken Cancellation { get; } = cancellation;
 			public long Total, Files, Folders, Entries;
-			public bool Truncated, Canceled;
+			public bool Truncated, Canceled, EntryLimitHit;
 		}
 	}
 }

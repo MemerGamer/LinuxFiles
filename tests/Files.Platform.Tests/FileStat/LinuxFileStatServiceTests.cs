@@ -82,6 +82,7 @@ namespace Files.Platform.Tests.FileStat
 
 			var shallow = await _service.ScanFolderAsync(_root, new FolderScanOptions { MaxDepth = 1 });
 			Assert.AreEqual(3, shallow.TotalSize);
+			Assert.IsTrue(shallow.Truncated);
 
 			var limited = await _service.ScanFolderAsync(_root, new FolderScanOptions { MaxEntries = 1 });
 			Assert.IsTrue(limited.Truncated);

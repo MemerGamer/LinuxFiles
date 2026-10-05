@@ -19,6 +19,16 @@ namespace Files.App.Data.Enums
 		AccessDenied,
 
 		/// <summary>
+		/// The file or one of its parent folders does not exist.
+		/// </summary>
+		NotFound,
+
+		/// <summary>
+		/// The file or its file system is read-only, so its security settings cannot be changed.
+		/// </summary>
+		ReadOnly,
+
+		/// <summary>
 		/// The security descriptor or access control list is invalid.
 		/// </summary>
 		InvalidAcl,

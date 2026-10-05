@@ -35,7 +35,24 @@ namespace Files.App.Actions
 						LeftPaneNavPathParam = "Settings",
 						LeftPaneSelectItemParam = settingsPage,
 					})
-				: NavigationHelpers.OpenPathInNewTab("Settings", true);
+				: OpenOrFocusSettingsTab();
+		}
+
+		private static Task OpenOrFocusSettingsTab()
+		{
+			var existingIndex = MainPageViewModel.AppInstances.ToList().FindIndex(tab =>
+				tab.NavigationParameter?.NavigationParameter switch
+				{
+					string path => path == "Settings",
+					PaneNavigationArguments args => args.LeftPaneNavPathParam == "Settings" && args.RightPaneNavPathParam is null,
+					_ => false
+				});
+
+			if (existingIndex < 0)
+				return NavigationHelpers.OpenPathInNewTab("Settings", true);
+
+			App.AppModel.TabStripSelectedIndex = existingIndex;
+			return Task.CompletedTask;
 		}
 	}
 }

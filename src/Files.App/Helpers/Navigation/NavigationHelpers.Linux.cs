@@ -187,22 +187,34 @@ namespace Files.App.Helpers
 		}
 
 		/// <summary>
-		/// Runs an executable with the dropped items as arguments. Goes through the same plan and confirmation as opening it;
-		/// anything that is not a confirmable executable is refused.
+		/// Runs an executable with the dropped items as arguments. The complete argv (target and every item) is shown and
+		/// exactly that argv is run; anything that is not a confirmable executable, or too large to show in full, is refused.
 		/// </summary>
 		internal static async Task<bool> RunWithItemsLinuxAsync(string executablePath, IReadOnlyList<string> arguments)
 		{
 			var plan = await PlanAsync(executablePath);
-			if (!OpenDecision.NeedsRunConfirmation(plan.Action))
+			var argv = new List<string>(arguments.Count + 1) { plan.Target };
+			argv.AddRange(arguments);
+
+			if (!OpenDecision.NeedsRunConfirmation(plan.Action) || DisplaySanitizer.FullArguments(argv) is not { } lines)
 			{
 				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(DisplaySanitizer.Field(plan.Target)));
 				return false;
 			}
 
-			return await ExecutePlanAsync(executablePath, plan, arguments);
+			var confirmed = await DialogDisplayHelper.ShowDialogAsync(
+				Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(plan.Target), 60)),
+				Strings.LinuxWouldRun.GetLocalizedResource() + "\n" + string.Join('\n', lines),
+				Strings.Run.GetLocalizedResource(),
+				Strings.Cancel.GetLocalizedResource());
+
+			if (!confirmed)
+				return true;
+
+			return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(argv[0], argv.Skip(1).ToList(), Path.GetDirectoryName(argv[0])) : false;
 		}
 
-		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan, IReadOnlyList<string>? arguments = null)
+		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan)
 		{
 			var target = plan.Target;
 			var workingDirectory = Path.GetDirectoryName(target);
@@ -233,7 +245,7 @@ namespace Files.App.Helpers
 					if (!confirmed)
 						return true;
 
-					return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, arguments, workingDirectory) : await ChangedAsync();
+					return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory) : await ChangedAsync();
 				}
 
 				case OpenAction.RunScriptWithConfirm:
@@ -258,7 +270,7 @@ namespace Files.App.Helpers
 					switch (OpenDecision.Resolve(plan.Action, choice))
 					{
 						case FollowUp.RunExact:
-							return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, arguments, workingDirectory) : await ChangedAsync();
+							return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory) : await ChangedAsync();
 						case FollowUp.DisplayAsText:
 							return plan.StillValid() ? await DisplayAsTextAsync(target) : await ChangedAsync();
 						default:

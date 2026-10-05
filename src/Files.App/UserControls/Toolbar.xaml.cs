@@ -513,7 +513,11 @@ namespace Files.App.UserControls
 #endif
 
 			foreach (var code in group.Commands)
+#if WINDOWS
+				if (Commands[code] is { Code: not CommandCodes.None } cmd)
+#else
 				if (Commands[code] is { Code: not CommandCodes.None, IsExecutable: true } cmd)
+#endif
 					flyout.Items.Add(CreateGroupMenuItem(cmd));
 
 			if (group is NewItemCommandGroup && ViewModel?.InstanceViewModel.CanCreateFileInPage == true

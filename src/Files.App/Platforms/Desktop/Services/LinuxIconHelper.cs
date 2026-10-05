@@ -8,6 +8,7 @@ using Files.Platform.Abstractions.Thumbnails;
 using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Mime;
 using Microsoft.Extensions.Logging;
+using SkiaSharp;
 using System.Collections.Concurrent;
 using System.Globalization;
 using System.IO;
@@ -67,6 +68,8 @@ namespace Files.App.Utils.Storage
 					return cached;
 
 				var bytes = await LoadThemeIconAsync(names, size);
+				if (bytes is null && isFolder)
+					bytes = await Task.Run(() => LoadIconFile(Path.Combine(AppContext.BaseDirectory, "Assets", "FolderIcon.png"), size));
 				_themeCache[key] = bytes;
 				return bytes;
 			}
@@ -134,7 +137,16 @@ namespace Files.App.Utils.Storage
 					return SvgRasterizer.RenderToPng(data, (int)size);
 
 				// PNG signature
-				return data.Length > 8 && data[0] == 0x89 && data[1] == (byte)'P' && data[2] == (byte)'N' && data[3] == (byte)'G' ? data : null;
+				if (data.Length <= 8 || data[0] != 0x89 || data[1] != (byte)'P' || data[2] != (byte)'N' || data[3] != (byte)'G')
+					return null;
+
+				using var imageStream = new SKMemoryStream(data);
+				using var codec = SKCodec.Create(imageStream);
+				if (codec is null || codec.Info.Width <= 0 || codec.Info.Height <= 0 || (long)codec.Info.Width * codec.Info.Height > 4 * 1024 * 1024)
+					return null;
+
+				using var bitmap = SKBitmap.Decode(codec);
+				return bitmap is not null && bitmap.Pixels.Any(pixel => pixel.Alpha != 0) ? data : null;
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
@@ -186,13 +198,21 @@ namespace Files.App.Utils.Storage
 			if (result is null)
 				return null;
 
-			if (result.Value.IsSvg)
-				return await Task.Run(() => SvgRasterizer.RenderToPng(result.Value.Path, (int)size));
+			var bytes = await Task.Run(() => LoadIconFile(result.Value.Path, size));
+			if (bytes is not null)
+				return bytes;
 
-			if (result.Value.Path.EndsWith(".xpm", StringComparison.OrdinalIgnoreCase))
-				return null;
+			foreach (var candidate in await Theme.ResolveIconCandidatesAsync(names, size))
+			{
+				if (candidate.Path == result.Value.Path)
+					continue;
 
-			return await File.ReadAllBytesAsync(result.Value.Path);
+				bytes = await Task.Run(() => LoadIconFile(candidate.Path, size));
+				if (bytes is not null)
+					return bytes;
+			}
+
+			return null;
 		}
 	}
 }

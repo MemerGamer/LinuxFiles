@@ -37,5 +37,10 @@ namespace Files.Platform.Abstractions.Icons
 		/// Resolves the first name in <paramref name="iconNames"/> that exists in the theme, or <see langword="null"/>.
 		/// </summary>
 		Task<IconLookupResult?> ResolveIconAsync(IReadOnlyList<string> iconNames, uint size, int scale = 1, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Resolves candidates in lookup order, including alternate sizes and inherited themes, so callers can skip images that fail to decode.
+		/// </summary>
+		Task<IReadOnlyList<IconLookupResult>> ResolveIconCandidatesAsync(IReadOnlyList<string> iconNames, uint size, int scale = 1, CancellationToken cancellationToken = default);
 	}
 }

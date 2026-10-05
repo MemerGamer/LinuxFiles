@@ -1,6 +1,8 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.App.Data.Enums;
+using OwlCore.Storage;
 using Windows.Storage;
 
 namespace Files.App.Utils.Storage

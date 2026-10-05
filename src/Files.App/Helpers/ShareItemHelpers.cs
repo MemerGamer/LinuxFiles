@@ -19,7 +19,7 @@ namespace Files.App.Helpers
 #if WINDOWS
 			=> DataTransferManager.IsSupported();
 #else
-			=> false; // LINUX-TODO(share): no system share UI on Linux (could use xdg-desktop-portal)
+			=> false; // LINUX-TODO(share): Share UI is hidden on Linux; future work is an xdg-desktop-portal backend behind Files.Platform.Abstractions
 #endif
 
 #if !WINDOWS

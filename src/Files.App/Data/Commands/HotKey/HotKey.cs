@@ -3,8 +3,10 @@
 
 using System.Collections.Frozen;
 using System.Text;
+#if WINDOWS
 using Windows.Win32;
 using Windows.Win32.UI.Input.KeyboardAndMouse;
+#endif
 
 namespace Files.App.Data.Commands
 {

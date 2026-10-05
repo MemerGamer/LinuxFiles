@@ -18,7 +18,7 @@ namespace Files.Platform.Tests.FileOperations
 		[TestMethod]
 		[DataRow(22)]
 		[DataRow(38)]
-		public async Task Rename2Unavailable_CopyMoveRenameAndDeviceCache(int errno)
+		public async Task Rename2Unavailable_CopyMoveRenameAndMountCache(int errno)
 		{
 			var attempts = 0;
 			var service = new LinuxFileOperationsService((_, _) => true, new LinuxFileOperationsHooks
@@ -49,7 +49,7 @@ namespace Files.Platform.Tests.FileOperations
 			Assert.IsTrue(movedDirectory[0].Succeeded, movedDirectory[0].ErrorMessage);
 			Assert.AreEqual("nested data", File.ReadAllText(Path.Combine(Dst, "tree", "nested", "child")));
 			Assert.IsFalse(Directory.Exists(directory));
-			Assert.AreEqual(1, attempts, "The unsupported device must not retry renameat2.");
+			Assert.AreEqual(errno == 22 ? 1 : 4, attempts, "Only unambiguous EINVAL results are cached.");
 		}
 
 		[TestMethod]

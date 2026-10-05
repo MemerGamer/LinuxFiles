@@ -19,9 +19,45 @@ namespace Files.Platform.Linux.FileOperations
 		internal async Task CopyRestoreEntryAsync(string source, string destination, DirectoryHandle sourceParent, DirectoryHandle destinationParent, CancellationToken cancellationToken)
 		{
 			var context = new FileOperationContext(null, cancellationToken, _hooks);
-			var result = await CopyEntryAsync(source, destination, context, verifySource: true, destinationParent, sourceParent).ConfigureAwait(false);
-			if (result.Status != FileOperationStatus.Succeeded)
-				throw new IOException(result.ErrorMessage ?? "The trashed item could not be copied.");
+			var sourceStat = PosixNative.StatAt(sourceParent.Descriptor, Path.GetFileName(source), source);
+			if (!sourceStat.IsDirectory)
+			{
+				var entry = await CopyEntryAsync(source, destination, context, verifySource: true, destinationParent, sourceParent).ConfigureAwait(false);
+				if (entry.Status != FileOperationStatus.Succeeded)
+					throw new IOException(entry.ErrorMessage ?? "The trashed item could not be copied.");
+				return;
+			}
+
+			var temporaryName = ".files-restore-" + Guid.NewGuid().ToString("N");
+			var temporary = Path.Combine(Path.GetDirectoryName(destination)!, temporaryName);
+			PosixNative.MkdirAt(destinationParent.Descriptor, temporaryName, 0x1C0, temporary);
+			var temporaryStat = PosixNative.StatAt(destinationParent.Descriptor, temporaryName, temporary);
+			var published = false;
+			try
+			{
+				using var staging = DirectoryHandle.OpenChild(destinationParent.Descriptor, temporaryName, temporary);
+				if (!staging.IsSameEntry(temporaryStat))
+					throw new IOException("The restore staging folder changed.");
+				_hooks?.DirectoryCreated?.Invoke(temporary);
+				var result = await CopyDirectoryAsync(source, temporary, context, verifySource: true, sourceParent, destinationParent, merge: true, staging).ConfigureAwait(false);
+				if (result.Status != FileOperationStatus.Succeeded)
+					throw new IOException(result.ErrorMessage ?? "The trashed folder could not be copied.");
+				ApplyDirectoryMetadata(staging, sourceStat, temporary);
+				cancellationToken.ThrowIfCancellationRequested();
+				if (!PosixNative.SameEntry(temporaryStat, PosixNative.StatAt(destinationParent.Descriptor, temporaryName, temporary)))
+					throw new IOException("The restore staging folder changed.");
+				PosixNative.RenameAt(destinationParent.Descriptor, temporaryName, destinationParent.Descriptor, Path.GetFileName(destination), false, destination, _hooks);
+				published = true;
+			}
+			finally
+			{
+				if (!published && destinationParent.EntryExists(temporaryName))
+				{
+					if (!PosixNative.SameEntry(temporaryStat, PosixNative.StatAt(destinationParent.Descriptor, temporaryName, temporary)))
+						throw new IOException("The restore staging folder changed; its replacement was left untouched.");
+					destinationParent.DeleteEntry(temporaryName);
+				}
+			}
 		}
 
 		private async Task<Outcome> CopyTopLevelAsync(string source, string destinationDirectory, FileOperationContext context, DirectoryHandle sourceParent, DirectoryHandle destinationParent)
@@ -96,7 +132,7 @@ namespace Files.Platform.Linux.FileOperations
 			}
 		}
 
-		private async Task<Outcome> CopyDirectoryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle? parent, DirectoryHandle destinationParent, bool merge)
+		private async Task<Outcome> CopyDirectoryAsync(string source, string destination, FileOperationContext context, bool verifySource, DirectoryHandle? parent, DirectoryHandle destinationParent, bool merge, DirectoryHandle? staging = null)
 		{
 			string? canonical = null;
 			if (context.FollowSymlinks)
@@ -114,7 +150,7 @@ namespace Files.Platform.Linux.FileOperations
 				if (destinationParent.IsSameOrInside(metadata))
 					return Outcome.Fail(FileOperationErrorKind.InvalidDestination, "A folder cannot be copied into itself.", destination);
 				var destinationName = Path.GetFileName(destination);
-				var created = !destinationParent.EntryExists(destinationName);
+				var created = staging is null && !destinationParent.EntryExists(destinationName);
 				if (!created && !merge)
 					throw PosixNative.CreateException(17, destination);
 				if (created)
@@ -122,7 +158,9 @@ namespace Files.Platform.Linux.FileOperations
 					PosixNative.MkdirAt(destinationParent.Descriptor, destinationName, 0x1C0, destination);
 					context.Hooks?.DirectoryCreated?.Invoke(destination);
 				}
-				using var destinationHandle = DirectoryHandle.OpenChild(destinationParent.Descriptor, destinationName, destination);
+				using var destinationHandle = staging is null
+					? DirectoryHandle.OpenChild(destinationParent.Descriptor, destinationName, destination)
+					: DirectoryHandle.OpenChild(staging.Descriptor, ".", destination);
 
 				var result = Outcome.Success(destination);
 				foreach (var name in handle.ListNames())

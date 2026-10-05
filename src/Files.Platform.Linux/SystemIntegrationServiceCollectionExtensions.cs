@@ -41,7 +41,7 @@ namespace Files.Platform.Linux
 			services.TryAddSingleton<INotificationService>(_ => new DBusNotificationService());
 			services.TryAddSingleton<IElevatedProcessRunner, ProcessElevatedRunner>();
 			services.TryAddSingleton<IExecutableLocator, PathExecutableLocator>();
-			services.TryAddSingleton<IElevationService, PkexecElevationService>();
+			services.TryAddSingleton<IElevationService>(sp => new PkexecElevationService(sp.GetRequiredService<IElevatedProcessRunner>()));
 			services.TryAddSingleton<IFontInstallService>(sp => new UserFontInstallService(UserFontInstallService.DefaultFontsDirectory(System.Environment.GetEnvironmentVariable), sp.GetRequiredService<IExecutableLocator>(), sp.GetRequiredService<IElevatedProcessRunner>()));
 			services.TryAddSingleton<IWallpaperService>(_ => new PortalWallpaperService());
 			return services;

@@ -24,7 +24,7 @@ namespace Files.Platform.Tests.SystemIntegration
 		{
 			private readonly DBusConnection connection;
 
-			public List<(string Uri, string SetOn, bool ShowPreview)> Calls { get; } = new();
+			public List<(string Content, string SetOn, bool ShowPreview)> Calls { get; } = new();
 
 			public uint ResponseCode { get; set; }
 
@@ -62,11 +62,18 @@ namespace Files.Platform.Tests.SystemIntegration
 
 				var reader = request.GetBodyReader();
 				reader.ReadString();
-				var uri = reader.ReadString();
+				string content;
+				using (var fd = reader.ReadHandle<Microsoft.Win32.SafeHandles.SafeFileHandle>())
+				{
+					var data = new byte[64];
+					var length = System.IO.RandomAccess.Read(fd, data, 0);
+					content = Encoding.UTF8.GetString(data, 0, length);
+				}
+
 				var options = reader.ReadDictionaryOfStringToVariantValue();
 				var token = options["handle_token"].GetString();
 				lock (Calls)
-					Calls.Add((uri, options["set-on"].GetString(), options["show-preview"].GetBool()));
+					Calls.Add((content, options["set-on"].GetString(), options["show-preview"].GetBool()));
 
 				var handle = "/org/freedesktop/portal/desktop/request/fake/" + token;
 				using (var reply = context.CreateReplyWriter("o"))
@@ -99,16 +106,26 @@ namespace Files.Platform.Tests.SystemIntegration
 			using var portal = await FakePortal.StartAsync(bus.Address);
 			using var service = new PortalWallpaperService(bus.Address);
 
+			// A name that URI parsing would mangle (%41 -> A) must reach the portal as the very same file
+			var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "fwall-" + Guid.NewGuid().ToString("N")[..8]);
+			System.IO.Directory.CreateDirectory(dir);
+			var first = System.IO.Path.Combine(dir, "%41 b.png");
+			var second = System.IO.Path.Combine(dir, "c.png");
+			System.IO.File.WriteAllText(first, "first");
+			System.IO.File.WriteAllText(second, "second");
+
 			Assert.IsTrue(await service.IsAvailableAsync());
-			Assert.AreEqual(WallpaperResult.Applied, await service.SetAsync("/tmp/a b.png", WallpaperTarget.Background));
-			Assert.AreEqual(WallpaperResult.Applied, await service.SetAsync("/tmp/c.png", WallpaperTarget.LockScreen));
+			Assert.AreEqual(WallpaperResult.Applied, await service.SetAsync(first, WallpaperTarget.Background));
+			Assert.AreEqual(WallpaperResult.Applied, await service.SetAsync(second, WallpaperTarget.LockScreen));
+			System.IO.Directory.Delete(dir, true);
 
 			var calls = portal.Calls.ToArray();
 			Assert.AreEqual(2, calls.Length);
-			Assert.AreEqual("file:///tmp/a%20b.png", calls[0].Uri);
+			Assert.AreEqual("first", calls[0].Content);
 			Assert.AreEqual("background", calls[0].SetOn);
 			Assert.IsTrue(calls[0].ShowPreview);
 			Assert.AreEqual("lockscreen", calls[1].SetOn);
+			Assert.AreEqual("second", calls[1].Content);
 		}
 
 		[TestMethod]
@@ -118,10 +135,18 @@ namespace Files.Platform.Tests.SystemIntegration
 			using var portal = await FakePortal.StartAsync(bus.Address);
 			using var service = new PortalWallpaperService(bus.Address);
 
-			portal.ResponseCode = 1;
-			Assert.AreEqual(WallpaperResult.Cancelled, await service.SetAsync("/tmp/a.png", WallpaperTarget.Background));
-			portal.ResponseCode = 2;
-			Assert.AreEqual(WallpaperResult.Failed, await service.SetAsync("/tmp/a.png", WallpaperTarget.Background));
+			var file = System.IO.Path.GetTempFileName();
+			try
+			{
+				portal.ResponseCode = 1;
+				Assert.AreEqual(WallpaperResult.Cancelled, await service.SetAsync(file, WallpaperTarget.Background));
+				portal.ResponseCode = 2;
+				Assert.AreEqual(WallpaperResult.Failed, await service.SetAsync(file, WallpaperTarget.Background));
+			}
+			finally
+			{
+				System.IO.File.Delete(file);
+			}
 		}
 
 		[TestMethod]
@@ -131,7 +156,16 @@ namespace Files.Platform.Tests.SystemIntegration
 			using var service = new PortalWallpaperService(bus.Address);
 
 			Assert.IsFalse(await service.IsAvailableAsync());
-			Assert.AreEqual(WallpaperResult.Unavailable, await service.SetAsync("/tmp/a.png", WallpaperTarget.Background));
+			var file = System.IO.Path.GetTempFileName();
+			try
+			{
+				Assert.AreEqual(WallpaperResult.Unavailable, await service.SetAsync(file, WallpaperTarget.Background));
+			}
+			finally
+			{
+				System.IO.File.Delete(file);
+			}
+
 			Assert.AreEqual(WallpaperResult.Failed, await service.SetAsync("relative.png", WallpaperTarget.Background));
 		}
 	}

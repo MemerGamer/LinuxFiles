@@ -6,6 +6,7 @@ using Files.Platform.Linux.DBus;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Tmds.DBus.Protocol;
@@ -23,7 +24,7 @@ namespace Files.Platform.Linux.Wallpaper
 		private const string WallpaperInterface = "org.freedesktop.portal.Wallpaper";
 		private const string RequestInterface = "org.freedesktop.portal.Request";
 		private static readonly TimeSpan CallTimeout = TimeSpan.FromSeconds(5);
-		private static readonly TimeSpan ConfirmTimeout = TimeSpan.FromMinutes(2);
+		private static readonly TimeSpan ConfirmTimeout = TimeSpan.FromMinutes(10);
 
 		private readonly string? busAddress;
 		private readonly SemaphoreSlim gate = new(1, 1);
@@ -85,12 +86,14 @@ namespace Files.Platform.Linux.Wallpaper
 
 				try
 				{
+					// The portal receives an open descriptor, so the path is never re-parsed (no URI escaping, no swap after the call)
+					using var image = File.OpenHandle(imagePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 					MessageBuffer message;
 					using (var writer = bus.GetMessageWriter())
 					{
-						writer.WriteMethodCallHeader(Service, ObjectPath, WallpaperInterface, "SetWallpaperURI", "ssa{sv}");
+						writer.WriteMethodCallHeader(Service, ObjectPath, WallpaperInterface, "SetWallpaperFile", "sha{sv}");
 						writer.WriteString("");
-						writer.WriteString(new Uri(imagePath).AbsoluteUri);
+						writer.WriteHandle(image);
 						writer.WriteDictionary(new Dictionary<string, VariantValue>
 						{
 							["handle_token"] = token,
@@ -102,7 +105,17 @@ namespace Files.Platform.Linux.Wallpaper
 
 					await bus.CallMethodAsync(message, static (Message _, object? _) => true, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
 
-					var code = await response.Task.WaitAsync(ConfirmTimeout, cancellationToken).ConfigureAwait(false);
+					uint code;
+					try
+					{
+						code = await response.Task.WaitAsync(ConfirmTimeout, cancellationToken).ConfigureAwait(false);
+					}
+					catch (TimeoutException)
+					{
+						// The desktop's confirmation may still be open; do not claim failure
+						return WallpaperResult.Cancelled;
+					}
+
 					return code switch
 					{
 						0 => WallpaperResult.Applied,
@@ -124,7 +137,7 @@ namespace Files.Platform.Linux.Wallpaper
 		}
 
 		private static bool IsBackendFailure(Exception ex)
-			=> ex is TimeoutException or DBusExceptionBase or ObjectDisposedException or InvalidOperationException or UriFormatException or System.IO.IOException;
+			=> ex is TimeoutException or DBusExceptionBase or ObjectDisposedException or InvalidOperationException or IOException or UnauthorizedAccessException;
 
 		private async Task<DBusConnection?> GetConnectionAsync()
 		{
@@ -141,6 +154,7 @@ namespace Files.Platform.Linux.Wallpaper
 				var rule = new MatchRule
 				{
 					Type = MessageType.Signal,
+					Sender = Service,
 					Interface = RequestInterface,
 					Member = "Response",
 				};

@@ -3,6 +3,7 @@
 
 using Files.Platform.Abstractions.Clipboard;
 using Files.Platform.Abstractions.Elevation;
+using Files.Platform.Linux.Launching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using System.IO;
@@ -21,14 +22,8 @@ namespace Files.App.Helpers
 
 		public static async Task DeleteAsync(IReadOnlyList<string> paths)
 		{
-			if (Elevation is not { } elevation || paths.Count == 0)
-				return;
-
-			var commands = paths.Select(elevation.PlanDelete).ToList();
-			if (commands.Any(c => c is null) || !await ConfirmAsync(commands!, null))
-				return;
-
-			await RunAsync(paths.Select<string, Func<Task<ElevatedResult>>>(path => () => elevation.DeleteAsync(path)).ToList());
+			if (Elevation is { } elevation)
+				await ConfirmAndRunAsync(elevation, elevation.PlanDelete(paths));
 		}
 
 		public static async Task RenameAsync(string path)
@@ -38,16 +33,18 @@ namespace Files.App.Helpers
 
 			var box = new TextBox { Text = Path.GetFileName(path) };
 			var preview = new TextBlock { IsTextSelectionEnabled = true, TextWrapping = TextWrapping.Wrap };
-			void Update() => preview.Text = elevation.PlanRename(path, box.Text)?.DisplayText ?? string.Empty;
+			void Update() => preview.Text = Describe(elevation.PlanRename(path, box.Text));
 			box.TextChanged += (_, _) => Update();
 			Update();
 
 			var dialog = CreateDialog(preview, box);
-			dialog.IsPrimaryButtonEnabled = true;
-			if (await dialog.TryShowAsync() != ContentDialogResult.Primary || elevation.PlanRename(path, box.Text) is null)
+			if (await dialog.TryShowAsync() != ContentDialogResult.Primary)
 				return;
 
-			await ReportAsync(await elevation.RenameAsync(path, box.Text));
+			// The plan that is run is the one for the name that was confirmed
+			var plan = elevation.PlanRename(path, box.Text);
+			if (plan.Plan is not null)
+				await RunAsync(elevation, plan.Plan);
 		}
 
 		public static async Task PasteAsync(string destinationFolder)
@@ -59,26 +56,46 @@ namespace Files.App.Helpers
 			if (files is null || files.Paths.Count == 0)
 				return;
 
-			var move = files.Operation == ClipboardOperation.Cut;
-			var commands = files.Paths.Select(p => move ? elevation.PlanMove(p, destinationFolder) : elevation.PlanCopy(p, destinationFolder)).ToList();
-			if (commands.Any(c => c is null) || !await ConfirmAsync(commands!, null))
-				return;
-
-			await RunAsync(files.Paths.Select<string, Func<Task<ElevatedResult>>>(path => () => move
-				? elevation.MoveAsync(path, destinationFolder)
-				: elevation.CopyAsync(path, destinationFolder)).ToList());
+			await ConfirmAndRunAsync(elevation, files.Operation == ClipboardOperation.Cut
+				? elevation.PlanMove(files.Paths, destinationFolder)
+				: elevation.PlanCopy(files.Paths, destinationFolder));
 		}
 
-		private static async Task RunAsync(IReadOnlyList<Func<Task<ElevatedResult>>> operations)
+		// Shows the plan, and runs that very object when confirmed
+		private static async Task ConfirmAndRunAsync(IElevationService elevation, ElevatedPlanResult planned)
 		{
-			foreach (var operation in operations)
-			{
-				if (!await ReportAsync(await operation()))
-					break;
-			}
+			var text = new TextBlock { Text = Describe(planned), IsTextSelectionEnabled = true, TextWrapping = TextWrapping.Wrap };
+			var dialog = CreateDialog(text, null);
+			dialog.IsPrimaryButtonEnabled = planned.Plan is not null;
+			if (await dialog.TryShowAsync() == ContentDialogResult.Primary && planned.Plan is not null)
+				await RunAsync(elevation, planned.Plan);
+		}
+
+		private static async Task RunAsync(IElevationService elevation, ElevatedPlan plan)
+		{
+			await ReportAsync(await elevation.RunAsync(plan));
 
 			if (Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage is { } shellPage)
 				await shellPage.RefreshIfNoWatcherExistsAsync();
+		}
+
+		// One escaped argument per line, never truncated; plans that cannot be shown completely are not offered
+		private static string Describe(ElevatedPlanResult planned)
+		{
+			if (planned.Plan is not { } plan)
+				return DisplaySanitizer.Field(planned.Refusal, 400);
+
+			var blocks = new List<string>();
+			foreach (var command in plan.Commands)
+			{
+				var lines = DisplaySanitizer.FullArguments(["pkexec", command.Program, .. command.Arguments]);
+				if (lines is null)
+					return Strings.RootActionFailed.GetLocalizedResource().Replace("{0}", "too many items to display");
+
+				blocks.Add(string.Join(Environment.NewLine, lines));
+			}
+
+			return string.Join(Environment.NewLine + Environment.NewLine, blocks);
 		}
 
 		private static async Task<bool> ReportAsync(ElevatedResult result)
@@ -89,25 +106,13 @@ namespace Files.App.Helpers
 			var dialog = new ContentDialog
 			{
 				Title = Strings.RootActions.GetLocalizedResource(),
-				Content = string.Format(Strings.RootActionFailed.GetLocalizedResource(), result.Error),
+				Content = string.Format(Strings.RootActionFailed.GetLocalizedResource(), DisplaySanitizer.Field(result.Error, 400)),
 				PrimaryButtonText = Strings.OK.GetLocalizedResource(),
 				XamlRoot = MainWindow.Instance.Content.XamlRoot,
 			};
 
 			await dialog.TryShowAsync();
 			return false;
-		}
-
-		private static async Task<bool> ConfirmAsync(IReadOnlyList<ElevatedCommand> commands, UIElement? extra)
-		{
-			var text = new TextBlock
-			{
-				Text = string.Join(Environment.NewLine, commands.Select(c => c.DisplayText)),
-				IsTextSelectionEnabled = true,
-				TextWrapping = TextWrapping.Wrap,
-			};
-
-			return await CreateDialog(text, extra).TryShowAsync() == ContentDialogResult.Primary;
 		}
 
 		private static ContentDialog CreateDialog(UIElement commandText, UIElement? extra)

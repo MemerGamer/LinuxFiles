@@ -242,6 +242,9 @@
         <Compile Remove="Utils\Global\LinuxDriveCatalog.cs" />
         <Compile Remove="Services\Storage\StorageNetworkService.Linux.cs" />
         <Compile Remove="Helpers\Application\AppToastNotificationHelper.Linux.cs" />
+        <Compile Remove="Helpers\Layout\LayoutPreferencesDatabase.Linux.cs" />
+        <Compile Remove="Services\SizeProvider\CachedSizeProvider.Linux.cs" />
+        <Compile Remove="Utils\Storage\Operations\FileSizeCalculator.Linux.cs" />
     </ItemGroup>
 
     <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->
@@ -264,6 +267,24 @@
         <Compile Remove="Extensions\Win32FindDataExtensions.cs" />
         <Compile Remove="Services\PreviewPopupProviders\SeerProProvider.cs" />
     </ItemGroup>
+
+    <!--  Windows-only sources (*.Windows.cs) never build for non-Windows TFMs, compat mode included  -->
+    <ItemGroup Condition="!$(TargetFramework.Contains('-windows'))">
+        <Compile Remove="**\*.Windows.cs" />
+    </ItemGroup>
+
+    <!--  Windows-only Properties pages (NTFS ACLs, Authenticode signatures, compatibility tab, icon customization)  -->
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <Compile Remove="Utils\Signatures\**" />
+        <Compile Remove="Views\Properties\SecurityPage.xaml.cs" />
+        <Compile Remove="Views\Properties\SecurityAdvancedPage.xaml.cs" />
+        <Compile Remove="Views\Properties\SignaturesPage.xaml.cs" />
+        <Compile Remove="Views\Properties\CompatibilityPage.xaml.cs" />
+        <Compile Remove="Views\Properties\CustomizationPage.xaml.cs" />
+    </ItemGroup>
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <DefaultItemExcludes>$(DefaultItemExcludes);Views/Properties/SecurityPage.xaml;Views/Properties/SecurityAdvancedPage.xaml;Views/Properties/SignaturesPage.xaml;Views/Properties/CompatibilityPage.xaml;Views/Properties/CustomizationPage.xaml</DefaultItemExcludes>
+    </PropertyGroup>
 
     <!--  Opt-in transitional aid (-p:FilesWin32Compat=true): compiles against the CsWin32-generated Windows.Win32 types (built for
           the Windows TFM with Platform=x64, which works on Linux) so Win32-touching code gets past declaration binding and the compiler

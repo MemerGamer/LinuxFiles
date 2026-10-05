@@ -6,6 +6,7 @@ using Svg.Skia;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Text.RegularExpressions;
 
 namespace Files.Platform.Linux.Icons
 {
@@ -25,18 +26,36 @@ namespace Files.Platform.Linux.Icons
 			return _cache.GetOrAdd((path, pixelSize), key => Render(key.Path, key.Size));
 		}
 
+		private const long MaxSvgBytes = 4L * 1024 * 1024;
+
+		// Breeze-style "translate(-384.57-515.8)" omits the separator between numbers, which Svg.Skia drops silently
+		private static readonly Regex TransformAttribute = new("(?<=\\btransform\\s*=\\s*\"[^\"]*)(?<=\\d)(?=-)", RegexOptions.Compiled | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+
+		/// <summary>
+		/// Inserts the missing comma between adjacent numbers inside <c>transform</c> attributes.
+		/// </summary>
+		public static string NormalizeTransforms(string svg) => TransformAttribute.Replace(svg, ",");
+
 		/// <summary>
 		/// Renders SVG content the caller already read (not cached), so the file is never opened a second time.
 		/// </summary>
 		public static byte[]? RenderToPng(byte[] svgData, int pixelSize)
 		{
 			pixelSize = Math.Clamp(pixelSize, 8, 1024);
-			using var stream = new System.IO.MemoryStream(svgData, writable: false);
-			return Render(svg => svg.Load(stream), pixelSize);
+			if (svgData.Length > MaxSvgBytes)
+				return null;
+
+			return Render(svg => svg.FromSvg(NormalizeTransforms(System.Text.Encoding.UTF8.GetString(svgData))), pixelSize);
 		}
 
 		private static byte[]? Render(string path, int pixelSize)
-			=> Render(svg => svg.Load(path), pixelSize);
+		{
+			var fileInfo = new FileInfo(path);
+			if (!fileInfo.Exists || fileInfo.Length > MaxSvgBytes)
+				return null;
+
+			return Render(svg => svg.FromSvg(NormalizeTransforms(File.ReadAllText(path))), pixelSize);
+		}
 
 		private static byte[]? Render(Func<SKSvg, SKPicture?> load, int pixelSize)
 		{

@@ -406,7 +406,9 @@ namespace Files.App.Helpers
 					.AddSingleton<IStorageCacheService, StorageCacheService>()
 					.AddSingleton<IIconCacheService, IconCacheService>()
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
+#if WINDOWS
 					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
+#endif
 #if WINDOWS
 					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
 #endif
@@ -433,6 +435,9 @@ namespace Files.App.Helpers
 					.AddSingleton<FileTagsManager>()
 					.AddSingleton<LibraryManager>()
 					.AddSingleton(appModel);
+
+			// Storable path resolution
+			services.AddStorables();
 
 			// Conditional DI
 #if WINDOWS

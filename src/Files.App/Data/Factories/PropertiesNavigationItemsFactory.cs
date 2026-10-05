@@ -80,6 +80,7 @@ namespace Files.App.Data.Factories
 				var hashItemEnabled = !(isFolder && !listedItem.IsArchive) && !isLibrary && !listedItem.IsRecycleBinItem;
 				var detailsItemEnabled = !(isFolder && !listedItem.IsArchive) && !isLibrary && !listedItem.IsRecycleBinItem;
 				var customizationItemEnabled =
+					OperatingSystem.IsWindows() &&
 					!isLibrary &&
 					(isFolder && !listedItem.IsArchive && !listedItem.IsFtpItem && !listedItem.IsRecycleBinItem && !isMtpPath &&
 						(!isNetworkPath || PolicyHelpers.IsShellShortcutIconRemotePathEnabled()) || isShortcut);

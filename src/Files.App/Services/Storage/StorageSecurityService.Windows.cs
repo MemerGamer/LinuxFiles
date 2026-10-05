@@ -93,7 +93,10 @@ namespace Files.App.Services
 		}
 
 		/// <inheritdoc/>
-		public unsafe WIN32_ERROR GetAcl(string path, bool isFolder, out AccessControlList acl)
+		public FileSecurityResult GetAcl(string path, bool isFolder, out AccessControlList acl)
+			=> GetAclCore(path, isFolder, out acl).ToFileSecurityResult();
+
+		private unsafe WIN32_ERROR GetAclCore(string path, bool isFolder, out AccessControlList acl)
 		{
 			acl = new();
 
@@ -200,7 +203,10 @@ namespace Files.App.Services
 		}
 
 		/// <inheritdoc/>
-		public unsafe WIN32_ERROR AddAce(string szPath, bool isFolder, string szSid)
+		public FileSecurityResult AddAce(string szPath, bool isFolder, string szSid)
+			=> AddAceCore(szPath, isFolder, szSid).ToFileSecurityResult();
+
+		private unsafe WIN32_ERROR AddAceCore(string szPath, bool isFolder, string szSid)
 		{
 			// Get DACL for the specified object
 			var result = PInvoke.GetNamedSecurityInfo(
@@ -301,7 +307,10 @@ namespace Files.App.Services
 		}
 
 		/// <inheritdoc/>
-		public unsafe WIN32_ERROR DeleteAce(string szPath, uint dwAceIndex)
+		public FileSecurityResult DeleteAce(string szPath, uint dwAceIndex)
+			=> DeleteAceCore(szPath, dwAceIndex).ToFileSecurityResult();
+
+		private unsafe WIN32_ERROR DeleteAceCore(string szPath, uint dwAceIndex)
 		{
 			// Get DACL for the specified object
 			var result = PInvoke.GetNamedSecurityInfo(

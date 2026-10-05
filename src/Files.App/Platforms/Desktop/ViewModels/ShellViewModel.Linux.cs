@@ -192,6 +192,23 @@ namespace Files.App.ViewModels
 				FileSizeBytes = 0,
 			};
 
+			var items = await BuildLinuxTrashItemsAsync(cancellationToken);
+
+			if (cancellationToken.IsCancellationRequested)
+				return -1;
+
+			filesAndFolders.Clear();
+			filesAndFolders.AddRange(items);
+
+			await OrderFilesAndFoldersAsync();
+			await ApplyFilesAndFoldersChangesAsync();
+
+			IsLocationUnavailable = false;
+			return 4;
+		}
+
+		private async Task<List<ListedItem>> BuildLinuxTrashItemsAsync(CancellationToken cancellationToken)
+		{
 			var trashed = await StorageTrashBinService.GetAllRecycleBinFoldersAsync();
 			var iconCache = Ioc.Default.GetRequiredService<IIconCacheService>();
 			var iconSize = GetPreloadIconSize();
@@ -235,17 +252,84 @@ namespace Files.App.ViewModels
 				items.Add(item);
 			}
 
-			if (cancellationToken.IsCancellationRequested)
-				return -1;
+			return items;
+		}
 
-			filesAndFolders.Clear();
-			filesAndFolders.AddRange(items);
+		// Diffs the trash against the listed items by trash path and applies only the additions and removals, so the
+		// selection and scroll position survive. Falls back to a full apply when grouping or a filter is active.
+		private async Task RefreshLinuxTrashIncrementallyAsync()
+		{
+			if (isDisposed || WorkingDirectory != Constants.UserEnvironmentPaths.RecycleBinPath)
+				return;
 
-			await OrderFilesAndFoldersAsync();
-			await ApplyFilesAndFoldersChangesAsync();
+			var cts = _linuxRefreshDebounce;
+			var token = cts?.Token ?? CancellationToken.None;
 
-			IsLocationUnavailable = false;
-			return 4;
+			var fresh = await BuildLinuxTrashItemsAsync(token);
+			if (token.IsCancellationRequested)
+				return;
+
+			// Diff, backing state and displayed collection are updated together on the UI thread so a superseded
+			// refresh can never leave them out of step.
+			await dispatcherQueue.EnqueueOrInvokeAsync(async () =>
+			{
+				if (token.IsCancellationRequested)
+					return;
+
+				var freshPaths = fresh.Select(x => x.ItemPath).ToHashSet(StringComparer.Ordinal);
+				var displayed = FilesAndFolders.ToList();
+				var currentPaths = displayed.Select(x => x.ItemPath).ToHashSet(StringComparer.Ordinal);
+
+				var removed = displayed.Where(x => !freshPaths.Contains(x.ItemPath)).ToList();
+				var added = fresh.Where(x => !currentPaths.Contains(x.ItemPath)).ToList();
+				if (removed.Count == 0 && added.Count == 0)
+					return;
+
+				foreach (var item in removed)
+					filesAndFolders.Remove(item);
+				filesAndFolders.AddRange(added);
+
+				if (!string.IsNullOrEmpty(FilesAndFoldersFilter) || folderSettings.DirectoryGroupOption != GroupOption.None)
+				{
+					await OrderFilesAndFoldersAsync();
+					await ApplyFilesAndFoldersChangesAsync();
+					return;
+				}
+
+				var ordered = SortingHelper.OrderFileList(filesAndFolders.ToList(), folderSettings.DirectorySortOption, folderSettings.DirectorySortDirection,
+					folderSettings.SortDirectoriesAlongsideFiles, folderSettings.SortFilesFirst).ToList();
+				filesAndFolders = new ConcurrentCollection<ListedItem>(ordered);
+
+				foreach (var item in removed)
+					FilesAndFolders.Remove(item);
+
+				// Ascending final positions, so each insert lands after everything that sorts before it
+				foreach (var item in added.OrderBy(x => ordered.IndexOf(x)))
+					FilesAndFolders.Insert(Math.Clamp(ordered.IndexOf(item), 0, FilesAndFolders.Count), item);
+
+				UpdateEmptyTextType();
+				UpdateNetworkAvailabilityInfoBar();
+				DirectoryInfoUpdated?.Invoke(this, EventArgs.Empty);
+			});
+		}
+
+		private async Task RefreshLinuxTrashAfterChangeAsync()
+		{
+			_linuxRefreshDebounce?.Cancel();
+			var cts = _linuxRefreshDebounce = new CancellationTokenSource();
+
+			try
+			{
+				await Task.Delay(300, cts.Token);
+				await RefreshLinuxTrashIncrementallyAsync();
+			}
+			catch (OperationCanceledException)
+			{
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Could not refresh the trash listing");
+			}
 		}
 
 		// Trash changes are pushed by ITrashService.Watcher rather than by a folder watcher on trash:///
@@ -259,7 +343,7 @@ namespace Files.App.ViewModels
 			try
 			{
 				var notifier = Ioc.Default.GetRequiredService<ITrashService>().Watcher;
-				void OnChanged(object? s, EventArgs e) => _ = RefreshAfterLinuxChangeAsync();
+				void OnChanged(object? s, EventArgs e) => _ = RefreshLinuxTrashAfterChangeAsync();
 
 				notifier.ItemAdded += OnChanged;
 				notifier.ItemDeleted += OnChanged;

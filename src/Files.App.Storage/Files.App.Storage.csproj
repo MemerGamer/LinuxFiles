@@ -19,6 +19,7 @@
     <ItemGroup>
         <PackageReference Include="Uno.WinUI" />
         <PackageReference Include="FluentFTP" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     </ItemGroup>
 
     <!--  Win32/WinRT-only storage implementation; not part of the Linux build  -->
@@ -42,9 +43,14 @@
     <!--  Uno.Sdk drops a root-level Windows/ folder from Compile on non-Windows targets; add it back late in compat mode  -->
     <Target Name="AddWin32CompatSources" BeforeTargets="BeforeCompile;CoreCompile" Condition="'$(FilesWin32Compat)' == 'true'">
         <ItemGroup>
-            <Compile Include="Windows\**\*.cs" />
+            <Compile Include="Windows\**\*.cs" Exclude="**\*.Windows.cs" />
         </ItemGroup>
     </Target>
+
+    <!--  Windows-only sources (*.Windows.cs) never build for non-Windows TFMs, compat mode included  -->
+    <ItemGroup Condition="!$(TargetFramework.Contains('-windows'))">
+        <Compile Remove="**\*.Windows.cs" />
+    </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\Files.Core.Storage\Files.Core.Storage.csproj" />

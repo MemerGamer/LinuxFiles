@@ -105,7 +105,10 @@ namespace Files.App.Services
 				rootTheme ??= AppThemeMode;
 
 				if (window.Content is FrameworkElement rootElement)
-					rootElement.RequestedTheme = ResolveRootTheme((ElementTheme)rootTheme);
+				{
+					var resolvedTheme = ResolveRootTheme((ElementTheme)rootTheme);
+					rootElement.RequestedTheme = resolvedTheme;
+				}
 
 				if (titleBar is not null)
 				{

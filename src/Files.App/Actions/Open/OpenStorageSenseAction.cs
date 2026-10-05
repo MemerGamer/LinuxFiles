@@ -19,6 +19,7 @@ namespace Files.App.Actions
 			=> ActionCategory.Open;
 
 		public virtual bool IsExecutable =>
+			OperatingSystem.IsWindows() &&
 			context.HasItem &&
 			!context.HasSelection &&
 			drivesViewModel.Drives

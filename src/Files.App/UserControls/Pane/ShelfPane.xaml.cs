@@ -43,7 +43,11 @@ namespace Files.App.UserControls
 				return;
 
 			// Get items
+#if WINDOWS
+			var storageService = Ioc.Default.GetRequiredService<IStorageService>();
+#else
 			var resolver = Ioc.Default.GetRequiredService<Files.Core.Storage.Contracts.IStorableResolver>();
+#endif
 			var storageItems = (await FilesystemHelpers.GetDraggedStorageItems(e.DataView)).ToArray();
 
 			// Add to list
@@ -53,8 +57,17 @@ namespace Files.App.UserControls
 				if (ItemsSource.Any(x => x.Inner.Id == item.Path))
 					continue;
 
+#if WINDOWS
+				var storable = item switch
+				{
+					StorageFileWithPath => (IStorableChild?)await storageService.TryGetFileAsync(item.Path),
+					StorageFolderWithPath => (IStorableChild?)await storageService.TryGetFolderAsync(item.Path),
+					_ => null
+				};
+#else
 				var resolved = await resolver.TryGetAsync(item.Path);
 				var storable = resolved.Item as IStorableChild;
+#endif
 
 				if (storable is null)
 					continue;

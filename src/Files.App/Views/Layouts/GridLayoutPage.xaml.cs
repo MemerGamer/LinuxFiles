@@ -177,9 +177,11 @@ namespace Files.App.Views.Layouts
 		public GridLayoutPage() : base()
 		{
 			InitializeComponent();
-#if !WINDOWS
+#if WINDOWS
+			CommunityToolkit.WinUI.Animations.ItemsReorderAnimation.SetDuration(FileList, TimeSpan.FromMilliseconds(350));
+#else
 			HoistSemanticZoomContent(RootGridZoom);
-			// LINUX-TODO(listing): the ItemsReorderAnimation.Duration (350ms) was dropped from the XAML; Uno lacks CreateImplicitAnimationCollection
+			// LINUX-TODO(listing): ItemsReorderAnimation is Windows-only; Uno lacks CreateImplicitAnimationCollection
 #endif
 			DataContext = this;
 
@@ -346,11 +348,18 @@ namespace Files.App.Views.Layouts
 			var folderSettings = FolderSettings
 				?? throw new InvalidOperationException("The grid layout does not have folder settings.");
 
+#if WINDOWS
+			const string verticalStyleKey = "VerticalLayoutGridView";
+			const string horizontalStyleKey = "HorizontalLayoutGridView";
+#else
+			const string verticalStyleKey = "WrapVerticalLayoutGridView";
+			const string horizontalStyleKey = "WrapHorizontalLayoutGridView";
+#endif
 			var newFileListStyle = folderSettings.LayoutMode switch
 			{
-				FolderLayoutModes.ListView => (Style)Resources["VerticalLayoutGridView"],
-				FolderLayoutModes.CardsView => (Style)Resources["HorizontalLayoutGridView"],
-				_ => (Style)Resources["HorizontalLayoutGridView"]
+				FolderLayoutModes.ListView => (Style)Resources[verticalStyleKey],
+				FolderLayoutModes.CardsView => (Style)Resources[horizontalStyleKey],
+				_ => (Style)Resources[horizontalStyleKey]
 			};
 
 			if (FileList.Style != newFileListStyle)

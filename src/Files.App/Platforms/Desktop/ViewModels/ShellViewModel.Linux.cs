@@ -111,6 +111,10 @@ namespace Files.App.ViewModels
 					}
 				}
 
+				// A superseded navigation must not publish a partial listing
+				if (cancellationToken.IsCancellationRequested)
+					return;
+
 				filesAndFolders.AddRange(pending);
 
 				await OrderFilesAndFoldersAsync();
@@ -124,6 +128,9 @@ namespace Files.App.ViewModels
 					CheckForBackgroundImage();
 				}, Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 			}, cancellationToken);
+
+			if (cancellationToken.IsCancellationRequested)
+				return -1;
 
 			IsLocationUnavailable = false;
 			return 3;
@@ -192,6 +199,9 @@ namespace Files.App.ViewModels
 
 				items.Add(item);
 			}
+
+			if (cancellationToken.IsCancellationRequested)
+				return -1;
 
 			filesAndFolders.Clear();
 			filesAndFolders.AddRange(items);

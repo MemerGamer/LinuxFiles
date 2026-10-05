@@ -177,6 +177,7 @@
         <PackageReference Include="Uno.WinUI" />
         <PackageReference Include="Uno.WinUI.Runtime.Skia.X11" />
         <PackageReference Include="Uno.Microsoft.Xaml.Behaviors.WinUI.Managed" />
+        <ProjectReference Include="..\Files.App.UnoVirtualization\Files.App.UnoVirtualization.csproj" />
     </ItemGroup>
 
     <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">

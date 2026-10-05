@@ -367,6 +367,24 @@ namespace Files.App.Views.Layouts
 				var oldSource = FileList.ItemsSource;
 				FileList.ItemsSource = null;
 				FileList.Style = newFileListStyle;
+#if !WINDOWS
+				// Uno Skia has no ItemsWrapGrid; this panel virtualizes, the style's WrapPanel would realize every item
+				var wrapOrientation = folderSettings.LayoutMode == FolderLayoutModes.ListView ? Orientation.Vertical : Orientation.Horizontal;
+				FileList.ItemsPanel = new ItemsPanelTemplate(() => new Files.App.UnoVirtualization.VirtualizingWrapGrid
+				{
+					Orientation = wrapOrientation,
+					ProvisionalCellSize = folderSettings.LayoutMode == FolderLayoutModes.GridView
+						? new Windows.Foundation.Size(ItemWidthGridView, ItemWidthGridView + 48)
+						: new Windows.Foundation.Size(240, 96),
+				});
+				// A virtualizing panel sizes its lines from the first realized containers, so the template must be in place before items are restored
+				FileList.ItemTemplate = (DataTemplate)Resources[folderSettings.LayoutMode switch
+				{
+					FolderLayoutModes.ListView => "ListViewBrowserTemplate",
+					FolderLayoutModes.CardsView => "CardsBrowserTemplate",
+					_ => "GridViewBrowserTemplate",
+				}];
+#endif
 				FileList.ItemsSource = oldSource;
 			}
 

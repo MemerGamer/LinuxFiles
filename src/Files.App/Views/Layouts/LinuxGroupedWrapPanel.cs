@@ -13,7 +13,44 @@ namespace Files.App.Views.Layouts
 	/// </summary>
 	internal sealed class LinuxGroupedWrapPanel : Panel
 	{
+		private readonly List<(UIElement Child, Rect Slot)> slots = [];
+
 		public Orientation Orientation { get; set; }
+
+		/// <summary>
+		/// Finds the tile in the next or previous row (column for the List layout) closest to <paramref name="from"/>; headers are never returned.
+		/// </summary>
+		public UIElement? FindInAdjacentLine(UIElement from, bool forward)
+		{
+			var vertical = Orientation == Orientation.Vertical;
+			var index = slots.FindIndex(slot => ReferenceEquals(slot.Child, from));
+			if (index < 0)
+				return null;
+
+			var origin = slots[index].Slot;
+			UIElement? best = null;
+			var bestLine = 0d;
+			var bestOffset = 0d;
+			foreach (var (child, slot) in slots)
+			{
+				var line = vertical ? slot.X - origin.X : slot.Y - origin.Y;
+				if (forward ? line <= 0.5 : line >= -0.5)
+					continue;
+
+				var distance = Math.Abs(line);
+				var offset = vertical
+					? Math.Abs(slot.Y + slot.Height / 2 - origin.Y - origin.Height / 2)
+					: Math.Abs(slot.X + slot.Width / 2 - origin.X - origin.Width / 2);
+				if (best is null || distance < bestLine - 0.5 || (Math.Abs(distance - bestLine) <= 0.5 && offset < bestOffset))
+				{
+					best = child;
+					bestLine = distance;
+					bestOffset = offset;
+				}
+			}
+
+			return best;
+		}
 
 		protected override Size MeasureOverride(Size availableSize) => Layout(availableSize, false);
 		protected override Size ArrangeOverride(Size finalSize)
@@ -30,6 +67,8 @@ namespace Files.App.Views.Layouts
 			var extent = 0d;
 			var lineExtent = 0d;
 			var maxBreadth = 0d;
+			if (arrange)
+				slots.Clear();
 
 			foreach (var child in Children)
 			{
@@ -51,9 +90,12 @@ namespace Files.App.Views.Layouts
 
 				if (arrange)
 				{
-					child.Arrange(vertical
+					var slot = vertical
 						? new Rect(extent, breadth, childExtent, childBreadth)
-						: new Rect(breadth, extent, childBreadth, childExtent));
+						: new Rect(breadth, extent, childBreadth, childExtent);
+					child.Arrange(slot);
+					if (!header)
+						slots.Add((child, slot));
 				}
 
 				breadth += childBreadth;

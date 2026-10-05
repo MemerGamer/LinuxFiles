@@ -537,7 +537,7 @@ namespace Files.App.Views.Layouts
 				return;
 
 #if DESKTOP
-			if (TryHandleListJumpKey(e))
+			if (TryHandleListJumpKey(e) || TryHandleGroupedArrowKey(e))
 				return;
 #endif
 

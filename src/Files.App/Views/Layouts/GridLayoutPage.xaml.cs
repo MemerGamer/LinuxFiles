@@ -709,7 +709,7 @@ namespace Files.App.Views.Layouts
 				return;
 
 #if DESKTOP
-			if (TryHandleListJumpKey(e) || TryHandleWrapGridArrowKey(e))
+			if (TryHandleListJumpKey(e) || TryHandleWrapGridArrowKey(e) || TryHandleGroupedArrowKey(e))
 				return;
 #endif
 

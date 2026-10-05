@@ -576,12 +576,19 @@ namespace Files.App.Utils.Storage
 			{
 				var theme = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Icons.IIconThemeProvider>();
 
-				// LINUX-TODO(icons): SVG theme icons need a rasterizer, so fall back to the nearest PNG size
-				foreach (var candidate in new[] { size, 48u, 32u, 24u, 16u }.Distinct())
+				var result = await theme.ResolveIconAsync(names, size);
+				if (result is { } found)
 				{
-					var result = await theme.ResolveIconAsync(names, candidate);
-					if (result is { IsSvg: false } found)
+					if (found.IsSvg)
+					{
+						var png = await Task.Run(() => Files.Platform.Linux.Icons.SvgRasterizer.RenderToPng(found.Path, (int)size));
+						if (png is not null)
+							return png;
+					}
+					else if (!found.Path.EndsWith(".xpm", StringComparison.OrdinalIgnoreCase))
+					{
 						return await SystemIO.File.ReadAllBytesAsync(found.Path);
+					}
 				}
 
 				// Current Adwaita ships drive icons only as SVG; the legacy PNG set is still installed next to it
@@ -608,7 +615,7 @@ namespace Files.App.Utils.Storage
 
 		public static Task<StorageItemThumbnail?> GetThumbnailAsync(StorageFolder folder)
 		{
-			// LINUX-TODO(thumbnails): drive thumbnails; the generic drive icon is used instead
+			// Drive thumbnails are not a Linux concept; callers use the generic drive icon from GetDriveIconAsync
 			return Task.FromResult<StorageItemThumbnail?>(null);
 		}
 	}

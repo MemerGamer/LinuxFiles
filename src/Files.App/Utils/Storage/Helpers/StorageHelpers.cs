@@ -34,12 +34,18 @@ namespace Files.App.Helpers
 			}
 
 			// Fast get attributes
+#if WINDOWS
 			uint itemAttributes = PInvoke.GetFileAttributes(path);
 			bool exists = itemAttributes != PInvoke.INVALID_FILE_ATTRIBUTES;
+			bool isDirectory = exists && (itemAttributes & (uint)FILE_FLAGS_AND_ATTRIBUTES.FILE_ATTRIBUTE_DIRECTORY) != 0;
+#else
+			bool isDirectory = System.IO.Directory.Exists(path);
+			bool exists = isDirectory || System.IO.File.Exists(path);
+#endif
 			if (exists) // Exists on local storage
 			{
 				// Directory
-				if ((itemAttributes & (uint)FILE_FLAGS_AND_ATTRIBUTES.FILE_ATTRIBUTE_DIRECTORY) != 0)
+				if (isDirectory)
 				{
 					if (typeof(IStorageFile).IsAssignableFrom(typeof(TRequested))) // Wanted file
 					{

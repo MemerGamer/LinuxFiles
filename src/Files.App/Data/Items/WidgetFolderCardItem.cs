@@ -60,17 +60,9 @@ namespace Files.App.Data.Items
 
 			if (Item is null)
 			{
-				// SVG-only theme sizes are not rasterized yet (LINUX-TODO(icons)), so try the sizes that have PNGs
 				byte[]? icon = Path == Constants.UserEnvironmentPaths.RecycleBinPath
 					? await DriveHelpers.GetDriveIconAsync(null, Constants.ShellIconSizes.Large)
-					: null;
-				foreach (var size in new[] { (uint)Constants.ShellIconSizes.Large, 48u, (uint)Constants.ShellIconSizes.Small })
-				{
-					if (icon is not null)
-						break;
-
-					icon = await FileThumbnailHelper.GetIconAsync(Path, size, true, IconOptions.ReturnIconOnly);
-				}
+					: await FileThumbnailHelper.GetIconAsync(Path, (uint)Constants.ShellIconSizes.Large, true, IconOptions.ReturnIconOnly);
 				if (icon is not null)
 					Thumbnail = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => icon.ToBitmapAsync(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal);
 				return;

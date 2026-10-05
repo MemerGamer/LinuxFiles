@@ -23,7 +23,11 @@ namespace Files.App.Actions
 		];
 
 		public virtual string Label
+#if WINDOWS
 			=> Strings.OpenTerminal.GetLocalizedResource();
+#else
+			=> Strings.OpenTerminalLinux.GetLocalizedResource();
+#endif
 
 		public virtual string Description
 			=> Strings.OpenTerminalDescription.GetLocalizedResource();

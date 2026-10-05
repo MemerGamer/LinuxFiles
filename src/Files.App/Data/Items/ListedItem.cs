@@ -33,6 +33,18 @@ namespace Files.App.Utils
 
 		public byte[]? PreloadedIconData { get; set; }
 
+		/// <summary>
+		/// Gets the raw target of a Linux symbolic link, or <see langword="null"/> when the item is not a link.
+		/// </summary>
+		public string? SymLinkTarget { get; set; }
+
+		public bool IsBrokenSymLink { get; set; }
+
+		/// <summary>
+		/// Gets a name shown instead of the file name, such as the Name of a .desktop file. Renaming still uses <see cref="ItemNameRaw"/>.
+		/// </summary>
+		public string? DisplayNameOverride { get; set; }
+
 		public bool NeedsDelayedThumbnailLoad { get; set; }
 
 		private volatile int itemPropertiesInitialized = 0;
@@ -49,6 +61,8 @@ namespace Files.App.Utils
 				var tooltipBuilder = new StringBuilder();
 				tooltipBuilder.AppendLine($"{Strings.NameWithColon.GetLocalizedResource()} {Name}");
 				tooltipBuilder.AppendLine($"{Strings.ItemType.GetLocalizedResource()} {itemType}");
+				if (!string.IsNullOrEmpty(SymLinkTarget))
+					tooltipBuilder.AppendLine($"{Strings.PropertiesLinkTarget.GetLocalizedResource()} {SymLinkTarget}");
 				tooltipBuilder.Append($"{Strings.ToolTipDescriptionDate.GetLocalizedResource()} {ItemDateModified}");
 				if (!string.IsNullOrWhiteSpace(FileSize))
 					tooltipBuilder.Append($"{Environment.NewLine}{Strings.SizeLabel.GetLocalizedResource()} {FileSize}");
@@ -240,6 +254,9 @@ namespace Files.App.Utils
 		{
 			get
 			{
+				if (DisplayNameOverride is not null)
+					return DisplayNameOverride;
+
 				if (PrimaryItemAttribute == StorageItemTypes.File)
 				{
 					var nameWithoutExtension = Path.GetFileNameWithoutExtension(itemNameRaw);

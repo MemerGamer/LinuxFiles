@@ -1,7 +1,10 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.FileChooser;
+using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
+using System.Threading;
 
 namespace Files.App.Services.Desktop
 {
@@ -59,22 +62,63 @@ namespace Files.App.Services.Desktop
 		public Task<IEnumerable<string>> GetFoldersAsync() => Task.FromResult<IEnumerable<string>>([]);
 	}
 
-	// LINUX-TODO(pickers): open file/folder choosers through the xdg-desktop-portal FileChooser; until then pickers report "cancelled"
+	// Blocks the caller while the desktop's chooser is open: the shared dialog contract is synchronous.
 	internal sealed class DesktopCommonDialogService : ICommonDialogService
 	{
-		public bool Open_FileOpenDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath, Guid? clientGuid = null)
+		private readonly IFileChooserService _fileChooser;
+		private int _unavailableLogged;
+
+		public DesktopCommonDialogService(IFileChooserService fileChooser)
 		{
-			filePath = string.Empty;
-			return false;
+			_fileChooser = fileChooser;
 		}
+
+		public bool Open_FileOpenDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath, Guid? clientGuid = null)
+			=> Choose(new FileChooserRequest { PickFolder = pickFoldersOnly, Filters = ParseFilters(filters), ParentWindowId = (ulong)hWnd }, out filePath);
 
 		public bool Open_FileSaveDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath)
 		{
-			filePath = string.Empty;
-			return false;
+			var folder = Environment.GetFolderPath(defaultFolder);
+			return Choose(new FileChooserRequest
+			{
+				Save = true,
+				PickFolder = pickFoldersOnly,
+				Filters = ParseFilters(filters),
+				CurrentFolder = string.IsNullOrEmpty(folder) ? null : folder,
+				ParentWindowId = (ulong)hWnd,
+			}, out filePath);
 		}
 
 		public bool Open_NetworkConnectionDialog(nint hWnd, bool hideRestoreConnectionCheckBox = false, bool persistConnectionAtLogon = false, bool readOnlyPath = false, string? remoteNetworkName = null, bool useMostRecentPath = false) => false;
+
+		private bool Choose(FileChooserRequest request, out string filePath)
+		{
+			filePath = string.Empty;
+
+			var result = Task.Run(() => _fileChooser.ChooseAsync(request)).GetAwaiter().GetResult();
+			if (result.Status == FileChooserStatus.Unavailable && Interlocked.Exchange(ref _unavailableLogged, 1) == 0)
+				App.Logger.LogWarning("The xdg-desktop-portal FileChooser is not available; file pickers will report cancelled.");
+
+			if (result.Status != FileChooserStatus.Selected || result.Paths.Count == 0)
+				return false;
+
+			filePath = result.Paths[0];
+			return true;
+		}
+
+		// Filters come as [name, "*.a;*.b", name, ...] pairs
+		private static List<FileChooserFilter> ParseFilters(string[] filters)
+		{
+			var list = new List<FileChooserFilter>();
+			for (var i = 0; i + 1 < filters.Length; i += 2)
+			{
+				var patterns = filters[i + 1].Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+				if (patterns.Length > 0)
+					list.Add(new FileChooserFilter(filters[i], patterns));
+			}
+
+			return list;
+		}
 	}
 
 	// Linux has no Start Menu pins

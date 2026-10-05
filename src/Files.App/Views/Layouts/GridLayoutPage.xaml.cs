@@ -534,25 +534,44 @@ namespace Files.App.Views.Layouts
 			// Grid View
 			if (FolderSettings.LayoutMode == FolderLayoutModes.GridView)
 			{
-				// FindName from inside the template's namescope realizes the x:Load-deferred popup
-				if (textBlock.FindName("EditPopup") is not Popup popup)
+				// FindName does not resolve template names under Uno, so search the visual tree
+				if (gridViewItem.FindDescendant("EditPopup") is not Popup popup)
 					return;
 
 				textBox = popup.Child as TextBox;
 				if (textBox is null)
 					return;
 
-				textBox.Width = templateRoot?.ActualWidth ?? gridViewItem.ActualWidth;
+				textBox.Width = OperatingSystem.IsLinux() ? Math.Max(textBlock.ActualWidth, 120) : templateRoot?.ActualWidth ?? gridViewItem.ActualWidth;
 				textBox.Text = editText;
 				textBlock.Opacity = 0;
 				popup.IsOpen = true;
+
+				// Uno anchors the popup at the item's edge rather than at the name label; line it up with the label
+				if (OperatingSystem.IsLinux())
+				{
+					var label = textBlock;
+					var box = textBox;
+					DispatcherQueue.TryEnqueue(() =>
+					{
+						try
+						{
+							var labelPoint = label.TransformToVisual(null).TransformPoint(default);
+							var boxPoint = box.TransformToVisual(null).TransformPoint(default);
+							popup.HorizontalOffset += labelPoint.X - boxPoint.X;
+							popup.VerticalOffset += labelPoint.Y - boxPoint.Y;
+						}
+						catch (ArgumentException)
+						{
+						}
+					});
+				}
 				OldItemName = editText;
 			}
 			// List View
 			else if (FolderSettings.LayoutMode == FolderLayoutModes.ListView)
 			{
-				// FindName from inside the template's namescope realizes the x:Load-deferred text box
-				textBox = textBlock.FindName("ListViewTextBoxItemName") as TextBox;
+				textBox = gridViewItem.FindDescendant("ListViewTextBoxItemName") as TextBox;
 				if (textBox is null)
 					return;
 
@@ -588,6 +607,7 @@ namespace Files.App.Views.Layouts
 
 			var activeTextBox = textBox
 				?? throw new InvalidOperationException("The rename text box is not available for the selected layout.");
+			ApplyRenameBoxColors(activeTextBox);
 			activeTextBox.Focus(FocusState.Pointer);
 			activeTextBox.LostFocus += RenameTextBox_LostFocus;
 			activeTextBox.KeyDown += RenameTextBox_KeyDown;

@@ -295,7 +295,7 @@ namespace Files.App.Views
 		{
 			base.OnPreviewKeyDown(e);
 
-			switch (e.Key)
+			switch (HotKeyHelpers.GetHotKeyVirtualKey(e))
 			{
 				case VirtualKey.Menu:
 				case VirtualKey.Control:
@@ -305,7 +305,7 @@ namespace Files.App.Views
 					break;
 				default:
 					var currentModifiers = HotKeyHelpers.GetCurrentKeyModifiers();
-					HotKey hotKey = new((Keys)e.Key, currentModifiers);
+					HotKey hotKey = new(HotKeyHelpers.GetHotKeyKey(e), currentModifiers);
 					var source = e.OriginalSource as DependencyObject;
 
 					// A textbox takes precedence over certain hotkeys.
@@ -336,7 +336,7 @@ namespace Files.App.Views
 		{
 			base.OnPreviewKeyUp(e);
 
-			switch (e.Key)
+			switch (HotKeyHelpers.GetHotKeyVirtualKey(e))
 			{
 				case VirtualKey.Menu:
 				case VirtualKey.Control:
@@ -444,6 +444,15 @@ namespace Files.App.Views
 			SidebarAdaptiveViewModel.ActualDisplayMode = SidebarControl.DisplayMode;
 			SidebarControl.RegisterPropertyChangedCallback(SidebarView.DisplayModeProperty, (_, _) =>
 				SidebarAdaptiveViewModel.ActualDisplayMode = SidebarControl.DisplayMode);
+
+			// Uno drops the DisplayMode binding once the adaptive visual state sets a local value, so mirror the preference by hand
+			SidebarAdaptiveViewModel.PropertyChanged += (_, e) =>
+			{
+				if (e.PropertyName == nameof(SidebarViewModel.SidebarDisplayMode) &&
+					SidebarControl.DisplayMode != SidebarDisplayMode.Minimal &&
+					SidebarControl.DisplayMode != SidebarAdaptiveViewModel.SidebarDisplayMode)
+					SidebarControl.DisplayMode = SidebarAdaptiveViewModel.SidebarDisplayMode;
+			};
 		}
 
 		private void RootGrid_SizeChanged(object sender, SizeChangedEventArgs e) => LoadPaneChanged();
@@ -568,7 +577,7 @@ namespace Files.App.Views
 
 		private void RootGrid_PreviewKeyDown(object sender, KeyRoutedEventArgs e)
 		{
-			switch (e.Key)
+			switch (HotKeyHelpers.GetHotKeyVirtualKey(e))
 			{
 				case VirtualKey.Menu:
 				case VirtualKey.Control:
@@ -578,7 +587,7 @@ namespace Files.App.Views
 					break;
 				default:
 					var currentModifiers = HotKeyHelpers.GetCurrentKeyModifiers();
-					HotKey hotKey = new((Keys)e.Key, currentModifiers);
+					HotKey hotKey = new(HotKeyHelpers.GetHotKeyKey(e), currentModifiers);
 
 					// Prevents the arrow key events from navigating the list instead of switching compact overlay
 					if (Commands[hotKey].Code is CommandCodes.EnterCompactOverlay or CommandCodes.ExitCompactOverlay)

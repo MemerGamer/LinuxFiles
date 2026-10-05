@@ -263,8 +263,7 @@
 
 					<Popup
 						x:Name="EditPopup"
-						Grid.Row="1"
-						x:Load="False">
+						Grid.Row="1">
 						<TextBox
 							x:Name="GridViewTextBoxItemName"
 							Margin="0"
@@ -402,7 +401,6 @@
 						Margin="0"
 						HorizontalAlignment="Stretch"
 						VerticalAlignment="Center"
-						x:Load="False"
 						BeforeTextChanging="ItemNameTextBox_BeforeTextChanging"
 						TextAlignment="Left"
 						TextWrapping="Wrap"

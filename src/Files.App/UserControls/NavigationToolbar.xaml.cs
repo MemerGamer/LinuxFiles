@@ -51,6 +51,20 @@ namespace Files.App.UserControls
 
 		// Methods
 
+		private void SidebarPaneToggleButton_Click(object sender, RoutedEventArgs e)
+		{
+			var sidebarViewModel = Ioc.Default.GetRequiredService<SidebarViewModel>();
+
+			// Minimal mode shows the pane as a flyout; otherwise switch between the expanded and compact sidebar
+			if (sidebarViewModel.ActualDisplayMode is SidebarDisplayMode.Minimal)
+				MainPageViewModel.IsSidebarPaneOpen = !MainPageViewModel.IsSidebarPaneOpen;
+			else
+				_ = Commands.ToggleSidebar.ExecuteAsync();
+
+			if (sender is ToggleButton button)
+				button.IsChecked = MainPageViewModel.IsSidebarPaneOpen;
+		}
+
 		private void NavToolbar_Loaded(object sender, RoutedEventArgs e)
 			=> this.RunAfterNextRender(() => FindName(nameof(ListaryIntegration)));
 

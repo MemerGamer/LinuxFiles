@@ -29,7 +29,7 @@ namespace Files.App.Utils.Storage
 		private static IMimeTypeService Mime => Ioc.Default.GetRequiredService<IMimeTypeService>();
 		private static IUserDirectories Directories => Ioc.Default.GetRequiredService<IUserDirectories>();
 
-		public static async Task<byte[]?> GetIconAsync(string? path, uint size, bool isFolder, IconOptions options)
+		public static async Task<byte[]?> GetIconAsync(string? path, uint size, bool isFolder, IconOptions options, CancellationToken cancellationToken = default)
 		{
 			try
 			{
@@ -42,10 +42,9 @@ namespace Files.App.Utils.Storage
 
 				if (!string.IsNullOrEmpty(path) && !isFolder && !options.HasFlag(IconOptions.ReturnIconOnly))
 				{
-					var thumbnail = await Thumbnails.GetThumbnailAsync(
-						path,
-						size,
-						options.HasFlag(IconOptions.ReturnOnlyIfCached) ? ThumbnailOptions.ReturnOnlyIfCached : ThumbnailOptions.None);
+					// The cache lookup reads files synchronously, and callers may be on the UI thread
+					var thumbnailOptions = options.HasFlag(IconOptions.ReturnOnlyIfCached) ? ThumbnailOptions.ReturnOnlyIfCached : ThumbnailOptions.None;
+					var thumbnail = await Task.Run(() => Thumbnails.GetThumbnailAsync(path, size, thumbnailOptions, cancellationToken), cancellationToken);
 
 					if (thumbnail is not null)
 						return thumbnail;

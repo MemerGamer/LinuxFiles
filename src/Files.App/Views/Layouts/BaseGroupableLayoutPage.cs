@@ -309,6 +309,28 @@ namespace Files.App.Views.Layouts
 				container.RequestedTheme = ActualTheme;
 		}
 
+		/// <summary>
+		/// Gives the rename box explicit theme colours on Linux: Uno can resolve its template (and popup) brushes against the
+		/// wrong theme, which leaves the text invisible or the box transparent.
+		/// </summary>
+		protected void ApplyRenameBoxColors(TextBox textBox)
+		{
+			if (!OperatingSystem.IsLinux())
+				return;
+
+			var dark = ActualTheme == ElementTheme.Dark;
+			var foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(dark ? Microsoft.UI.Colors.White : Windows.UI.Color.FromArgb(0xFF, 0x1B, 0x1B, 0x1B));
+			var background = new Microsoft.UI.Xaml.Media.SolidColorBrush(dark ? Windows.UI.Color.FromArgb(0xFF, 0x1E, 0x1E, 0x1E) : Microsoft.UI.Colors.White);
+
+			textBox.RequestedTheme = ActualTheme;
+			textBox.Foreground = foreground;
+			textBox.Background = background;
+			foreach (var key in new[] { "TextControlForeground", "TextControlForegroundPointerOver", "TextControlForegroundFocused" })
+				textBox.Resources[key] = foreground;
+			foreach (var key in new[] { "TextControlBackground", "TextControlBackgroundPointerOver", "TextControlBackgroundFocused" })
+				textBox.Resources[key] = background;
+		}
+
 		protected static bool ShouldShowExtensionInRename(ListedItem item) =>
 			(!item.IsFolder || item.IsArchive) && !item.IsShortcut && item is not AlternateStreamItem;
 
@@ -335,6 +357,7 @@ namespace Files.App.Views.Layouts
 				throw new InvalidOperationException("The rename controls are not available for the selected item.");
 
 			string editText = ShouldShowExtensionInRename(renamingItem) ? renamingItem.ItemNameRaw! : textBlock.Text;
+			ApplyRenameBoxColors(textBox);
 			textBox.Text = editText;
 			OldItemName = editText;
 			textBlock.Visibility = Visibility.Collapsed;

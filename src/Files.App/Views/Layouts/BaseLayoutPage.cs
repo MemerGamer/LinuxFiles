@@ -1358,7 +1358,7 @@ namespace Files.App.Views.Layouts
 			}
 
 			if (itemsToLoad.Count is not 0)
-				_ = Parallel.ForEachAsync(itemsToLoad, (item, _) => new ValueTask(LoadItemExtendedPropertiesAsync(item, shellViewModel)));
+				_ = Parallel.ForEachAsync(itemsToLoad, new ParallelOptions { MaxDegreeOfParallelism = 4 }, (item, _) => new ValueTask(LoadItemExtendedPropertiesAsync(item, shellViewModel)));
 		}
 
 		private static async Task LoadItemExtendedPropertiesAsync(ListedItem item, ShellViewModel shellViewModel)

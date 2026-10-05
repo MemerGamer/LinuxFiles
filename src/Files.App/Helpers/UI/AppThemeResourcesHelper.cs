@@ -23,7 +23,10 @@ namespace Files.App.Helpers
 
 			try
 			{
-				service.SetAppThemeBackgroundColor(appThemeBackgroundColor.ToColor());
+				// The default (transparent) lets the Windows Mica backdrop show through; on Linux keep the solid theme fill
+				var backgroundColor = appThemeBackgroundColor.ToColor();
+				if (!OperatingSystem.IsLinux() || backgroundColor.A != 0)
+					service.SetAppThemeBackgroundColor(backgroundColor);
 			}
 			catch
 			{

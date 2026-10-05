@@ -76,16 +76,13 @@
 					BorderThickness="1"
 					CornerRadius="4">
 
-					<uc:FileIcon
+					<Image
 						x:Name="Icon"
 						Width="48"
 						Height="48"
 						HorizontalAlignment="Center"
 						VerticalAlignment="Center"
-						AutomationProperties.AccessibilityView="Raw"
-						FileIconImageData="{x:Bind ViewModel.IconData, Mode=OneWay}"
-						ItemSize="48"
-						ViewModel="{x:Bind ViewModel}" />
+						AutomationProperties.AccessibilityView="Raw" />
 
 					<!--  Edit Album Cover Button  -->
 					<Button

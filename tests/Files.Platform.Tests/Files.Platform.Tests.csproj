@@ -25,6 +25,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
         <ProjectReference Include="..\..\src\Files.Platform.Linux\Files.Platform.Linux.csproj" />
+        <ProjectReference Include="..\..\src\Files.Core.Storage\Files.Core.Storage.csproj" />
     </ItemGroup>
 
     <ItemGroup>
@@ -32,6 +33,10 @@
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/CodeLanguageMap.cs" Link="Previews/CodeLanguageMap.cs" />
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewCodeTokenizer.cs" Link="Previews/PreviewCodeTokenizer.cs" />
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewImageDecoder.cs" Link="Previews/PreviewImageDecoder.cs" />
+        <Compile Include="../../src/Files.App.Storage/Storables/Routes/*.cs" LinkBase="Storables/Routes" />
+        <Compile Include="../../src/Files.App/Data/Enums/FilesystemItemType.cs" Link="Storables/FilesystemItemType.cs" />
+        <Compile Include="../../src/Files.App/Utils/Storage/Helpers/IStorageItemWithPath.cs" Link="Storables/IStorageItemWithPath.cs" />
+        <Compile Include="../../src/Files.App/Utils/Storage/Helpers/StorableWithPath.cs" Link="Storables/StorableWithPath.cs" />
     </ItemGroup>
 
 </Project>

@@ -88,16 +88,9 @@ namespace Files.Platform.Linux.Native
 
 			try
 			{
-				var buffer = new byte[StatxBufferSize];
-				fixed (byte* p = buffer)
-				{
-					const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize | StatxIno | StatxMountId;
-					if (statx(dirfd, path, flags, mask, p) != 0)
-					{
-						errno = Marshal.GetLastPInvokeError();
-						return false;
-					}
-				}
+				const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxSize | StatxIno | StatxMountId;
+				if (!TryStatx(dirfd, path, flags, mask, out var buffer, out errno))
+					return false;
 
 				var returned = BitConverter.ToUInt32(buffer, 0);
 				const uint required = StatxType | StatxMode | StatxUid;
@@ -119,8 +112,21 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 
-		private const uint StatxMntId = 0x1000;
 		internal const ulong StatxAttrMountRoot = 0x2000;
+
+		private static bool TryStatx(int dirfd, string path, int flags, uint mask, out byte[] buffer, out int errno)
+		{
+			buffer = new byte[StatxBufferSize];
+			errno = 0;
+			fixed (byte* p = buffer)
+			{
+				if (statx(dirfd, path, flags, mask, p) == 0)
+					return true;
+			}
+
+			errno = Marshal.GetLastPInvokeError();
+			return false;
+		}
 
 		/// <summary>
 		/// Reads the <c>statx</c> mount information of <paramref name="path"/> relative to <paramref name="dirfd"/>: the attribute bits
@@ -131,15 +137,11 @@ namespace Files.Platform.Linux.Native
 			info = default;
 			try
 			{
-				var buffer = new byte[StatxBufferSize];
-				fixed (byte* p = buffer)
-				{
-					if (statx(dirfd, path, flags, StatxType | StatxMntId, p) != 0)
-						return false;
-				}
+				if (!TryStatx(dirfd, path, flags, StatxType | StatxMountId, out var buffer, out _))
+					return false;
 
 				var returned = BitConverter.ToUInt32(buffer, 0);
-				var mntValid = (returned & StatxMntId) != 0;
+				var mntValid = (returned & StatxMountId) != 0;
 				info = new MountInfo(BitConverter.ToUInt64(buffer, 8), BitConverter.ToUInt64(buffer, 56),
 					mntValid, mntValid ? BitConverter.ToUInt64(buffer, 144) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140));
 				return true;

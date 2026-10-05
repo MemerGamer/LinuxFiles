@@ -4940,4 +4940,23 @@
   <data name="BreadcrumbMoreFolders" xml:space="preserve">
     <value>{0} more folders…</value>
   </data>
+  <data name="LinuxBrokenLink" xml:space="preserve">
+    <value>Broken link</value>
+  </data>
+  <data name="StatusCenter_RestoreWarning_Header" xml:space="preserve">
+    <value>Item restored with a warning</value>
+    <comment>Shown in a StatusCenter card.</comment>
+  </data>
+  <data name="StatusCenter_RestoreWarning_SubHeader" xml:space="preserve">
+    <value>The item was restored, but the Trash could not be fully cleaned up.</value>
+    <comment>Shown in a StatusCenter card.</comment>
+  </data>
+  <data name="FontAlreadyInstalledPrompt" xml:space="preserve">
+    <value>A font named "{0}" is already installed for your user. Replace it?</value>
+    <comment>Shown when installing a font on Linux.</comment>
+  </data>
+  <data name="FontInstallFailed" xml:space="preserve">
+    <value>"{0}" could not be installed. Make sure it is a valid font file.</value>
+    <comment>Shown when installing a font on Linux.</comment>
+  </data>
 </root>

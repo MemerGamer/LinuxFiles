@@ -625,8 +625,7 @@ namespace Files.App.Helpers.ContextFlyouts
 		private static double ClientYToScreen(double xamlRootY)
 		{
 			var scale = MainWindow.Instance.Content.XamlRoot?.RasterizationScale ?? 1.0;
-			var clientOrigin = new System.Drawing.Point(0, 0);
-			Windows.Win32.PInvoke.ClientToScreen(new(MainWindow.Instance.WindowHandle), ref clientOrigin);
+			UIHelpers.TryGetMainWindowClientOrigin(out var clientOrigin);
 			return clientOrigin.Y + xamlRootY * scale;
 		}
 
@@ -651,7 +650,7 @@ namespace Files.App.Helpers.ContextFlyouts
 			var cursorY = double.NaN;
 			try
 			{
-				if (Windows.Win32.PInvoke.GetCursorPos(out var cursor))
+				if (UIHelpers.TryGetCursorPosition(out var cursor))
 					cursorY = cursor.Y;
 			}
 			catch (Exception ex)
@@ -745,7 +744,7 @@ namespace Files.App.Helpers.ContextFlyouts
 			double cursorX = double.NaN, cursorY = double.NaN;
 			try
 			{
-				Windows.Win32.PInvoke.GetCursorPos(out var cursor);
+				UIHelpers.TryGetCursorPosition(out var cursor);
 				cursorX = cursor.X;
 				cursorY = cursor.Y;
 			}

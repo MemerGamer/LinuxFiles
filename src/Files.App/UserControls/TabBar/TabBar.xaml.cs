@@ -8,7 +8,6 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Shapes;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using Windows.Win32;
 using WinRT;
 
 namespace Files.App.UserControls.TabBar
@@ -193,7 +192,7 @@ namespace Files.App.UserControls.TabBar
 			// Get cursor position & time to track how far the tab was dragged.
 			// LINUX-TODO(tab-tearout): no global cursor position on Linux, so tab drag-out to a new window is disabled
 			if (OperatingSystem.IsWindows())
-				PInvoke.GetCursorPos(out dragStartPoint);
+				UIHelpers.TryGetCursorPosition(out dragStartPoint);
 			dragStartTime = DateTimeOffset.UtcNow;
 
 			// Focus the UI Element, without this the focus sometimes changes
@@ -303,7 +302,7 @@ namespace Files.App.UserControls.TabBar
 			if (!OperatingSystem.IsWindows())
 				return;
 
-			PInvoke.GetCursorPos(out var droppedPoint);
+			UIHelpers.TryGetCursorPosition(out var droppedPoint);
 			var droppedTime = DateTimeOffset.UtcNow;
 			var dragTime = droppedTime - dragStartTime;
 			var dragDistance = Math.Sqrt(Math.Pow(dragStartPoint.X - droppedPoint.X, 2) + Math.Pow(dragStartPoint.Y - droppedPoint.Y, 2));

@@ -423,6 +423,8 @@ namespace Files.Platform.Linux.Thumbnails
 			var pdfFallback = entry is null && mime == "application/pdf";
 			if (pdfFallback)
 				entry = new ThumbnailerEntry("pdftoppm -f 1 -singlefile -scale-to %s -png %i %o", "pdftoppm", [mime]);
+			if (entry is null && mime.StartsWith("video/", StringComparison.Ordinal))
+				entry = new ThumbnailerEntry("ffmpeg -nostdin -v error -protocol_whitelist file -t 10 -i file:%i -vf thumbnail,scale=%s:%s:force_original_aspect_ratio=decrease -frames:v 1 -update 1 -c:v png %o", "ffmpeg", [mime]);
 			if (entry is null || (entry.TryExec is not null && !ExecutableExists(entry.TryExec)))
 				return null;
 

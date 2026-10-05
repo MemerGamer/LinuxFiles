@@ -194,10 +194,12 @@ namespace Files.App.ViewModels.Settings
 				return;
 			}
 
+#if WINDOWS
 			IsIDEPathValid = await Win32Helper.RunPowershellCommandAsync(
 				$"& {Win32Helper.ToPowerShellStringLiteral(IDEPath)}",
 				PowerShellExecutionOptions.Hidden
 			);
+#endif
 		}
 
 		private bool CheckPathExists()

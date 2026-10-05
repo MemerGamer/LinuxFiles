@@ -1,6 +1,6 @@
 # Security Policy
 
-LinuxFiles is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files). It is in alpha, and only the latest release and the `linux/main` branch receive fixes.
+LinuxFiles is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files). It is in alpha, and only the latest release and the `main` branch receive fixes.
 
 ## Reporting a vulnerability in LinuxFiles
 

@@ -117,10 +117,10 @@ unbuilt.
 
 ## Nightly builds
 
-`.github/workflows/nightly-linux.yml` builds the tarball and AppImage on every push to `linux/main` and replaces the
+`.github/workflows/nightly-linux.yml` builds the tarball and AppImage on every push to `main` and replaces the
 single rolling pre-release at https://github.com/MemerGamer/LinuxFiles/releases/tag/nightly (stable asset names
 `LinuxFiles-nightly-linux-x64.tar.gz` and `LinuxFiles-nightly-x86_64.AppImage`; the Flatpak is only built for
-`linux-v*` tags). Pull requests targeting `linux/main` get the same files as workflow artifacts with a read-only token.
+`linux-v*` tags). Pull requests targeting `main` get the same files as workflow artifacts with a read-only token.
 Try it: `curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/LinuxFiles-nightly-x86_64.AppImage && chmod +x LinuxFiles-nightly-x86_64.AppImage && ./LinuxFiles-nightly-x86_64.AppImage`
 
 ## Becoming the default file manager (Phase 6, not done yet)

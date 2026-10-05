@@ -1,5 +1,7 @@
 # Files on Linux — Porting Plan
 
+> **Branching (2026-10-05):** `main` is the single integration branch. `linux/main` is retired (frozen at the last merge). Releases are tags: the rolling `nightly` pre-release (every push to `main`) and stable `linux-v*` tags.
+
 Status: draft v1 · 2026-10-04 · fork base `0e3c17ca4` (in sync with `files-community/Files` main)
 
 ## 0. Revision 2 (2026-10-04): Linux-first
@@ -359,8 +361,8 @@ files (outside `*.Windows.cs`) → 0. Exit: compat off by default, 0 errors, hea
    unit tests, and an `rg --no-ignore` coupling check against the WP's owned files. It reports pass/fail plus a
    capped log.
 4. **Opus** reviews the diff (correctness, CRLF, `.editorconfig`, AOT rules, no scope creep), then merges into
-   `linux/main` in dependency order.
-5. **Haiku** merges `upstream/main` into `linux/main` weekly and reports conflicts. **Opus** resolves non-trivial ones.
+   `main` in dependency order.
+5. **Haiku** merges `upstream/main` into `main` (via a sync PR) weekly and reports conflicts. **Opus** resolves non-trivial ones.
 
 Windows builds can't run locally on Linux. Validate them through GitHub Actions on `windows-2025-vs2026`, with a
 Haiku agent polling `gh run` results.

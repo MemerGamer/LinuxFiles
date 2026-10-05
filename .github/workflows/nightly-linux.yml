@@ -2,8 +2,8 @@
 # Licensed under the MIT License.
 
 # Abstract:
-#   Builds the self-contained linux-x64 tarball and AppImage on every push to linux/main and publishes them to
-#   one rolling "nightly" GitHub pre-release with stable asset names. Pull requests targeting linux/main get the
+#   Builds the self-contained linux-x64 tarball and AppImage on every push to main and publishes them to
+#   one rolling "nightly" GitHub pre-release with stable asset names. Pull requests targeting main get the
 #   same build as workflow artifacts only (read-only token). The Flatpak is left to package-linux.yml.
 
 name: Nightly Linux
@@ -12,10 +12,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - linux/main
+      - main
   pull_request:
     branches:
-      - linux/main
+      - main
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'nightly' }}
@@ -69,7 +69,7 @@ jobs:
 
   publish-nightly:
 
-    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/linux/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build-linux-x64
     runs-on: ubuntu-latest
     permissions:
@@ -104,7 +104,7 @@ jobs:
           range="-20 $SHA"
         fi
         {
-          echo "Rolling build of \`linux/main\` at $SHA. Replaced on every push; not for production use."
+          echo "Rolling build of \`main\` at $SHA. Replaced on every push; not for production use."
           echo
           echo "Run the AppImage: \`chmod +x LinuxFiles-nightly-x86_64.AppImage && ./LinuxFiles-nightly-x86_64.AppImage\`"
           echo
@@ -115,5 +115,5 @@ jobs:
 
         gh release delete nightly -R "$REPO" --cleanup-tag --yes 2>/dev/null || true
         gh release create nightly -R "$REPO" --target "$SHA" --prerelease \
-          --title "Nightly (linux/main @ $short)" --notes-file notes.md \
+          --title "Nightly (main @ $short)" --notes-file notes.md \
           dist/LinuxFiles-nightly-linux-x64.tar.gz dist/LinuxFiles-nightly-x86_64.AppImage

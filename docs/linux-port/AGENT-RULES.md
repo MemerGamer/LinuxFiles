@@ -16,10 +16,10 @@ Read this first, then `PLAN.md` §0, then `CLAUDE.md`.
 - Never commit anything from the real home directory.
 
 ## Git / GitHub
-- Branch from `origin/linux/main`: `git fetch origin && git switch -c linux/<wp> origin/linux/main`.
+- Branch from `origin/main` (the single integration branch; releases are tags: `nightly` rolling, `linux-v*` stable): `git fetch origin && git switch -c linux/<wp> origin/main`.
 - Commit trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 - Push: `git -c credential.helper='!gh auth git-credential' push -u origin linux/<wp>`.
-- PR: `gh pr create -R MemerGamer/LinuxFiles --base linux/main --head linux/<wp> ...`. The body ends with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
+- PR: `gh pr create -R MemerGamer/LinuxFiles --base main --head linux/<wp> ...`. The body ends with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 - Never target, push to, or comment on upstream `files-community/Files`.
 
 ## Code

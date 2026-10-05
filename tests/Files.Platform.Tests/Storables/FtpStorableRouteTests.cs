@@ -6,6 +6,7 @@ using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using FluentFTP;
 using Files.App.Storage;
 using Files.App.Storage.Storables;
 using Files.Core.Storage;
@@ -280,6 +281,10 @@ namespace Files.Platform.Tests.Storables
 		[DataRow("530", "Login incorrect", true)]
 		[DataRow("550", "Permission denied", true)]
 		[DataRow("550", "/x: No such file or directory", false)]
+		[DataRow("550", "/access.log: No such file or directory", false)]
+		[DataRow("550", "/permission/denied.txt: not found", false)]
+		[DataRow("550", "/access.log: Permission denied", true)]
+		[DataRow("550", "/data.txt: Access is denied", true)]
 		[DataRow("450", "busy", false)]
 		[DataRow(null, null, false)]
 		public void IsPermissionReply_MapsAccessFailures(string? code, string? message, bool expected)
@@ -298,6 +303,18 @@ namespace Files.Platform.Tests.Storables
 			Assert.IsTrue(FtpManager.Credentials.TryGetValue(url.GetCredentialKey(), out var credential));
 			Assert.AreEqual("alice", credential.UserName);
 			Assert.IsFalse(FtpManager.Credentials.TryGetValue(FtpUrl.Parse("ftpes://route-cred.example:2121/").GetCredentialKey(), out _));
+		}
+
+		[TestMethod]
+		public void Factory_UsesUrlCredential_ButSavedCredentialWins()
+		{
+			var plain = FtpUrl.Parse("ftpes://alice:secret@factory1.example/p");
+			using (var client = FtpClientFactory.Create(plain))
+				Assert.AreEqual("alice", client.Credentials.UserName);
+
+			FtpManager.Credentials[FtpUrl.Parse("ftpes://factory2.example").GetCredentialKey()] = new NetworkCredential("bob", "saved");
+			using (var client = FtpClientFactory.Create(FtpUrl.Parse("ftpes://eve:typed@factory2.example/p")))
+				Assert.AreEqual("bob", client.Credentials.UserName);
 		}
 
 		[TestMethod]

@@ -15,6 +15,9 @@ namespace Files.App.Storage
 		/// <param name="explicitCredential">A credential the user entered for this item; otherwise the one cached for the exact scheme+host+port.</param>
 		public static AsyncFtpClient Create(FtpUrl url, NetworkCredential? explicitCredential = null)
 		{
+			// Credentials embedded in the URL are kept (session only) but never override a saved one for this scope.
+			FtpManager.RememberUrlCredential(url);
+
 			// Only the exact scheme+host+port key is consulted; there is no host-only fallback.
 			var credentials = explicitCredential
 				?? (FtpManager.Credentials.TryGetValue(url.GetCredentialKey(), out var known) ? known : FtpManager.Anonymous);

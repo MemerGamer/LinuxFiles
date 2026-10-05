@@ -17,6 +17,7 @@
         <PackageReference Include="UTF.Unknown" />
         <PackageReference Include="ColorCode.Core" />
         <PackageReference Include="TagLibSharp" />
+        <PackageReference Include="FluentFTP" />
         <PackageReference Include="MSTest.TestAdapter" />
         <PackageReference Include="MSTest.TestFramework" />
         <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
@@ -34,7 +35,7 @@
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewCodeTokenizer.cs" Link="Previews/PreviewCodeTokenizer.cs" />
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewImageDecoder.cs" Link="Previews/PreviewImageDecoder.cs" />
         <Compile Include="../../src/Files.App.Storage/Storables/Routes/*.cs" LinkBase="Storables/Routes" />
-        <Compile Include="../../src/Files.App.Storage/Ftp/FtpUrl.cs;../../src/Files.App.Storage/Ftp/FtpManager.cs;../../src/Files.App.Storage/Ftp/FtpStorableRoute.cs" LinkBase="Storables/Ftp" />
+        <Compile Include="../../src/Files.App.Storage/Ftp/FtpUrl.cs;../../src/Files.App.Storage/Ftp/FtpManager.cs;../../src/Files.App.Storage/Ftp/FtpStorableRoute.cs;../../src/Files.App.Storage/Ftp/FtpClientFactory.cs" LinkBase="Storables/Ftp" />
         <Compile Include="../../src/Files.App/Data/Enums/FilesystemItemType.cs" Link="Storables/FilesystemItemType.cs" />
         <Compile Include="../../src/Files.App/Utils/Storage/Helpers/IStorageItemWithPath.cs" Link="Storables/IStorageItemWithPath.cs" />
         <Compile Include="../../src/Files.App/Utils/Storage/Helpers/StorableWithPath.cs" Link="Storables/StorableWithPath.cs" />

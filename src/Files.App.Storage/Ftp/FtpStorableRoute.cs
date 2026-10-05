@@ -86,12 +86,24 @@ namespace Files.App.Storage
 			if (code is "530" or "532")
 				return true;
 
-			return code == "550" && message is not null &&
-				(message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
-				message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
-				message.Contains("not allowed", StringComparison.OrdinalIgnoreCase) ||
-				message.Contains("access", StringComparison.OrdinalIgnoreCase) ||
-				message.Contains("forbidden", StringComparison.OrdinalIgnoreCase));
+			if (code != "550" || message is null)
+				return false;
+
+			// "No such file" wins over everything else
+			if (message.Contains("no such", StringComparison.OrdinalIgnoreCase) ||
+				message.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+				message.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+				return false;
+
+			// Servers echo the path first ("/access.log: Permission denied"), so only the reason after it is matched
+			var separator = message.LastIndexOf(": ", StringComparison.Ordinal);
+			var reason = separator >= 0 ? message[(separator + 2)..] : message;
+
+			return reason.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
+				reason.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
+				reason.Contains("not allowed", StringComparison.OrdinalIgnoreCase) ||
+				reason.Contains("access", StringComparison.OrdinalIgnoreCase) ||
+				reason.Contains("forbidden", StringComparison.OrdinalIgnoreCase);
 		}
 
 		private static StorableResult ToFailure(Exception ex)

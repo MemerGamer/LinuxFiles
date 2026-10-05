@@ -91,17 +91,18 @@ namespace Files.Platform.Linux.Native
 				// must not rewrite what this process resolves. Stale directories of dead processes are removed first.
 				RemoveStaleProcessDirectories(current, uid);
 
-				var processDir = CreateProcessDirectory(current, uid, out var processDirName);
+				var processDir = CreateProcessDirectory(current, uid, out var processDirName, out var lockFd);
 				if (processDir < 0)
 					return null;
 
 				if (!PosixNative.SymlinkAt("/proc/self/fd/" + libraryFd, processDir, linkName, out _))
 				{
 					PosixNative.Close(processDir);
+					PosixNative.Close(lockFd);
 					return null;
 				}
 
-				RegisterCleanup(current, processDirName, processDir, linkName);
+				RegisterCleanup(current, processDirName, processDir, linkName, lockFd);
 				keep = true;
 				return "/proc/self/fd/" + processDir;
 			}
@@ -116,7 +117,13 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 
-		private static int CreateProcessDirectory(int parent, uint uid, out string name)
+		private const string LockName = "lock";
+
+		/// <summary>
+		/// Creates <c>&lt;pid&gt;-&lt;hex&gt;/lock</c> and holds an exclusive <c>flock</c> on the lock file for the life of the process; the lock
+		/// (not the pid in the name, which is only for readability) tells cleanup that the owner is still alive.
+		/// </summary>
+		private static int CreateProcessDirectory(int parent, uint uid, out string name, out int lockFd)
 		{
 			var pid = Environment.ProcessId;
 			for (var attempt = 0; attempt < 8; attempt++)
@@ -127,28 +134,54 @@ namespace Files.Platform.Linux.Native
 
 				var fd = PosixNative.OpenAt(parent, name, PosixNative.ODirectory | PosixNative.ONofollow | PosixNative.ReadOnlyFlags, out _);
 				if (fd >= 0 && IsTrusted(fd, uid, mustBeUser: true))
-					return fd;
+				{
+					lockFd = PosixNative.OpenAt(fd, LockName, PosixNative.CreateExclusiveFlags, out _, 0x180);
+					if (lockFd >= 0 && PosixNative.TryLockExclusive(lockFd))
+						return fd;
+
+					if (lockFd >= 0)
+						PosixNative.Close(lockFd);
+				}
 
 				if (fd >= 0)
 					PosixNative.Close(fd);
 			}
 
 			name = string.Empty;
+			lockFd = -1;
 			return -1;
 		}
 
-		/// <summary>Removes <c>&lt;pid&gt;-&lt;hex&gt;</c> directories of processes that are gone, using descriptors only and never following links.</summary>
+		/// <summary>True when <paramref name="child"/> is a mount root or lives on another mount than <paramref name="parent"/>.</summary>
+		public static bool CrossesMount(MountInfo child, MountInfo parent)
+		{
+			if ((child.AttributesMask & PosixNative.StatxAttrMountRoot) != 0 && (child.Attributes & PosixNative.StatxAttrMountRoot) != 0)
+				return true;
+
+			if (child.MountIdValid && parent.MountIdValid)
+				return child.MountId != parent.MountId;
+
+			return child.DevMajor != parent.DevMajor || child.DevMinor != parent.DevMinor;
+		}
+
+		/// <summary>
+		/// Removes <c>&lt;pid&gt;-&lt;hex&gt;</c> directories whose owner is gone. Ownership of the lock decides: a directory is only touched
+		/// when its <c>lock</c> file can be locked, which means no process holds it. Nothing is followed, mount crossings are skipped.
+		/// </summary>
 		private static void RemoveStaleProcessDirectories(int parent, uint uid)
 		{
 			try
 			{
+				if (!PosixNative.TryGetMountInfo(parent, string.Empty, PosixNative.AtEmptyPath, out var parentMount))
+					return;
+
 				foreach (var name in PosixNative.ListNames(parent, "native"))
 				{
 					var dash = name.IndexOf('-');
-					if (dash <= 0 || !int.TryParse(name.AsSpan(0, dash), out var pid) || pid == Environment.ProcessId || Directory.Exists("/proc/" + pid))
+					if (dash <= 0 || !int.TryParse(name.AsSpan(0, dash), out _))
 						continue;
 
-					RemoveDirectoryAt(parent, name, uid);
+					RemoveDirectoryIfAbandoned(parent, name, uid, parentMount);
 				}
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -156,36 +189,55 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 
-		private static void RemoveDirectoryAt(int parent, string name, uint uid)
+		private static void RemoveDirectoryIfAbandoned(int parent, string name, uint uid, MountInfo parentMount)
 		{
 			var fd = PosixNative.OpenAt(parent, name, PosixNative.ODirectory | PosixNative.ONofollow | PosixNative.ReadOnlyFlags, out _);
 			if (fd < 0)
 				return;
 
+			var lockFd = -1;
 			try
 			{
 				if (!PosixNative.TryStat(fd, out var stat) || !stat.IsDirectory || stat.OwnerUserId != uid)
 					return;
 
+				// A bind mount of another directory under a stale-looking name must not be emptied
+				if (!PosixNative.TryGetMountInfo(fd, string.Empty, PosixNative.AtEmptyPath, out var mount) || CrossesMount(mount, parentMount))
+					return;
+
+				lockFd = PosixNative.OpenAt(fd, LockName, PosixNative.ReadOnlyFlags | PosixNative.ONofollow | 0x800, out _);
+				if (lockFd < 0 || !PosixNative.TryStat(lockFd, out var lockStat) || !lockStat.IsRegularFile || !PosixNative.TryLockExclusive(lockFd))
+					return;
+
+				// Lock held: the owner is dead. Keep holding it while emptying, then drop the lock file last
 				foreach (var entry in PosixNative.ListNames(fd, name))
 				{
+					if (entry == LockName)
+						continue;
+
 					try { PosixNative.UnlinkAt(fd, entry, 0, entry); } catch (IOException) { } catch (UnauthorizedAccessException) { }
 				}
+
+				try { PosixNative.UnlinkAt(fd, LockName, 0, LockName); } catch (IOException) { } catch (UnauthorizedAccessException) { }
 			}
 			finally
 			{
+				if (lockFd >= 0)
+					PosixNative.Close(lockFd);
 				PosixNative.Close(fd);
 			}
 
 			try { PosixNative.UnlinkAt(parent, name, PosixNative.AtRemoveDir, name); } catch (IOException) { } catch (UnauthorizedAccessException) { }
 		}
 
-		private static void RegisterCleanup(int parent, string processDirName, int processDir, string linkName)
+		private static void RegisterCleanup(int parent, string processDirName, int processDir, string linkName, int lockFd)
 		{
 			AppDomain.CurrentDomain.ProcessExit += (_, _) =>
 			{
 				try { PosixNative.UnlinkAt(processDir, linkName, 0, linkName); } catch (Exception) { }
+				try { PosixNative.UnlinkAt(processDir, LockName, 0, LockName); } catch (Exception) { }
 				try { PosixNative.UnlinkAt(parent, processDirName, PosixNative.AtRemoveDir, processDirName); } catch (Exception) { }
+				PosixNative.Close(lockFd);
 			};
 		}
 

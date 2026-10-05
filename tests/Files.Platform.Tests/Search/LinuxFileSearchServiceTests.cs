@@ -243,13 +243,55 @@ namespace Files.Platform.Tests.Search
 
 				// Directories of dead processes are removed, live ones are kept
 				var native = Path.Combine(cache, "Files", "native");
-				var stale = Path.Combine(native, "4194300-deadbeef");
+				// A dead owner leaves an unlocked lock file
+				var stale = Path.Combine(native, "1-deadbeef");
 				Directory.CreateDirectory(stale);
+				File.WriteAllText(Path.Combine(stale, "lock"), "");
 				File.CreateSymbolicLink(Path.Combine(stale, "git2-x.so"), "/proc/self/fd/9");
-				Assert.IsFalse(Directory.Exists("/proc/4194300"));
+
+				var noLock = Path.Combine(native, "3-0badf00d");
+				Directory.CreateDirectory(noLock);
+
 				Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(cache, ["Files", "native"], "git2-x.so", lib);
-				Assert.IsFalse(Directory.Exists(stale));
-				Assert.IsTrue(File.Exists(Path.Combine(first, "git2-x.so")));
+				Assert.IsFalse(Directory.Exists(stale), "an abandoned directory is removed");
+				Assert.IsTrue(Directory.Exists(noLock), "a directory without a lock file may still be being created and is left alone");
+				Assert.IsTrue(File.Exists(Path.Combine(first, "git2-x.so")), "directories of live processes (lock held) are kept");
+			}
+			finally
+			{
+				Directory.Delete(root, recursive: true);
+			}
+		}
+
+		[TestMethod]
+		[SupportedOSPlatform("linux")]
+		public void TrustedNativeDirectory_HeldLockPreventsRemovalAndMountRootsAreSkipped()
+		{
+			var root = Path.Combine(AppContext.BaseDirectory, "trust-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				var lib = "/bin/sh";
+				var cache = Path.Combine(root, "cache");
+				var first = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(cache, ["Files", "native"], "git2-x.so", lib);
+				Assert.IsNotNull(first);
+
+				// The first call's directory is still locked by this process, so a second call must not remove it even though it is
+				// "not ours" by name once the pid is rewritten to look foreign
+				var native = Path.Combine(cache, "Files", "native");
+				var ours = Directory.GetDirectories(native).Single();
+				var foreign = Path.Combine(native, "1" + Path.GetFileName(ours));
+				Directory.Move(ours, foreign); // the lock is on the inode, so it is still held
+				Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(cache, ["Files", "native"], "git2-x.so", lib);
+				Assert.IsTrue(Directory.Exists(foreign), "a directory whose lock is held is never removed");
+
+				// Mount seam: mount root attribute, different mount id, different device
+				var same = new Files.Platform.Linux.Native.MountInfo(0, 0x2000, true, 7, 1, 1);
+				Assert.IsFalse(Files.Platform.Linux.Native.TrustedNativeDirectory.CrossesMount(same, same));
+				Assert.IsTrue(Files.Platform.Linux.Native.TrustedNativeDirectory.CrossesMount(same with { Attributes = 0x2000 }, same));
+				Assert.IsTrue(Files.Platform.Linux.Native.TrustedNativeDirectory.CrossesMount(same with { MountId = 8 }, same));
+				Assert.IsTrue(Files.Platform.Linux.Native.TrustedNativeDirectory.CrossesMount(same with { MountIdValid = false, DevMinor = 2 }, same with { MountIdValid = false }));
+				Assert.IsFalse(Files.Platform.Linux.Native.TrustedNativeDirectory.CrossesMount(same with { MountIdValid = false }, same with { MountIdValid = false }));
 			}
 			finally
 			{

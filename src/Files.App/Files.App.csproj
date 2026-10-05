@@ -266,6 +266,19 @@
         <Compile Remove="**\*.Windows.cs" />
     </ItemGroup>
 
+    <!--  Windows-only Properties pages (NTFS ACLs, Authenticode signatures, compatibility tab, icon customization)  -->
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <Compile Remove="Utils\Signatures\**" />
+        <Compile Remove="Views\Properties\SecurityPage.xaml.cs" />
+        <Compile Remove="Views\Properties\SecurityAdvancedPage.xaml.cs" />
+        <Compile Remove="Views\Properties\SignaturesPage.xaml.cs" />
+        <Compile Remove="Views\Properties\CompatibilityPage.xaml.cs" />
+        <Compile Remove="Views\Properties\CustomizationPage.xaml.cs" />
+    </ItemGroup>
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <DefaultItemExcludes>$(DefaultItemExcludes);Views/Properties/SecurityPage.xaml;Views/Properties/SecurityAdvancedPage.xaml;Views/Properties/SignaturesPage.xaml;Views/Properties/CompatibilityPage.xaml;Views/Properties/CustomizationPage.xaml</DefaultItemExcludes>
+    </PropertyGroup>
+
     <!--  Opt-in transitional aid (-p:FilesWin32Compat=true): compiles against the CsWin32-generated Windows.Win32 types (built for
           the Windows TFM with Platform=x64, which works on Linux) so Win32-touching code gets past declaration binding and the compiler
           reports the remaining, Uno-specific errors. Nothing here runs on Linux; replace Win32 usage with Files.Platform interfaces,

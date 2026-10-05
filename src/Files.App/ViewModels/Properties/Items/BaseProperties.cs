@@ -6,13 +6,10 @@ using Files.Platform.Abstractions.Permissions;
 using Microsoft.UI.Dispatching;
 using System.IO;
 using Windows.Storage.FileProperties;
-using Windows.Win32;
-using Windows.Win32.Storage.FileSystem;
-using FileAttributes = System.IO.FileAttributes;
 
 namespace Files.App.ViewModels.Properties
 {
-	public abstract class BaseProperties
+	public abstract partial class BaseProperties
 	{
 		public IShellPage AppInstance { get; }
 
@@ -38,19 +35,6 @@ namespace Files.App.ViewModels.Properties
 
 		public abstract Task GetSpecialPropertiesAsync();
 
-		private static unsafe (FindCloseSafeHandle Handle, WIN32_FIND_DATAW Data) FindFirstFile(string path)
-		{
-			WIN32_FIND_DATAW findData = default;
-			FindCloseSafeHandle hFile = PInvoke.FindFirstFileEx(
-				path,
-				FINDEX_INFO_LEVELS.FindExInfoBasic,
-				&findData,
-				FINDEX_SEARCH_OPS.FindExSearchNameMatch,
-				FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
-
-			return (hFile, findData);
-		}
-
 		public async Task GetOtherPropertiesAsync(IStorageItemExtraProperties properties)
 		{
 			string dateAccessedProperty = "System.DateAccessed";
@@ -71,74 +55,11 @@ namespace Files.App.ViewModels.Properties
 
 		public async Task<(long size, long sizeOnDisk)> CalculateFolderSizeAsync(string path, CancellationToken token)
 		{
-			if (OperatingSystem.IsLinux())
-				return await CalculateFolderSizeLinuxAsync(path, token);
-
-			if (string.IsNullOrEmpty(path))
-			{
-				// In MTP devices calculating folder size would be too slow
-				// Also should use StorageFolder methods instead of FindFirstFileEx
-				return (0, 0);
-			}
-
-			long size = 0;
-			long sizeOnDisk = 0;
-			var (hFile, findData) = FindFirstFile(path + "\\*.*");
-			using FindCloseSafeHandle findHandleScope = hFile;
-
-			var count = 0;
-			if (!hFile.IsInvalid)
-			{
-				do
-				{
-					string fileName = findData.cFileName.ToString();
-					if (((FileAttributes)findData.dwFileAttributes & FileAttributes.ReparsePoint) == FileAttributes.ReparsePoint)
-						// Skip symbolic links and junctions
-						continue;
-
-					if (((FileAttributes)findData.dwFileAttributes & FileAttributes.Directory) != FileAttributes.Directory)
-					{
-						size += findData.GetSize();
-						var fileSizeOnDisk = Win32Helper.GetFileSizeOnDisk(Path.Combine(path, fileName));
-						sizeOnDisk += fileSizeOnDisk ?? 0;
-						++count;
-						ViewModel.FilesCount++;
-					}
-					else if (fileName != "." && fileName != "..")
-					{
-						var itemPath = Path.Combine(path, fileName);
-
-						var folderSize = await CalculateFolderSizeAsync(itemPath, token);
-						size += folderSize.size;
-						sizeOnDisk += folderSize.sizeOnDisk;
-						++count;
-						ViewModel.FoldersCount++;
-					}
-
-					if (size > ViewModel.ItemSizeBytes || sizeOnDisk > ViewModel.ItemSizeOnDiskBytes)
-					{
-						await Dispatcher.EnqueueOrInvokeAsync(() =>
-						{
-							ViewModel.ItemSizeBytes = size;
-							ViewModel.ItemSize = size.ToSizeString();
-							ViewModel.ItemSizeOnDiskBytes = sizeOnDisk;
-							ViewModel.ItemSizeOnDisk = sizeOnDisk.ToSizeString();
-							SetItemsCountString();
-						},
-						DispatcherQueuePriority.Low);
-					}
-
-					if (token.IsCancellationRequested)
-						break;
-				}
-				while (PInvoke.FindNextFile(hFile, out findData));
-
-				return (size, sizeOnDisk);
-			}
-			else
-			{
-				return (0, 0);
-			}
+#if WINDOWS
+			return await CalculateFolderSizeWindowsAsync(path, token);
+#else
+			return await CalculateFolderSizeLinuxAsync(path, token);
+#endif
 		}
 
 		private async Task<(long size, long sizeOnDisk)> CalculateFolderSizeLinuxAsync(string path, CancellationToken token)
@@ -180,13 +101,14 @@ namespace Files.App.ViewModels.Properties
 		}
 
 		/// <summary>
-		/// Fills the stat-derived fields (sizes, timestamps, link target) of the General page on Linux and hides the Windows attributes.
+		/// Fills the stat-derived fields (sizes, timestamps, link target) and the read-only and hidden attributes of the General page on Linux.
 		/// </summary>
 		protected void ApplyLinuxStat(string path)
 		{
-			ViewModel.ItemAttributesVisibility = false;
 			ViewModel.IsDownloadedFile = false;
 			ViewModel.CanCompressContent = false;
+			ViewModel.CompressAttributeVisibility = false;
+			ApplyLinuxAttributes(path);
 
 			if (!Ioc.Default.GetRequiredService<IFileStatService>().TryGetStat(path, out var stat))
 				return;
@@ -208,6 +130,28 @@ namespace Files.App.ViewModels.Properties
 
 			if (stat.IsSymbolicLink)
 				ViewModel.LinkTarget = stat.LinkTarget;
+		}
+
+		private void ApplyLinuxAttributes(string path)
+		{
+			var attributes = Ioc.Default.GetRequiredService<IFileAttributesService>();
+			var permissions = Ioc.Default.GetRequiredService<IFilePermissionsService>();
+
+			ViewModel.IsHidden = attributes.IsHidden(path);
+
+			// Mode bits of a symbolic link cannot be changed, so only the hidden rename applies to links
+			if (attributes.TryGetReadOnly(path, out var isReadOnly) && permissions.TryGetPermissions(path, out var info) && info.CanChangeMode)
+			{
+				ViewModel.IsReadOnly = isReadOnly;
+				ViewModel.IsReadOnlyEnabled = true;
+			}
+			else
+			{
+				ViewModel.IsReadOnly = attributes.TryGetReadOnly(path, out isReadOnly) && isReadOnly;
+				ViewModel.IsReadOnlyEnabled = false;
+			}
+
+			ViewModel.ItemAttributesVisibility = true;
 		}
 
 		/// <summary>

@@ -57,6 +57,7 @@ namespace Files.App.ViewModels.Properties
 					ViewModel.FormatVisibility = false;
 				}
 
+#if WINDOWS
 				ViewModel.CleanupDriveCommand = new AsyncRelayCommand(() => StorageSenseHelper.OpenStorageSenseAsync(drivePath));
 				ViewModel.FormatDriveCommand = new RelayCommand(async () =>
 				{
@@ -68,6 +69,7 @@ namespace Files.App.ViewModels.Properties
 					{
 					}
 				});
+#endif
 			}
 			// Storage objects (multi-selected)
 			else if (np.Parameter is List<ListedItem> items)

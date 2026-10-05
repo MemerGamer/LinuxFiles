@@ -82,18 +82,27 @@ namespace Files.App.ViewModels.Properties
 				Window = Window
 			};
 
+			// The ACL, compatibility and signature pages are Windows-only; other platforms fall back to General
 			var page = item.ItemType switch
 			{
 				PropertiesNavigationViewItemType.General => typeof(GeneralPage),
 				PropertiesNavigationViewItemType.Shortcut => typeof(ShortcutPage),
 				PropertiesNavigationViewItemType.Library => typeof(LibraryPage),
 				PropertiesNavigationViewItemType.Details => typeof(DetailsPage),
+#if WINDOWS
 				PropertiesNavigationViewItemType.Security => typeof(SecurityPage),
+#endif
 				PropertiesNavigationViewItemType.Permissions => typeof(PermissionsPage),
+#if WINDOWS
 				PropertiesNavigationViewItemType.Customization => typeof(CustomizationPage),
+#endif
+#if WINDOWS
 				PropertiesNavigationViewItemType.Compatibility => typeof(CompatibilityPage),
+#endif
 				PropertiesNavigationViewItemType.Hashes => typeof(HashesPage),
+#if WINDOWS
 				PropertiesNavigationViewItemType.Signatures => typeof(SignaturesPage),
+#endif
 				_ => typeof(GeneralPage),
 			};
 

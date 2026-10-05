@@ -374,7 +374,8 @@ namespace Files.App.Helpers
 
 			if (isFtp)
 			{
-				var host = FtpHelpers.GetFtpHost(path);
+				// Scoped by scheme+host+port so the password is never offered to another service on the same host
+				var host = FtpUrl.Parse(path).GetCredentialKey();
 				FtpManager.Credentials[host] = new NetworkCredential(credentials.UserName, credentials.SecurePassword);
 			}
 

@@ -438,6 +438,7 @@ namespace Files.App.Helpers
 
 			// Storable path resolution
 			services.AddStorables();
+			services.AddFtpStorables();
 
 			// Conditional DI
 #if WINDOWS

@@ -9,7 +9,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Animation;
 using System.Collections.Concurrent;
 using Windows.Graphics;
+#if WINDOWS
 using Windows.Win32;
+#endif
 
 namespace Files.App.Utils.Storage
 {
@@ -135,8 +137,10 @@ namespace Files.App.Utils.Storage
 
 			// WINUI3: Move window to cursor position (the window manager places the window on Linux)
 			var pointerPosition = default(System.Drawing.Point);
+#if WINDOWS
 			if (!OperatingSystem.IsLinux())
 				PInvoke.GetCursorPos(out pointerPosition);
+#endif
 
 			// Null when no display is available, e.g. while monitors are detached
 			var displayArea = OperatingSystem.IsLinux()

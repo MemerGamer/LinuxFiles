@@ -364,10 +364,12 @@ namespace Files.App.ViewModels.UserControls.Widgets
 				}
 				else
 				{
+#if WINDOWS
 					var listedItem = await UniversalStorageEnumerator.AddFileAsync(file, null, default);
 					var shellPage = ContentPageContext.ShellPage
 						?? throw new InvalidOperationException("The shell page is not available for opening properties.");
 					FilePropertiesHelpers.OpenPropertiesWindow(listedItem!, shellPage);
+#endif
 				}
 			}
 

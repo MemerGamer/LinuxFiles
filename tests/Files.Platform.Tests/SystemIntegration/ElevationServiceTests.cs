@@ -79,5 +79,35 @@ namespace Files.Platform.Tests.SystemIntegration
 			Assert.IsFalse(missing.IsAvailable);
 			Assert.IsFalse((await missing.DeleteAsync("/x/y")).Succeeded);
 		}
+
+		[TestMethod]
+		public async Task MoveAndRenameUseMvWithoutClobberingAndPlansMatchWhatRuns()
+		{
+			var runner = new FakeRunner();
+			var service = new PkexecElevationService(new FakeLocator("pkexec", "mv"), runner);
+
+			await service.MoveAsync("/home/u/a.txt", "/opt/app");
+			await service.RenameAsync("/opt/app/old name", "new; name");
+
+			CollectionAssert.AreEqual(new[] { "/usr/bin/mv", "-n", "--", "/home/u/a.txt", "/opt/app/" }, runner.Calls[0].Args);
+			CollectionAssert.AreEqual(new[] { "/usr/bin/mv", "-n", "-T", "--", "/opt/app/old name", "/opt/app/new; name" }, runner.Calls[1].Args);
+			Assert.AreEqual("pkexec /usr/bin/mv -n -- /home/u/a.txt /opt/app/", service.PlanMove("/home/u/a.txt", "/opt/app")!.DisplayText);
+		}
+
+		[TestMethod]
+		public async Task RenameRefusesPathsAsNames()
+		{
+			var runner = new FakeRunner();
+			var service = new PkexecElevationService(new FakeLocator("pkexec", "mv"), runner);
+
+			Assert.IsFalse((await service.RenameAsync("/opt/a", "../b")).Succeeded);
+			Assert.IsFalse((await service.RenameAsync("/opt/a", "b/c")).Succeeded);
+			Assert.IsFalse((await service.RenameAsync("/opt/a", "..")).Succeeded);
+			Assert.IsFalse((await service.RenameAsync("/opt/a", "")).Succeeded);
+			Assert.IsFalse((await service.RenameAsync("/", "x")).Succeeded);
+			Assert.IsFalse((await service.MoveAsync("/", "/opt")).Succeeded);
+			Assert.IsNull(service.PlanRename("rel", "x"));
+			Assert.AreEqual(0, runner.Calls.Count);
+		}
 	}
 }

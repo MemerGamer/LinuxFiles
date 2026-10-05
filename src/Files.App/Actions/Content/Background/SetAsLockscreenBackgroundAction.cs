@@ -1,6 +1,8 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Wallpaper;
+
 namespace Files.App.Actions
 {
 	[GeneratedRichCommand]
@@ -22,7 +24,7 @@ namespace Files.App.Actions
 			=> new("\uEE3F");
 
 		public override bool IsExecutable =>
-			OperatingSystem.IsWindows() &&
+			(OperatingSystem.IsWindows() || IsWallpaperPortalAvailable) &&
 			base.IsExecutable &&
 			ContentPageContext.SelectedItem is not null;
 
@@ -30,6 +32,9 @@ namespace Files.App.Actions
 		{
 			if (!IsExecutable || ContentPageContext.SelectedItem is not ListedItem selectedItem)
 				return Task.CompletedTask;
+
+			if (!OperatingSystem.IsWindows())
+				return SetThroughPortalAsync(selectedItem.ItemPath!, WallpaperTarget.LockScreen);
 
 			try
 			{

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Microsoft.UI.Xaml.Controls;
+using Files.Platform.Abstractions.Wallpaper;
 using Windows.Foundation.Metadata;
 
 namespace Files.App.Actions
@@ -31,12 +32,36 @@ namespace Files.App.Actions
 			ContentPageContext.PageType != ContentPageTypes.Settings &&
 			(ContentPageContext.ShellPage?.SlimContentPage?.SelectedItemsPropertiesViewModel?.IsCompatibleToSetAsWindowsWallpaper ?? false);
 
+		private static volatile int portalState; // 0 = unknown, 1 = available, 2 = unavailable
+
+		/// <summary>Whether the desktop's wallpaper portal answered. Only meaningful off Windows; hides the action until known.</summary>
+		protected static bool IsWallpaperPortalAvailable => portalState == 1;
+
 		public BaseSetAsAction()
 		{
 			ContentPageContext.PropertyChanged += ContentPageContext_PropertyChanged;
+
+			if (!OperatingSystem.IsWindows() && portalState == 0)
+				_ = ProbeWallpaperPortalAsync();
+		}
+
+		private async Task ProbeWallpaperPortalAsync()
+		{
+			var service = Ioc.Default.GetService<IWallpaperService>();
+			var available = service is not null && await service.IsAvailableAsync();
+			portalState = available ? 1 : 2;
+			OnPropertyChanged(nameof(IsExecutable));
 		}
 
 		public abstract Task ExecuteAsync(object? parameter = null);
+
+		protected async Task SetThroughPortalAsync(string path, WallpaperTarget target)
+		{
+			var service = Ioc.Default.GetService<IWallpaperService>();
+			var result = service is null ? WallpaperResult.Unavailable : await service.SetAsync(path, target);
+			if (result is WallpaperResult.Failed or WallpaperResult.Unavailable)
+				ShowErrorDialog(Strings.FailedToSetBackground.GetLocalizedResource());
+		}
 
 		protected async void ShowErrorDialog(string message)
 		{

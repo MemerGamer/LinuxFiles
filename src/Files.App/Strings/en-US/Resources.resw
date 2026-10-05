@@ -4948,4 +4948,37 @@
     <value>The item was restored, but the Trash could not be fully cleaned up.</value>
     <comment>Shown in a StatusCenter card.</comment>
   </data>
+  <data name="FontAlreadyInstalledPrompt" xml:space="preserve">
+    <value>A font named "{0}" is already installed for your user. Replace it?</value>
+    <comment>Shown when installing a font on Linux.</comment>
+  </data>
+  <data name="FontInstallFailed" xml:space="preserve">
+    <value>"{0}" could not be installed. Make sure it is a valid font file.</value>
+    <comment>Shown when installing a font on Linux.</comment>
+  </data>
+  <data name="RootActions" xml:space="preserve">
+    <value>Root actions</value>
+    <comment>Context menu submenu on Linux. Each action asks the system to authenticate and runs as root.</comment>
+  </data>
+  <data name="RootDeleteAction" xml:space="preserve">
+    <value>Delete as root</value>
+  </data>
+  <data name="RootRenameAction" xml:space="preserve">
+    <value>Rename as root</value>
+  </data>
+  <data name="RootPasteAction" xml:space="preserve">
+    <value>Paste here as root</value>
+  </data>
+  <data name="RootConfirmTitle" xml:space="preserve">
+    <value>Run as root?</value>
+  </data>
+  <data name="RootConfirmContent" xml:space="preserve">
+    <value>Your system will ask you to authenticate, then run exactly:</value>
+  </data>
+  <data name="RootRunButton" xml:space="preserve">
+    <value>Run as root</value>
+  </data>
+  <data name="RootActionFailed" xml:space="preserve">
+    <value>The operation failed: {0}</value>
+  </data>
 </root>

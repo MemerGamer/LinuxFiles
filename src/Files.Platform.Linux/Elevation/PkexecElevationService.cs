@@ -89,36 +89,75 @@ namespace Files.Platform.Linux.Elevation
 		public bool IsAvailable => locator.Locate("pkexec") is not null;
 
 		/// <inheritdoc/>
-		public Task<ElevatedResult> DeleteAsync(string path, CancellationToken cancellationToken = default)
+		public ElevatedCommand? PlanDelete(string path)
 		{
 			if (!IsSafeAbsolutePath(path) || IsFilesystemRoot(path))
-				return Task.FromResult(Failure("Refusing to delete this path."));
+				return null;
 
-			return RunPrivilegedAsync("rm", ["-rf", "--", Normalize(path)], cancellationToken);
+			return Plan("rm", ["-rf", "--", Normalize(path)]);
 		}
 
 		/// <inheritdoc/>
-		public Task<ElevatedResult> CopyAsync(string sourcePath, string destinationFolder, CancellationToken cancellationToken = default)
+		public ElevatedCommand? PlanCopy(string sourcePath, string destinationFolder)
 		{
-			if (!IsSafeAbsolutePath(sourcePath) || !IsSafeAbsolutePath(destinationFolder))
-				return Task.FromResult(Failure("Paths must be absolute."));
+			if (!IsSafeAbsolutePath(sourcePath) || !IsSafeAbsolutePath(destinationFolder) || IsFilesystemRoot(sourcePath))
+				return null;
 
 			// -a keeps the source's mode and timestamps; -T is not used so an existing destination folder receives the item
-			return RunPrivilegedAsync("cp", ["-a", "--", Normalize(sourcePath), Normalize(destinationFolder) + "/"], cancellationToken);
+			return Plan("cp", ["-a", "--", Normalize(sourcePath), Normalize(destinationFolder) + "/"]);
 		}
 
-		private async Task<ElevatedResult> RunPrivilegedAsync(string program, string[] arguments, CancellationToken cancellationToken)
+		/// <inheritdoc/>
+		public ElevatedCommand? PlanMove(string sourcePath, string destinationFolder)
+		{
+			if (!IsSafeAbsolutePath(sourcePath) || !IsSafeAbsolutePath(destinationFolder) || IsFilesystemRoot(sourcePath))
+				return null;
+
+			// -n never replaces an existing item
+			return Plan("mv", ["-n", "--", Normalize(sourcePath), Normalize(destinationFolder) + "/"]);
+		}
+
+		/// <inheritdoc/>
+		public ElevatedCommand? PlanRename(string path, string newName)
+		{
+			if (!IsSafeAbsolutePath(path) || IsFilesystemRoot(path) || !IsPlainName(newName))
+				return null;
+
+			var source = Normalize(path);
+			var parent = Path.GetDirectoryName(source) ?? "/";
+			return Plan("mv", ["-n", "-T", "--", source, Path.Combine(parent, newName)]);
+		}
+
+		/// <inheritdoc/>
+		public Task<ElevatedResult> DeleteAsync(string path, CancellationToken cancellationToken = default)
+			=> RunAsync(PlanDelete(path), "Refusing to delete this path.", cancellationToken);
+
+		/// <inheritdoc/>
+		public Task<ElevatedResult> CopyAsync(string sourcePath, string destinationFolder, CancellationToken cancellationToken = default)
+			=> RunAsync(PlanCopy(sourcePath, destinationFolder), "Paths must be absolute.", cancellationToken);
+
+		/// <inheritdoc/>
+		public Task<ElevatedResult> MoveAsync(string sourcePath, string destinationFolder, CancellationToken cancellationToken = default)
+			=> RunAsync(PlanMove(sourcePath, destinationFolder), "Paths must be absolute.", cancellationToken);
+
+		/// <inheritdoc/>
+		public Task<ElevatedResult> RenameAsync(string path, string newName, CancellationToken cancellationToken = default)
+			=> RunAsync(PlanRename(path, newName), "Refusing to rename this path.", cancellationToken);
+
+		private ElevatedCommand? Plan(string program, string[] arguments)
+			=> locator.Locate(program) is { } target ? new ElevatedCommand(target, arguments) : null;
+
+		private async Task<ElevatedResult> RunAsync(ElevatedCommand? command, string refusal, CancellationToken cancellationToken)
 		{
 			var pkexec = locator.Locate("pkexec");
 			if (pkexec is null)
 				return Failure("pkexec is not installed.");
 
-			var target = locator.Locate(program);
-			if (target is null)
-				return Failure($"{program} was not found.");
+			if (command is null)
+				return Failure(refusal);
 
-			var full = new List<string>(arguments.Length + 1) { target };
-			full.AddRange(arguments);
+			var full = new List<string>(command.Arguments.Count + 1) { command.Program };
+			full.AddRange(command.Arguments);
 
 			try
 			{
@@ -131,6 +170,9 @@ namespace Files.Platform.Linux.Elevation
 				return Failure(ex.Message);
 			}
 		}
+
+		private static bool IsPlainName(string name)
+			=> !string.IsNullOrEmpty(name) && name is not ("." or "..") && name.IndexOfAny(['/', '\0']) < 0;
 
 		private static ElevatedResult Failure(string message) => new(false, false, -1, message);
 

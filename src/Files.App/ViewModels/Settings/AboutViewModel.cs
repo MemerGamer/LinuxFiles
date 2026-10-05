@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Microsoft.Win32;
+using System.Reflection;
 using System.Windows.Input;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.DataTransfer;
@@ -23,13 +24,19 @@ namespace Files.App.ViewModels.Settings
 		// Properties
 
 		public string Version
-			=> string.Format($"{Strings.SettingsAboutVersionTitle.GetLocalizedResource()} {AppVersion.Major}.{AppVersion.Minor}.{AppVersion.Build}.{AppVersion.Revision}");
+			=> $"{Strings.SettingsAboutVersionTitle.GetLocalizedResource()} {GetAppVersion()}";
 
 		public string AppName
-			=> Package.Current.DisplayName;
+			=> OperatingSystem.IsLinux() ? typeof(AboutViewModel).Assembly.GetName().Name ?? string.Empty : Package.Current.DisplayName;
 
-		public PackageVersion AppVersion
-			=> Package.Current.Id.Version;
+		public Microsoft.UI.Xaml.Visibility WindowsOnlyVisibility => OperatingSystem.IsWindows()
+			? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+
+#if WINDOWS
+		public PackageVersion AppVersion => Package.Current.Id.Version;
+#else
+		public System.Version AppVersion => typeof(AboutViewModel).Assembly.GetName().Version ?? new System.Version();
+#endif
 
 		public ObservableCollection<OpenSourceLibraryItem> OpenSourceLibraries { get; }
 
@@ -97,6 +104,12 @@ namespace Files.App.ViewModels.Settings
 
 		private async Task<bool> OpenLogLocation()
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				return await Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.ILauncherService>()
+					.OpenAsync([ApplicationData.Current.LocalFolder.Path]);
+			}
+
 			await Launcher.LaunchFolderAsync(ApplicationData.Current.LocalFolder).AsTask();
 
 			// TODO: Move this to an application service
@@ -186,11 +199,18 @@ namespace Files.App.ViewModels.Settings
 
 		public string GetAppVersion()
 		{
+			if (OperatingSystem.IsLinux())
+				return typeof(AboutViewModel).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+					?? typeof(AboutViewModel).Assembly.GetName().Version?.ToString() ?? string.Empty;
+
 			return $"{AppVersion.Major}.{AppVersion.Minor}.{AppVersion.Build}.{AppVersion.Revision}";
 		}
 
 		public string GetWindowsVersion()
 		{
+			if (OperatingSystem.IsLinux())
+				return Environment.OSVersion.VersionString;
+
 			ulong v = ulong.Parse(Windows.System.Profile.AnalyticsInfo.VersionInfo.DeviceFamilyVersion);
 			return $"{(v >> 48) & 0xFFFF}.{(v >> 32) & 0xFFFF}.{(v >> 16) & 0xFFFF}.{v & 0xFFFF}";
 		}
@@ -204,7 +224,7 @@ namespace Files.App.ViewModels.Settings
 		{
 			var query = System.Web.HttpUtility.ParseQueryString(string.Empty);
 			query["files_version"] = GetAppVersion();
-			query["windows_version"] = GetWindowsVersion();
+			query[OperatingSystem.IsLinux() ? "os_version" : "windows_version"] = GetWindowsVersion();
 			query["user_id"] = GetUserID();
 			return query.ToString() ?? string.Empty;
 		}

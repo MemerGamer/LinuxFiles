@@ -522,6 +522,17 @@ namespace Files.App.Helpers
 					return recycleBinPreference;
 
 				var defaultPref = new LayoutPreferencesItem();
+				if (OperatingSystem.IsLinux())
+				{
+					var columns = defaultPref.ColumnsViewModel;
+					columns.NameColumn.UserLengthPixels = 180;
+					columns.TagColumn.UserLengthPixels = 60;
+					columns.OriginalPathColumn.UserLengthPixels = 140;
+					columns.DateDeletedColumn.UserLengthPixels = 140;
+					columns.DateModifiedColumn.UserLengthPixels = 140;
+					columns.ItemTypeColumn.UserLengthPixels = 100;
+					columns.SizeColumn.UserLengthPixels = 80;
+				}
 				if (defaultPref.LayoutMode == FolderLayoutModes.ColumnView)
 					defaultPref.LayoutMode = FolderLayoutModes.DetailsView;
 

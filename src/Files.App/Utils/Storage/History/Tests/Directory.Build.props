@@ -1,0 +1,7 @@
+<Project>
+	<Import Project="../../../../../../Directory.Build.props" />
+	<PropertyGroup>
+		<BaseIntermediateOutputPath>/tmp/files-p4-b-history/obj/</BaseIntermediateOutputPath>
+		<BaseOutputPath>/tmp/files-p4-b-history/bin/</BaseOutputPath>
+	</PropertyGroup>
+</Project>

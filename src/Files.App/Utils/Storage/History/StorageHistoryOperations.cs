@@ -10,15 +10,20 @@ namespace Files.App.Utils.Storage
 	public sealed partial class StorageHistoryOperations : IStorageHistoryOperations
 	{
 		private IFilesystemHelpers? helpers;
-		private ShellFilesystemOperations? operations;
+		private IFilesystemOperations? operations;
 
 		private readonly CancellationToken cancellationToken;
 
 		public StorageHistoryOperations(IShellPage associatedInstance, CancellationToken cancellationToken)
+			: this(associatedInstance.FilesystemHelpers, FilesystemOperationsFactory.Create(associatedInstance), cancellationToken)
+		{
+		}
+
+		internal StorageHistoryOperations(IFilesystemHelpers helpers, IFilesystemOperations operations, CancellationToken cancellationToken)
 		{
 			this.cancellationToken = cancellationToken;
-			helpers = associatedInstance.FilesystemHelpers;
-			operations = new ShellFilesystemOperations(associatedInstance);
+			this.helpers = helpers;
+			this.operations = operations;
 		}
 
 		public async Task<ReturnResult> Undo(IStorageHistory history)
@@ -26,9 +31,13 @@ namespace Files.App.Utils.Storage
 			var helpers = this.helpers ?? throw new ObjectDisposedException(nameof(StorageHistoryOperations));
 			var operations = this.operations ?? throw new ObjectDisposedException(nameof(StorageHistoryOperations));
 			ReturnResult returnStatus = ReturnResult.InProgress;
+#if WINDOWS
 			Progress<StatusCenterItemProgressModel> progress = new();
 
 			progress.ProgressChanged += (s, e) => returnStatus = e.Status!.Value.ToStatus();
+#else
+			HistoryProgress progress = new();
+#endif
 
 			switch (history.OperationType)
 			{
@@ -55,7 +64,13 @@ namespace Files.App.Utils.Storage
 						for (int i = 0; i < renamedItems.Count; i++)
 						{
 							string name = Path.GetFileName(history.Source[i].Path);
+#if WINDOWS
 							await operations.RenameAsync(renamedItems[i], name, collision, progress, cancellationToken);
+#else
+							var replayed = await operations.RenameAsync(renamedItems[i], name, collision, progress, cancellationToken);
+							if (replayed?.Destination is { Count: > 0 })
+								history.Source[i] = replayed.Destination[0];
+#endif
 						}
 					}
 					break;
@@ -71,7 +86,11 @@ namespace Files.App.Utils.Storage
 					var movedItems = history.Destination;
 					if (!IsHistoryNull(history.Source) && !IsHistoryNull(movedItems))
 					{
+#if WINDOWS
 						return await helpers.MoveItemsAsync(movedItems, history.Source.Select(item => item.Path), false, false);
+#else
+						return await helpers.MoveItemsAsync(movedItems, history.Source.Select(item => item.Path), false, false, replayed => UpdateHistory(history, replayed, true));
+#endif
 					}
 					break;
 				case FileOperationType.Extract: // Opposite: No opposite for archive extraction
@@ -82,7 +101,11 @@ namespace Files.App.Utils.Storage
 					var recycledItems = history.Destination;
 					if (!IsHistoryNull(history.Source) && !IsHistoryNull(recycledItems))
 					{
+#if WINDOWS
 						returnStatus = await helpers.RestoreItemsFromTrashAsync(recycledItems, history.Source.Select(item => item.Path), false);
+#else
+						returnStatus = await helpers.RestoreItemsFromTrashAsync(recycledItems, history.Source.Select(item => item.Path), false, replayed => UpdateHistory(history, replayed, true));
+#endif
 						if (returnStatus is ReturnResult.IntegrityCheckFailed) // Not found, corrupted
 						{
 							App.HistoryWrapper.RemoveHistory(history, false);
@@ -101,7 +124,11 @@ namespace Files.App.Utils.Storage
 						else
 						{
 							// We need to change the recycled item paths (since IDs are different) - for Redo() to work
+#if WINDOWS
 							App.HistoryWrapper.ModifyCurrentHistory(newHistory);
+#else
+							UpdateHistory(history, newHistory, true);
+#endif
 						}
 					}
 					break;
@@ -110,7 +137,11 @@ namespace Files.App.Utils.Storage
 					break;
 			}
 
+#if WINDOWS
 			return returnStatus;
+#else
+			return progress.Status ?? returnStatus;
+#endif
 		}
 
 		public async Task<ReturnResult> Redo(IStorageHistory history)
@@ -118,9 +149,13 @@ namespace Files.App.Utils.Storage
 			var helpers = this.helpers ?? throw new ObjectDisposedException(nameof(StorageHistoryOperations));
 			var operations = this.operations ?? throw new ObjectDisposedException(nameof(StorageHistoryOperations));
 			ReturnResult returnStatus = ReturnResult.InProgress;
+#if WINDOWS
 			Progress<StatusCenterItemProgressModel> progress = new();
 
 			progress.ProgressChanged += (s, e) => { returnStatus = e.Status!.Value.ToStatus(); };
+#else
+			HistoryProgress progress = new();
+#endif
 
 			switch (history.OperationType)
 			{
@@ -142,7 +177,13 @@ namespace Files.App.Utils.Storage
 						for (int i = 0; i < history.Source.Count; i++)
 						{
 							string name = Path.GetFileName(renameDestinations[i].Path);
+#if WINDOWS
 							await operations.RenameAsync(history.Source[i], name, collision, progress, cancellationToken);
+#else
+							var replayed = await operations.RenameAsync(history.Source[i], name, collision, progress, cancellationToken);
+							if (replayed?.Destination is { Count: > 0 })
+								renameDestinations[i] = replayed.Destination[0];
+#endif
 						}
 					}
 					break;
@@ -150,14 +191,22 @@ namespace Files.App.Utils.Storage
 					var copyDestinations = history.Destination;
 					if (!IsHistoryNull(history.Source) && !IsHistoryNull(copyDestinations))
 					{
+#if WINDOWS
 						return await helpers.CopyItemsAsync(history.Source, copyDestinations.Select(item => item.Path), false, false);
+#else
+						return await helpers.CopyItemsAsync(history.Source, copyDestinations.Select(item => item.Path), false, false, replayed => UpdateHistory(history, replayed, false));
+#endif
 					}
 					break;
 				case FileOperationType.Move:
 					var moveDestinations = history.Destination;
 					if (!IsHistoryNull(history.Source) && !IsHistoryNull(moveDestinations))
 					{
+#if WINDOWS
 						return await helpers.MoveItemsAsync(history.Source, moveDestinations.Select(item => item.Path), false, false);
+#else
+						return await helpers.MoveItemsAsync(history.Source, moveDestinations.Select(item => item.Path), false, false, replayed => UpdateHistory(history, replayed, false));
+#endif
 					}
 					break;
 				case FileOperationType.Extract:
@@ -184,7 +233,11 @@ namespace Files.App.Utils.Storage
 					var restoreDestinations = history.Destination;
 					if (!IsHistoryNull(history.Source) && !IsHistoryNull(restoreDestinations))
 					{
+#if WINDOWS
 						await helpers.RestoreItemsFromTrashAsync(history.Source, restoreDestinations.Select(item => item.Path), false);
+#else
+						return await helpers.RestoreItemsFromTrashAsync(history.Source, restoreDestinations.Select(item => item.Path), false, replayed => UpdateHistory(history, replayed, false));
+#endif
 					}
 					break;
 				case FileOperationType.Delete:
@@ -192,7 +245,11 @@ namespace Files.App.Utils.Storage
 					break;
 			}
 
+#if WINDOWS
 			return returnStatus;
+#else
+			return progress.Status ?? returnStatus;
+#endif
 		}
 
 		public void Dispose()
@@ -203,6 +260,26 @@ namespace Files.App.Utils.Storage
 			operations?.Dispose();
 			operations = null;
 		}
+
+#if !WINDOWS
+		private static void UpdateHistory(IStorageHistory history, IStorageHistory? replayed, bool reverse)
+		{
+			if (replayed?.Destination is not null)
+				history.Modify(new StorageHistory(history.OperationType,
+					reverse ? replayed.Destination : replayed.Source,
+					reverse ? replayed.Source : replayed.Destination));
+		}
+
+		private sealed class HistoryProgress : IProgress<StatusCenterItemProgressModel>
+		{
+			private StatusCenterItemProgressModel? model;
+
+			// The model can reach its terminal status while its last notification is throttled.
+			public ReturnResult? Status => model?.Status?.ToStatus();
+
+			public void Report(StatusCenterItemProgressModel value) => model = value;
+		}
+#endif
 
 		private static bool IsHistoryNull([NotNullWhen(false)] IEnumerable<IStorageItemWithPath>? source)
 			=> source is null || !source.All(HasPath);

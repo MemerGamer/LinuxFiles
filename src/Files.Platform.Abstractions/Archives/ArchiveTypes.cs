@@ -110,7 +110,7 @@ namespace Files.Platform.Abstractions.Archives
 	/// <summary>
 	/// Describes an item of the extraction that already exists at the destination.
 	/// </summary>
-	/// <param name="EntryPath">The entry path relative to the destination.</param>
+	/// <param name="EntryPath">The entry path relative to the destination, escaped for display. Use DestinationPath for file operations.</param>
 	/// <param name="DestinationPath">The existing path.</param>
 	/// <param name="IsDirectory">Whether the incoming item is a folder.</param>
 	public sealed record ArchiveConflict(string EntryPath, string DestinationPath, bool IsDirectory);

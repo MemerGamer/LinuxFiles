@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Text;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -38,6 +39,12 @@ namespace Files.Platform.Abstractions.Archives
 		/// Lists the entries. Fails with <see cref="ArchivePasswordException"/> if the headers are encrypted and the password is missing or wrong.
 		/// </summary>
 		Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default);
+
+		/// <summary>Opens one safe entry as a caller-owned, read-only stream with fixed browsing size and ratio limits.</summary>
+		Task<Stream> OpenEntryAsync(string archivePath, string entryPath, string? password = null, CancellationToken cancellationToken = default);
+
+		/// <summary>Whether existing archives can be modified through this service.</summary>
+		bool CanWriteEntries => false;
 
 		/// <summary>Lists untrusted preview headers with bounded input, expanded bytes and entry count, without extracting files.</summary>
 		Task<ArchiveListing> ListPreviewAsync(string archivePath, CancellationToken cancellationToken = default);

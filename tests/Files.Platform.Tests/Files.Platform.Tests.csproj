@@ -36,4 +36,8 @@
         <Compile Include="../../src/Files.App.Storage/Storables/Routes/*.cs" LinkBase="Storables/Routes" />
     </ItemGroup>
 
+    <ItemGroup>
+        <Compile Include="../../src/Files.App.Storage/Archives/*.cs" LinkBase="Archives/Storables" />
+        <Compile Include="../../src/Files.Shared/Helpers/FileExtensionHelpers.cs" Link="Archives/FileExtensionHelpers.cs" />
+    </ItemGroup>
 </Project>

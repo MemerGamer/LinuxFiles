@@ -24,7 +24,7 @@ namespace Files.Platform.Linux.Archives
 		[
 			".tar.gz", ".tar.bz2", ".tar.xz", ".tar.zst", ".tar.lz",
 			".tgz", ".tbz2", ".tbz", ".txz", ".tzst",
-			".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".lz",
+			".zip", ".jar", ".mrpack", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".lz",
 		];
 
 		private readonly ISevenZipRunner sevenZip;
@@ -86,14 +86,23 @@ namespace Files.Platform.Linux.Archives
 		{
 			return Task.Run(() =>
 			{
-				using var archive = OpenArchive(archivePath, password, fileNameEncoding);
+				using var archive = OpenArchive(archivePath, password, fileNameEncoding, BrowsingLimits.MaxTotalBytes, cancellationToken);
 				var fallback = GetDefaultExtractFolderName(archivePath);
 				var entries = new List<ArchiveEntryInfo>();
 				var encrypted = false;
+				var guard = new ExtractionGuard(BrowsingLimits, null, new FileInfo(archivePath).Length, cancellationToken);
+				long bytes = 0;
+				var nameChars = 0;
 
-				foreach (var (entry, _) in archive.Entries())
+				foreach (var (entry, _) in archive.Entries(headersOnly: true))
 				{
 					cancellationToken.ThrowIfCancellationRequested();
+					guard.CheckEntryCount(entries.Count + 1);
+					bytes = checked(bytes + Math.Max(entry.Size, 0));
+					guard.CheckDeclared(bytes);
+					nameChars = checked(nameChars + (entry.Key?.Length ?? fallback.Length));
+					if (nameChars > 1024 * 1024)
+						throw new ArchiveSecurityException("The archive name limit was exceeded.");
 					encrypted |= entry.IsEncrypted;
 					entries.Add(new ArchiveEntryInfo(
 						(entry.Key ?? fallback).Replace('\\', '/'),
@@ -102,7 +111,7 @@ namespace Files.Platform.Linux.Archives
 						Math.Max(entry.CompressedSize, 0),
 						entry.Modified,
 						entry.IsEncrypted,
-						entry.LinkTarget));
+						IsLink(entry) ? entry.LinkTarget ?? string.Empty : null));
 				}
 
 				return new ArchiveListing(entries, encrypted, archive.IsSolid);
@@ -135,11 +144,11 @@ namespace Files.Platform.Linux.Archives
 			return null;
 		}
 
-		private static ArchiveSource OpenArchive(string path, string? password, Encoding? encoding)
+		private static ArchiveSource OpenArchive(string path, string? password, Encoding? encoding, long? maxBytes = null, CancellationToken cancellationToken = default)
 		{
 			try
 			{
-				return ArchiveSource.Open(path, password, encoding);
+				return ArchiveSource.Open(path, password, encoding, maxBytes, cancellationToken);
 			}
 			catch (Exception ex) when (ex is CryptographicException or System.Security.Cryptography.CryptographicException)
 			{

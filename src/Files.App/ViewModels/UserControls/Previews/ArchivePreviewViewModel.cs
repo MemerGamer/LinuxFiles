@@ -1,70 +1,27 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if !WINDOWS
 using Files.App.ViewModels.Properties;
-using SevenZip;
-using System.IO;
+using Files.Platform.Abstractions.Archives;
 
 namespace Files.App.ViewModels.Previews
 {
-	public sealed partial class ArchivePreviewViewModel : BasePreviewModel
+	public sealed partial class ArchivePreviewViewModel(ListedItem item) : BasePreviewModel(item)
 	{
-		public ArchivePreviewViewModel(ListedItem item)
-			: base(item)
-		{
-		}
-
 		public override async Task<List<FileProperty>> LoadPreviewAndDetailsAsync()
 		{
-			var details = new List<FileProperty>();
-
-			var zipResult = await FilesystemTasks.WrapNullable<SevenZipExtractor>(async () =>
+			var listing = await Ioc.Default.GetRequiredService<IArchiveService>().ListPreviewAsync(item.ItemPath!);
+			var files = listing.Entries.Count(entry => !entry.IsDirectory);
+			var total = listing.Entries.Aggregate(0UL, (sum, entry) => checked(sum + (ulong)entry.Size));
+			var details = new List<FileProperty>
 			{
-				var arch = new SevenZipExtractor(await PreviewFile.OpenStreamForReadAsync());
-
-				// Force load archive (1665013614u)
-				if (arch.ArchiveFileData is null)
-				{
-					arch.Dispose();
-					return null;
-				}
-
-				return arch;
-			});
-			using var zipFile = zipResult.Result;
-
-			if (zipFile is null)
-			{
-				// Loads the thumbnail preview
-				_ = await base.LoadPreviewAndDetailsAsync();
-
-				return details;
-			}
-
-			//zipFile.IsStreamOwner = true;
-
-			var folderCount = 0;
-			var fileCount = 0;
-			ulong totalSize = 0;
-
-			foreach (ArchiveFileInfo entry in zipFile.ArchiveFileData)
-			{
-				if (!entry.IsDirectory)
-				{
-					++fileCount;
-					totalSize += entry.Size;
-				}
-			}
-
-			folderCount = (int)zipFile.FilesCount - fileCount;
-
-			string propertyItemCount = Strings.DetailsArchiveItems.GetLocalizedFormatResource(zipFile.FilesCount, fileCount, folderCount);
-			details.Add(GetFileProperty("PropertyItemCount", propertyItemCount));
-			details.Add(GetFileProperty("PropertyUncompressedSize", totalSize.ToLongSizeString()));
-
-			// Loads the thumbnail preview
+				GetFileProperty("PropertyItemCount", Strings.DetailsArchiveItems.GetLocalizedFormatResource(listing.Entries.Count, files, listing.Entries.Count - files)),
+				GetFileProperty("PropertyUncompressedSize", total.ToLongSizeString())
+			};
 			_ = await base.LoadPreviewAndDetailsAsync();
 			return details;
 		}
 	}
 }
+#endif

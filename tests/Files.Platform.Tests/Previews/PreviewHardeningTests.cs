@@ -64,6 +64,9 @@ namespace Files.Platform.Tests.Previews
 				using (var linkedReader = new StreamReader(linkedStream))
 					Assert.AreEqual("hello", linkedReader.ReadToEnd());
 				Assert.Throws<IOException>(() => PreviewFile.OpenRead(directory));
+				var deviceLink = Path.Combine(directory, "cover.png");
+				File.CreateSymbolicLink(deviceLink, "/dev/null");
+				Assert.Throws<IOException>(() => PreviewFile.OpenRead(deviceLink));
 				using var stream = PreviewFile.OpenRead(path);
 				using var reader = new StreamReader(stream);
 				Assert.AreEqual("hello", reader.ReadToEnd());

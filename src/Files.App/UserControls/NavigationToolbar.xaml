@@ -257,14 +257,17 @@
 						ItemClicked="BreadcrumbBar_ItemClicked"
 						ItemDropDownFlyoutClosed="BreadcrumbBar_ItemDropDownFlyoutClosed"
 						ItemDropDownFlyoutOpening="BreadcrumbBar_ItemDropDownFlyoutOpening"
-						ItemsSource="{x:Bind ViewModel.PathComponents, Mode=OneWay}"
+						ItemsSource="{x:Bind ViewModel.BreadcrumbComponents, Mode=OneWay}"
 						RootItemChevronToolTip="{helpers:ResourceString Key=BreadcrumbBarRootChevronButtonToolTip}"
 						RootItemToolTip="{helpers:ResourceString Key=Home}">
 						<controls:BreadcrumbBar.RootItem>
-							<Image
-								Width="16"
-								Height="16"
-								Source="/Assets/FluentIcons/SidebarSections/Home.png" />
+							<StackPanel Orientation="Horizontal" Spacing="6">
+								<Image
+									Width="16"
+									Height="16"
+									Source="/Assets/FluentIcons/SidebarSections/Home.png" />
+								<TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.BreadcrumbHomeLabel, Mode=OneWay}" Visibility="{x:Bind ViewModel.BreadcrumbHomeLabelVisibility, Mode=OneWay}" />
+							</StackPanel>
 						</controls:BreadcrumbBar.RootItem>
 						<controls:BreadcrumbBar.ItemTemplate>
 							<DataTemplate x:DataType="dataitems:PathBoxItem">

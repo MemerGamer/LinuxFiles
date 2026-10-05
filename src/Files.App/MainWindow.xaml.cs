@@ -36,8 +36,11 @@ namespace Files.App
 		{
 			InitializeComponent();
 
-			// Uno/X11 has no non-client drag regions: extending into the title bar would strip the WM decorations (no move/resize)
-			ExtendsContentIntoTitleBar = !OperatingSystem.IsLinux();
+#if WINDOWS
+			ExtendsContentIntoTitleBar = true;
+#else
+			ExtendsContentIntoTitleBar = UseClientSideDecorations;
+#endif
 			Title = OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : "Files";
 			AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;

@@ -63,6 +63,29 @@ namespace Files.App.ViewModels.UserControls
 
 		public ObservableCollection<PathBoxItem> PathComponents { get; } = [];
 
+		public IReadOnlyList<PathBoxItem> BreadcrumbComponents
+		{
+			get
+			{
+				if (!OperatingSystem.IsLinux())
+					return PathComponents;
+
+				var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('/');
+				var path = PathComponents.LastOrDefault()?.Path?.TrimEnd('/');
+				if (string.IsNullOrEmpty(home) || path is null ||
+					(path != home && !path.StartsWith(home + "/", StringComparison.Ordinal)))
+					return PathComponents;
+
+				return PathComponents.Where(item => item.Path?.TrimEnd('/') is { } component &&
+					component.StartsWith(home + "/", StringComparison.Ordinal)).ToArray();
+			}
+		}
+
+		public Visibility BreadcrumbHomeLabelVisibility => string.IsNullOrEmpty(BreadcrumbHomeLabel) ? Visibility.Collapsed : Visibility.Visible;
+
+		public string BreadcrumbHomeLabel => OperatingSystem.IsLinux() && PathComponents.LastOrDefault()?.Path?.StartsWith('/') == true
+			? Strings.Home.GetLocalizedResource() : string.Empty;
+
 		public ObservableCollection<NavigationBarSuggestionItem> NavigationBarSuggestions { get; } = [];
 
 		internal ObservableCollection<OmnibarPathModeSuggestionModel> PathModeSuggestionItems { get; } = [];
@@ -292,6 +315,12 @@ namespace Files.App.ViewModels.UserControls
 		public NavigationToolbarViewModel()
 		{
 			_dispatcherQueue = DispatcherQueue.GetForCurrentThread();
+			PathComponents.CollectionChanged += (_, _) =>
+			{
+				OnPropertyChanged(nameof(BreadcrumbComponents));
+				OnPropertyChanged(nameof(BreadcrumbHomeLabel));
+				OnPropertyChanged(nameof(BreadcrumbHomeLabelVisibility));
+			};
 			UserSettingsService.OnSettingChangedEvent += UserSettingsService_OnSettingChangedEvent;
 			UpdateService.PropertyChanged += UpdateService_OnPropertyChanged;
 

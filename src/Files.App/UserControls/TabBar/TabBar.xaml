@@ -36,6 +36,11 @@
 						<MenuFlyoutItem />
 						<MenuFlyoutItem />
 						<MenuFlyoutItem />
+						<ToggleMenuFlyoutItem
+							x:Name="ClientSideDecorationsMenuItem"
+							Click="ClientSideDecorationsMenuItem_Click"
+							Text="{helpers:ResourceString Key=LinuxClientSideDecorations}"
+							Visibility="Collapsed" />
 					</MenuFlyout>
 				</ResourceDictionary>
 			</ResourceDictionary.MergedDictionaries>
@@ -51,6 +56,8 @@
 		HorizontalAlignment="Stretch"
 		x:FieldModifier="public"
 		Background="Transparent">
+
+		<Grid>
 
 		<!--  TabBar + Draggable Right Padding  -->
 		<TabView
@@ -180,6 +187,7 @@
 								Text="{x:Bind Commands.CloseActivePane.Label}"
 								ThemedIconStyle="{x:Bind Commands.CloseActivePane.ThemedIconStyle}" />
 
+
 						</MenuFlyout>
 					</Button.Flyout>
 
@@ -248,6 +256,34 @@
 			</TabView.TabStripFooter>
 
 		</TabView>
+		<Button
+			x:Name="LinuxTabActionsButton"
+			Width="34"
+			Height="40"
+			Margin="4,0,0,0"
+			Padding="0"
+			HorizontalAlignment="Left"
+			VerticalAlignment="Top"
+			AutomationProperties.Name="{helpers:ResourceString Key=TabActions}"
+			Background="Transparent"
+			BorderThickness="0"
+			Click="LinuxTabActionsButton_Click"
+			ToolTipService.ToolTip="{helpers:ResourceString Key=TabActions}"
+			Visibility="Collapsed">
+			<FontIcon FontSize="16" Glyph="&#xE8A7;" />
+		</Button>
+		<StackPanel x:Name="LinuxCaptionButtons" HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal" Visibility="Collapsed">
+			<Button Width="46" Height="40" Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="0" Click="MinimizeWindow_Click" AutomationProperties.Name="{helpers:ResourceString Key=LinuxMinimizeWindow}" ToolTipService.ToolTip="{helpers:ResourceString Key=LinuxMinimizeWindow}">
+				<FontIcon FontSize="12" Glyph="&#xE921;" />
+			</Button>
+			<Button x:Name="LinuxMaximizeButton" Width="46" Height="40" Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="0" Click="MaximizeWindow_Click">
+				<FontIcon x:Name="LinuxMaximizeIcon" FontSize="12" Glyph="&#xE922;" />
+			</Button>
+			<Button Width="46" Height="40" Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="0" Click="CloseWindow_Click" AutomationProperties.Name="{helpers:ResourceString Key=Close}" ToolTipService.ToolTip="{helpers:ResourceString Key=Close}">
+				<FontIcon FontSize="12" Glyph="&#xE8BB;" />
+			</Button>
+		</StackPanel>
+		</Grid>
 	</Border>
 
 </local:BaseTabBar>

@@ -252,7 +252,7 @@ namespace Files.App.Helpers
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(ImageIconSource))]
-		public static async Task<(string? tabLocationHeader, IconSource tabIcon, string toolTipText)> GetSelectedTabInfoAsync(string currentPath)
+		public static async Task<(string? tabLocationHeader, IconSource tabIcon, string toolTipText)> GetSelectedTabInfoAsync(string currentPath, bool loadIcon = true)
 		{
 			string? tabLocationHeader;
 			IconSource iconSource = new ImageIconSource();
@@ -279,7 +279,11 @@ namespace Files.App.Helpers
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.DownloadsPath, StringComparison.OrdinalIgnoreCase))
 				tabLocationHeader = Strings.Downloads.GetLocalizedResource();
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.OrdinalIgnoreCase))
+			{
 				tabLocationHeader = Strings.RecycleBin.GetLocalizedResource();
+				if (OperatingSystem.IsLinux())
+					iconSource = new FontIconSource { Glyph = "\uE74D" };
+			}
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.MyComputerPath, StringComparison.OrdinalIgnoreCase))
 				tabLocationHeader = Strings.ThisPC.GetLocalizedResource();
 			else if (currentPath.Equals(Constants.UserEnvironmentPaths.NetworkFolderPath, StringComparison.OrdinalIgnoreCase))
@@ -318,10 +322,12 @@ namespace Files.App.Helpers
 				}
 				else
 				{
-					tabLocationHeader = currentPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries).Last();
+					tabLocationHeader = currentPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar).Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries).Last();
 
-					var rootItem = await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(currentPath));
-					if (rootItem)
+					var rootItem = loadIcon
+						? await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(currentPath))
+						: default;
+					if (rootItem is { ErrorCode: FileSystemStatusCode.Success })
 					{
 						var currentFolderResult = await FilesystemTasks.WrapNullable(() => StorageFileExtensions.DangerousGetFolderFromPathAsync(currentPath, rootItem.Result));
 						if (currentFolderResult.Result is { } currentFolder && !string.IsNullOrEmpty(currentFolder.DisplayName))
@@ -330,7 +336,7 @@ namespace Files.App.Helpers
 				}
 			}
 
-			if (iconSource is ImageIconSource imageIcon && imageIcon.ImageSource is null)
+			if (loadIcon && iconSource is ImageIconSource imageIcon && imageIcon.ImageSource is null)
 			{
 				var result = await FileThumbnailHelper.GetIconAsync(
 					currentPath,
@@ -345,8 +351,17 @@ namespace Files.App.Helpers
 			return (tabLocationHeader, iconSource, toolTipText);
 		}
 
+		private static TabBarItem? SelectedWindowTab => MainPageViewModel.AppInstances.ElementAtOrDefault(App.AppModel.TabStripSelectedIndex);
+
+		private static int _titleUpdateVersion;
+
 		public static async Task UpdateInstancePropertiesAsync(object? navigationArg)
 		{
+			var selectedTab = SelectedWindowTab;
+			if (OperatingSystem.IsLinux())
+				navigationArg = selectedTab?.TabItemContent?.TabBarItemParameter?.NavigationParameter
+					?? selectedTab?.NavigationParameter?.NavigationParameter ?? navigationArg;
+			var version = Interlocked.Increment(ref _titleUpdateVersion);
 			await SafetyExtensions.IgnoreExceptions(async () =>
 			{
 				string? windowTitle = string.Empty;
@@ -354,18 +369,28 @@ namespace Files.App.Helpers
 				{
 					if (!string.IsNullOrEmpty(paneArgs.LeftPaneNavPathParam) && !string.IsNullOrEmpty(paneArgs.RightPaneNavPathParam))
 					{
-						var leftTabInfo = await GetSelectedTabInfoAsync(paneArgs.LeftPaneNavPathParam);
-						var rightTabInfo = await GetSelectedTabInfoAsync(paneArgs.RightPaneNavPathParam);
+						var leftTabInfo = await GetSelectedTabInfoAsync(paneArgs.LeftPaneNavPathParam, !OperatingSystem.IsLinux());
+						var rightTabInfo = await GetSelectedTabInfoAsync(paneArgs.RightPaneNavPathParam, !OperatingSystem.IsLinux());
 						windowTitle = $"{leftTabInfo.tabLocationHeader} | {rightTabInfo.tabLocationHeader}";
 					}
 					else
-						(windowTitle, _, _) = await GetSelectedTabInfoAsync(paneArgs.LeftPaneNavPathParam ?? string.Empty);
+						(windowTitle, _, _) = await GetSelectedTabInfoAsync(paneArgs.LeftPaneNavPathParam ?? paneArgs.RightPaneNavPathParam ?? string.Empty, !OperatingSystem.IsLinux());
 				}
 				else if (navigationArg is string pathArgs)
-					(windowTitle, _, _) = await GetSelectedTabInfoAsync(pathArgs);
+					(windowTitle, _, _) = await GetSelectedTabInfoAsync(pathArgs, !OperatingSystem.IsLinux());
 
-				if (navigationArg == MainPageViewModel.SelectedTabItem?.NavigationParameter?.NavigationParameter)
-					MainWindow.Instance.AppWindow.Title = $"{windowTitle} - Files";
+				var isCurrent = OperatingSystem.IsLinux()
+					? version == _titleUpdateVersion && selectedTab == SelectedWindowTab
+					: navigationArg == MainPageViewModel.SelectedTabItem?.NavigationParameter?.NavigationParameter;
+				if (isCurrent)
+				{
+					var title = $"{windowTitle} - {(OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : "Files")}";
+#if !WINDOWS
+					title = Files.Platform.Linux.Windowing.X11WindowChrome.SanitizeTitle(title);
+					MainWindow.Instance.UpdateLinuxWindowTitle(title);
+#endif
+					MainWindow.Instance.AppWindow.Title = title;
+				}
 			});
 		}
 
@@ -378,6 +403,8 @@ namespace Files.App.Helpers
 			if (matchingTabItem is null)
 				return;
 
+			if (OperatingSystem.IsLinux() && matchingTabItem == SelectedWindowTab)
+				await UpdateInstancePropertiesAsync(e.NavigationParameter);
 			await UpdateTabInfoAsync(matchingTabItem, e.NavigationParameter);
 		}
 

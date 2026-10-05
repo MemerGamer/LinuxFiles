@@ -65,6 +65,9 @@ namespace Files.App.Views
 			};
 			PreviewKeyUp += (_, e) => OnPreviewKeyUp(e);
 			LostFocus += (_, e) => OnLostFocus(e);
+
+			// Keeps content clear of the right-edge resize grip
+			RootGrid.Padding = new(0, 0, 8, 8);
 #endif
 
 			// Dependency Injection

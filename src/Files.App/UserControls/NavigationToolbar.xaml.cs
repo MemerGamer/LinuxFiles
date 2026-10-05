@@ -323,12 +323,12 @@ namespace Files.App.UserControls
 			}
 
 			// Validate index before accessing the collection
-			if (args.Index < 0 || args.Index >= viewModel.PathComponents.Count)
+			if (args.Index < 0 || args.Index >= viewModel.BreadcrumbComponents.Count)
 				return;
 
 			// Navigation to the current folder should not happen
-			if (args.Index == viewModel.PathComponents.Count - 1 ||
-				viewModel.PathComponents[args.Index].Path is not { } path)
+			if (args.Index == viewModel.BreadcrumbComponents.Count - 1 ||
+				viewModel.BreadcrumbComponents[args.Index].Path is not { } path)
 				return;
 
 			// If user clicked the item with middle mouse button, open it in new tab
@@ -442,10 +442,10 @@ namespace Files.App.UserControls
 
 			var viewModel = ViewModel
 				?? throw new InvalidOperationException("The navigation toolbar does not have a view model.");
-			if (e.Index < 0 || e.Index >= viewModel.PathComponents.Count)
+			if (e.Index < 0 || e.Index >= viewModel.BreadcrumbComponents.Count)
 				return;
 
-			await viewModel.SetPathBoxDropDownFlyoutAsync(e.Flyout, viewModel.PathComponents[e.Index]);
+			await viewModel.SetPathBoxDropDownFlyoutAsync(e.Flyout, viewModel.BreadcrumbComponents[e.Index]);
 		}
 
 		private void BreadcrumbBar_ItemDropDownFlyoutClosed(object sender, BreadcrumbBarItemDropDownFlyoutEventArgs e)

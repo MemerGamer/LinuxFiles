@@ -2218,6 +2218,13 @@ namespace Files.App.ViewModels
 						WatchForLinuxFolderChanges(path);
 					break;
 
+				// Trash listed through IStorageTrashBinService (Linux)
+				case 4:
+					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs() { IsTypeCloudDrive = false, IsTypeRecycleBin = true });
+					if (!HasNoWatcher)
+						WatchForLinuxTrashChanges();
+					break;
+
 				// Enumeration failed
 				case -1:
 				default:

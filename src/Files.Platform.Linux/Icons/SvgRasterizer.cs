@@ -6,6 +6,7 @@ using Svg.Skia;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace Files.Platform.Linux.Icons
@@ -29,12 +30,13 @@ namespace Files.Platform.Linux.Icons
 		private const long MaxSvgBytes = 4L * 1024 * 1024;
 
 		// Breeze-style "translate(-384.57-515.8)" omits the separator between numbers, which Svg.Skia drops silently
-		private static readonly Regex TransformAttribute = new("(?<=\\btransform\\s*=\\s*\"[^\"]*)(?<=\\d)(?=-)", RegexOptions.Compiled | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+		private static readonly Regex TransformAttribute = new("\\btransform\\s*=\\s*(?:\"[^\"]*\"|'[^']*')", RegexOptions.NonBacktracking | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+		private static readonly Regex AdjacentNumbers = new("(?<=\\d)(?=-)", RegexOptions.Compiled | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
 		/// <summary>
 		/// Inserts the missing comma between adjacent numbers inside <c>transform</c> attributes.
 		/// </summary>
-		public static string NormalizeTransforms(string svg) => TransformAttribute.Replace(svg, ",");
+		public static string NormalizeTransforms(string svg) => TransformAttribute.Replace(svg, match => AdjacentNumbers.Replace(match.Value, ","));
 
 		/// <summary>
 		/// Renders SVG content the caller already read (not cached), so the file is never opened a second time.
@@ -81,6 +83,10 @@ namespace Files.Platform.Linux.Icons
 				canvas.Flush();
 
 				using var image = surface.Snapshot();
+				using var bitmap = SKBitmap.FromImage(image);
+				if (!bitmap.Pixels.Any(pixel => pixel.Alpha != 0))
+					return null;
+
 				using var data = image.Encode(SKEncodedImageFormat.Png, 100);
 				return data.ToArray();
 			}

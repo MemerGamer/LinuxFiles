@@ -1,7 +1,10 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.FileChooser;
+using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
+using System.Threading;
 
 namespace Files.App.Services.Desktop
 {
@@ -59,22 +62,74 @@ namespace Files.App.Services.Desktop
 		public Task<IEnumerable<string>> GetFoldersAsync() => Task.FromResult<IEnumerable<string>>([]);
 	}
 
-	// LINUX-TODO(pickers): open file/folder choosers through the xdg-desktop-portal FileChooser; until then pickers report "cancelled"
+	// Prefer the Async methods: the synchronous ones block the calling thread while the chooser is open.
 	internal sealed class DesktopCommonDialogService : ICommonDialogService
 	{
+		private readonly IFileChooserService _fileChooser;
+		private int _unavailableLogged;
+
+		public DesktopCommonDialogService(IFileChooserService fileChooser)
+		{
+			_fileChooser = fileChooser;
+		}
+
 		public bool Open_FileOpenDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath, Guid? clientGuid = null)
 		{
-			filePath = string.Empty;
-			return false;
+			// Synchronous fallback for callers that cannot await; it blocks the calling thread
+			var (result, path) = Task.Run(() => OpenFileOpenDialogAsync(hWnd, pickFoldersOnly, filters, defaultFolder, clientGuid)).GetAwaiter().GetResult();
+			filePath = path;
+			return result;
 		}
 
 		public bool Open_FileSaveDialog(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, out string filePath)
 		{
-			filePath = string.Empty;
-			return false;
+			var (result, path) = Task.Run(() => OpenFileSaveDialogAsync(hWnd, pickFoldersOnly, filters, defaultFolder)).GetAwaiter().GetResult();
+			filePath = path;
+			return result;
+		}
+
+		public Task<(bool Result, string FilePath)> OpenFileOpenDialogAsync(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder, Guid? clientGuid = null)
+			=> ChooseAsync(new FileChooserRequest { PickFolder = pickFoldersOnly, Filters = ParseFilters(filters), ParentWindowId = (ulong)hWnd });
+
+		public Task<(bool Result, string FilePath)> OpenFileSaveDialogAsync(nint hWnd, bool pickFoldersOnly, string[] filters, Environment.SpecialFolder defaultFolder)
+		{
+			var folder = Environment.GetFolderPath(defaultFolder);
+			return ChooseAsync(new FileChooserRequest
+			{
+				Save = true,
+				PickFolder = pickFoldersOnly,
+				Filters = ParseFilters(filters),
+				CurrentFolder = string.IsNullOrEmpty(folder) ? null : folder,
+				ParentWindowId = (ulong)hWnd,
+			});
 		}
 
 		public bool Open_NetworkConnectionDialog(nint hWnd, bool hideRestoreConnectionCheckBox = false, bool persistConnectionAtLogon = false, bool readOnlyPath = false, string? remoteNetworkName = null, bool useMostRecentPath = false) => false;
+
+		private async Task<(bool Result, string FilePath)> ChooseAsync(FileChooserRequest request)
+		{
+			var result = await _fileChooser.ChooseAsync(request).ConfigureAwait(true);
+			if (result.Status == FileChooserStatus.Unavailable && Interlocked.Exchange(ref _unavailableLogged, 1) == 0)
+				App.Logger.LogWarning("The xdg-desktop-portal FileChooser is not available; file pickers will report cancelled.");
+
+			return result.Status == FileChooserStatus.Selected && result.Paths.Count > 0
+				? (true, result.Paths[0])
+				: (false, string.Empty);
+		}
+
+		// Filters come as [name, "*.a;*.b", name, ...] pairs
+		private static List<FileChooserFilter> ParseFilters(string[] filters)
+		{
+			var list = new List<FileChooserFilter>();
+			for (var i = 0; i + 1 < filters.Length; i += 2)
+			{
+				var patterns = filters[i + 1].Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+				if (patterns.Length > 0)
+					list.Add(new FileChooserFilter(filters[i], patterns));
+			}
+
+			return list;
+		}
 	}
 
 	// Linux has no Start Menu pins

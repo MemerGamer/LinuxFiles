@@ -18,7 +18,7 @@ namespace Files.App.ViewModels.Settings
 
 		private ReadOnlyCollection<IMenuFlyoutItemViewModel>? addFlyoutItemsSource;
 
-		public RelayCommand ChangePageCommand { get; }
+		public AsyncRelayCommand ChangePageCommand { get; }
 		public RelayCommand<PageOnStartupViewModel> RemovePageCommand { get; }
 		public RelayCommand<string> AddPageCommand { get; }
 		public RelayCommand RestartCommand { get; }
@@ -86,7 +86,7 @@ namespace Files.App.ViewModels.Settings
 
 		public GeneralViewModel()
 		{
-			ChangePageCommand = new RelayCommand(ChangePageAsync);
+			ChangePageCommand = new AsyncRelayCommand(ChangePageAsync);
 			RemovePageCommand = new RelayCommand<PageOnStartupViewModel>(RemovePage);
 			AddPageCommand = new RelayCommand<string>(async (path) => await AddPageAsync(path));
 			RestartCommand = new RelayCommand(DoRestartAsync);
@@ -346,9 +346,9 @@ namespace Files.App.ViewModels.Settings
 			}
 		}
 
-		private void ChangePageAsync()
+		private async Task ChangePageAsync()
 		{
-			var result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop, out var filePath);
+			var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop);
 			if (result && SelectedPageIndex >= 0)
 				PagesOnStartupList[SelectedPageIndex] = new PageOnStartupViewModel(filePath);
 		}
@@ -363,7 +363,7 @@ namespace Files.App.ViewModels.Settings
 		{
 			if (string.IsNullOrWhiteSpace(path))
 			{
-				bool result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop, out var filePath);
+				var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop);
 				if (!result)
 					return;
 

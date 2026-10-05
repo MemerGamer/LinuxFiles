@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 
+using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Native;
 
 namespace Files.Platform.Linux.Trash
@@ -37,6 +38,12 @@ namespace Files.Platform.Linux.Trash
 		/// Gets or sets the clock used for deletion dates; must return local time.
 		/// </summary>
 		public Func<DateTime> LocalNow { get; set; } = () => DateTime.Now;
+
+		/// <summary>Diagnostic seam invoked with both parents pinned, immediately before a restore acts.</summary>
+		public Action<string, string>? BeforeRestoreMove { get; set; }
+
+		/// <summary>Diagnostic seams for fd-relative restore renames and cross-device copies.</summary>
+		public LinuxFileOperationsHooks? FileOperationsHooks { get; set; }
 
 		private static string GetDefaultDataHome()
 		{

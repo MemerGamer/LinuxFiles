@@ -10,7 +10,6 @@ using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using Windows.Storage;
-using Windows.Win32.UI.WindowsAndMessaging;
 using ByteSize = ByteSizeLib.ByteSize;
 
 #pragma warning disable CS0618 // Type or member is obsolete
@@ -496,8 +495,13 @@ namespace Files.App.Utils
 		public bool IsDriveRoot => ItemPath == PathNormalization.GetPathRoot(ItemPath);
 		public bool IsElevationRequired { get; set; }
 
+#if WINDOWS
 		private BaseStorageFile? itemFile;
 		public BaseStorageFile? ItemFile
+#else
+		private IFile? itemFile;
+		public IFile? ItemFile
+#endif
 		{
 			get => itemFile;
 			set => SetProperty(ref itemFile, value);
@@ -607,18 +611,7 @@ namespace Files.App.Utils
 			IsHiddenItem = false;
 		}
 
-		public async Task<IStorageItem> ToStorageItem()
-		{
-			var path = this.GetRequiredPath();
-			var name = ItemNameRaw ?? throw new InvalidOperationException("The FTP item does not have a name.");
 
-			return PrimaryItemAttribute switch
-			{
-				StorageItemTypes.File => await new Utils.Storage.FtpStorageFile(path, name, ItemDateCreatedReal).ToStorageFileAsync(),
-				StorageItemTypes.Folder => new Utils.Storage.FtpStorageFolder(path, name, ItemDateCreatedReal),
-				_ => throw new InvalidDataException("The FTP item has an unsupported storage type."),
-			};
-		}
 	}
 
 	public sealed partial class ShortcutItem : ListedItem, IShortcutItem
@@ -640,7 +633,7 @@ namespace Files.App.Utils
 		public string? Arguments { get; set; }
 		public string? WorkingDirectory { get; set; }
 		public bool RunAsAdmin { get; set; }
-		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
+		public ShowWindowCommand ShowWindowCommand { get; set; }
 		public bool IsUrl { get; set; }
 		public bool IsSymLink { get; set; }
 		public override bool IsScriptFile => FileExtensionHelpers.IsScriptFile(TargetPath);
@@ -842,7 +835,7 @@ namespace Files.App.Utils
 		public string? Arguments { get; set; }
 		public string? WorkingDirectory { get; set; }
 		public bool RunAsAdmin { get; set; }
-		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
+		public ShowWindowCommand ShowWindowCommand { get; set; }
 		public bool IsUrl { get; set; }
 		public bool IsSymLink { get; set; }
 		public override bool IsScriptFile => FileExtensionHelpers.IsScriptFile(TargetPath);
@@ -875,7 +868,7 @@ namespace Files.App.Utils
 		public string? Arguments { get; set; }
 		public string? WorkingDirectory { get; set; }
 		public bool RunAsAdmin { get; set; }
-		public SHOW_WINDOW_CMD ShowWindowCommand { get; set; }
+		public ShowWindowCommand ShowWindowCommand { get; set; }
 		public bool IsUrl { get; set; }
 		public bool IsSymLink { get; set; }
 	}

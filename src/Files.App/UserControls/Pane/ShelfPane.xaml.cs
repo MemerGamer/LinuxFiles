@@ -7,8 +7,10 @@ using Microsoft.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 using Windows.ApplicationModel.DataTransfer;
+#if WINDOWS
 using Windows.Win32.System.Com;
 using Windows.Win32.UI.Shell;
+#endif
 using WinRT;
 using DragEventArgs = Microsoft.UI.Xaml.DragEventArgs;
 using Visibility = Microsoft.UI.Xaml.Visibility;
@@ -41,7 +43,7 @@ namespace Files.App.UserControls
 				return;
 
 			// Get items
-			var storageService = Ioc.Default.GetRequiredService<IStorageService>();
+			var resolver = Ioc.Default.GetRequiredService<Files.Core.Storage.Contracts.IStorableResolver>();
 			var storageItems = (await FilesystemHelpers.GetDraggedStorageItems(e.DataView)).ToArray();
 
 			// Add to list
@@ -51,12 +53,8 @@ namespace Files.App.UserControls
 				if (ItemsSource.Any(x => x.Inner.Id == item.Path))
 					continue;
 
-				var storable = item switch
-				{
-					StorageFileWithPath => (IStorableChild?)await storageService.TryGetFileAsync(item.Path),
-					StorageFolderWithPath => (IStorableChild?)await storageService.TryGetFolderAsync(item.Path),
-					_ => null
-				};
+				var resolved = await resolver.TryGetAsync(item.Path);
+				var storable = resolved.Item as IStorableChild;
 
 				if (storable is null)
 					continue;
@@ -93,8 +91,8 @@ namespace Files.App.UserControls
 					item.Dispose();
 			}
 #else
-			// LINUX-TODO(dnd): shell data object drag from the shelf; use Uno DataPackage storage items / text/uri-list instead
 			e.Data.Properties["Files_ActionBinder"] = "Files_ShelfBinder";
+			Files.App.Services.Desktop.DesktopFileDragHelper.StartExternalDrag(paths);
 #endif
 		}
 

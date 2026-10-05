@@ -15,7 +15,7 @@ namespace Files.App.Utils.Storage
 		/// <summary>
 		/// Returns icon or thumbnail for given file or folder
 		/// </summary>
-		public static async Task<byte[]?> GetIconAsync(string? path, uint requestedSize, bool isFolder, IconOptions iconOptions)
+		public static async Task<byte[]?> GetIconAsync(string? path, uint requestedSize, bool isFolder, IconOptions iconOptions, CancellationToken cancellationToken = default)
 		{
 			var scaledSize = requestedSize * App.AppModel.AppWindowDPI;
 
@@ -26,7 +26,7 @@ namespace Files.App.Utils.Storage
 				: _standardSizes.FirstOrDefault(s => s >= scaledSize, _standardSizes[^1]);
 
 #if !WINDOWS
-			return await LinuxIconHelper.GetIconAsync(path, size, isFolder, iconOptions);
+			return await LinuxIconHelper.GetIconAsync(path, size, isFolder, iconOptions, cancellationToken);
 #else
 			if (!isFolder && !iconOptions.HasFlag(IconOptions.ReturnIconOnly) && !iconOptions.HasFlag(IconOptions.ReturnOnlyIfCached))
 			{

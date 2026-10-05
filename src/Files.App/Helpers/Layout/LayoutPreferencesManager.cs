@@ -624,6 +624,8 @@ namespace Files.App.Helpers
 			if (string.IsNullOrEmpty(path))
 				return new();
 
+#if WINDOWS
+			// LINUX-TODO(listing): Uno's grouped CollectionView renders no rows, so Downloads is not grouped by default on Linux
 			if (path == Constants.UserEnvironmentPaths.DownloadsPath)
 			{
 				// Default for downloads folder is to group by date created
@@ -634,7 +636,9 @@ namespace Files.App.Helpers
 					DirectoryGroupByDateUnit = GroupByDateUnit.Year
 				};
 			}
-			else if (LibraryManager.IsLibraryPath(path))
+			else
+#endif
+			if (LibraryManager.IsLibraryPath(path))
 			{
 				// Default for libraries is to group by folder path
 				return new()

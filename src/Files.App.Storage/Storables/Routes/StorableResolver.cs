@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Core.Storage.Contracts;
-using OwlCore.Storage;
+using Files.Core.Storage.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,33 +29,21 @@ namespace Files.App.Storage.Storables
 		}
 
 		/// <inheritdoc/>
-		public bool CanResolve(string path)
-		{
-			return FindRoute(path) is not null;
-		}
-
-		/// <inheritdoc/>
-		public Task<IStorable?> TryGetAsync(string path, CancellationToken cancellationToken = default)
+		public async Task<StorableResult> TryGetAsync(string path, CancellationToken cancellationToken = default)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 
-			return FindRoute(path) is { } route
-				? route.TryGetAsync(path, cancellationToken)
-				: Task.FromResult<IStorable?>(null);
-		}
-
-		private IStorableRoute? FindRoute(string path)
-		{
 			if (string.IsNullOrEmpty(path))
-				return null;
+				return StorableResult.NotMine;
 
 			foreach (var route in _routes)
 			{
-				if (route.CanResolve(path))
-					return route;
+				var result = await route.TryGetAsync(path, cancellationToken).ConfigureAwait(false);
+				if (result.Status is not StorableStatus.NotMine)
+					return result;
 			}
 
-			return null;
+			return StorableResult.NotMine;
 		}
 	}
 }

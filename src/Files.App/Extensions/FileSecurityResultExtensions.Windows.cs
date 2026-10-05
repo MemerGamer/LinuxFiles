@@ -19,6 +19,8 @@ namespace Files.App.Extensions
 			{
 				WIN32_ERROR.ERROR_SUCCESS => FileSecurityResult.Success,
 				WIN32_ERROR.ERROR_ACCESS_DENIED or WIN32_ERROR.ERROR_PRIVILEGE_NOT_HELD => FileSecurityResult.AccessDenied,
+				WIN32_ERROR.ERROR_FILE_NOT_FOUND or WIN32_ERROR.ERROR_PATH_NOT_FOUND => FileSecurityResult.NotFound,
+				WIN32_ERROR.ERROR_WRITE_PROTECT => FileSecurityResult.ReadOnly,
 				WIN32_ERROR.ERROR_INVALID_ACL or WIN32_ERROR.ERROR_INVALID_SECURITY_DESCR => FileSecurityResult.InvalidAcl,
 				WIN32_ERROR.ERROR_NOT_SUPPORTED or WIN32_ERROR.ERROR_CALL_NOT_IMPLEMENTED => FileSecurityResult.NotSupported,
 				_ => FileSecurityResult.Failed,

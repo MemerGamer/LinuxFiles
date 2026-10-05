@@ -195,12 +195,17 @@ namespace Files.Platform.Tests.SystemIntegration
 					using var socket = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.Unix, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Unspecified);
 					await socket.ConnectAsync(new System.Net.Sockets.UnixDomainSocketEndPoint(socketPath));
 					using var stream = new System.Net.Sockets.NetworkStream(socket);
-					using (var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true))
+					// The server may close mid-write once it rejects the message (EPIPE): that is also a rejection.
+					try
 					{
+						using var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true);
 						writer.Write(0);
 						writer.Write("/w");
 						writer.Write(1);
 						writer.Write(bad);
+					}
+					catch (IOException)
+					{
 					}
 
 					var ack = new byte[1];

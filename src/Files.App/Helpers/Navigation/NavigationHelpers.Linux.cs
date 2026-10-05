@@ -186,6 +186,34 @@ namespace Files.App.Helpers
 			return await ExecutePlanAsync(path, await PlanAsync(path));
 		}
 
+		/// <summary>
+		/// Runs an executable with the dropped items as arguments. The complete argv (target and every item) is shown and
+		/// exactly that argv is run; anything that is not a confirmable executable, or too large to show in full, is refused.
+		/// </summary>
+		internal static async Task<bool> RunWithItemsLinuxAsync(string executablePath, IReadOnlyList<string> arguments)
+		{
+			var plan = await PlanAsync(executablePath);
+			var argv = new List<string>(arguments.Count + 1) { plan.Target };
+			argv.AddRange(arguments);
+
+			if (!OpenDecision.NeedsRunConfirmation(plan.Action) || DisplaySanitizer.FullArguments(argv) is not { } lines)
+			{
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(DisplaySanitizer.Field(plan.Target)));
+				return false;
+			}
+
+			var confirmed = await DialogDisplayHelper.ShowDialogAsync(
+				Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(plan.Target), 60)),
+				Strings.LinuxWouldRun.GetLocalizedResource() + "\n" + string.Join('\n', lines),
+				Strings.Run.GetLocalizedResource(),
+				Strings.Cancel.GetLocalizedResource());
+
+			if (!confirmed)
+				return true;
+
+			return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(argv[0], argv.Skip(1).ToList(), Path.GetDirectoryName(argv[0])) : false;
+		}
+
 		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan)
 		{
 			var target = plan.Target;

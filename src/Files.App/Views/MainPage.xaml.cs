@@ -93,10 +93,12 @@ namespace Files.App.Views
 
 			ApplySidebarWidthState();
 
+#if WINDOWS
 			// Realize the navigation controls before the first measure pass.
 			FindName(nameof(InnerNavigationToolbar));
 			FindName(nameof(TabControl));
 			FindName(nameof(NavToolbar));
+#endif
 		}
 
 		private void NumberedTabKeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
@@ -359,6 +361,12 @@ namespace Files.App.Views
 		private void Page_Loaded(object sender, RoutedEventArgs e)
 		{
 			ViewModel.OnPageLoaded();
+#if !WINDOWS
+			// LINUX-TODO(toolbar): realizing x:Load controls in the constructor leaves their x:Bind bindings uninitialized on Uno (toolbar row never shows), so defer to Loaded.
+			FindName(nameof(InnerNavigationToolbar));
+			FindName(nameof(TabControl));
+			FindName(nameof(NavToolbar));
+#endif
 
 			MainWindow.Instance.AppWindow.Changed += (_, _) => MainWindow.Instance.RaiseSetTitleBarDragRegion(SetTitleBarDragRegion);
 

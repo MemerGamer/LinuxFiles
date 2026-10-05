@@ -195,6 +195,21 @@ namespace Files.App.Views.Layouts
 		protected override void ItemManipulationModel_ScrollIntoViewInvoked(object? sender, ListedItem e)
 		{
 			FileList.ScrollIntoView(e);
+#if !WINDOWS
+			// The virtualizing panel only knows a virtual strip per item; make sure the whole cell is in view
+			if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.VirtualizingWrapGrid panel)
+			{
+				var index = FileList.Items.IndexOf(e);
+				var request = ++_ensureVisibleRequest;
+
+				// Only the latest request may scroll; earlier ones would drag the view back after a faster jump (e.g. End after Page Down)
+				DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+				{
+					if (request == _ensureVisibleRequest)
+						panel.EnsureItemVisible(index);
+				});
+			}
+#endif
 		}
 
 		protected override void ItemManipulationModel_ScrollToTopInvoked(object? sender, EventArgs e)
@@ -342,6 +357,57 @@ namespace Files.App.Views.Layouts
 			}
 		}
 
+#if !WINDOWS
+		private (bool Virtualized, FolderLayoutModes? Mode)? _appliedPanelKey;
+		private int _ensureVisibleRequest;
+		private static bool s_loggedPanelFallback;
+
+		/// <summary>
+		/// Uses the virtualizing wrap panel (Uno Skia has no ItemsWrapGrid, and the style's WrapPanel would realize every item) unless
+		/// the list is grouped (the panel has no group headers) or Uno's internals no longer match what the panel was built against.
+		/// </summary>
+		protected override void OnCollectionViewSourceChanged() => UpdateItemsPanel();
+
+		private void UpdateItemsPanel()
+		{
+			if (FolderSettings is not { } folderSettings)
+				return;
+
+			// The folder setting decides, not the CollectionViewSource: that is still a placeholder when this first runs, and swapping the panel after
+			// the items are assigned would first realize every item in the style's non-virtualizing panel
+			var virtualize = folderSettings.DirectoryGroupOption == GroupOption.None;
+			if (virtualize && !Files.App.UnoVirtualization.VirtualizingWrapGrid.IsSupported(out var reason))
+			{
+				virtualize = false;
+				if (!s_loggedPanelFallback)
+				{
+					s_loggedPanelFallback = true;
+					Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, "Falling back to the non-virtualizing wrap panel for Grid and Cards layouts: {Reason}", reason);
+				}
+			}
+
+			var key = (virtualize, (FolderLayoutModes?)folderSettings.LayoutMode);
+			if (_appliedPanelKey == key)
+				return;
+
+			_appliedPanelKey = key;
+			if (!virtualize)
+			{
+				FileList.ClearValue(ItemsControl.ItemsPanelProperty);
+				return;
+			}
+
+			var wrapOrientation = folderSettings.LayoutMode == FolderLayoutModes.ListView ? Orientation.Vertical : Orientation.Horizontal;
+			FileList.ItemsPanel = new ItemsPanelTemplate(() => new Files.App.UnoVirtualization.VirtualizingWrapGrid
+			{
+				Orientation = wrapOrientation,
+				ProvisionalCellSize = folderSettings.LayoutMode == FolderLayoutModes.GridView
+					? new Windows.Foundation.Size(ItemWidthGridView, ItemWidthGridView + 48)
+					: new Windows.Foundation.Size(240, 96),
+			});
+		}
+#endif
+
 		[DynamicWindowsRuntimeCast(typeof(Style))]
 		private void SetItemTemplate()
 		{
@@ -367,6 +433,11 @@ namespace Files.App.Views.Layouts
 				var oldSource = FileList.ItemsSource;
 				FileList.ItemsSource = null;
 				FileList.Style = newFileListStyle;
+#if !WINDOWS
+				_appliedPanelKey = null;
+				FileList.ClearValue(ItemsControl.ItemsPanelProperty);
+				UpdateItemsPanel();
+#endif
 				FileList.ItemsSource = oldSource;
 			}
 
@@ -610,7 +681,7 @@ namespace Files.App.Views.Layouts
 				return;
 
 #if DESKTOP
-			if (TryHandleListJumpKey(e))
+			if (TryHandleListJumpKey(e) || TryHandleWrapGridArrowKey(e))
 				return;
 #endif
 

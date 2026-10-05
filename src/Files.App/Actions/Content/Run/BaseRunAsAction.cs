@@ -3,7 +3,7 @@
 
 namespace Files.App.Actions
 {
-	internal abstract class BaseRunAsAction : ObservableObject, IAction
+	internal abstract partial class BaseRunAsAction : ObservableObject, IAction
 	{
 		private readonly IContentPageContext _context;
 
@@ -28,10 +28,11 @@ namespace Files.App.Actions
 			_context.PropertyChanged += Context_PropertyChanged;
 		}
 
-		public async Task ExecuteAsync(object? parameter = null)
-		{
-			await ContextMenu.InvokeVerb(_verb, _context.SelectedItem!.ItemPath);
-		}
+#if !WINDOWS
+		// LINUX-TODO(launching): Windows shell elevation verbs are hidden on Linux.
+		public Task ExecuteAsync(object? parameter = null)
+			=> Task.CompletedTask;
+#endif
 
 		public void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

@@ -121,7 +121,7 @@ namespace Files.App.Services
 		{
 			try
 			{
-				HRESULT hr = item.ShellItem.BindToHandler(null, PInvoke.BHID_SFUIObject, out IContextMenu? pContextMenu);
+				HRESULT hr = item.ShellItem!.BindToHandler(null, PInvoke.BHID_SFUIObject, out IContextMenu? pContextMenu);
 				if (hr.Failed || pContextMenu is null)
 					return false;
 

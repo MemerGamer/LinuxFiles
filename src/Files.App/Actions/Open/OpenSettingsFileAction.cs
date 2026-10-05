@@ -32,8 +32,12 @@ namespace Files.App.Actions
 			try
 			{
 				var settingsJsonFile = await StorageFile.GetFileFromApplicationUriAsync(new Uri($"ms-appdata:///local/{Constants.LocalSettings.SettingsFolderName}/{Constants.LocalSettings.UserSettingsFileName}"));
+#if WINDOWS
 				if (!await Launcher.LaunchFileAsync(settingsJsonFile))
 					await ContextMenu.InvokeVerb("open", settingsJsonFile.Path);
+#else
+				await NavigationHelpers.OpenFileLinuxAsync(settingsJsonFile.Path);
+#endif
 			}
 			catch (Exception ex)
 			{

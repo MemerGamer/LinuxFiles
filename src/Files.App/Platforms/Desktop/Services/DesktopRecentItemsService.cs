@@ -91,8 +91,6 @@ namespace Files.App.Services.Desktop
 						Path = entry.Path,
 						Name = string.IsNullOrEmpty(name) ? entry.Path : name,
 						LastModified = entry.LastUsedUtc.ToLocalTime(),
-						// The Windows shell item is not used on Linux
-						ShellItem = null!,
 					});
 
 					if (items.Count == MaxItems)

@@ -535,6 +535,11 @@ namespace Files.App.Views.Layouts
 			if (ParentShellPageInstance is null || IsRenamingItem)
 				return;
 
+#if DESKTOP
+			if (TryHandleListJumpKey(e))
+				return;
+#endif
+
 			var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
 			var shiftPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
 			var focusedElement = (FrameworkElement)FocusManager.GetFocusedElement(MainWindow.Instance.Content.XamlRoot);

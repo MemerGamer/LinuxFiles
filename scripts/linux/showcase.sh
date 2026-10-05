@@ -67,6 +67,9 @@ fi
 if command -v zip >/dev/null; then
 	(cd "$d" && zip -q -r "$d/Projects.zip" Projects Reports) || true
 fi
+# A long folder to exercise scrolling (Videos is otherwise empty)
+mkdir -p "$home/Videos/Clips"
+for i in $(seq -w 1 300); do : >"$home/Videos/Clips/clip-$i.txt"; done
 # Content for the synthetic drives (see showcase-drives.txt)
 for m in disk1 disk2 disk3 usb; do mkdir -p "$home/mnt/$m"; done
 mkdir -p "$home/mnt/disk1"/{Games,Projects,Backups} "$home/mnt/usb/Photos"

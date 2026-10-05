@@ -150,8 +150,6 @@
         <PackageReference Include="System.Drawing.Common" />
         <PackageReference Include="TagLibSharp" />
         <PackageReference Include="UTF.Unknown" />
-        <PackageReference Include="Markdig" />
-        <PackageReference Include="ColorCode.Core" />
     </ItemGroup>
 
     <!--  Windows UI packages; desktop previews use ColorCode.Core and Markdig  -->
@@ -171,6 +169,8 @@
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <PackageReference Include="Markdig" />
+        <PackageReference Include="ColorCode.Core" />
         <PackageReference Include="Uno.WinUI" />
         <PackageReference Include="Uno.WinUI.Runtime.Skia.X11" />
         <PackageReference Include="Uno.Microsoft.Xaml.Behaviors.WinUI.Managed" />
@@ -242,7 +242,11 @@
 
     <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->
     <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
-        <DefaultItemExcludes>$(DefaultItemExcludes);UserControls/FilePreviews/ShellPreview.xaml;UserControls/FilePreviews/CodePreview.xaml;UserControls/FilePreviews/MarkdownPreview.xaml</DefaultItemExcludes>
+        <DefaultItemExcludes>$(DefaultItemExcludes);UserControls/FilePreviews/ShellPreview.xaml;UserControls/FilePreviews/CodePreview.xaml;UserControls/FilePreviews/MarkdownPreview.xaml;UserControls/FilePreviews/TextPreview.xaml</DefaultItemExcludes>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(TargetFramework)' != '$(DesktopTargetFramework)'">
+        <DefaultItemExcludes>$(DefaultItemExcludes);UserControls/FilePreviews/DesktopTextPreview.xaml</DefaultItemExcludes>
     </PropertyGroup>
 
     <!--  Win32/Shell COM code: compiled only in the FilesWin32Compat inventory mode (see below)  -->

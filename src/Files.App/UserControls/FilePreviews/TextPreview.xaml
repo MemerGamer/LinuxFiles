@@ -1,4 +1,4 @@
-<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+﻿<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <UserControl
 	x:Class="Files.App.UserControls.FilePreviews.TextPreview"
 	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -9,24 +9,15 @@
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	mc:Ignorable="d">
 
-	<Grid RowSpacing="4">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="*" />
-			<RowDefinition Height="Auto" />
-		</Grid.RowDefinitions>
+	<Border>
+		<ScrollViewer>
 
-		<ScrollViewer Grid.Row="0">
-			<RichTextBlock
-				x:Name="ContentBlock"
-				IsTextSelectionEnabled="True"
-				TextWrapping="Wrap" />
+			<RichTextBlock IsTextSelectionEnabled="True">
+				<Paragraph>
+					<Run Text="{x:Bind ViewModel.TextValue, Mode=OneWay}" />
+				</Paragraph>
+			</RichTextBlock>
+
 		</ScrollViewer>
-
-		<TextBlock
-			x:Name="FooterText"
-			Grid.Row="1"
-			Margin="0,0,0,4"
-			Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-			Visibility="Collapsed" />
-	</Grid>
+	</Border>
 </UserControl>

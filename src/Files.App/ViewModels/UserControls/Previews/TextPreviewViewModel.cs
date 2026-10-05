@@ -1,6 +1,86 @@
+#if WINDOWS
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.App.UserControls.FilePreviews;
+using Files.App.ViewModels.Properties;
+
+namespace Files.App.ViewModels.Previews
+{
+	public sealed partial class TextPreviewViewModel : BasePreviewModel
+	{
+		private string? textValue;
+		public string? TextValue
+		{
+			get => textValue;
+			private set => SetProperty(ref textValue, value);
+		}
+
+		public TextPreviewViewModel(ListedItem item)
+			: base(item)
+		{
+		}
+
+		public async override Task<List<FileProperty>> LoadPreviewAndDetailsAsync()
+		{
+			var details = new List<FileProperty>();
+
+			try
+			{
+				var text = TextValue ?? await ReadFileAsTextAsync(PreviewFile);
+
+				details.Add(GetFileProperty("PropertyLineCount", text.Split('\n').Length));
+				details.Add(GetFileProperty("PropertyWordCount", text.Split(new[] { ' ', '\n' }, StringSplitOptions.RemoveEmptyEntries).Length));
+
+				TextValue = text.Left(Constants.PreviewPane.TextCharacterLimit);
+			}
+			catch (Exception e)
+			{
+				Debug.WriteLine(e);
+			}
+
+			return details;
+		}
+
+		public static async Task<TextPreview?> TryLoadAsTextAsync(ListedItem item)
+		{
+			string? extension = item.FileExtension?.ToLowerInvariant();
+			if (ExcludedExtensions(extension) || item.FileSizeBytes is 0 or > Constants.PreviewPane.TryLoadAsTextSizeLimit)
+				return null;
+
+			try
+			{
+				item.ItemFile = await StorageFileExtensions.DangerousGetFileFromPathAsync(item.ItemPath!);
+				if (item.ItemFile is not { } itemFile)
+					return null;
+
+				var text = await ReadFileAsTextAsync(itemFile);
+				bool isBinaryFile = text.Contains("\0\0\0\0", StringComparison.Ordinal);
+
+				if (isBinaryFile)
+					return null;
+
+				var model = new TextPreviewViewModel(item) { TextValue = text };
+				await model.LoadAsync();
+
+				return new TextPreview(model);
+			}
+			catch
+			{
+				return null;
+			}
+		}
+
+		private static bool ExcludedExtensions(string? extension)
+			=> extension is ".iso";
+	}
+}
+
+#else
+// Copyright (c) Files Community
+// Licensed under the MIT License.
+
+using TextPreview = Files.App.UserControls.FilePreviews.DesktopTextPreview;
 using ColorCode;
 using Files.App.UserControls.FilePreviews;
 using Files.App.ViewModels.Properties;
@@ -36,6 +116,8 @@ namespace Files.App.ViewModels.Previews
 		/// </summary>
 		public string? Footer { get; private set; }
 
+		public PreviewTextRenderer.Model? RenderModel { get; private set; }
+
 		private List<FileProperty>? presetDetails;
 		private string? encodingName;
 
@@ -50,22 +132,27 @@ namespace Files.App.ViewModels.Previews
 
 			try
 			{
-				if (presetDetails is not null)
-					return presetDetails;
-
 				if (TextValue is null)
 				{
-					using var stream = await PreviewFile.OpenStreamForReadAsync();
-					Apply(await PreviewTextReader.ReadAsync(stream));
+					if (Item.FileSizeBytes is 0)
+						return details;
+					using var stream = Files.Platform.Linux.Previews.PreviewFile.OpenRead(Item.ItemPath!, LoadCancelledTokenSource.Token);
+					if (stream.Length == 0)
+						return details;
+					Apply(await PreviewTextReader.ReadAsync(stream, LoadCancelledTokenSource.Token));
 				}
 
 				var text = TextValue ?? string.Empty;
+				RenderModel = await Task.Run(() => PreviewTextRenderer.Parse(text, Kind, Language, LoadCancelledTokenSource.Token), LoadCancelledTokenSource.Token);
+				if (presetDetails is not null)
+					return presetDetails;
 				details.Add(GetFileProperty("PropertyLineCount", CountLines(text)));
 				details.Add(GetFileProperty("PropertyWordCount", text.Split(new[] { ' ', '\n' }, StringSplitOptions.RemoveEmptyEntries).Length));
 
 				if (encodingName is not null)
 					details.Add(GetFileProperty("Encoding", encodingName));
 			}
+			catch (OperationCanceledException) when (LoadCancelledTokenSource.IsCancellationRequested) { throw; }
 			catch (Exception e)
 			{
 				Debug.WriteLine(e);
@@ -95,9 +182,10 @@ namespace Files.App.ViewModels.Previews
 		/// <summary>
 		/// Shows <paramref name="text"/> (for example a generated listing) in the text preview with the given details.
 		/// </summary>
-		public static async Task<TextPreview> CreateFromTextAsync(ListedItem item, string text, List<FileProperty> details)
+		public static async Task<TextPreview> CreateFromTextAsync(ListedItem item, string text, List<FileProperty> details, CancellationToken cancellationToken = default)
 		{
 			var model = new TextPreviewViewModel(item) { TextValue = text, presetDetails = details };
+			using var registration = cancellationToken.Register(model.LoadCancelledTokenSource.Cancel);
 			await model.LoadAsync();
 
 			return new TextPreview(model);
@@ -106,42 +194,51 @@ namespace Files.App.ViewModels.Previews
 		/// <summary>
 		/// Loads the file with a specific rendering when its extension asks for one (Markdown, highlighted code).
 		/// </summary>
-		public static async Task<TextPreview?> TryLoadWithKindAsync(ListedItem item, TextPreviewKind kind, ILanguage? language)
+		public static async Task<TextPreview?> TryLoadWithKindAsync(ListedItem item, TextPreviewKind kind, ILanguage? language, CancellationToken cancellationToken = default)
 		{
+			if (item.FileSizeBytes is 0)
+				return null;
 			try
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				item.ItemFile ??= await StorageFileExtensions.DangerousGetFileFromPathAsync(item.ItemPath!);
 				if (item.ItemFile is not { } itemFile)
 					return null;
 
-				using var stream = await itemFile.OpenStreamForReadAsync();
-				var result = await PreviewTextReader.ReadAsync(stream);
+				using var stream = Files.Platform.Linux.Previews.PreviewFile.OpenRead(item.ItemPath!, cancellationToken);
+				if (stream.Length == 0)
+					return null;
+				var result = await PreviewTextReader.ReadAsync(stream, cancellationToken);
 				if (result.LooksBinary)
 					return null;
 
 				var model = new TextPreviewViewModel(item) { Kind = kind, Language = language };
 				model.Apply(result);
+				using var registration = cancellationToken.Register(model.LoadCancelledTokenSource.Cancel);
 				await model.LoadAsync();
 
 				return new TextPreview(model);
 			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
 			catch
 			{
 				return null;
 			}
 		}
 
-		public static async Task<TextPreview?> TryLoadAsTextAsync(ListedItem item)
+		public static async Task<TextPreview?> TryLoadAsTextAsync(ListedItem item, CancellationToken cancellationToken = default)
 		{
 			string? extension = item.FileExtension?.ToLowerInvariant();
 			if (ExcludedExtensions(extension) || item.FileSizeBytes is 0)
 				return null;
 
 			// The reader caps the bytes read, so large files are previewed by their beginning instead of being skipped.
-			return await TryLoadWithKindAsync(item, TextPreviewKind.Plain, null);
+			return await TryLoadWithKindAsync(item, TextPreviewKind.Plain, null, cancellationToken);
 		}
 
 		private static bool ExcludedExtensions(string? extension)
 			=> extension is ".iso" or ".pdf";
 	}
 }
+
+#endif

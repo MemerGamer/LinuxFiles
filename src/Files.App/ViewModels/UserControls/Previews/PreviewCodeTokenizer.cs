@@ -1,3 +1,4 @@
+#if !WINDOWS
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
@@ -7,6 +8,7 @@ using ColorCode.Styling;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 
 namespace Files.App.ViewModels.Previews
 {
@@ -16,9 +18,17 @@ namespace Files.App.ViewModels.Previews
 
 		public PreviewCodeTokenizer() : base(StyleDictionary.DefaultLight, null) { }
 
-		public List<Token> Tokenize(string text, ILanguage language)
+		public List<Token> Tokenize(string text, ILanguage language, CancellationToken cancellationToken = default)
 		{
 			var tokens = new List<Token>();
+			void Add(string fragment, int start, int length, string? scope)
+			{
+				cancellationToken.ThrowIfCancellationRequested();
+				if (tokens.Count >= 8192)
+					throw new InvalidDataException("The preview token limit was exceeded.");
+				tokens.Add(new Token(fragment.Substring(start, length), scope));
+			}
+			cancellationToken.ThrowIfCancellationRequested();
 			languageParser.Parse(text, language, (fragment, scopes) =>
 			{
 				// ColorCode's offsets are relative to each callback fragment.
@@ -28,14 +38,12 @@ namespace Files.App.ViewModels.Previews
 					if (scope.Index < position || scope.Length < 0 || scope.Index > fragment.Length - scope.Length)
 						continue;
 					if (scope.Index > position)
-						tokens.Add(new Token(fragment[position..scope.Index], null));
-					tokens.Add(new Token(fragment.Substring(scope.Index, scope.Length), scope.Name));
+						Add(fragment, position, scope.Index - position, null);
+					Add(fragment, scope.Index, scope.Length, scope.Name);
 					position = scope.Index + scope.Length;
 				}
 				if (position < fragment.Length)
-					tokens.Add(new Token(fragment[position..], null));
-				if (tokens.Count > 8192)
-					throw new InvalidDataException("The preview token limit was exceeded.");
+					Add(fragment, position, fragment.Length - position, null);
 			});
 			return tokens;
 		}
@@ -43,3 +51,5 @@ namespace Files.App.ViewModels.Previews
 		protected override void Write(string parsedSourceCode, IList<Scope> scopes) { }
 	}
 }
+
+#endif

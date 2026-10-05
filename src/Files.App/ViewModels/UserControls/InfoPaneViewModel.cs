@@ -222,7 +222,7 @@ namespace Files.App.ViewModels.UserControls
 				return;
 			}
 
-			var control = await GetBuiltInPreviewControlAsync(item, downloadItem);
+			var control = await GetBuiltInPreviewControlAsync(item, downloadItem, token);
 
 			if (token.IsCancellationRequested)
 				return;
@@ -246,7 +246,7 @@ namespace Files.App.ViewModels.UserControls
 			PreviewPaneState = SelectedDriveItem is not null ? PreviewPaneStates.DriveStorageDetailsAvailable : PreviewPaneStates.PreviewAndDetailsAvailable;
 		}
 
-		private async Task<UserControl?> GetBuiltInPreviewControlAsync(ListedItem item, bool downloadItem)
+		private async Task<UserControl?> GetBuiltInPreviewControlAsync(ListedItem item, bool downloadItem, CancellationToken token)
 		{
 			ShowCloudItemButton = false;
 
@@ -289,7 +289,7 @@ namespace Files.App.ViewModels.UserControls
 #if DESKTOP
 			if (item.PrimaryItemAttribute != StorageItemTypes.Folder && !item.IsFtpItem && ArchiveListingPreview.IsArchive(item))
 			{
-				var archivePreview = await ArchiveListingPreview.TryLoadAsync(item);
+				var archivePreview = await ArchiveListingPreview.TryLoadAsync(item, token);
 				if (archivePreview is not null)
 					return archivePreview;
 			}
@@ -325,6 +325,7 @@ namespace Files.App.ViewModels.UserControls
 #if DESKTOP
 				// LINUX-TODO(media): metadata only; playback needs libvlc (see MediaMetadataPreviewViewModel)
 				var model = new MediaMetadataPreviewViewModel(item);
+				using var registration = token.Register(model.LoadCancelledTokenSource.Cancel);
 				await model.LoadAsync();
 
 				return new BasicPreview(model);
@@ -349,11 +350,11 @@ namespace Files.App.ViewModels.UserControls
 			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML is shown as source, never rendered.
 			// LINUX-TODO(preview): shell scripts and other languages without a ColorCode grammar are shown as plain text
 			if (FileExtensionHelpers.IsMarkdownFile(ext) &&
-				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Markdown, null) is { } markdownPreview)
+				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Markdown, null, token) is { } markdownPreview)
 				return markdownPreview;
 
 			if (CodeLanguageMap.TryGetLanguage(ext, out var codeLanguage) &&
-				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Code, codeLanguage) is { } codePreview)
+				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Code, codeLanguage, token) is { } codePreview)
 				return codePreview;
 
 #endif
@@ -364,6 +365,9 @@ namespace Files.App.ViewModels.UserControls
 				)
 			{
 				var model = new ImagePreviewViewModel(item);
+#if DESKTOP
+				using var registration = token.Register(model.LoadCancelledTokenSource.Cancel);
+#endif
 				await model.LoadAsync();
 
 				return new ImagePreview(model);
@@ -372,7 +376,7 @@ namespace Files.App.ViewModels.UserControls
 			if (FileExtensionHelpers.IsTextFile(ext))
 			{
 #if DESKTOP
-				return await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Plain, null);
+				return await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Plain, null, token);
 #else
 				var model = new TextPreviewViewModel(item);
 				await model.LoadAsync();
@@ -397,7 +401,7 @@ namespace Files.App.ViewModels.UserControls
 				return new HtmlPreview(model);
 			}*/
 
-			// LINUX-TODO(preview): RTF falls back to bounded source text on desktop; Uno has no RTF renderer.
+			// LINUX-TODO(preview): implement an RTF renderer for desktop.
 #if WINDOWS
 			if (FileExtensionHelpers.IsRichTextFile(ext))
 			{
@@ -430,7 +434,11 @@ namespace Files.App.ViewModels.UserControls
 			}
 
 #endif
+#if WINDOWS
 			var control = await TextPreviewViewModel.TryLoadAsTextAsync(item);
+#else
+			var control = await TextPreviewViewModel.TryLoadAsTextAsync(item, token);
+#endif
 
 			return control ?? null;
 		}
@@ -454,9 +462,6 @@ namespace Files.App.ViewModels.UserControls
 					PreviewPaneState = PreviewPaneStates.LoadingPreview;
 
 					if (SelectedTab == InfoPaneTabs.Preview ||
-#if DESKTOP
-						SelectedTab == InfoPaneTabs.Details ||
-#endif
 						SelectedItem?.PrimaryItemAttribute == StorageItemTypes.Folder)
 					{
 						await LoadPreviewControlAsync(token, downloadItem);

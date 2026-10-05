@@ -48,7 +48,7 @@ namespace Files.Platform.Linux.Native
 		private const uint StatxSize = 0x200;
 		private const int StatxBufferSize = 256;
 
-		private const int ONonblock = 0x800;
+		public const int ONonblock = 0x800;
 		private const int OCloexec = 0x80000;
 
 		private const int ENOENT = 2;
@@ -123,6 +123,30 @@ namespace Files.Platform.Linux.Native
 			return fd;
 		}
 
+		/// <summary>Checks the mode of an open descriptor using fstat; struct stat differs by architecture.</summary>
+		public static bool IsRegularFile(int fd)
+		{
+			byte* buffer = stackalloc byte[256];
+			if (fstat(fd, buffer) != 0)
+				throw CreateException(Marshal.GetLastPInvokeError(), "preview descriptor");
+			var modeOffset = RuntimeInformation.ProcessArchitecture switch
+			{
+				Architecture.X64 => 24,
+				Architecture.Arm64 => 16,
+				_ => throw new PlatformNotSupportedException("Preview fstat requires linux-x64 or linux-arm64."),
+			};
+			var mode = *(uint*)(buffer + modeOffset);
+			return (mode & 0xF000) == 0x8000;
+		}
+
+		public static void ClearNonBlocking(int fd)
+		{
+			const int getFlags = 3, setFlags = 4;
+			var flags = fcntl(fd, getFlags, 0);
+			if (flags < 0 || fcntl(fd, setFlags, flags & ~ONonblock) < 0)
+				throw CreateException(Marshal.GetLastPInvokeError(), "preview descriptor");
+		}
+
 		public static void Close(int fd) => _ = close(fd);
 
 		/// <summary>Removes a file, link or (with <see cref="AtRemoveDir"/>) empty directory relative to <paramref name="dirfd"/>.</summary>
@@ -190,6 +214,12 @@ namespace Files.Platform.Linux.Native
 				1 or 13 or 30 => new UnauthorizedAccessException($"Access to '{path}' is denied."),
 				_ => new IOException($"The operation on '{path}' failed with errno {errno}.", errno),
 			};
+
+		[LibraryImport("libc", EntryPoint = "fstat", SetLastError = true)]
+		private static partial int fstat(int fd, byte* buffer);
+
+		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]
+		private static partial int fcntl(int fd, int command, int argument);
 
 		[LibraryImport("libc", EntryPoint = "statx", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int statx(int dirfd, string pathname, int flags, uint mask, byte* statxbuf);

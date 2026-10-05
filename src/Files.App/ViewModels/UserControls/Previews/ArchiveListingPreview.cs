@@ -2,10 +2,11 @@
 // Licensed under the MIT License.
 
 #if DESKTOP
-using Files.App.UserControls.FilePreviews;
+using TextPreview = Files.App.UserControls.FilePreviews.DesktopTextPreview;
 using Files.App.ViewModels.Properties;
 using Files.Platform.Abstractions.Archives;
 using System.Text;
+using Files.Platform.Linux.Previews;
 
 namespace Files.App.ViewModels.Previews
 {
@@ -19,13 +20,14 @@ namespace Files.App.ViewModels.Previews
 		public static bool IsArchive(ListedItem item)
 			=> item.ItemPath is { } path && Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName(path);
 
-		public static async Task<TextPreview?> TryLoadAsync(ListedItem item)
+		public static async Task<TextPreview?> TryLoadAsync(ListedItem item, CancellationToken cancellationToken = default)
 		{
 			var service = Ioc.Default.GetRequiredService<IArchiveService>();
 
 			try
 			{
-				using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+				using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+				timeout.CancelAfter(TimeSpan.FromSeconds(10));
 				var listing = await service.ListPreviewAsync(item.ItemPath!, cancellationToken: timeout.Token);
 
 				var fileCount = 0;
@@ -45,7 +47,7 @@ namespace Files.App.ViewModels.Previews
 				foreach (var entry in listing.Entries.Take(MaxListedEntries))
 				{
 					var size = entry.IsDirectory ? string.Empty : entry.Size.ToSizeString();
-					text.Append(size.PadLeft(10)).Append("  ").Append(Sanitize(entry.Path.Length > 1024 ? entry.Path[..1024] + "…" : entry.Path)).Append(entry.IsDirectory ? "/" : string.Empty).Append('\n');
+					text.Append(size.PadLeft(10)).Append("  ").Append(PreviewEntryName.Sanitize(entry.Path)).Append(entry.IsDirectory ? "/" : string.Empty).Append('\n');
 				}
 				if (listing.Entries.Count > MaxListedEntries)
 					text.Append("PreviewArchiveMoreEntries".GetLocalizedFormatResource(listing.Entries.Count - MaxListedEntries));
@@ -56,8 +58,9 @@ namespace Files.App.ViewModels.Previews
 					new() { NameResource = "PropertyUncompressedSize", Value = totalSize.ToSizeString() },
 				};
 
-				return await TextPreviewViewModel.CreateFromTextAsync(item, text.ToString(), details);
+				return await TextPreviewViewModel.CreateFromTextAsync(item, text.ToString(), details, timeout.Token);
 			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { throw; }
 			catch (Exception ex)
 			{
 				// Encrypted headers, unsupported formats and limit violations fall back to the generic preview.
@@ -66,13 +69,6 @@ namespace Files.App.ViewModels.Previews
 			}
 		}
 
-		// Entry names are untrusted: drop control characters so they cannot disturb the layout.
-		private static string Sanitize(string name)
-			=> string.Create(name.Length, name, static (span, source) =>
-			{
-				for (var i = 0; i < source.Length; i++)
-					span[i] = char.IsControl(source[i]) ? '?' : source[i];
-			});
 	}
 }
 #endif

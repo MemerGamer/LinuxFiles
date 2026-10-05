@@ -36,6 +36,7 @@ namespace Files.App.ViewModels.Previews
 			try
 			{
 				var path = Item.ItemPath!;
+				using var source = Files.Platform.Linux.Previews.PreviewFile.OpenRead(path, LoadCancelledTokenSource.Token);
 				if (string.Equals(Item.FileExtension, ".pdf", StringComparison.OrdinalIgnoreCase))
 				{
 					// LINUX-TODO(preview): PDF shows the first page; multipage navigation needs a document renderer.
@@ -44,7 +45,6 @@ namespace Files.App.ViewModels.Previews
 				}
 				else
 				{
-					using var source = await PreviewFile.OpenStreamForReadAsync();
 					if (source.CanSeek && source.Length > MaxImageFileBytes)
 						throw new InvalidOperationException("The image is too large to preview.");
 					using var timeout = CancellationTokenSource.CreateLinkedTokenSource(LoadCancelledTokenSource.Token);
@@ -53,12 +53,13 @@ namespace Files.App.ViewModels.Previews
 					using var buffer = new MemoryStream();
 					await stream.CopyToAsync(buffer, timeout.Token);
 					var bytes = buffer.ToArray();
-					var result = await Task.Run(() => PreviewImageDecoder.DecodeImage(bytes));
+					var result = await Task.Run(() => PreviewImageDecoder.DecodeImage(bytes), timeout.Token);
 					png = result.Png;
 					if (result.Width > 0)
 						details.Add(GetFileProperty("PropertyDimensions", $"{result.Width} x {result.Height}"));
 				}
 			}
+			catch (OperationCanceledException) when (LoadCancelledTokenSource.IsCancellationRequested) { throw; }
 			catch (Exception ex)
 			{
 				System.Diagnostics.Debug.WriteLine(ex);

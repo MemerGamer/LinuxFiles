@@ -31,8 +31,9 @@ namespace Files.App.ViewModels.Previews
 			{
 				using var timeout = CancellationTokenSource.CreateLinkedTokenSource(LoadCancelledTokenSource.Token);
 				timeout.CancelAfter(TimeSpan.FromSeconds(5));
-				using var source = System.IO.File.OpenRead(Item.ItemPath!);
-				using var input = new PreviewReadStream(source, 16 * 1024 * 1024, timeout.Token);
+				using var source = Files.Platform.Linux.Previews.PreviewFile.OpenRead(Item.ItemPath!, timeout.Token);
+				using var snapshot = await MediaPreviewInput.ReadAsync(source, Item.FileExtension?.ToLowerInvariant(), timeout.Token);
+				using var input = new PreviewReadStream(snapshot, MediaPreviewInput.MaxBytes, timeout.Token);
 				using var file = OpenMedia(new ReadOnlyMediaFile(Item.ItemPath!, input), Item.FileExtension?.ToLowerInvariant());
 
 				void Add(string name, object? value)
@@ -54,9 +55,11 @@ namespace Files.App.ViewModels.Previews
 				Add("PropertySampleRate", props.AudioSampleRate > 0 ? $"{props.AudioSampleRate} Hz" : null);
 				Add("PropertyChannelCount", props.AudioChannels > 0 ? props.AudioChannels.ToString() : null);
 
+				ValidatePictures(tag, timeout.Token);
 				if (tag.Pictures is { Length: > 0 } pictures && pictures[0].Data.Count is > 0 and <= MaxCoverBytes)
 					cover = pictures[0].Data.Data;
 			}
+			catch (OperationCanceledException) when (LoadCancelledTokenSource.IsCancellationRequested) { throw; }
 			catch (Exception ex)
 			{
 				System.Diagnostics.Debug.WriteLine(ex);
@@ -70,6 +73,37 @@ namespace Files.App.ViewModels.Previews
 				_ = await base.LoadPreviewAndDetailsAsync();
 
 			return details;
+		}
+
+		private static void ValidatePictures(TagLib.Tag tag, CancellationToken token)
+		{
+			token.ThrowIfCancellationRequested();
+			switch (tag)
+			{
+				case TagLib.CombinedTag combined:
+					foreach (var child in combined.Tags)
+						if (child is not null) ValidatePictures(child, token);
+					break;
+				case TagLib.Ogg.GroupedComment grouped:
+					foreach (var comment in grouped.Comments) ValidatePictures(comment, token);
+					break;
+				case TagLib.Ogg.XiphComment comment:
+					foreach (var field in new[] { "COVERART", "METADATA_BLOCK_PICTURE" })
+						foreach (var value in comment.GetField(field))
+						{
+							token.ThrowIfCancellationRequested();
+							if (value.Length > MaxCoverBytes * 4 / 3) throw new InvalidDataException("The cover is too large to preview.");
+							var bytes = Convert.FromBase64String(value);
+							if (field == "METADATA_BLOCK_PICTURE") MediaPreviewInput.ValidateFlacPicture(bytes);
+						}
+					break;
+				case TagLib.Asf.Tag asf:
+					foreach (var descriptor in asf.GetDescriptors("WM/Picture"))
+						MediaPreviewInput.ValidateAsfPicture(descriptor.ToByteVector().Data);
+					foreach (var record in asf.MetadataLibraryObject.GetRecords(0, 0, "WM/Picture"))
+						MediaPreviewInput.ValidateAsfPicture(record.ToByteVector().Data);
+					break;
+			}
 		}
 
 		private static TagLib.File OpenMedia(TagLib.File.IFileAbstraction file, string? extension)

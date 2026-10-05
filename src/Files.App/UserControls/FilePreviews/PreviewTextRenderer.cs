@@ -1,3 +1,4 @@
+#if !WINDOWS
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
@@ -39,31 +40,57 @@ namespace Files.App.UserControls.FilePreviews
 			return new FontFamily("Consolas");
 		}
 
-		/// <summary>
-		/// Fills <paramref name="paragraph"/> with the colorized <paramref name="text"/>, or one plain run when it cannot be highlighted.
-		/// </summary>
-		public static void AddCodeInlines(Paragraph paragraph, string text, ILanguage? language, bool dark)
-		{
-			if (language is null || text.Length > MaxHighlightChars)
-			{
-				paragraph.Inlines.Add(new Run { Text = text });
-				return;
-			}
+		public sealed record Model(string Text, MarkdownDocument? Markdown, List<PreviewCodeTokenizer.Token>? Tokens);
 
+		// This model contains no XAML objects and can be reused when the theme changes.
+		public static Model Parse(string text, TextPreviewKind kind, ILanguage? language, CancellationToken token)
+		{
+			token.ThrowIfCancellationRequested();
 			try
 			{
-				foreach (var token in new PreviewCodeTokenizer().Tokenize(text, language))
-				{
-					var run = new Run { Text = token.Text };
-					if (GetColor(token.ScopeName, dark) is { } color)
-						run.Foreground = new SolidColorBrush(color);
-					paragraph.Inlines.Add(run);
-				}
+				MarkdownDocument? markdown = null;
+				List<PreviewCodeTokenizer.Token>? tokens = null;
+				if (kind == TextPreviewKind.Markdown && text.Length <= MaxMarkdownChars)
+					markdown = Markdown.Parse(text, markdownPipeline);
+				else if (kind == TextPreviewKind.Code && language is not null && text.Length <= MaxHighlightChars)
+					tokens = new PreviewCodeTokenizer().Tokenize(text, language, token);
+				token.ThrowIfCancellationRequested();
+				return new Model(text, markdown, tokens);
 			}
+			catch (OperationCanceledException) { throw; }
 			catch (Exception)
 			{
-				paragraph.Inlines.Clear();
-				paragraph.Inlines.Add(new Run { Text = text });
+				return new Model(text, null, null);
+			}
+		}
+
+		public static void AddPlainInlines(InlineCollection target, string text, SolidColorBrush? foreground = null)
+		{
+			const int chunkSize = 4096;
+			for (var start = 0; start < text.Length;)
+			{
+				var length = Math.Min(chunkSize, text.Length - start);
+				if (start + length < text.Length && char.IsHighSurrogate(text[start + length - 1]))
+					length--;
+				var run = new Run { Text = text.Substring(start, length) };
+				if (foreground is not null)
+					run.Foreground = foreground;
+				target.Add(run);
+				start += length;
+			}
+		}
+
+		public static void AddCodeInlines(Paragraph paragraph, Model model, bool dark)
+		{
+			if (model.Tokens is null)
+			{
+				AddPlainInlines(paragraph.Inlines, model.Text);
+				return;
+			}
+			foreach (var token in model.Tokens)
+			{
+				var brush = GetColor(token.ScopeName, dark) is { } color ? new SolidColorBrush(color) : null;
+				AddPlainInlines(paragraph.Inlines, token.Text, brush);
 			}
 		}
 
@@ -91,34 +118,29 @@ namespace Files.App.UserControls.FilePreviews
 			return null;
 		}
 
-		/// <summary>
-		/// Appends the basic Markdown rendering of <paramref name="markdown"/> (headings, emphasis, lists, quotes, code, links) to <paramref name="blocks"/>.
-		/// </summary>
-		public static void AddMarkdownBlocks(BlockCollection blocks, string markdown, bool dark)
+		public static void AddMarkdownBlocks(BlockCollection blocks, Model model, bool dark)
 		{
-			if (markdown.Length > MaxMarkdownChars)
+			if (model.Markdown is null)
 			{
-				blocks.Add(PlainParagraph(markdown));
+				blocks.Add(PlainParagraph(model.Text));
 				return;
 			}
-
 			try
 			{
-				var document = Markdown.Parse(markdown, markdownPipeline);
-				foreach (var block in document)
+				foreach (var block in model.Markdown)
 					AddBlock(blocks, block, 0, dark);
 			}
 			catch (Exception)
 			{
 				blocks.Clear();
-				blocks.Add(PlainParagraph(markdown));
+				blocks.Add(PlainParagraph(model.Text));
 			}
 		}
 
 		private static Paragraph PlainParagraph(string text)
 		{
 			var paragraph = new Paragraph();
-			paragraph.Inlines.Add(new Run { Text = text });
+			AddPlainInlines(paragraph.Inlines, text);
 			return paragraph;
 		}
 
@@ -202,7 +224,7 @@ namespace Files.App.UserControls.FilePreviews
 						FontSize = 12,
 						Margin = new Thickness(depth * 20 + 8, 0, 0, 8),
 					};
-					paragraph.Inlines.Add(new Run { Text = string.Join('\n', code.Lines.Lines.Select(l => l.ToString()).Take(code.Lines.Count)).TrimEnd('\n') });
+					AddPlainInlines(paragraph.Inlines, string.Join('\n', code.Lines.Lines.Select(l => l.ToString()).Take(code.Lines.Count)).TrimEnd('\n'));
 					blocks.Add(paragraph);
 					break;
 				}
@@ -213,7 +235,7 @@ namespace Files.App.UserControls.FilePreviews
 				{
 					// Raw HTML and anything else: literal text only.
 					var paragraph = new Paragraph { Margin = indent, FontFamily = GetMonospaceFont(), FontSize = 12 };
-					paragraph.Inlines.Add(new Run { Text = leaf.Lines.ToString() });
+					AddPlainInlines(paragraph.Inlines, leaf.Lines.ToString());
 					blocks.Add(paragraph);
 					break;
 				}
@@ -238,7 +260,7 @@ namespace Files.App.UserControls.FilePreviews
 				switch (inline)
 				{
 					case LiteralInline literal:
-						target.Add(new Run { Text = literal.Content.ToString() });
+						AddPlainInlines(target, literal.Content.ToString());
 						break;
 					case LineBreakInline lineBreak:
 						if (lineBreak.IsHard)
@@ -293,3 +315,5 @@ namespace Files.App.UserControls.FilePreviews
 		}
 	}
 }
+
+#endif

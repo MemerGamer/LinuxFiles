@@ -24,7 +24,7 @@ namespace Files.Platform.Linux.Archives
 		{
 			return Task.Run(() =>
 			{
-				using var file = new FileStream(archivePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+				using var file = PreviewFile.OpenRead(archivePath, cancellationToken);
 				if (file.Length > MaxPreviewBytes)
 					throw new InvalidDataException("The archive is too large to preview.");
 				using var input = new PreviewReadStream(file, MaxPreviewBytes, cancellationToken);

@@ -46,6 +46,22 @@ namespace Files.Platform.Tests.Mime
 		}
 
 		[TestMethod]
+		public async Task MimeXml_HigherPriorityOverrideInstalledLater_IsPickedUp()
+		{
+			using var fx = new XdgFixture();
+			fx.Write("usr-share/mime/globs2", Globs2);
+			const string xml = "<mime-type xmlns=\"http://www.freedesktop.org/standards/shared-mime-info\" type=\"application/x-over\"><icon name=\"{0}\"/></mime-type>";
+			fx.Write("usr-share/mime/application/x-over.xml", string.Format(xml, "system-icon"));
+			var svc = new LinuxMimeTypeService(fx.Directories, CultureInfo.GetCultureInfo("en-US")) { RecheckInterval = System.TimeSpan.Zero };
+
+			Assert.AreEqual("system-icon", await svc.GetIconNameAsync("application/x-over"));
+
+			fx.Write("data/mime/application/x-over.xml", string.Format(xml, "user-icon"));
+
+			Assert.AreEqual("user-icon", await svc.GetIconNameAsync("application/x-over"));
+		}
+
+		[TestMethod]
 		public async Task Glob_SimpleExtension_CaseInsensitive()
 		{
 			using var fx = new XdgFixture();

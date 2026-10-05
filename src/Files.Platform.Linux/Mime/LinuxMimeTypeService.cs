@@ -373,8 +373,10 @@ namespace Files.Platform.Linux.Mime
 				if (now - entry.CheckedAt < RecheckInterval.Ticks)
 					return entry.Root;
 
-				// Hit: keep it while the file is unchanged. Miss: probe again.
-				if (entry.File is not null && TryGetWriteTime(entry.File) == entry.LastWriteUtc)
+				// Keep the entry while the highest-priority file is the same and unchanged (a new override in an earlier directory, or a type
+				// installed after a miss, changes which file that is)
+				var current = FindMimeXmlPath(mimeType);
+				if (current == entry.File && (current is null || TryGetWriteTime(current) == entry.LastWriteUtc))
 				{
 					mimeXmlCache[mimeType] = entry with { CheckedAt = now };
 					return entry.Root;
@@ -382,6 +384,7 @@ namespace Files.Platform.Linux.Mime
 			}
 
 			var (root, file) = ReadMimeXml(mimeType);
+			file = FindMimeXmlPath(mimeType) ?? file;
 			mimeXmlCache[mimeType] = new MimeXmlEntry(root, file, file is null ? default : TryGetWriteTime(file), now);
 			return root;
 		}
@@ -396,6 +399,21 @@ namespace Files.Platform.Linux.Mime
 			{
 				return default;
 			}
+		}
+
+		private string? FindMimeXmlPath(string mimeType)
+		{
+			if (mimeType.Contains("..", StringComparison.Ordinal) || mimeType.Split('/').Length != 2)
+				return null;
+
+			foreach (var dir in xdg.AllDataDirs)
+			{
+				var file = Path.Combine(dir, "mime", mimeType + ".xml");
+				if (File.Exists(file))
+					return file;
+			}
+
+			return null;
 		}
 
 		private (XElement? Root, string? File) ReadMimeXml(string mimeType)

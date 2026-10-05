@@ -44,6 +44,7 @@ namespace Files.App.Storage
 				return StorableResult.NotFound;
 
 			// The URL can contain a password, so neither it nor exception messages are logged or surfaced.
+			FtpManager.RememberUrlCredential(url);
 			var id = url.ToId();
 			try
 			{
@@ -74,6 +75,23 @@ namespace Files.App.Storage
 			{
 				return ToFailure(ex);
 			}
+		}
+
+		/// <summary>
+		/// Whether an FTP reply means the server refused access (login or permission) rather than "no such file".
+		/// 530 and 532 are always access failures; 550 is ambiguous, so its text decides.
+		/// </summary>
+		public static bool IsPermissionReply(string? code, string? message)
+		{
+			if (code is "530" or "532")
+				return true;
+
+			return code == "550" && message is not null &&
+				(message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
+				message.Contains("denied", StringComparison.OrdinalIgnoreCase) ||
+				message.Contains("not allowed", StringComparison.OrdinalIgnoreCase) ||
+				message.Contains("access", StringComparison.OrdinalIgnoreCase) ||
+				message.Contains("forbidden", StringComparison.OrdinalIgnoreCase));
 		}
 
 		private static StorableResult ToFailure(Exception ex)

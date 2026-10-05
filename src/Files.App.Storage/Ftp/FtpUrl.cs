@@ -214,8 +214,7 @@ namespace Files.App.Storage
 			if (host.StartsWith('.') || host.Contains("..", StringComparison.Ordinal) || host.Contains(':') || host.Contains('[') || host.Contains(']'))
 				return false;
 
-			host = host.TrimEnd('.');
-			foreach (var label in host.Split('.'))
+			foreach (var label in host.TrimEnd('.', '\u3002', '\uFF0E', '\uFF61').Split('.', '\u3002', '\uFF0E', '\uFF61'))
 			{
 				if (label.Length == 0 || label.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
 					return false;
@@ -223,7 +222,8 @@ namespace Files.App.Storage
 
 			try
 			{
-				host = new IdnMapping().GetAscii(host).ToLowerInvariant();
+				// Normalize the trailing dot only after IDNA mapping, which turns U+3002 and friends into '.'
+				host = new IdnMapping().GetAscii(host).TrimEnd('.').ToLowerInvariant();
 			}
 			catch (ArgumentException)
 			{
@@ -237,7 +237,7 @@ namespace Files.App.Storage
 			}
 
 			canonical = host;
-			return host.Length > 0;
+			return host.Length > 0 && !host.Contains("..", StringComparison.Ordinal);
 		}
 	}
 }

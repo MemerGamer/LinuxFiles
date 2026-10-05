@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using FluentFTP;
+using FluentFTP.Exceptions;
 using Files.Platform.Abstractions.Secrets;
 using System.IO;
 
@@ -20,43 +21,50 @@ namespace Files.App.Storage
 		public async Task<IFolder> GetFolderAsync(string id, CancellationToken cancellationToken = default)
 		{
 			var url = FtpUrl.Parse(id);
-			RememberUrlCredential(url);
-			id = url.ToId();
+			FtpManager.RememberUrlCredential(url);
 
-			using var ftpClient = FtpHelpers.GetFtpClient(id);
-			await ftpClient.EnsureConnectedAsync(cancellationToken);
-
-			var ftpPath = FtpHelpers.GetFtpPath(id);
-			var item = await ftpClient.GetObjectInfo(ftpPath, token: cancellationToken);
+			var item = await GetObjectInfoAsync(url, cancellationToken);
 			if (item is null || item.Type != FtpObjectType.Directory)
 				throw new DirectoryNotFoundException("Directory was not found from path.");
 
-			return new FtpStorageFolder(id, item.Name, null);
+			return new FtpStorageFolder(url.ToId(), item.Name, null);
 		}
 
 		/// <inheritdoc/>
 		public async Task<IFile> GetFileAsync(string id, CancellationToken cancellationToken = default)
 		{
 			var url = FtpUrl.Parse(id);
-			RememberUrlCredential(url);
-			id = url.ToId();
+			FtpManager.RememberUrlCredential(url);
 
-			using var ftpClient = FtpHelpers.GetFtpClient(id);
-			await ftpClient.EnsureConnectedAsync(cancellationToken);
-
-			var ftpPath = FtpHelpers.GetFtpPath(id);
-			var item = await ftpClient.GetObjectInfo(ftpPath, token: cancellationToken);
+			var item = await GetObjectInfoAsync(url, cancellationToken);
 			if (item is null || item.Type != FtpObjectType.File)
 				throw new FileNotFoundException("File was not found from path.");
 
-			return new FtpStorageFile(id, item.Name, null);
+			return new FtpStorageFile(url.ToId(), item.Name, null);
 		}
 
-		// Credentials typed into a URL stay in memory for the session; they are never persisted or kept in item ids.
-		private static void RememberUrlCredential(FtpUrl url)
+		// The same parsed URL provides the credential scope, connection target and path.
+		private static async Task<FtpListItem?> GetObjectInfoAsync(FtpUrl url, CancellationToken cancellationToken)
 		{
-			if (url.GetCredential() is { } credential)
-				FtpManager.Credentials.SetFromUrl(url.GetCredentialKey(), credential);
+			using var ftpClient = FtpClientFactory.Create(url);
+			try
+			{
+				await ftpClient.EnsureConnectedAsync(cancellationToken);
+
+				var item = await ftpClient.GetObjectInfo(url.Path, token: cancellationToken);
+				if (item is null && FtpStorableRoute.IsPermissionReply(ftpClient.LastReply.Code, ftpClient.LastReply.Message))
+					throw new UnauthorizedAccessException("The server denied access.");
+
+				return item;
+			}
+			catch (FtpAuthenticationException)
+			{
+				throw new UnauthorizedAccessException("The server rejected the login.");
+			}
+			catch (FtpCommandException ex) when (FtpStorableRoute.IsPermissionReply(ex.CompletionCode, ex.Message))
+			{
+				throw new UnauthorizedAccessException("The server denied access.");
+			}
 		}
 	}
 }

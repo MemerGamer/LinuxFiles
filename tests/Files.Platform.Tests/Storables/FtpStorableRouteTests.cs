@@ -268,6 +268,39 @@ namespace Files.Platform.Tests.Storables
 		}
 
 		[TestMethod]
+		public void Parse_IdeographicTrailingDot_IsNormalizedAfterIdna_AndIdIsStable()
+		{
+			var parsed = FtpUrl.Parse("ftps://alice:secret@example\u3002/private");
+
+			Assert.AreEqual("example", parsed.Host);
+			Assert.AreEqual(parsed.GetCredentialKey(), FtpUrl.Parse(parsed.ToId()).GetCredentialKey());
+		}
+
+		[TestMethod]
+		[DataRow("530", "Login incorrect", true)]
+		[DataRow("550", "Permission denied", true)]
+		[DataRow("550", "/x: No such file or directory", false)]
+		[DataRow("450", "busy", false)]
+		[DataRow(null, null, false)]
+		public void IsPermissionReply_MapsAccessFailures(string? code, string? message, bool expected)
+		{
+			Assert.AreEqual(expected, FtpStorableRoute.IsPermissionReply(code, message));
+		}
+
+		[TestMethod]
+		public async Task Route_RemembersUrlCredentialBeforeStrippingIt()
+		{
+			var url = FtpUrl.Parse("ftpes://alice:secret@route-cred.example/private");
+			var route = new FtpStorableRoute(new FakeFtpService());
+
+			await route.TryGetAsync("ftpes://alice:secret@route-cred.example/private");
+
+			Assert.IsTrue(FtpManager.Credentials.TryGetValue(url.GetCredentialKey(), out var credential));
+			Assert.AreEqual("alice", credential.UserName);
+			Assert.IsFalse(FtpManager.Credentials.TryGetValue(FtpUrl.Parse("ftpes://route-cred.example:2121/").GetCredentialKey(), out _));
+		}
+
+		[TestMethod]
 		public void CredentialCache_HasNoHostOnlyFallback()
 		{
 			var cache = new FtpCredentialCache();

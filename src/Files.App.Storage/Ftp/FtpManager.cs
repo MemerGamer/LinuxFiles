@@ -24,6 +24,15 @@ namespace Files.App.Storage
 		/// </summary>
 		public static ISecretStore? SecretStore { get; set; }
 
+		/// <summary>
+		/// Keeps credentials embedded in <paramref name="url"/> for this session. Call before the user info is stripped from the id.
+		/// </summary>
+		public static void RememberUrlCredential(FtpUrl url)
+		{
+			if (url.GetCredential() is { } credential)
+				Credentials.SetFromUrl(url.GetCredentialKey(), credential);
+		}
+
 		private static readonly HashSet<string> _cleartextApproved = new(StringComparer.OrdinalIgnoreCase);
 
 		/// <summary>

@@ -1,10 +1,10 @@
 <p align="center">
-  <img alt="Files hero image (artwork from the upstream Files project)" src="./assets/ReadmeHero.png" />
+  <img alt="LinuxFiles on Linux: Home page" src="../docs/linux-port/showcase/home.png" width="820" />
 </p>
 
 # LinuxFiles: Files for Linux
 
-**LinuxFiles is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files) by the Files Community. It is not affiliated with or endorsed by the Files Community.**
+**LinuxFiles, Files for Linux, based on Files by the Files Community, is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files) by the Files Community. It is not affiliated with or endorsed by the Files Community.**
 
 Files is created and maintained by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors). This fork builds on their work and keeps their MIT-licensed code, history and credit. The Linux port itself (Uno Platform, Skia, X11, and the Linux platform layer) is the work of the LinuxFiles contributors. See [Credits](#credits) and [NOTICE.md](../NOTICE.md).
 
@@ -14,10 +14,6 @@ Files is created and maintained by the [Files Community](https://github.com/file
 ## Linux port: current state
 
 This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.
-
-<p align="center">
-  <img alt="Files on Linux: Home page" src="../docs/linux-port/showcase/home.png" width="720" />
-</p>
 
 ## Installing LinuxFiles
 

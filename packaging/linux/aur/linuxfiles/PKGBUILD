@@ -4,7 +4,7 @@
 pkgname=linuxfiles
 pkgver=0.1.0
 pkgrel=1
-pkgdesc='LinuxFiles, unofficial Linux port of Files, a modern file manager (Linux port built on Uno Platform)'
+pkgdesc='LinuxFiles, Files for Linux: unofficial port of Files by the Files Community (Uno Platform)'
 arch=('x86_64' 'aarch64')
 url='https://github.com/MemerGamer/LinuxFiles'
 license=('MIT')

@@ -28,6 +28,18 @@ namespace Files.App.Utils
 		{
 			var entries = new List<DriveEntry>();
 
+			// Headless sandbox runs show only the synthetic drives: no UDisks2, no GVfs, no real mounts
+			if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Current is not null)
+			{
+				foreach (var mount in DriveHelpers.GetMounts())
+				{
+					var captured = mount;
+					entries.Add(new DriveEntry(mount.MountPoint, $"{mount.Source}|{mount.FsType}", () => CreateMountedAsync(captured, null)));
+				}
+
+				return entries;
+			}
+
 			IReadOnlyList<VolumeInfo> volumes = [];
 			if (Ioc.Default.GetService<IVolumeService>() is { } volumeService)
 			{

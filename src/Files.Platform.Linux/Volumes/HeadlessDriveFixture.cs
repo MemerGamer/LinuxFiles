@@ -62,8 +62,7 @@ namespace Files.Platform.Linux.Volumes
 		{
 			if (getVariable(EnableVariable) != "1"
 				|| getVariable(RootVariable) is not { Length: > 0 } root
-				|| getVariable("HOME") is not { Length: > 0 } home
-				|| getVariable(DrivesVariable) is not { Length: > 0 } path)
+				|| getVariable("HOME") is not { Length: > 0 } home)
 				return null;
 
 			try
@@ -72,9 +71,13 @@ namespace Files.Platform.Linux.Volumes
 				if (!Path.IsPathRooted(root) || fullHome != Path.GetFullPath(root).TrimEnd('/') + "/home")
 					return null;
 
+				// Headless sandbox mode is established: from here on a missing or invalid fixture means no drives
+				if (getVariable(DrivesVariable) is not { Length: > 0 } path)
+					return [];
+
 				var fullPath = Path.GetFullPath(path);
 				if (!fullPath.StartsWith(fullHome + "/", StringComparison.Ordinal))
-					return null;
+					return [];
 
 				return Parse(ReadFixture(fullPath), fullHome);
 			}
@@ -87,7 +90,7 @@ namespace Files.Platform.Linux.Volumes
 
 		private static string ReadFixture(string path)
 		{
-			var fd = PosixNative.OpenAt(PosixNative.AtFdCwd, path, PosixNative.ReadOnlyFlags | PosixNative.ONofollow, out var errno);
+			var fd = PosixNative.OpenAt(PosixNative.AtFdCwd, path, PosixNative.NonBlockingFlags | PosixNative.ONofollow, out var errno);
 			if (fd < 0)
 				throw PosixNative.CreateException(errno, path);
 

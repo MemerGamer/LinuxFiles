@@ -65,8 +65,35 @@ namespace Files.Platform.Tests.Volumes
 				otherHome["HOME"] = "/home/someone";
 				Assert.IsNull(HeadlessDriveFixture.LoadFromEnvironment(Env(otherHome)));
 
-				var outside = Gated(root, "/etc/passwd");
-				Assert.IsNull(HeadlessDriveFixture.LoadFromEnvironment(Env(outside)));
+							}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
+		public void EstablishedHeadlessModeWithMissingOrOutsideFixtureMeansNoDrives()
+		{
+			var root = NewRoot();
+			try
+			{
+				var missing = Gated(root, "x");
+				missing.Remove("FILES_HEADLESS_DRIVES");
+				Assert.AreEqual(0, HeadlessDriveFixture.LoadFromEnvironment(Env(missing))!.Count);
+				Assert.AreEqual(0, HeadlessDriveFixture.LoadFromEnvironment(Env(Gated(root, "/etc/passwd")))!.Count);
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
+		public void FifoFixtureDoesNotBlock()
+		{
+			var root = NewRoot();
+			try
+			{
+				var fifo = Path.Combine(root, "home", "fifo");
+				using (var p = System.Diagnostics.Process.Start("mkfifo", fifo)!) { p.WaitForExit(); Assert.AreEqual(0, p.ExitCode); }
+				var task = System.Threading.Tasks.Task.Run(() => HeadlessDriveFixture.LoadFromEnvironment(Env(Gated(root, fifo))));
+				Assert.IsTrue(task.Wait(TimeSpan.FromSeconds(10)));
+				Assert.AreEqual(0, task.Result!.Count);
 			}
 			finally { Directory.Delete(root, true); }
 		}

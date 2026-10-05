@@ -88,7 +88,7 @@ fi
 # Private D-Bus session: notifications, portals and app launches never reach the real desktop session.
 # shellcheck disable=SC2016
 setsid bash -c 'cd "$0" && exec "$@"' "$bin" \
-	env -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS "${sandbox_env[@]}" DISPLAY=":$display" LIBGL_ALWAYS_SOFTWARE=1 \
+	env -u WAYLAND_DISPLAY -u DBUS_SESSION_BUS_ADDRESS -u FILES_GVFS_DIR "${sandbox_env[@]}" DISPLAY=":$display" LIBGL_ALWAYS_SOFTWARE=1 \
 	FILES_LAUNCH_DRYRUN="${FILES_LAUNCH_DRYRUN:-1}" nice -n 19 dbus-run-session -- dotnet Files.dll "$@" \
 	>"$outdir/app.log" 2>&1 &
 app_pid=$!

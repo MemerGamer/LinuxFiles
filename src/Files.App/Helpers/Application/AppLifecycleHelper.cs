@@ -434,6 +434,9 @@ namespace Files.App.Helpers
 					.AddSingleton<LibraryManager>()
 					.AddSingleton(appModel);
 
+			// Storable path resolution
+			services.AddStorables();
+
 			// Conditional DI
 #if WINDOWS
 			if (AppEnvironment is AppEnvironment.SideloadPreview or AppEnvironment.SideloadStable)

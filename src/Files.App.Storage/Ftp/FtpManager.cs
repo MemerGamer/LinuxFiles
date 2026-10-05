@@ -166,7 +166,7 @@ namespace Files.App.Storage
 			}
 		}
 
-		private static string GetResource(string host) => "Files FTP " + host.ToLowerInvariant();
+		private static string GetResource(string key) => "Files FTP " + key;
 
 		public bool ContainsKey(string host) => TryGetValue(host, out _);
 

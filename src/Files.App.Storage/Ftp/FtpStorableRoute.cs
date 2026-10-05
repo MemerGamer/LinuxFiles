@@ -32,22 +32,22 @@ namespace Files.App.Storage
 		public int Order => DefaultOrder;
 
 		/// <inheritdoc/>
-		public bool CanResolve(string path)
-			=> FtpUrl.TryParse(path, out _);
-
-		/// <inheritdoc/>
-		public async Task<IStorable?> TryGetAsync(string path, CancellationToken cancellationToken = default)
+		public async Task<StorableResult> TryGetAsync(string path, CancellationToken cancellationToken = default)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 
+			if (!FtpUrl.IsFtpScheme(path))
+				return StorableResult.NotMine;
+
+			// A malformed FTP URL is still ours, so it never falls through to the local route.
 			if (!FtpUrl.TryParse(path, out var url))
-				return null;
+				return StorableResult.NotFound;
 
 			// The URL can contain a password, so neither it nor exception messages are logged or surfaced.
 			var id = url.ToId();
 			try
 			{
-				return await _ftpStorageService.GetFolderAsync(id, cancellationToken);
+				return StorableResult.Success(await _ftpStorageService.GetFolderAsync(id, cancellationToken));
 			}
 			catch (OperationCanceledException)
 			{
@@ -57,23 +57,34 @@ namespace Files.App.Storage
 			{
 				// Not a folder; fall through to the file lookup
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
-				return null;
+				return ToFailure(ex);
 			}
 
 			try
 			{
-				return await _ftpStorageService.GetFileAsync(id, cancellationToken);
+				return StorableResult.Success(await _ftpStorageService.GetFileAsync(id, cancellationToken));
 			}
 			catch (OperationCanceledException)
 			{
 				throw;
 			}
-			catch (Exception)
+			catch (Exception ex)
 			{
-				return null;
+				return ToFailure(ex);
 			}
+		}
+
+		private static StorableResult ToFailure(Exception ex)
+		{
+			return ex switch
+			{
+				DirectoryNotFoundException or FileNotFoundException => StorableResult.NotFound,
+				UnauthorizedAccessException => StorableResult.AccessDenied,
+				_ when ex.GetType().Name == "FtpAuthenticationException" => StorableResult.AccessDenied,
+				_ => StorableResult.Error,
+			};
 		}
 	}
 }

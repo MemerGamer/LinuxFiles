@@ -10,6 +10,7 @@ using Files.App.Storage;
 using Files.App.Storage.Storables;
 using Files.Core.Storage;
 using Files.Core.Storage.Contracts;
+using Files.Core.Storage.Enums;
 using Files.Platform.Abstractions.Secrets;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -78,15 +79,13 @@ namespace Files.Platform.Tests.Storables
 		}
 
 		[TestMethod]
-		public void CanResolve_OnlyFtpSchemes()
+		public async Task TryGet_NotMine_ForNonFtp()
 		{
 			var route = new FtpStorableRoute(new FakeFtpService());
 
-			Assert.IsTrue(route.CanResolve("ftp://h/x"));
-			Assert.IsTrue(route.CanResolve("FTPS://h"));
-			Assert.IsTrue(route.CanResolve("ftpes://h"));
-			Assert.IsFalse(route.CanResolve("/home/x"));
-			Assert.IsFalse(route.CanResolve("http://h"));
+			Assert.AreEqual(StorableStatus.NotMine, (await route.TryGetAsync("/home/x")).Status);
+			Assert.AreEqual(StorableStatus.NotMine, (await route.TryGetAsync("http://h")).Status);
+			Assert.AreEqual(StorableStatus.NotFound, (await route.TryGetAsync("ftp://h:abc/")).Status);
 			Assert.IsTrue(route.Order < LocalStorableRoute.DefaultOrder);
 		}
 
@@ -98,17 +97,18 @@ namespace Files.Platform.Tests.Storables
 
 			var result = await route.TryGetAsync("ftp://u:secret@host/dir/file.txt");
 
-			Assert.IsNotNull(result);
+			Assert.AreEqual(StorableStatus.Success, result.Status);
+			Assert.IsInstanceOfType<IFile>(result.Item);
 			Assert.AreEqual("ftp://host/dir/file.txt", service.LastFileId);
 			Assert.AreEqual("ftp://host/dir/file.txt", service.LastFolderId);
 		}
 
 		[TestMethod]
-		public async Task TryGet_ReturnsNull_WhenNothingFoundOrServerFails()
+		public async Task TryGet_MapsFailures()
 		{
-			Assert.IsNull(await new FtpStorableRoute(new FakeFtpService { FolderMissing = true, FileMissing = true }).TryGetAsync("ftp://h/x"));
-			Assert.IsNull(await new FtpStorableRoute(new FakeFtpService { Fail = true }).TryGetAsync("ftp://h/x"));
-			Assert.IsNull(await new FtpStorableRoute(new FakeFtpService()).TryGetAsync("not-ftp"));
+			Assert.AreEqual(StorableStatus.NotFound, (await new FtpStorableRoute(new FakeFtpService { FolderMissing = true, FileMissing = true }).TryGetAsync("ftp://h/x")).Status);
+			Assert.AreEqual(StorableStatus.Error, (await new FtpStorableRoute(new FakeFtpService { Fail = true }).TryGetAsync("ftp://h/x")).Status);
+			Assert.AreEqual(StorableStatus.AccessDenied, (await new FtpStorableRoute(new FakeFtpService { Denied = true }).TryGetAsync("ftp://h/x")).Status);
 		}
 
 		[TestMethod]
@@ -131,8 +131,7 @@ namespace Files.Platform.Tests.Storables
 			using var provider = services.BuildServiceProvider();
 			var resolver = provider.GetRequiredService<IStorableResolver>();
 
-			Assert.IsTrue(resolver.CanResolve("ftp://h/x"));
-			Assert.IsInstanceOfType<IFolder>(await resolver.TryGetAsync("ftp://h/x"));
+			Assert.IsInstanceOfType<IFolder>((await resolver.TryGetAsync("ftp://h/x")).Item);
 		}
 
 		[TestMethod]
@@ -215,6 +214,32 @@ namespace Files.Platform.Tests.Storables
 		}
 
 		[TestMethod]
+		[DataRow("ftp://Example.COM", "ftp://example.com.", true)]
+		[DataRow("ftp://[::1]", "ftp://[0:0:0:0:0:0:0:1]:21", true)]
+		[DataRow("ftp://[::ffff:1.2.3.4]", "ftp://1.2.3.4", true)]
+		[DataRow("ftp://b\u00fccher.example", "ftp://xn--bcher-kva.example", true)]
+		[DataRow("ftp://example.com", "ftp://example.com.evil", false)]
+		[DataRow("ftp://example.com", "ftp://www.example.com", false)]
+		[DataRow("ftp://example.com", "ftps://example.com", false)]
+		[DataRow("ftp://example.com", "ftp://example.com:2121", false)]
+		[DataRow("ftp://1.2.3.4", "ftp://1.2.3.40", false)]
+		[DataRow("ftp://[::1]", "ftp://[::2]", false)]
+		public void CredentialKey_NormalizesSameHostOnly(string a, string b, bool same)
+		{
+			Assert.AreEqual(same, FtpUrl.Parse(a).GetCredentialKey() == FtpUrl.Parse(b).GetCredentialKey());
+		}
+
+		[TestMethod]
+		public void CredentialCache_HasNoHostOnlyFallback()
+		{
+			var cache = new FtpCredentialCache();
+			cache.SetFromUrl(FtpUrl.Parse("ftp://h").GetCredentialKey(), new NetworkCredential("u", "p"));
+
+			Assert.IsFalse(cache.TryGetValue("h", out _));
+			Assert.IsFalse(cache.TryGetValue(FtpUrl.Parse("ftps://h").GetCredentialKey(), out _));
+		}
+
+		[TestMethod]
 		public void ToString_NeverContainsUserInfo()
 		{
 			var url = FtpUrl.Parse("ftp://user:secret@host/dir");
@@ -253,12 +278,15 @@ namespace Files.Platform.Tests.Storables
 			public bool FolderMissing { get; init; }
 			public bool FileMissing { get; init; }
 			public bool Fail { get; init; }
+			public bool Denied { get; init; }
 			public string? LastFolderId { get; private set; }
 			public string? LastFileId { get; private set; }
 
 			public Task<IFolder> GetFolderAsync(string id, CancellationToken cancellationToken = default)
 			{
 				LastFolderId = id;
+				if (Denied)
+					throw new UnauthorizedAccessException("secret in message");
 				if (Fail)
 					throw new IOException("secret in message");
 				if (FolderMissing)

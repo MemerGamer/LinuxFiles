@@ -62,7 +62,31 @@ namespace Files.App.Storage
 		/// Scope key for credentials: scheme, host and port, so ftp:// credentials are never used for ftps:// or another port.
 		/// </summary>
 		public string GetCredentialKey()
-			=> $"{Scheme}://{Host.ToLowerInvariant()}:{Port.ToString(CultureInfo.InvariantCulture)}";
+			=> $"{Scheme}://{NormalizeHost(Host)}:{Port.ToString(CultureInfo.InvariantCulture)}";
+
+		// Same server must map to one key (case, trailing dot, IDN, IPv6 spelling); different servers must never share one.
+		private static string NormalizeHost(string host)
+		{
+			if (IPAddress.TryParse(host, out var address))
+			{
+				address = address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
+				return address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6
+					? $"[{new IPAddress(address.GetAddressBytes()).ToString()}]"
+					: address.ToString();
+			}
+
+			host = host.TrimEnd('.');
+			try
+			{
+				host = new System.Globalization.IdnMapping().GetAscii(host);
+			}
+			catch (ArgumentException)
+			{
+				// Keep the literal text; it still only matches itself
+			}
+
+			return host.ToLowerInvariant();
+		}
 
 		/// <summary>Never includes the user info.</summary>
 		public override string ToString() => ToId();

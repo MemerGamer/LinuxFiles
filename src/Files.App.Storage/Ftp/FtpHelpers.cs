@@ -35,9 +35,8 @@ namespace Files.App.Storage
 			var key = url.GetCredentialKey();
 
 			// Saved or session credentials win; credentials embedded in the URL are only a last resort and never replace them.
-			var credentials = FtpManager.Credentials.TryGetValue(key, out var known)
-				? known
-				: FtpManager.Credentials.TryGetValue(url.Host, out var legacy) ? legacy : FtpManager.Anonymous;
+			// Only the exact scheme+host+port key is consulted; there is no host-only fallback.
+			var credentials = FtpManager.Credentials.TryGetValue(key, out var known) ? known : FtpManager.Anonymous;
 			var isAnonymous = ReferenceEquals(credentials, FtpManager.Anonymous);
 
 			var client = new AsyncFtpClient(url.Host, credentials, url.Port);

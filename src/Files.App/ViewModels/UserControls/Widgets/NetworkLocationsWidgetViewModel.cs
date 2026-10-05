@@ -41,6 +41,8 @@ namespace Files.App.ViewModels.UserControls.Widgets
 		// Commands
 
 		private ICommand EjectDeviceCommand { get; } = null!;
+		private ICommand MountDeviceCommand { get; } = null!;
+		private ICommand UnmountDeviceCommand { get; } = null!;
 		private ICommand MapNetworkDriveCommand { get; } = null!;
 		private ICommand DisconnectNetworkDriveCommand { get; } = null!;
 		private bool isDisposed;
@@ -58,6 +60,8 @@ namespace Files.App.ViewModels.UserControls.Widgets
 			PinToSidebarCommand = new AsyncRelayCommand<WidgetCardItem>(ExecutePinToSidebarCommand);
 			UnpinFromSidebarCommand = new AsyncRelayCommand<WidgetCardItem>(ExecuteUnpinFromSidebarCommand);
 			EjectDeviceCommand = new RelayCommand<WidgetDriveCardItem>(ExecuteEjectDeviceCommand);
+			MountDeviceCommand = new RelayCommand<WidgetDriveCardItem>(ExecuteMountDeviceCommand);
+			UnmountDeviceCommand = new RelayCommand<WidgetDriveCardItem>(ExecuteUnmountDeviceCommand);
 			OpenPropertiesCommand = new RelayCommand<WidgetDriveCardItem>(ExecuteOpenPropertiesCommand);
 			DisconnectNetworkDriveCommand = new RelayCommand<WidgetDriveCardItem>(ExecuteDisconnectNetworkDriveCommand);
 			MapNetworkDriveCommand = new AsyncRelayCommand(ExecuteMapNetworkDriveCommand);
@@ -173,6 +177,27 @@ namespace Files.App.ViewModels.UserControls.Widgets
 					CommandParameter = item,
 					ShowItem = options?.ShowEjectDevice ?? false
 				},
+				new()
+				{
+					Text = Strings.LinuxMountDrive.GetLocalizedResource(),
+					Command = MountDeviceCommand,
+					CommandParameter = item,
+					ShowItem = options?.ShowMountDevice ?? false
+				},
+				new()
+				{
+					Text = Strings.LinuxUnmountDrive.GetLocalizedResource(),
+					Command = UnmountDeviceCommand,
+					CommandParameter = item,
+					ShowItem = options?.ShowUnmountDevice ?? false
+				},
+				new()
+				{
+					Text = Strings.LinuxDisconnectLocation.GetLocalizedResource(),
+					Command = EjectDeviceCommand,
+					CommandParameter = item,
+					ShowItem = options?.ShowDisconnectLocation ?? false
+				},
 				new ContextMenuFlyoutItemViewModelBuilder(CommandManager.FormatDriveFromHome).Build(),
 				new()
 				{
@@ -216,6 +241,22 @@ namespace Files.App.ViewModels.UserControls.Widgets
 				return;
 
 			DriveHelpers.EjectDeviceAsync(item.Item.Path!);
+		}
+
+		private void ExecuteMountDeviceCommand(WidgetDriveCardItem? item)
+		{
+#if !WINDOWS
+			if (item is not null)
+				_ = DriveHelpers.MountVolumeAsync(item.Item.Path!);
+#endif
+		}
+
+		private void ExecuteUnmountDeviceCommand(WidgetDriveCardItem? item)
+		{
+#if !WINDOWS
+			if (item is not null)
+				_ = DriveHelpers.UnmountVolumeAsync(item.Item.Path!);
+#endif
 		}
 
 		private Task ExecuteMapNetworkDriveCommand()

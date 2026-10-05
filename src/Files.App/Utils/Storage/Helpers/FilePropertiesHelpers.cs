@@ -133,11 +133,15 @@ namespace Files.App.Utils.Storage
 			if (App.AppModel.IncrementPropertiesWindowCount() == 1)
 				PropertiesWindowsClosingTCS = new();
 
-			// WINUI3: Move window to cursor position
-			PInvoke.GetCursorPos(out var pointerPosition);
+			// WINUI3: Move window to cursor position (the window manager places the window on Linux)
+			var pointerPosition = default(System.Drawing.Point);
+			if (!OperatingSystem.IsLinux())
+				PInvoke.GetCursorPos(out pointerPosition);
 
 			// Null when no display is available, e.g. while monitors are detached
-			var displayArea = DisplayArea.GetFromPoint(new PointInt32 { X = pointerPosition.X, Y = pointerPosition.Y }, DisplayAreaFallback.Nearest);
+			var displayArea = OperatingSystem.IsLinux()
+				? null
+				: DisplayArea.GetFromPoint(new PointInt32 { X = pointerPosition.X, Y = pointerPosition.Y }, DisplayAreaFallback.Nearest);
 			if (displayArea is not null)
 			{
 				var appWindowPos = new PointInt32

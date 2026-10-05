@@ -115,7 +115,18 @@ namespace Files.Platform.Linux.Mime
 				if (eq <= 0)
 					continue;
 
-				if (!keys.Add(line[..eq].TrimEnd()))
+				var key = line[..eq].TrimEnd();
+
+				// Localized Exec/Type/Terminal/Path/TryExec variants are not part of the spec; refuse so only one value can exist
+				if (key.StartsWith("Exec[", StringComparison.Ordinal) || key.StartsWith("Type[", StringComparison.Ordinal) ||
+					key.StartsWith("Terminal[", StringComparison.Ordinal) || key.StartsWith("Path[", StringComparison.Ordinal) ||
+					key.StartsWith("TryExec[", StringComparison.Ordinal))
+				{
+					error = "localized " + key;
+					return null;
+				}
+
+				if (!keys.Add(key))
 				{
 					error = "duplicate key " + line[..eq].TrimEnd();
 					return null;

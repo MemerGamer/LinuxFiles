@@ -67,6 +67,9 @@ namespace Files.App.Helpers
 				dataPackage.SetStorageItems(items, false);
 
 				Clipboard.SetContent(dataPackage);
+#if !WINDOWS
+				await Files.App.Services.Desktop.DesktopFileDragHelper.PublishFilesAsync(itemsToTransfer.Select(x => x.Id), type);
+#endif
 			}
 			catch (Exception ex)
 			{
@@ -179,6 +182,9 @@ namespace Files.App.Helpers
 				dataPackage.SetStorageItems(items, false);
 
 				Clipboard.SetContent(dataPackage);
+#if !WINDOWS
+				await Files.App.Services.Desktop.DesktopFileDragHelper.PublishFilesAsync(context.SelectedItems.Select(x => x.ItemPath), type);
+#endif
 			}
 			catch (Exception ex)
 			{

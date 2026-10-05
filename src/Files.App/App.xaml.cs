@@ -64,7 +64,14 @@ namespace Files.App
 
 			// Configure exception handlers
 			AppLifecycleHelper.RecordFirstChanceExceptions();
-			UnhandledException += (sender, e) => AppLifecycleHelper.HandleAppUnhandledException(e.Exception, true, "Application.UnhandledException", e.Message);
+			UnhandledException += (sender, e) =>
+			{
+#if !WINDOWS
+				if (DesktopRuntimeGuards.TryHandleRecoverable(e))
+					return;
+#endif
+				AppLifecycleHelper.HandleAppUnhandledException(e.Exception, true, "Application.UnhandledException", e.Message);
+			};
 			AppDomain.CurrentDomain.UnhandledException += (sender, e) => AppLifecycleHelper.HandleAppUnhandledException(e.ExceptionObject as Exception, false, "AppDomain.UnhandledException");
 			TaskScheduler.UnobservedTaskException += (sender, e) => AppLifecycleHelper.HandleAppUnhandledException(e.Exception, false, "TaskScheduler.UnobservedTaskException");
 			AppDomain.CurrentDomain.ProcessExit += static (_, _) =>

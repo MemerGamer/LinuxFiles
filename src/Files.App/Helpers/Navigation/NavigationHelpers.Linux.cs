@@ -43,7 +43,7 @@ namespace Files.App.Helpers
 
 				var opened = await OpenFileLinuxAsync(path, openViaApplicationPicker);
 				if (!opened)
-					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(path));
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
 
 				return opened;
 			}
@@ -101,7 +101,7 @@ namespace Files.App.Helpers
 		/// Everything decided about a file before any dialog: the resolved target, its identity, the decision and the
 		/// parsed .desktop entry. The same entry object is shown in the dialog and launched.
 		/// </summary>
-		private sealed record LinuxOpenPlan(OpenAction Action, string Target, FileIdentity? Identity, DesktopEntryParser.Entry? Entry)
+		private sealed record LinuxOpenPlan(OpenAction Action, string Target, FileIdentity? Identity, DesktopEntryParser.Entry? Entry, IReadOnlyList<string>? Argv = null)
 		{
 			public bool StillValid() => Identity is { } id && id.StillMatches(Target);
 		}
@@ -119,6 +119,7 @@ namespace Files.App.Helpers
 			// Read the bytes once; the identity must be unchanged afterwards so the bytes belong to that version
 			byte[] head;
 			DesktopEntryParser.Entry? entry = null;
+			IReadOnlyList<string>? argv = null;
 			var desktop = DesktopState.None;
 			var looksDesktop = mime == "application/x-desktop" || target.EndsWith(".desktop", StringComparison.OrdinalIgnoreCase);
 			try
@@ -129,7 +130,10 @@ namespace Files.App.Helpers
 					head = bytes.Length > 4 ? bytes[..4] : bytes;
 					var lines = System.Text.Encoding.UTF8.GetString(bytes).Replace("\r\n", "\n").Split('\n');
 					entry = DesktopEntryParser.ParseStrict(lines, target, Path.GetFileName(target), CultureInfo.CurrentUICulture, out var error);
-					if (entry is not null && DesktopExecExpander.Expand(entry.Application, []).Count == 0)
+					// The one argv that is displayed and later started; nothing is re-derived after the dialog
+					var expanded = entry is null ? [] : DesktopExecExpander.Expand(entry.Application, []);
+					argv = expanded.Count == 1 ? expanded[0] : null;
+					if (argv is null)
 						entry = null;
 
 					desktop = entry is null ? DesktopState.Invalid : DesktopState.Valid;
@@ -153,7 +157,7 @@ namespace Files.App.Helpers
 				return new LinuxOpenPlan(OpenAction.Refuse, target, null, null);
 
 			var action = OpenDecision.Decide(desktop, desktop == DesktopState.Valid && IsInApplicationsDirectory(target), hasExec, OpenDecision.Sniff(head), mime);
-			return new LinuxOpenPlan(action, target, identity, entry);
+			return new LinuxOpenPlan(action, target, identity, entry, argv);
 		}
 
 		/// <summary>
@@ -192,21 +196,21 @@ namespace Files.App.Helpers
 			async Task<bool> ChangedAsync()
 			{
 				App.Logger.LogWarning("File changed before it was opened: {Path}", target);
-				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxFileChangedTitle.GetLocalizedResource(), Strings.LinuxFileChangedText.GetLocalizedFormatResource(target));
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxFileChangedTitle.GetLocalizedResource(), Strings.LinuxFileChangedText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)));
 				return false;
 			}
 
 			switch (plan.Action)
 			{
 				case OpenAction.Refuse:
-					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(target));
+					await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxOpenRefusedText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)));
 					return false;
 
 				case OpenAction.RunBinaryWithConfirm:
 				{
 					var confirmed = await DialogDisplayHelper.ShowDialogAsync(
-						Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(Path.GetFileName(target)),
-						Strings.LinuxRunBinaryText.GetLocalizedFormatResource(target),
+						Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+						Strings.LinuxRunBinaryText.GetLocalizedFormatResource(DisplaySanitizer.Escape(target)),
 						Strings.Run.GetLocalizedResource(),
 						Strings.Cancel.GetLocalizedResource());
 
@@ -220,20 +224,27 @@ namespace Files.App.Helpers
 				{
 					var dialog = new DynamicDialog(new DynamicDialogViewModel()
 					{
-						TitleText = Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(Path.GetFileName(target)),
-						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedFormatResource(target),
+						TitleText = Strings.LinuxRunExecutableTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+						SubtitleText = Strings.LinuxRunExecutableText.GetLocalizedFormatResource(DisplaySanitizer.Escape(target)),
 						PrimaryButtonText = Strings.Run.GetLocalizedResource(),
 						SecondaryButtonText = Strings.LinuxDisplayFile.GetLocalizedResource(),
 						CloseButtonText = Strings.Cancel.GetLocalizedResource(),
 						DynamicButtons = DynamicDialogButtons.Primary | DynamicDialogButtons.Secondary | DynamicDialogButtons.Cancel
 					});
 
-					switch (await DialogDisplayHelper.ShowDialogAsync(dialog))
+					var choice = await DialogDisplayHelper.ShowDialogAsync(dialog) switch
 					{
-						case DynamicDialogResult.Primary:
+						DynamicDialogResult.Primary => ConfirmChoice.Run,
+						DynamicDialogResult.Secondary => ConfirmChoice.Display,
+						_ => ConfirmChoice.Cancel,
+					};
+
+					switch (OpenDecision.Resolve(plan.Action, choice))
+					{
+						case FollowUp.RunExact:
 							return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(target, null, workingDirectory) : await ChangedAsync();
-						case DynamicDialogResult.Secondary:
-							return plan.StillValid() ? await LinuxLauncher.OpenAsync([path]) : await ChangedAsync();
+						case FollowUp.DisplayAsText:
+							return plan.StillValid() ? await DisplayAsTextAsync(target) : await ChangedAsync();
 						default:
 							return true;
 					}
@@ -243,27 +254,77 @@ namespace Files.App.Helpers
 				case OpenAction.LaunchDesktopConfirm:
 				{
 					var application = plan.Entry!.Application;
+					var argv = plan.Argv!;
 					if (plan.Action == OpenAction.LaunchDesktopConfirm)
 					{
-						// Show the fully expanded command of the very entry that is launched below
-						var argv = DesktopExecExpander.Expand(application, [])[0];
-						var command = string.Join(' ', argv.Select(DesktopExecExpander.ShellQuote)) + (application.RunInTerminal ? " (in a terminal)" : string.Empty);
-						var confirmed = await DialogDisplayHelper.ShowDialogAsync(
-							Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(application.Name),
-							Strings.LinuxUntrustedLauncherText.GetLocalizedFormatResource(command),
-							Strings.Run.GetLocalizedResource(),
-							Strings.Cancel.GetLocalizedResource());
+						// The real file is the identity; the .desktop Name is only a claim. Argv is shown one item per line.
+						var confirmed = await ShowLauncherConfirmationAsync(target, application.Name, argv, application.RunInTerminal);
 
-						if (!confirmed)
+						if (OpenDecision.Resolve(plan.Action, confirmed ? ConfirmChoice.Run : ConfirmChoice.Cancel) != FollowUp.RunExact)
 							return true;
 					}
 
-					return plan.StillValid() ? await LinuxLauncher.OpenWithAsync(application, []) : await ChangedAsync();
+					return plan.StillValid() ? await LinuxLauncher.RunCommandAsync(argv, application.RunInTerminal) : await ChangedAsync();
 				}
 
 				default:
 					return plan.StillValid() ? await LinuxLauncher.OpenAsync([path]) : await ChangedAsync();
 			}
+		}
+
+		/// <summary>
+		/// Opens a file in the text/plain handler, chosen explicitly: the file's own MIME type could resolve to an interpreter or launcher.
+		/// </summary>
+		private static async Task<bool> DisplayAsTextAsync(string target)
+		{
+			var registry = Ioc.Default.GetRequiredService<IApplicationRegistry>();
+			var editor = await registry.GetDefaultApplicationAsync("text/plain") ?? (await registry.GetApplicationsForMimeTypeAsync("text/plain")).FirstOrDefault();
+			if (editor is null)
+			{
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(target)));
+				return false;
+			}
+
+			return await LinuxLauncher.OpenWithAsync(editor, [target]);
+		}
+
+		private static async Task<bool> ShowLauncherConfirmationAsync(string target, string claimedName, IReadOnlyList<string> argv, bool inTerminal)
+		{
+			// What will run must be shown in full; if it cannot be, it does not run
+			if (DisplaySanitizer.FullArguments(argv) is not { } lines)
+			{
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxCommandTooLong.GetLocalizedResource());
+				return false;
+			}
+
+			var panel = new Microsoft.UI.Xaml.Controls.StackPanel { Spacing = 8 };
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxFileLabel.GetLocalizedResource() + " " + DisplaySanitizer.Escape(target), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap, IsTextSelectionEnabled = true });
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxClaimsToBe.GetLocalizedResource() + " " + DisplaySanitizer.Field(claimedName), TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap });
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.TextBlock { Text = Strings.LinuxWouldRun.GetLocalizedResource() + (inTerminal ? " (" + Strings.LinuxInTerminal.GetLocalizedResource() + ")" : string.Empty) });
+			panel.Children.Add(new Microsoft.UI.Xaml.Controls.ScrollViewer
+			{
+				MaxHeight = 240,
+				VerticalScrollBarVisibility = Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Auto,
+				HorizontalScrollBarVisibility = Microsoft.UI.Xaml.Controls.ScrollBarVisibility.Auto,
+				Content = new Microsoft.UI.Xaml.Controls.TextBlock
+				{
+					Text = string.Join('\n', lines),
+					FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("monospace"),
+					IsTextSelectionEnabled = true,
+				},
+			});
+
+			var dialog = new DynamicDialog(new DynamicDialogViewModel()
+			{
+				TitleText = Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+				SubtitleText = Strings.LinuxUntrustedLauncherText.GetLocalizedResource(),
+				DisplayControl = panel,
+				PrimaryButtonText = Strings.Run.GetLocalizedResource(),
+				CloseButtonText = Strings.Cancel.GetLocalizedResource(),
+				DynamicButtons = DynamicDialogButtons.Primary | DynamicDialogButtons.Cancel
+			});
+
+			return await DialogDisplayHelper.ShowDialogAsync(dialog) == DynamicDialogResult.Primary;
 		}
 
 		private static bool IsInApplicationsDirectory(string path)

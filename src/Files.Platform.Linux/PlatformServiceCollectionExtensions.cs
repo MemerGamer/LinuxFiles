@@ -3,13 +3,16 @@
 
 using Files.Platform.Abstractions;
 using Files.Platform.Linux.Archives;
+using Files.Platform.Linux.Clipboard;
 using Files.Platform.Linux.Enumeration;
 using Files.Platform.Linux.FileOperations;
 using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
+using Files.Platform.Linux.Permissions;
 using Files.Platform.Linux.Thumbnails;
 using Files.Platform.Linux.Trash;
+using Files.Platform.Linux.Volumes;
 using Files.Platform.Linux.Watching;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -36,7 +39,10 @@ namespace Files.Platform.Linux
 				.AddLinuxMime()
 				.AddLinuxLaunching()
 				.AddLinuxFileOperations()
-				.AddLinuxArchives();
+				.AddLinuxArchives()
+				.AddLinuxPermissions()
+				.AddLinuxClipboard()
+				.AddLinuxVolumes();
 		}
 	}
 }

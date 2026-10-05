@@ -190,6 +190,8 @@ namespace Files.App.UserControls
 					return;
 				}
 
+				// Leave edit mode explicitly so the shortcuts reach the file list
+				Omnibar.IsFocused = false;
 				ContentPageContext.ShellPage?.PaneHolder?.FocusActivePane();
 				return;
 			}

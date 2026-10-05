@@ -27,3 +27,6 @@ The "Root actions" context-menu submenu (like Dolphin's) offers delete, rename a
 ## Not implemented (LINUX-TODO(root-actions))
 - "Open terminal here as root": many terminals refuse to run as root and `pkexec` drops the environment (no display variables), so it needs per-terminal handling and detection.
 - "Edit as root": needs sudoedit semantics (copy to a private temp file, edit as the user, copy back through the elevation service), with a check that the original did not change meanwhile.
+
+## Confirmation integrity
+The dialog is driven by `ElevationPlanPreview`: the plan is recomputed on every input change (rename), the confirm button is enabled only while a plan is valid and fully displayable, and `Confirm(shownText)` returns that very plan object only when the text on screen equals its display string. It returns the plan once (double click or Enter cannot confirm twice), ignores updates after confirming or closing, and never returns a plan that was too large to display. Cancel, close and Escape run nothing; the default button is Cancel. Only one root-action dialog can be open at a time.

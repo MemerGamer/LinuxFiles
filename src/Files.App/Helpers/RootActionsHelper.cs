@@ -3,6 +3,7 @@
 
 using Files.Platform.Abstractions.Clipboard;
 using Files.Platform.Abstractions.Elevation;
+using Files.Platform.Linux.Elevation;
 using Files.Platform.Linux.Launching;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -20,31 +21,18 @@ namespace Files.App.Helpers
 
 		public static bool IsAvailable => Elevation?.IsAvailable ?? false;
 
+		private static bool dialogOpen;
+
 		public static async Task DeleteAsync(IReadOnlyList<string> paths)
 		{
 			if (Elevation is { } elevation)
-				await ConfirmAndRunAsync(elevation, elevation.PlanDelete(paths));
+				await ConfirmAndRunAsync(elevation, new ElevationPlanPreview(_ => elevation.PlanDelete(paths)), null);
 		}
 
 		public static async Task RenameAsync(string path)
 		{
-			if (Elevation is not { } elevation)
-				return;
-
-			var box = new TextBox { Text = Path.GetFileName(path) };
-			var preview = new TextBlock { IsTextSelectionEnabled = true, TextWrapping = TextWrapping.Wrap };
-			void Update() => preview.Text = Describe(elevation.PlanRename(path, box.Text));
-			box.TextChanged += (_, _) => Update();
-			Update();
-
-			var dialog = CreateDialog(preview, box);
-			if (await dialog.TryShowAsync() != ContentDialogResult.Primary)
-				return;
-
-			// The plan that is run is the one for the name that was confirmed
-			var plan = elevation.PlanRename(path, box.Text);
-			if (plan.Plan is not null)
-				await RunAsync(elevation, plan.Plan);
+			if (Elevation is { } elevation)
+				await ConfirmAndRunAsync(elevation, new ElevationPlanPreview(name => elevation.PlanRename(path, name)), Path.GetFileName(path));
 		}
 
 		public static async Task PasteAsync(string destinationFolder)
@@ -56,19 +44,54 @@ namespace Files.App.Helpers
 			if (files is null || files.Paths.Count == 0)
 				return;
 
-			await ConfirmAndRunAsync(elevation, files.Operation == ClipboardOperation.Cut
+			var move = files.Operation == ClipboardOperation.Cut;
+			await ConfirmAndRunAsync(elevation, new ElevationPlanPreview(_ => move
 				? elevation.PlanMove(files.Paths, destinationFolder)
-				: elevation.PlanCopy(files.Paths, destinationFolder));
+				: elevation.PlanCopy(files.Paths, destinationFolder)), null);
 		}
 
-		// Shows the plan, and runs that very object when confirmed
-		private static async Task ConfirmAndRunAsync(IElevationService elevation, ElevatedPlanResult planned)
+		// The plan that runs is the one object the preview hands out when the confirm button is clicked, and only when its text is on screen.
+		// With a name box (rename) the plan is recomputed on every keystroke and confirm stays disabled while it is invalid.
+		private static async Task ConfirmAndRunAsync(IElevationService elevation, ElevationPlanPreview preview, string? initialName)
 		{
-			var text = new TextBlock { Text = Describe(planned), IsTextSelectionEnabled = true, TextWrapping = TextWrapping.Wrap };
-			var dialog = CreateDialog(text, null);
-			dialog.IsPrimaryButtonEnabled = planned.Plan is not null;
-			if (await dialog.TryShowAsync() == ContentDialogResult.Primary && planned.Plan is not null)
-				await RunAsync(elevation, planned.Plan);
+			if (dialogOpen)
+				return;
+
+			dialogOpen = true;
+			try
+			{
+				preview.Update(initialName ?? string.Empty);
+				var text = new TextBlock { Text = preview.DisplayText, IsTextSelectionEnabled = true, TextWrapping = TextWrapping.Wrap };
+				TextBox? box = initialName is null ? null : new TextBox { Text = initialName };
+				var dialog = CreateDialog(text, box);
+				dialog.IsPrimaryButtonEnabled = preview.CanConfirm;
+
+				if (box is not null)
+				{
+					box.TextChanged += (_, _) =>
+					{
+						preview.Update(box.Text);
+						text.Text = preview.DisplayText;
+						dialog.IsPrimaryButtonEnabled = preview.CanConfirm;
+					};
+				}
+
+				ElevatedPlan? confirmed = null;
+				dialog.PrimaryButtonClick += (_, args) =>
+				{
+					confirmed = preview.Confirm(text.Text);
+					args.Cancel = confirmed is null;
+				};
+
+				var result = await dialog.TryShowAsync();
+				preview.Close();
+				if (result == ContentDialogResult.Primary && confirmed is not null)
+					await RunAsync(elevation, confirmed);
+			}
+			finally
+			{
+				dialogOpen = false;
+			}
 		}
 
 		private static async Task RunAsync(IElevationService elevation, ElevatedPlan plan)
@@ -77,25 +100,6 @@ namespace Files.App.Helpers
 
 			if (Ioc.Default.GetRequiredService<IContentPageContext>().ShellPage is { } shellPage)
 				await shellPage.RefreshIfNoWatcherExistsAsync();
-		}
-
-		// One escaped argument per line, never truncated; plans that cannot be shown completely are not offered
-		private static string Describe(ElevatedPlanResult planned)
-		{
-			if (planned.Plan is not { } plan)
-				return DisplaySanitizer.Field(planned.Refusal, 400);
-
-			var blocks = new List<string>();
-			foreach (var command in plan.Commands)
-			{
-				var lines = DisplaySanitizer.FullArguments(["pkexec", command.Program, .. command.Arguments]);
-				if (lines is null)
-					return Strings.RootActionFailed.GetLocalizedResource().Replace("{0}", "too many items to display");
-
-				blocks.Add(string.Join(Environment.NewLine, lines));
-			}
-
-			return string.Join(Environment.NewLine + Environment.NewLine, blocks);
 		}
 
 		private static async Task<bool> ReportAsync(ElevatedResult result)

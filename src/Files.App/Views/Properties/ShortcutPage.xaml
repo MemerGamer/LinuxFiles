@@ -7,6 +7,7 @@
 	xmlns:helpers="using:Files.App.Helpers"
 	xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 	xmlns:vm="using:Files.App.ViewModels.Properties"
+	xmlns:toolkitconverters="using:CommunityToolkit.WinUI.Converters"
 	xmlns:wctcontrols="using:CommunityToolkit.WinUI.Controls"
 	Loaded="Properties_Loaded"
 	Tag="Shortcut"
@@ -17,6 +18,7 @@
 			<ResourceDictionary.MergedDictionaries>
 				<ResourceDictionary Source="ms-appx:///Styles/PropertiesStyles.xaml" />
 			</ResourceDictionary.MergedDictionaries>
+			<toolkitconverters:StringVisibilityConverter x:Key="StringVisibilityConverter" />
 		</ResourceDictionary>
 	</vm:BasePropertiesPage.Resources>
 
@@ -42,7 +44,23 @@
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" />
 					<RowDefinition Height="Auto" />
+					<RowDefinition Height="Auto" />
 				</Grid.RowDefinitions>
+
+				<TextBlock
+					Grid.Row="2"
+					Grid.Column="0"
+					VerticalAlignment="Center"
+					Style="{StaticResource PropertyName}"
+					Text="{helpers:ResourceString Key=PropertiesDesktopEntryName}"
+					Visibility="{x:Bind ViewModel.DesktopEntryName, Mode=OneWay, Converter={StaticResource StringVisibilityConverter}}" />
+				<TextBox
+					Grid.Row="2"
+					Grid.Column="1"
+					VerticalAlignment="Center"
+					IsReadOnly="True"
+					Text="{x:Bind ViewModel.DesktopEntryName, Mode=OneWay}"
+					Visibility="{x:Bind ViewModel.DesktopEntryName, Mode=OneWay, Converter={StaticResource StringVisibilityConverter}}" />
 
 				<TextBlock
 					Grid.Row="0"
@@ -154,7 +172,7 @@
 				x:Name="OpenFileLocation"
 				Grid.Row="2"
 				Grid.Column="0"
-				x:Load="{x:Bind ViewModel.IsSelectedItemShortcut, Mode=OneWay}"
+				x:Load="{x:Bind ViewModel.IsOpenTargetVisible, Mode=OneWay}"
 				Command="{x:Bind ViewModel.ShortcutItemOpenLinkCommand, Mode=OneWay}"
 				Header="{helpers:ResourceString Key=OpenFileLocation}"
 				IsClickEnabled="True">

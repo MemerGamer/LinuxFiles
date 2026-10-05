@@ -326,6 +326,8 @@ namespace Files.App.Helpers
 					.AddWindowsPlatform()
 #else
 					.AddLinuxPlatform()
+					.AddSingleton<Files.Platform.Linux.Instance.LinuxSingleInstanceService>(_ => Program.SingleInstance ?? new Files.Platform.Linux.Instance.LinuxSingleInstanceService())
+					.AddLinuxSystemIntegration()
 #endif
 					// Settings services
 					.AddSingleton<IUserSettingsService, UserSettingsService>()

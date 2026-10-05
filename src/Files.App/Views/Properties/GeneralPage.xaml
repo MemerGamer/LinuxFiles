@@ -224,7 +224,26 @@
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
 							<RowDefinition Height="Auto" />
+							<RowDefinition Height="Auto" />
 						</Grid.RowDefinitions>
+
+						<!--  Link Target (symbolic links)  -->
+						<TextBlock
+							Grid.Row="8"
+							Grid.Column="0"
+							HorizontalAlignment="Left"
+							Style="{StaticResource PropertyName}"
+							Text="{helpers:ResourceString Key=PropertiesLinkTarget}"
+							Visibility="{x:Bind ViewModel.LinkTarget, Mode=OneWay, Converter={StaticResource StringVisibilityConverter}}" />
+
+						<TextBlock
+							Grid.Row="8"
+							Grid.Column="1"
+							IsTextSelectionEnabled="True"
+							Style="{StaticResource PropertyValueTextBlock}"
+							Text="{x:Bind ViewModel.LinkTarget, Mode=OneWay}"
+							TextWrapping="Wrap"
+							Visibility="{x:Bind ViewModel.LinkTarget, Mode=OneWay, Converter={StaticResource StringVisibilityConverter}}" />
 
 						<!--  Item Location  -->
 						<TextBlock
@@ -446,12 +465,7 @@
 										TextAlignment="Center" />
 								</StackPanel>
 
-								<!--  AnimatedVisualPlayer for Lottie  -->
-								<AnimatedVisualPlayer
-									x:Name="LottiePlayer"
-									AutoPlay="false"
-									Opacity="1"
-									Stretch="fill" />
+								<!--  LINUX-TODO(props): the Lottie AnimatedVisualPlayer placeholder is not implemented by Uno (UNO0001) and has no source  -->
 
 								<VisualStateManager.VisualStateGroups>
 									<VisualStateGroup x:Name="CommonStates">

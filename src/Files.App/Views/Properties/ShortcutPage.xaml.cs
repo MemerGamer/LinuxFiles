@@ -14,6 +14,10 @@ namespace Files.App.Views.Properties
 
 		public override async Task<bool> SaveChangesAsync()
 		{
+			// Symbolic links and Desktop Entries are shown read-only on Linux
+			if (OperatingSystem.IsLinux())
+				return true;
+
 			var shortcutItem = BaseProperties switch
 			{
 				FileProperties properties => properties.Item,

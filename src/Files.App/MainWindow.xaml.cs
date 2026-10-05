@@ -384,6 +384,15 @@ namespace Files.App
 			}
 		}
 
+		/// <summary>
+		/// Ensures the root frame and backdrop exist. Used by the desktop (Linux) activation path, which navigates itself.
+		/// </summary>
+		internal Frame? EnsureRootFrame()
+		{
+			SystemBackdrop ??= new AppSystemBackdrop();
+			return EnsureWindowIsInitialized();
+		}
+
 		public bool SetCanWindowToFront(bool canWindowToFront)
 		{
 			lock (_canWindowToFrontLock)

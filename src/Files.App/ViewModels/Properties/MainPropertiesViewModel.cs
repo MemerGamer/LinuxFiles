@@ -89,6 +89,7 @@ namespace Files.App.ViewModels.Properties
 				PropertiesNavigationViewItemType.Library => typeof(LibraryPage),
 				PropertiesNavigationViewItemType.Details => typeof(DetailsPage),
 				PropertiesNavigationViewItemType.Security => typeof(SecurityPage),
+				PropertiesNavigationViewItemType.Permissions => typeof(PermissionsPage),
 				PropertiesNavigationViewItemType.Customization => typeof(CustomizationPage),
 				PropertiesNavigationViewItemType.Compatibility => typeof(CompatibilityPage),
 				PropertiesNavigationViewItemType.Hashes => typeof(HashesPage),

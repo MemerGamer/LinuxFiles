@@ -4,7 +4,7 @@
 #
 # Usage: headless-run.sh [-s seconds] [-o outdir] [-a actions-file] [-- app args...]
 #   actions-file: one xdotool command per line (e.g. "mousemove 100 200 click 1", "key ctrl+l",
-#                 "type /etc", "sleep 2", "shot name"), run against the private display.
+#                 "type /etc", "sleep 2", "shot name", "run <cmd args>" = run a helper with DISPLAY set to the private display), run against the private display.
 # Env: FILES_BIN (default src/Files.App/bin/Debug/net10.0-desktop), XVFB_SIZE (default 1600x1000).
 set -euo pipefail
 
@@ -61,7 +61,10 @@ if [[ "${FILES_REAL_HOME:-0}" != "1" ]]; then
 	printf '#!/bin/sh\necho hi\n' >"$home/Downloads/script.sh"
 	head -c 2048 /dev/urandom >"$home/Downloads/archive.bin"
 	ln -sf "$home/Documents" "$home/Desktop/Documents link"
-	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache")
+	mkdir -p -m 0700 "$home/.runtime"
+	# Never reach the real system bus (UDisks2 could mount/unmount real disks) or the real gvfs/runtime dir.
+	sandbox_env=(HOME="$home" XDG_CONFIG_HOME="$home/.config" XDG_DATA_HOME="$home/.local/share" XDG_CACHE_HOME="$home/.cache" \
+		XDG_RUNTIME_DIR="$home/.runtime" DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent" GIO_USE_VFS=local GVFS_DISABLE_FUSE=1)
 fi
 
 # Private D-Bus session: notifications, portals and app launches never reach the real desktop session.
@@ -73,6 +76,14 @@ setsid bash -c 'cd "$0" && exec "$@"' "$bin" \
 app_pid=$!
 
 sleep "$seconds"
+# Xvfb has no window manager, so nothing has keyboard focus: give it to the Files window explicitly
+# (XSetInputFocus works without a WM). Re-run with the "focus" action after opening new windows.
+focus_files() {
+	local win
+	win="$(DISPLAY=":$display" xdotool search --class Files 2>/dev/null | tail -1 || true)"
+	[[ -n "$win" ]] && DISPLAY=":$display" xdotool windowfocus --sync "$win" 2>/dev/null || true
+}
+focus_files
 if [[ -n "$actions" ]]; then
 	while IFS= read -r line || [[ -n "$line" ]]; do
 		[[ -z "$line" || "$line" == \#* ]] && continue
@@ -82,6 +93,10 @@ if [[ -n "$actions" ]]; then
 			exec\ *) # Runs a shell command in the sandboxed HOME, to mutate files while the app runs.
 				[[ "${FILES_REAL_HOME:-0}" == "1" ]] && { echo "exec: refused with FILES_REAL_HOME=1" >&2; continue; }
 				(cd "$home" && env HOME="$home" sh -c "${line#exec }") ;;
+			focus) focus_files ;;
+			run\ *) # a helper program on the private display (e.g. an X clipboard client); word-split on purpose
+				# shellcheck disable=SC2086
+				DISPLAY=":$display" ${line#run } ;;
 			*) # shellcheck disable=SC2086
 				DISPLAY=":$display" xdotool $line ;;
 		esac

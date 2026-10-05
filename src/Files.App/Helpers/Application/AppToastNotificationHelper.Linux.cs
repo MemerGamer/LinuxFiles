@@ -1,7 +1,7 @@
 namespace Files.App.Helpers.Application
 {
 	/// <summary>
-	/// Desktop (Linux) variant of the toast helper; uses notify-send when available.
+	/// Desktop (Linux) variant of the toast helper; shows notifications through org.freedesktop.Notifications over D-Bus.
 	/// </summary>
 	internal static class AppToastNotificationHelper
 	{
@@ -16,23 +16,12 @@ namespace Files.App.Helpers.Application
 
 		private static void Notify(string title, string body)
 		{
-			// LINUX-TODO(notifications): use org.freedesktop.Notifications over D-Bus (or the Linux launcher service) instead of spawning notify-send
-			try
-			{
-				var psi = new System.Diagnostics.ProcessStartInfo("notify-send")
-				{
-					UseShellExecute = false,
-					CreateNoWindow = true,
-				};
-				psi.ArgumentList.Add("--app-name=Files");
-				psi.ArgumentList.Add(title);
-				psi.ArgumentList.Add(body);
-				System.Diagnostics.Process.Start(psi);
-			}
-			catch
-			{
-				// notify-send missing; ignore
-			}
+			// The service is not available if this runs before the host is configured (for example a crash during startup): then there is nothing to show
+			var service = Ioc.Default.GetService<Files.Platform.Abstractions.Notifications.INotificationService>();
+			if (service is null)
+				return;
+
+			_ = service.NotifyAsync(title, body);
 		}
 	}
 }

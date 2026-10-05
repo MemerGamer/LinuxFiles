@@ -52,11 +52,70 @@ namespace Files.App
 
 				Logger.LogInformation("App launched (desktop).");
 
-				// TODO: pass command line arguments (paths, --select, etc.) once the activation path is ported
-				await MainWindow.Instance.InitializeApplicationAsync(null);
+				// Command line (paths, --select, -t, -n) of this process; later launches arrive through ISingleInstanceService
+				var launchOptions = Files.App.Utils.CommandLine.DesktopCommandLine.Parse(Program.LaunchArguments, Environment.CurrentDirectory);
+				if (launchOptions.IsEmpty)
+					await MainWindow.Instance.InitializeApplicationAsync(null);
+				else
+					await DesktopActivation.ApplyAsync(launchOptions, isFirstLaunch: true);
+
+				StartInstanceRequestListener();
 
 				await AppLifecycleHelper.InitializeAppComponentsAsync();
 			}
+		}
+
+		private void StartInstanceRequestListener()
+		{
+			var singleInstance = Program.SingleInstance;
+			if (singleInstance is null)
+				return;
+
+			singleInstance.RequestReceived += (_, request) =>
+			{
+				UiDispatcher?.TryEnqueue(async () =>
+				{
+					try
+					{
+						var options = DesktopActivation.ToOptions(request);
+						Logger?.LogInformation("Request from another instance: {Kind}, {Paths} path(s), {Selects} selection(s).", request.Kind, options.Paths.Count, options.Selects.Count);
+						await DesktopActivation.ApplyAsync(options, isFirstLaunch: false);
+					}
+					catch (Exception ex)
+					{
+						Logger?.LogWarning(ex, "Failed to handle a request from another instance.");
+					}
+				});
+			};
+
+			// FileManager1 (other applications' "Show in folder"): only claimed when the user opted in
+			_ = Task.Run(async () =>
+			{
+				try
+				{
+					var settings = Ioc.Default.GetRequiredService<IUserSettingsService>().GeneralSettingsService;
+					var fileManager = Ioc.Default.GetRequiredService<Files.Platform.Linux.DBus.FileManagerService>();
+
+					async Task Apply()
+					{
+						if (settings.UseAsDefaultFileManager)
+							await fileManager.StartAsync();
+						else
+							await fileManager.StopAsync();
+					}
+
+					await Apply();
+					settings.PropertyChanged += async (_, e) =>
+					{
+						if (e.PropertyName == nameof(IGeneralSettingsService.UseAsDefaultFileManager))
+							await Apply();
+					};
+				}
+				catch (Exception ex)
+				{
+					Logger?.LogWarning(ex, "Could not set up the FileManager1 service.");
+				}
+			});
 		}
 
 		private void Window_Activated(object sender, WindowActivatedEventArgs args)

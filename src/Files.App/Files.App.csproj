@@ -245,6 +245,7 @@
         <Compile Remove="Helpers\Layout\LayoutPreferencesDatabase.Linux.cs" />
         <Compile Remove="Services\SizeProvider\CachedSizeProvider.Linux.cs" />
         <Compile Remove="Utils\Storage\Operations\FileSizeCalculator.Linux.cs" />
+        <Compile Remove="Utils\Storage\Helpers\SyncRootHelpers.Linux.cs" />
     </ItemGroup>
 
     <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->

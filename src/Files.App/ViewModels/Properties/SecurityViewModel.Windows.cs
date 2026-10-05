@@ -4,7 +4,6 @@
 using CommunityToolkit.WinUI;
 using Microsoft.UI.Xaml;
 using Windows.Storage;
-using Windows.Win32.Foundation;
 
 namespace Files.App.ViewModels.Properties
 {
@@ -99,7 +98,7 @@ namespace Files.App.ViewModels.Properties
 			if (!AccessControlList.IsValid)
 			{
 				DisplayElements = false;
-				ErrorMessage = error is WIN32_ERROR.ERROR_ACCESS_DENIED
+				ErrorMessage = error is FileSecurityResult.AccessDenied
 					? Strings.SecurityRequireReadPermissions.GetLocalizedResource() + "\r\n" + Strings.SecurityClickAdvancedPermissions.GetLocalizedResource()
 					: Strings.SecurityUnableToDisplayPermissions.GetLocalizedResource();
 			}

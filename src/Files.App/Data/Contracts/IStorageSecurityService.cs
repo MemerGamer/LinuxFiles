@@ -1,12 +1,10 @@
 ﻿// Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
-using Windows.Win32.Foundation;
-
 namespace Files.App.Data.Contracts
 {
 	/// <summary>
-	/// Provides service to manage storage security objects on NTFS and ReFS.
+	/// Provides service to manage storage security objects on NTFS and ReFS. Only registered on Windows.
 	/// </summary>
 	public interface IStorageSecurityService
 	{
@@ -30,16 +28,16 @@ namespace Files.App.Data.Contracts
 		/// </summary>
 		/// <param name="path"></param>
 		/// <param name="isFolder"></param>
-		/// <returns>If the function succeeds, an instance of AccessControlList; otherwise, null. To get extended error information, call GetLastError.</returns>
-		WIN32_ERROR GetAcl(string path, bool isFolder, out AccessControlList acl);
+		/// <returns>The outcome; on success <paramref name="acl"/> holds the list.</returns>
+		FileSecurityResult GetAcl(string path, bool isFolder, out AccessControlList acl);
 
 		/// <summary>
 		/// Add an default Access Control Entry (ACE) to the specified object's DACL
 		/// </summary>
 		/// <param name="path">The object's path to add an new ACE to its DACL</param>
 		/// <param name="sid">Principal's SID</param>
-		/// <returns> If the function succeeds, the return value is ERROR_SUCCESS. If the function fails, the return value is a nonzero error code defined in WinError.h.</returns>
-		WIN32_ERROR AddAce(string szPath, bool isFolder, string szSid);
+		/// <returns> <see cref="FileSecurityResult.Success"/> when the entry was added; otherwise the reason it failed.</returns>
+		FileSecurityResult AddAce(string szPath, bool isFolder, string szSid);
 
 		/// <summary>
 		/// Add an Access Control Entry (ACE) from the specified object's DACL
@@ -47,6 +45,6 @@ namespace Files.App.Data.Contracts
 		/// <param name="szPath">The object's path to remove an ACE from its DACL</param>
 		/// <param name="dwAceIndex"></param>
 		/// <returns></returns>
-		WIN32_ERROR DeleteAce(string szPath, uint dwAceIndex);
+		FileSecurityResult DeleteAce(string szPath, uint dwAceIndex);
 	}
 }

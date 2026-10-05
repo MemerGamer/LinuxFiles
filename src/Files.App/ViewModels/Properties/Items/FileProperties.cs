@@ -24,7 +24,9 @@ namespace Files.App.ViewModels.Properties
 
 			GetBaseProperties();
 
+#if WINDOWS
 			ViewModel.PropertyChanged += ViewModel_PropertyChanged;
+#endif
 		}
 
 		public override void GetBaseProperties()
@@ -41,7 +43,9 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.LoadCustomIcon = Item.LoadCustomIcon;
 			ViewModel.CustomIconSource = Item.CustomIconSource;
 			ViewModel.LoadFileIcon = Item.LoadFileIcon;
-			ViewModel.IsDownloadedFile = !OperatingSystem.IsLinux() && Win32Helper.ReadStringFromFile($"{itemPath}:Zone.Identifier") is not null;
+#if WINDOWS
+			ViewModel.IsDownloadedFile = Win32Helper.ReadStringFromFile($"{itemPath}:Zone.Identifier") is not null;
+#endif
 			ViewModel.IsEditAlbumCoverVisible =
 				Item.FileExtension is not ".avi" && (
 				FileExtensionHelpers.IsVideoFile(Item.FileExtension) ||
@@ -53,6 +57,7 @@ namespace Files.App.ViewModels.Properties
 				return;
 			}
 
+#if WINDOWS
 			if (!Item.IsShortcut)
 				return;
 
@@ -69,7 +74,7 @@ namespace Files.App.ViewModels.Properties
 			ViewModel.ShortcutItemWorkingDir = shortcutItem.WorkingDirectory;
 			ViewModel.ShortcutItemWorkingDirVisibility = Item.IsLinkItem || shortcutItem.IsSymLink ? false : true;
 			ViewModel.ShortcutItemArguments = shortcutItem.Arguments;
-			ViewModel.ShowWindowCommand = shortcutItem.ShowWindowCommand;
+			ViewModel.ShowWindowCommand = (ShowWindowCommand)(int)shortcutItem.ShowWindowCommand;
 			ViewModel.ShortcutItemArgumentsVisibility = Item.IsLinkItem || shortcutItem.IsSymLink ? false : true;
 			ViewModel.ShortcutItemWindowArgsVisibility = Item.IsLinkItem || shortcutItem.IsSymLink ? false : true;
 
@@ -97,6 +102,7 @@ namespace Files.App.ViewModels.Properties
 			{
 				return !string.IsNullOrWhiteSpace(ViewModel.ShortcutItemPath);
 			});
+#endif
 		}
 
 		private void SetupLinuxShortcut(string itemPath)
@@ -167,6 +173,7 @@ namespace Files.App.ViewModels.Properties
 				return;
 			}
 
+#if WINDOWS
 			// Check if item is on device (not online)
 			var isOnDevice = Item.SyncStatusUI.SyncStatus is not CloudDriveSyncStatus.FileOnline and not CloudDriveSyncStatus.FolderOnline;
 
@@ -240,6 +247,7 @@ namespace Files.App.ViewModels.Properties
 			// Get other properties if available
 			if (file.Properties is not null)
 				_ = GetOtherPropertiesAsync(file.Properties);
+#endif
 		}
 
 		public async Task GetSystemFilePropertiesAsync()
@@ -384,6 +392,7 @@ namespace Files.App.ViewModels.Properties
 			_ = GetSystemFilePropertiesAsync();
 		}
 
+#if WINDOWS
 		private async void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
 		{
 			if (OperatingSystem.IsLinux())
@@ -427,10 +436,11 @@ namespace Files.App.ViewModels.Properties
 					if (string.IsNullOrWhiteSpace(ViewModel.ShortcutItemPath))
 						return;
 
-					await FileOperationsHelpers.CreateOrUpdateLinkAsync(itemPath, ViewModel.ShortcutItemPath, ViewModel.ShortcutItemArguments, ViewModel.ShortcutItemWorkingDir, ViewModel.RunAsAdmin, ViewModel.ShowWindowCommand);
+					await FileOperationsHelpers.CreateOrUpdateLinkAsync(itemPath, ViewModel.ShortcutItemPath, ViewModel.ShortcutItemArguments, ViewModel.ShortcutItemWorkingDir, ViewModel.RunAsAdmin, (Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD)(int)ViewModel.ShowWindowCommand);
 
 					break;
 			}
 		}
+#endif
 	}
 }

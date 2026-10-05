@@ -406,8 +406,8 @@ namespace Files.App.Helpers
 					.AddSingleton<IStorageCacheService, StorageCacheService>()
 					.AddSingleton<IIconCacheService, IconCacheService>()
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
-					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
 #if WINDOWS
+					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
 					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
 #endif
 					.AddSingleton</*IVersionControlService,*/ LibGit2Service>()

@@ -408,6 +408,8 @@ namespace Files.App.Helpers
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
 #if WINDOWS
 					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
+#endif
+#if WINDOWS
 					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
 #endif
 					.AddSingleton</*IVersionControlService,*/ LibGit2Service>()

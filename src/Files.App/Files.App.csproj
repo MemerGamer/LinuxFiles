@@ -228,13 +228,6 @@
         <Compile Remove="ViewModels\UserControls\Previews\CodePreviewViewModel.cs" />
         <Compile Remove="UserControls\FilePreviews\MarkdownPreview.xaml.cs" />
         <Compile Remove="ViewModels\UserControls\Previews\MarkdownPreviewViewModel.cs" />
-        <Compile Remove="Utils\Signatures\**" />
-        <!--  Properties pages for NTFS ACLs, Authenticode signatures, the compatibility tab and icon customization  -->
-        <Compile Remove="Views\Properties\SecurityPage.xaml.cs" />
-        <Compile Remove="Views\Properties\SecurityAdvancedPage.xaml.cs" />
-        <Compile Remove="Views\Properties\SignaturesPage.xaml.cs" />
-        <Compile Remove="Views\Properties\CompatibilityPage.xaml.cs" />
-        <Compile Remove="Views\Properties\CustomizationPage.xaml.cs" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(TargetFramework)' != '$(DesktopTargetFramework)'">
@@ -249,7 +242,7 @@
 
     <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->
     <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
-        <DefaultItemExcludes>$(DefaultItemExcludes);UserControls/FilePreviews/ShellPreview.xaml;UserControls/FilePreviews/CodePreview.xaml;UserControls/FilePreviews/MarkdownPreview.xaml;UserControls/FilePreviews/TextPreview.xaml;Views/Properties/SecurityPage.xaml;Views/Properties/SecurityAdvancedPage.xaml;Views/Properties/SignaturesPage.xaml;Views/Properties/CompatibilityPage.xaml;Views/Properties/CustomizationPage.xaml</DefaultItemExcludes>
+        <DefaultItemExcludes>$(DefaultItemExcludes);UserControls/FilePreviews/ShellPreview.xaml;UserControls/FilePreviews/CodePreview.xaml;UserControls/FilePreviews/MarkdownPreview.xaml;UserControls/FilePreviews/TextPreview.xaml</DefaultItemExcludes>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(TargetFramework)' != '$(DesktopTargetFramework)'">
@@ -261,6 +254,7 @@
         <Compile Remove="Helpers\Win32\**" />
         <Compile Remove="Utils\Shell\**" />
         <Compile Remove="Utils\Taskbar\**" />
+        <Compile Remove="Utils\Signatures\**" />
         <Compile Remove="Services\Windows\**" />
         <Compile Remove="Data\Items\WindowMessageMonitor.cs" />
         <Compile Remove="Extensions\Win32FindDataExtensions.cs" />
@@ -271,6 +265,19 @@
     <ItemGroup Condition="!$(TargetFramework.Contains('-windows'))">
         <Compile Remove="**\*.Windows.cs" />
     </ItemGroup>
+
+    <!--  Windows-only Properties pages (NTFS ACLs, Authenticode signatures, compatibility tab, icon customization)  -->
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <Compile Remove="Utils\Signatures\**" />
+        <Compile Remove="Views\Properties\SecurityPage.xaml.cs" />
+        <Compile Remove="Views\Properties\SecurityAdvancedPage.xaml.cs" />
+        <Compile Remove="Views\Properties\SignaturesPage.xaml.cs" />
+        <Compile Remove="Views\Properties\CompatibilityPage.xaml.cs" />
+        <Compile Remove="Views\Properties\CustomizationPage.xaml.cs" />
+    </ItemGroup>
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <DefaultItemExcludes>$(DefaultItemExcludes);Views/Properties/SecurityPage.xaml;Views/Properties/SecurityAdvancedPage.xaml;Views/Properties/SignaturesPage.xaml;Views/Properties/CompatibilityPage.xaml;Views/Properties/CustomizationPage.xaml</DefaultItemExcludes>
+    </PropertyGroup>
 
     <!--  Opt-in transitional aid (-p:FilesWin32Compat=true): compiles against the CsWin32-generated Windows.Win32 types (built for
           the Windows TFM with Platform=x64, which works on Linux) so Win32-touching code gets past declaration binding and the compiler

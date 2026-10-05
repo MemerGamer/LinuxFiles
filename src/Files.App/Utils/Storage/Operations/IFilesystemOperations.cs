@@ -37,6 +37,7 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
 
+#if WINDOWS
 		/// <summary>
 		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
 		/// </summary>
@@ -57,6 +58,7 @@ namespace Files.App.Utils.Storage
 			NameCollisionOption collision,
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -79,6 +81,7 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
 
+#if WINDOWS
 		/// <summary>
 		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
 		/// </summary>
@@ -88,6 +91,7 @@ namespace Files.App.Utils.Storage
 			IList<FileNameConflictResolveOptionType> collisions,
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -100,6 +104,7 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
+#if WINDOWS
 		/// <summary>
 		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
 		/// </summary>
@@ -120,6 +125,7 @@ namespace Files.App.Utils.Storage
 			NameCollisionOption collision,
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -142,6 +148,7 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
 
+#if WINDOWS
 		/// <summary>
 		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
 		/// </summary>
@@ -151,6 +158,7 @@ namespace Files.App.Utils.Storage
 			IList<FileNameConflictResolveOptionType> collisions,
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -163,6 +171,7 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
+#if WINDOWS
 		/// <summary>
 		/// Deletes <paramref name="source"/>
 		/// </summary>
@@ -185,6 +194,7 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			bool permanently,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Deletes <paramref name="source"/>
@@ -209,6 +219,7 @@ namespace Files.App.Utils.Storage
 			bool permanently,
 			CancellationToken cancellationToken);
 
+#if WINDOWS
 		/// <summary>
 		/// Deletes provided <paramref name="source"/>
 		/// </summary>
@@ -217,6 +228,7 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			bool permanently,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Deletes provided <paramref name="source"/>
@@ -228,6 +240,7 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
+#if WINDOWS
 		/// <summary>
 		/// Renames <paramref name="source"/> with <paramref name="newName"/>
 		/// </summary>
@@ -247,6 +260,7 @@ namespace Files.App.Utils.Storage
 			NameCollisionOption collision,
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Renames <paramref name="source"/> fullPath with <paramref name="newName"/>
@@ -269,6 +283,7 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
+#if WINDOWS
 		/// <summary>
 		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath
 		/// </summary>
@@ -287,7 +302,9 @@ namespace Files.App.Utils.Storage
 			IList<string> destination,
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
+#endif
 
+#if WINDOWS
 		/// <summary>
 		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath
 		/// </summary>
@@ -306,6 +323,7 @@ namespace Files.App.Utils.Storage
 			string destination,
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
+#endif
 
 		/// <summary>
 		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath

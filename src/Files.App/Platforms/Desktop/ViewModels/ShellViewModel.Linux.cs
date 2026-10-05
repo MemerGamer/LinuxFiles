@@ -400,10 +400,12 @@ namespace Files.App.ViewModels
 					(Path.Combine(commonDir, "logs"), true),
 				};
 
-				void OnChanged(object? s, FolderChangeEventArgs e)
+				void OnChanged(string root, FolderChangeEventArgs e)
 				{
-					// Lock files appear and vanish around every Git write; the final rename is what matters
-					if (e.Name.EndsWith(".lock", StringComparison.Ordinal) || e.FullPath.Contains("/objects/", StringComparison.Ordinal))
+					// Lock files appear and vanish around every Git write; the final rename is what matters. The objects filter is
+					// relative to the watched folder so a repository that lives under a folder named "objects" still works.
+					var relative = Path.GetRelativePath(root, e.FullPath).Replace('\\', '/');
+					if (e.Name.EndsWith(".lock", StringComparison.Ordinal) || relative.StartsWith("objects/", StringComparison.Ordinal) || relative.Contains("/objects/", StringComparison.Ordinal))
 						return;
 
 					ScheduleLinuxGitRefresh();
@@ -415,10 +417,11 @@ namespace Files.App.ViewModels
 						continue;
 
 					var watcherInstance = factory.Create(path, new FolderWatcherOptions { IncludeSubdirectories = recursive, Debounce = TimeSpan.FromMilliseconds(200) });
-					watcherInstance.Created += OnChanged;
-					watcherInstance.Deleted += OnChanged;
-					watcherInstance.Changed += OnChanged;
-					watcherInstance.Renamed += (s, e) => OnChanged(s, e);
+					var root = path;
+					watcherInstance.Created += (_, e) => OnChanged(root, e);
+					watcherInstance.Deleted += (_, e) => OnChanged(root, e);
+					watcherInstance.Changed += (_, e) => OnChanged(root, e);
+					watcherInstance.Renamed += (_, e) => OnChanged(root, e);
 					watcherInstance.Start();
 					_linuxRepositoryWatchers.Add(watcherInstance);
 				}

@@ -186,8 +186,13 @@ namespace Files.Platform.Tests.Search
 				var userOwned = Path.Combine(root, "lib.so");
 				File.WriteAllText(userOwned, "x");
 
-				// A library the user (or anyone else) could have written is never linked
+				// A library other users could have written is never linked
+				File.SetUnixFileMode(userOwned, (UnixFileMode)0x1B6); // 0666
 				Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(root, ["Files", "native"], "git2-x.so", userOwned));
+				File.SetUnixFileMode(userOwned, (UnixFileMode)0x1A4); // 0644
+				var userLib = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(Path.Combine(root, "new", "cache"), ["Files", "native"], "git2-u.so", userOwned);
+				Assert.IsNotNull(userLib, "a user-owned library in a private directory chain is allowed and missing intermediate directories are created");
+				Assert.IsTrue(new FileInfo(Path.Combine(userLib, "git2-u.so")).LinkTarget!.StartsWith("/proc/self/fd/", StringComparison.Ordinal));
 				Assert.IsNull(Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare("relative/cache", ["Files"], "x.so", rootOwned));
 
 				// A group-writable cache root is rejected
@@ -205,7 +210,7 @@ namespace Files.Platform.Tests.Search
 				var dir = Files.Platform.Linux.Native.TrustedNativeDirectory.Prepare(Path.Combine(root, "newcache"), ["Files", "native"], "git2-x.so", rootOwned);
 				Assert.IsNotNull(dir);
 				StringAssert.StartsWith(dir, "/proc/self/fd/");
-				Assert.AreEqual(rootOwned, new FileInfo(Path.Combine(dir, "git2-x.so")).LinkTarget);
+				StringAssert.StartsWith(new FileInfo(Path.Combine(dir, "git2-x.so")).LinkTarget, "/proc/self/fd/");
 				Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute, File.GetUnixFileMode(Path.Combine(root, "newcache", "Files", "native")));
 			}
 			finally

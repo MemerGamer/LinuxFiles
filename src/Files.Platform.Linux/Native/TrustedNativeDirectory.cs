@@ -9,34 +9,33 @@ namespace Files.Platform.Linux.Native
 {
 	/// <summary>
 	/// Prepares a per-user directory holding a symbolic link to a native library that is about to be loaded, without any
-	/// time-of-check/time-of-use gap on path names: the directory is reached by walking from <c>/</c> with one <c>openat</c> per component
-	/// (<c>O_NOFOLLOW|O_DIRECTORY</c>), every opened descriptor is checked with <c>fstat</c> (owned by root or the current user, not
-	/// writable by group or others), missing directories are created 0700, and the link is created and loaded through the descriptor of the
-	/// final directory (<c>/proc/self/fd/N</c>), so replacing a path component afterwards cannot redirect the load.
-	/// The link target must be a library in a root-owned, non-writable location.
+	/// time-of-check/time-of-use gap on path names. Both the directory and the library are reached by walking from <c>/</c> with one
+	/// <c>openat</c> per component (<c>O_NOFOLLOW</c>; symlinks on the way are resolved here, component by component), and every opened
+	/// descriptor is checked with <c>fstat</c>: owned by root or the current user and not writable by group or others (so sticky
+	/// world-writable directories such as <c>/tmp</c> are rejected). The library descriptor stays open and the cache link points at
+	/// <c>/proc/self/fd/&lt;libfd&gt;</c>, which resolves to the pinned inode; the link is created and loaded through the descriptor of the cache
+	/// directory (<c>/proc/self/fd/&lt;dirfd&gt;</c>). Swapping any path component afterwards cannot redirect the load.
 	/// </summary>
 	[SupportedOSPlatform("linux")]
 	public static class TrustedNativeDirectory
 	{
 		private const uint GroupOtherWrite = 0x12;
+		private const int MaxSymlinkHops = 16;
 
 		/// <summary>
 		/// Creates <paramref name="cacheRoot"/>/<paramref name="subPath"/> and links <paramref name="linkName"/> to <paramref name="source"/>.
-		/// Returns <c>/proc/self/fd/N</c> of the directory (the descriptor stays open for the life of the process), or <see langword="null"/>
-		/// when any part of the chain is not trustworthy.
+		/// Returns <c>/proc/self/fd/N</c> of the directory (the descriptors stay open for the life of the process), or <see langword="null"/>
+		/// when any part of either chain is not trustworthy.
 		/// </summary>
 		/// <param name="cacheRoot">An absolute path (for example the XDG cache home).</param>
 		/// <param name="subPath">Relative directories below the cache root.</param>
 		/// <param name="linkName">The file name of the link.</param>
-		/// <param name="source">The absolute library path the link points at.</param>
+		/// <param name="source">The absolute library path to load.</param>
 		/// <param name="userId">The user that must own the directories; the process user by default.</param>
 		public static string? Prepare(string cacheRoot, string[] subPath, string linkName, string source, uint? userId = null)
 		{
 			var uid = userId ?? ProcessIdentityNative.CurrentUserId;
 			if (!Path.IsPathRooted(cacheRoot) || !Path.IsPathRooted(source) || linkName.Contains('/') || linkName is "" or "." or "..")
-				return null;
-
-			if (!IsRootOwnedLibrary(source))
 				return null;
 
 			var parts = new System.Collections.Generic.List<string>();
@@ -48,9 +47,16 @@ namespace Files.Platform.Linux.Native
 			if (parts.Exists(p => p is "." or ".." || p.Contains('\0')))
 				return null;
 
+			var libraryFd = OpenTrustedFile(source, uid);
+			if (libraryFd < 0)
+				return null;
+
 			var current = PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PosixNative.ODirectory | PosixNative.ReadOnlyFlags, out _);
 			if (current < 0)
+			{
+				PosixNative.Close(libraryFd);
 				return null;
+			}
 
 			var keep = false;
 			try
@@ -63,9 +69,9 @@ namespace Files.Platform.Linux.Native
 				{
 					var flags = PosixNative.ODirectory | PosixNative.ONofollow | PosixNative.ReadOnlyFlags;
 					var next = PosixNative.OpenAt(current, parts[i], flags, out var errno);
-					if (next < 0 && PosixNative.IsNotFound(errno) && i >= firstSubPath - 1)
+					if (next < 0 && PosixNative.IsNotFound(errno) && IsTrusted(current, uid, mustBeUser: true))
 					{
-						// Missing directories are created 0700 (the cache root itself, then the app's subfolders)
+						// Missing directories are created 0700, but only below a validated ancestor that belongs to the user
 						if (!PosixNative.MakeDirectoryAt(current, parts[i], out _))
 							return null;
 						next = PosixNative.OpenAt(current, parts[i], flags, out _);
@@ -81,9 +87,9 @@ namespace Files.Platform.Linux.Native
 						return null;
 				}
 
-				// Replace the link through the descriptor; a stale file or link of the same name is removed first
+				// Replace the link through the directory descriptor; it points at the pinned library inode, not at a path name
 				try { PosixNative.UnlinkAt(current, linkName, 0, linkName); } catch (IOException) { } catch (UnauthorizedAccessException) { }
-				if (!PosixNative.SymlinkAt(source, current, linkName, out _))
+				if (!PosixNative.SymlinkAt("/proc/self/fd/" + libraryFd, current, linkName, out _))
 					return null;
 
 				keep = true;
@@ -91,46 +97,110 @@ namespace Files.Platform.Linux.Native
 			}
 			finally
 			{
-				if (!keep && current >= 0)
-					PosixNative.Close(current);
+				if (!keep)
+				{
+					PosixNative.Close(libraryFd);
+					if (current >= 0)
+						PosixNative.Close(current);
+				}
 			}
 		}
+
+		/// <summary>
+		/// Opens a regular file by walking its path with validated descriptors, resolving symlinks component by component.
+		/// Every directory on the way, and the file, must be owned by root or the user and not writable by group or others.
+		/// </summary>
+		private static int OpenTrustedFile(string path, uint uid)
+		{
+			var queue = new System.Collections.Generic.LinkedList<string>(path.Split('/', StringSplitOptions.RemoveEmptyEntries));
+			var dir = PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PosixNative.ODirectory | PosixNative.ReadOnlyFlags, out _);
+			if (dir < 0)
+				return -1;
+
+			var hops = 0;
+			try
+			{
+				if (!IsTrusted(dir, uid, mustBeUser: false))
+					return -1;
+
+				while (queue.First is { } node)
+				{
+					var name = node.Value;
+					queue.RemoveFirst();
+					if (name == ".")
+						continue;
+
+					if (name == ".." || name.Contains('\0'))
+						return -1;
+
+					if (!PosixNative.TryStat(dir, name, PosixNative.AtSymlinkNofollow, out var stat))
+						return -1;
+
+					if (stat.IsSymbolicLink)
+					{
+						// The link lives in a validated directory, so only root or the user could have planted it
+						if (++hops > MaxSymlinkHops)
+							return -1;
+
+						var target = PosixNative.ReadLinkAt(dir, name, path);
+						var targetParts = target.Split('/', StringSplitOptions.RemoveEmptyEntries);
+						for (var i = targetParts.Length - 1; i >= 0; i--)
+							queue.AddFirst(targetParts[i]);
+
+						if (target.StartsWith('/'))
+						{
+							PosixNative.Close(dir);
+							dir = PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PosixNative.ODirectory | PosixNative.ReadOnlyFlags, out _);
+							if (dir < 0)
+								return -1;
+						}
+
+						continue;
+					}
+
+					if (queue.Count == 0)
+					{
+						if (!stat.IsRegularFile)
+							return -1;
+
+						var file = PosixNative.OpenAt(dir, name, PosixNative.ONofollow | PosixNative.ReadOnlyFlags, out _);
+						if (file < 0)
+							return -1;
+
+						if (PosixNative.TryStat(file, out var opened) && opened.IsRegularFile && IsAcceptableOwner(opened.OwnerUserId, uid) && (opened.Mode & GroupOtherWrite) == 0)
+							return file;
+
+						PosixNative.Close(file);
+						return -1;
+					}
+
+					var next = PosixNative.OpenAt(dir, name, PosixNative.ODirectory | PosixNative.ONofollow | PosixNative.ReadOnlyFlags, out _);
+					PosixNative.Close(dir);
+					dir = next;
+					if (dir < 0 || !IsTrusted(dir, uid, mustBeUser: false))
+						return -1;
+				}
+
+				return -1;
+			}
+			finally
+			{
+				if (dir >= 0)
+					PosixNative.Close(dir);
+			}
+		}
+
+		private static bool IsAcceptableOwner(uint owner, uint uid) => owner == 0 || owner == uid;
 
 		private static bool IsTrusted(int fd, uint uid, bool mustBeUser)
 		{
 			if (!PosixNative.TryStat(fd, out var stat) || !stat.IsDirectory)
 				return false;
 
-			if (mustBeUser ? stat.OwnerUserId != uid : stat.OwnerUserId != 0 && stat.OwnerUserId != uid)
+			if (mustBeUser ? stat.OwnerUserId != uid : !IsAcceptableOwner(stat.OwnerUserId, uid))
 				return false;
 
 			return (stat.Mode & GroupOtherWrite) == 0;
-		}
-
-		/// <summary>
-		/// A regular file whose real path (symlinks resolved) and every directory above it belong to root and are not writable by others.
-		/// Root-owned, non-writable parents mean only root could have planted any link on the way.
-		/// </summary>
-		private static bool IsRootOwnedLibrary(string path)
-		{
-			try
-			{
-				var real = File.ResolveLinkTarget(path, returnFinalTarget: true)?.FullName ?? Path.GetFullPath(path);
-				if (!PosixNative.TryStat(PosixNative.AtFdCwd, real, 0, out var file) || !file.IsRegularFile || file.OwnerUserId != 0 || (file.Mode & GroupOtherWrite) != 0)
-					return false;
-
-				for (var dir = Path.GetDirectoryName(real); dir is not null; dir = Path.GetDirectoryName(dir))
-				{
-					if (!PosixNative.TryStat(PosixNative.AtFdCwd, dir, 0, out var stat) || !stat.IsDirectory || stat.OwnerUserId != 0 || (stat.Mode & GroupOtherWrite) != 0)
-						return false;
-				}
-
-				return true;
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-			{
-				return false;
-			}
 		}
 	}
 }

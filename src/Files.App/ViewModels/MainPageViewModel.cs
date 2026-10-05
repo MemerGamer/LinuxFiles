@@ -161,7 +161,7 @@ namespace Files.App.ViewModels
 		{
 			get
 			{
-				if (!canShowPrompts || hasShownSponsorPrompt)
+				if (!canShowPrompts || hasShownSponsorPrompt || !Constants.ExternalUrl.IsSupportUsAvailable)
 					return false;
 
 				var isTargetEnvironment = AppLifecycleHelper.AppEnvironment is AppEnvironment.Dev or AppEnvironment.SideloadStable or AppEnvironment.SideloadPreview;
@@ -399,7 +399,7 @@ namespace Files.App.ViewModels
 		{
 			UserSettingsService.ApplicationSettingsService.HasClickedSponsorPrompt = true;
 			OnPropertyChanged(nameof(ShowSponsorPrompt));
-			await Launcher.LaunchUriAsync(new Uri(Constants.ExternalUrl.SupportUsUrl)).AsTask();
+			await Launcher.LaunchUriAsync(new Uri(Constants.ExternalUrl.ActiveSupportUsUrl)).AsTask();
 		}
 
 		private async Task ExecuteOpenNetworkSharingSettingsCommand()

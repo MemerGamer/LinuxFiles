@@ -51,7 +51,8 @@
 			<wctcontrols:SettingsCard
 				Command="{x:Bind ViewModel.SupportUsCommand}"
 				Header="{helpers:ResourceString Key=SponsorUsOnGitHub}"
-				IsClickEnabled="True">
+				IsClickEnabled="True"
+				Visibility="{x:Bind ViewModel.IsSupportUsVisible}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xEB51;" />
 				</wctcontrols:SettingsCard.HeaderIcon>

@@ -192,9 +192,11 @@ namespace Files.App.ViewModels.Settings
 			});
 		}
 
+		public bool IsSupportUsVisible => Constants.ExternalUrl.IsSupportUsAvailable;
+
 		public Task SupportUs()
 		{
-			return Launcher.LaunchUriAsync(new Uri(Constants.ExternalUrl.SupportUsUrl)).AsTask();
+			return Launcher.LaunchUriAsync(new Uri(Constants.ExternalUrl.ActiveSupportUsUrl)).AsTask();
 		}
 
 		public string GetAppVersion()

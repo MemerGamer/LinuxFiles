@@ -10,6 +10,7 @@ namespace Files.App.Utils.Storage.Operations
 		public async Task ComputeSizeAsync(CancellationToken cancellationToken = default)
 		{
 			var stat = Ioc.Default.GetRequiredService<IFileStatService>();
+			var incomplete = false;
 
 			await Parallel.ForEachAsync(
 				_paths,
@@ -17,12 +18,17 @@ namespace Files.App.Utils.Storage.Operations
 				async (path, token) =>
 				{
 					if (stat.TryGetStat(path, false, out var info) && info.IsDirectory)
-						await stat.ScanFolderAsync(path, new FolderScanOptions { FileVisited = AddFile }, token);
+					{
+						var result = await stat.ScanFolderAsync(path, new FolderScanOptions { FileVisited = AddFile }, token);
+						if (result.Canceled || result.Truncated)
+							incomplete = true;
+					}
 					else
 						ComputeFileSize(path);
 				});
 
-			Completed = true;
+			// A cancelled or bounded scan leaves the total partial
+			Completed = !incomplete;
 		}
 
 		private long ComputeFileSize(string path)

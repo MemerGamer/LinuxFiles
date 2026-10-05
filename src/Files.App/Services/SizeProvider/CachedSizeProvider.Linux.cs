@@ -40,6 +40,13 @@ namespace Files.App.Services.SizeProvider
 			}, cancellationToken);
 
 			var final = (ulong)result.TotalSize;
+			if (result.Canceled || result.Truncated)
+			{
+				// A partial total must not be cached or reported as the finished size
+				RaiseSizeChanged(path, final, SizeChangedValueState.Intermediate);
+				return;
+			}
+
 			sizes[path] = final;
 			RaiseSizeChanged(path, final, SizeChangedValueState.Final);
 		}

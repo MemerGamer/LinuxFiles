@@ -55,31 +55,11 @@ namespace Files.Platform.Linux.FileStat
 		private static long ScanDirectory(DirectoryHandle directory, string path, int depth, ScanState state)
 		{
 			long sum = 0;
-			List<string> names;
-			try
-			{
-				names = directory.ListNames();
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-			{
-				return 0;
-			}
 
-			foreach (var name in names)
+			void Visit(string name)
 			{
-				if (state.Cancellation.IsCancellationRequested)
-				{
-					state.Canceled = true;
-					break;
-				}
-				if (++state.Entries > state.Options.MaxEntries)
-				{
-					state.Truncated = true;
-					break;
-				}
-
 				if (!PosixNative.TryStat(directory.Descriptor, name, PosixNative.AtSymlinkNofollow, out var stat))
-					continue;
+					return;
 
 				if (stat.IsRegularFile)
 				{
@@ -91,19 +71,50 @@ namespace Files.Platform.Linux.FileStat
 					if ((state.Files & 0xFF) == 0)
 						state.Options.Progress?.Invoke(state.Total);
 				}
-				else if (stat.IsDirectory && depth < state.Options.MaxDepth)
+				else if (stat.IsDirectory)
 				{
+					if (depth >= state.Options.MaxDepth)
+					{
+						state.Truncated = true;
+						return;
+					}
+
 					var childPath = System.IO.Path.Combine(path, name);
 					using var child = DirectoryHandle.TryOpen(directory.Descriptor, name, childPath, noFollow: true, out _);
 					if (child is null || !child.IsSameEntry(stat))
-						continue;
+						return;
 					state.Folders++;
 					sum += ScanDirectory(child, childPath, depth + 1, state);
 				}
 				// Symbolic links and special files are not counted or followed.
 			}
 
-			state.Options.FolderCompleted?.Invoke(path, sum, depth);
+			try
+			{
+				PosixNative.ForEachName(directory.Descriptor, path, name =>
+				{
+					if (state.Cancellation.IsCancellationRequested)
+					{
+						state.Canceled = true;
+						return false;
+					}
+					if (++state.Entries > state.Options.MaxEntries)
+					{
+						state.Truncated = true;
+						return false;
+					}
+
+					Visit(name);
+					return !state.Canceled && !state.Truncated;
+				});
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				// Unreadable folders are skipped
+			}
+
+			if (!state.Canceled && !state.Truncated)
+				state.Options.FolderCompleted?.Invoke(path, sum, depth);
 			state.Options.Progress?.Invoke(state.Total);
 			return sum;
 		}

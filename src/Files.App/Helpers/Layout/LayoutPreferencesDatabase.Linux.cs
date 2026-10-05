@@ -25,7 +25,13 @@ namespace Files.App.Helpers
 		public LayoutPreferencesItem? GetPreferences(string filePath, ulong? frn)
 		{
 			lock (_gate)
-				return Find(Load(), filePath, true)?.Preferences;
+			{
+				var entries = Load();
+				var entry = Find(entries, filePath, true, out var changed);
+				if (changed)
+					Save(entries);
+				return entry?.Preferences;
+			}
 		}
 
 		public void SetPreferences(string filePath, ulong? frn, LayoutPreferencesItem? preferencesItem)
@@ -33,7 +39,7 @@ namespace Files.App.Helpers
 			lock (_gate)
 			{
 				var entries = Load();
-				var existing = Find(entries, filePath, false);
+				var existing = Find(entries, filePath, false, out _);
 
 				if (preferencesItem is null)
 				{
@@ -86,23 +92,36 @@ namespace Files.App.Helpers
 			}
 		}
 
-		// Looks the entry up by path, then by folder identity. With migrate, keeps the stored identity and path up to date.
-		private static LayoutPreferencesFileEntry? Find(List<LayoutPreferencesFileEntry> entries, string filePath, bool migrate)
+		// Looks the entry up by path, then by folder identity. With migrate, keeps the stored identity and path up to date
+		// and reports whether the entries changed and need saving.
+		private static LayoutPreferencesFileEntry? Find(List<LayoutPreferencesFileEntry> entries, string filePath, bool migrate, out bool changed)
 		{
+			changed = false;
 			if (string.IsNullOrEmpty(filePath))
 				return null;
 
 			var id = GetId(filePath);
 			var byPath = entries.FirstOrDefault(x => string.Equals(x.FilePath, filePath, StringComparison.Ordinal));
 			if (byPath is not null)
+			{
+				if (migrate && id is not null && !string.Equals(byPath.FileId, id, StringComparison.Ordinal))
+				{
+					byPath.FileId = id;
+					changed = true;
+				}
+
 				return byPath;
+			}
 
 			if (id is null)
 				return null;
 
 			var byId = entries.FirstOrDefault(x => string.Equals(x.FileId, id, StringComparison.Ordinal));
 			if (byId is not null && migrate)
+			{
 				byId.FilePath = filePath;
+				changed = true;
+			}
 
 			return byId;
 		}

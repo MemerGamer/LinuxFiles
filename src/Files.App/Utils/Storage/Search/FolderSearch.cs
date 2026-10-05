@@ -276,7 +276,7 @@ namespace Files.App.Utils.Storage
 					shortcutItem.Arguments = link.Arguments;
 					shortcutItem.WorkingDirectory = link.WorkingDirectory;
 					shortcutItem.RunAsAdmin = link.RunAsAdmin;
-					shortcutItem.ShowWindowCommand = (Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD)link.ShowWindowCommand;
+					shortcutItem.ShowWindowCommand = ((int)link.ShowWindowCommand).ToShowWindowCommand();
 					shortcutItem.PrimaryItemAttribute = link.IsFolder ? StorageItemTypes.Folder : StorageItemTypes.File;
 				}
 			});

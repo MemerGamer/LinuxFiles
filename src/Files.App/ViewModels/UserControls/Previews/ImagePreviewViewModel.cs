@@ -36,7 +36,7 @@ namespace Files.App.ViewModels.Previews
 			try
 			{
 				var path = Item.ItemPath!;
-				using var source = Files.Platform.Linux.Previews.PreviewFile.OpenRead(path, LoadCancelledTokenSource.Token);
+				using var source = await OpenPreviewReadAsync(LoadCancelledTokenSource.Token);
 				if (string.Equals(Item.FileExtension, ".pdf", StringComparison.OrdinalIgnoreCase))
 				{
 					// LINUX-TODO(preview): PDF shows the first page; multipage navigation needs a document renderer.

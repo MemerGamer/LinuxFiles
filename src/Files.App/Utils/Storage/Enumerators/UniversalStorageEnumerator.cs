@@ -224,7 +224,7 @@ namespace Files.App.Utils.Storage
 						Arguments = linkFolder.Arguments,
 						WorkingDirectory = linkFolder.WorkingDirectory,
 						RunAsAdmin = linkFolder.RunAsAdmin,
-						ShowWindowCommand = linkFolder.ShowWindowCommand
+						ShowWindowCommand = ((int)linkFolder.ShowWindowCommand).ToShowWindowCommand()
 					};
 				}
 				else if (folder is BinStorageFolder binFolder)
@@ -324,7 +324,7 @@ namespace Files.App.Utils.Storage
 						Arguments = linkFile.Arguments,
 						WorkingDirectory = linkFile.WorkingDirectory,
 						RunAsAdmin = linkFile.RunAsAdmin,
-						ShowWindowCommand = linkFile.ShowWindowCommand,
+						ShowWindowCommand = ((int)linkFile.ShowWindowCommand).ToShowWindowCommand(),
 						IsUrl = isUrl,
 					};
 				}

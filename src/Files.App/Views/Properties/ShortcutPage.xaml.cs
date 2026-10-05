@@ -40,7 +40,7 @@ namespace Files.App.Views.Properties
 				ViewModel.ShortcutItemArguments,
 				ViewModel.ShortcutItemWorkingDir,
 				ViewModel.RunAsAdmin,
-				(Windows.Win32.UI.WindowsAndMessaging.SHOW_WINDOW_CMD)(int)ViewModel.ShowWindowCommand)
+				ViewModel.ShowWindowCommand)
 			);
 
 			return true;

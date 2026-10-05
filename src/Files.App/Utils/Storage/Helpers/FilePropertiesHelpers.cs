@@ -111,7 +111,8 @@ namespace Files.App.Utils.Storage
 			propertiesWindow.IsMinimizable = false;
 			propertiesWindow.IsMaximizable = false;
 			propertiesWindow.Content = frame;
-			propertiesWindow.SystemBackdrop = new AppSystemBackdrop(true);
+			if (!OperatingSystem.IsLinux())
+				propertiesWindow.SystemBackdrop = new AppSystemBackdrop(true);
 
 			var appWindow = propertiesWindow.AppWindow;
 			appWindow.Title = Strings.Properties.GetLocalizedResource();
@@ -120,6 +121,10 @@ namespace Files.App.Utils.Storage
 			appWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
 
 			appWindow.SetIcon(AppLifecycleHelper.AppIconPath);
+
+			// Resolves "use system setting" the same way the main window does (Uno has no system theme tracking)
+			if (OperatingSystem.IsLinux())
+				AppThemeModeService.SetAppThemeMode(propertiesWindow, appWindow.TitleBar, AppThemeModeService.AppThemeMode, false);
 
 			frame.Navigate(
 				typeof(MainPropertiesPage),
@@ -168,7 +173,8 @@ namespace Files.App.Utils.Storage
 		// So instead of destroying the Window object, cache it and reuse it as a workaround.
 		private static void PropertiesWindow_Closed(object sender, WindowEventArgs args)
 		{
-			if (!App.AppModel.IsMainWindowClosed && sender is WindowEx window)
+			// Hiding a cached window does not work on X11 (it stays mapped with empty content), so close it for real there
+			if (!OperatingSystem.IsLinux() && !App.AppModel.IsMainWindowClosed && sender is WindowEx window)
 			{
 				args.Handled = true;
 

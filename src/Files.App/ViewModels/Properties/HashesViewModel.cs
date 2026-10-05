@@ -195,12 +195,7 @@ namespace Files.App.ViewModels.Properties
 		{
 			var hWnd = Microsoft.UI.Win32Interop.GetWindowFromWindowId(_appWindow.Id);
 
-			var result = CommonDialogService.Open_FileOpenDialog(
-				hWnd,
-				false,
-				[],
-				Environment.SpecialFolder.Desktop,
-				out var filePath);
+			var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(hWnd, false, [], Environment.SpecialFolder.Desktop);
 
 			HashInput = result && filePath != null
 				? await CalculateFileHashAsync(filePath)

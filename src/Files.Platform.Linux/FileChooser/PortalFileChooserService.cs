@@ -45,9 +45,12 @@ namespace Files.Platform.Linux.FileChooser
 		/// <inheritdoc/>
 		public async Task<FileChooserResult> ChooseAsync(FileChooserRequest request, CancellationToken cancellationToken = default)
 		{
+			cancellationToken.ThrowIfCancellationRequested();
+			string? handlePath = null;
+			DBusConnection? bus = null;
 			try
 			{
-				var bus = await GetConnectionAsync().ConfigureAwait(false);
+				bus = await GetConnectionAsync().ConfigureAwait(false);
 				if (bus is null)
 					return FileChooserResult.Unavailable;
 
@@ -73,7 +76,12 @@ namespace Files.Platform.Linux.FileChooser
 						writer.Dispose();
 					}
 
-					await bus.CallMethodAsync(message, static (Message _, object? _) => true, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
+					handlePath = await bus.CallMethodAsync(message, static (Message m, object? _) => m.GetBodyReader().ReadObjectPathAsString(), null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
+
+					// Older portals may not honor handle_token; the returned handle is authoritative
+					var returnedToken = handlePath[(handlePath.LastIndexOf('/') + 1)..];
+					if (returnedToken.Length > 0 && returnedToken != token)
+						pending[returnedToken] = response;
 
 					var (code, uris) = await response.Task.WaitAsync(ChooseTimeout, cancellationToken).ConfigureAwait(false);
 					if (code != 0)
@@ -91,6 +99,12 @@ namespace Files.Platform.Linux.FileChooser
 				finally
 				{
 					pending.TryRemove(token, out _);
+					if (handlePath is not null)
+						pending.TryRemove(handlePath[(handlePath.LastIndexOf('/') + 1)..], out _);
+
+					// An unanswered request means the dialog may still be open; ask the portal to close it
+					if (handlePath is not null && !response.Task.IsCompleted)
+						CloseRequest(bus, handlePath);
 				}
 			}
 			catch (Exception ex) when (IsBackendFailure(ex))
@@ -98,6 +112,19 @@ namespace Files.Platform.Linux.FileChooser
 				return ex is DBusErrorReplyException dbus && dbus.ErrorName is "org.freedesktop.DBus.Error.ServiceUnknown" or "org.freedesktop.DBus.Error.UnknownMethod" or "org.freedesktop.DBus.Error.UnknownObject"
 					? FileChooserResult.Unavailable
 					: FileChooserResult.Cancelled;
+			}
+		}
+
+		private static void CloseRequest(DBusConnection bus, string handlePath)
+		{
+			try
+			{
+				using var writer = bus.GetMessageWriter();
+				writer.WriteMethodCallHeader(Service, handlePath, RequestInterface, "Close");
+				bus.TrySendMessage(writer.CreateMessage());
+			}
+			catch (Exception ex) when (IsBackendFailure(ex))
+			{
 			}
 		}
 

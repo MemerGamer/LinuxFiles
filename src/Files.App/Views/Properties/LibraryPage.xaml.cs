@@ -91,7 +91,7 @@ namespace Files.App.Views.Properties
 
 		private async Task AddLocationAsync()
 		{
-			var result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop, out var filePath);
+			var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(MainWindow.Instance.WindowHandle, true, [], Environment.SpecialFolder.Desktop);
 			if (!result)
 				return;
 

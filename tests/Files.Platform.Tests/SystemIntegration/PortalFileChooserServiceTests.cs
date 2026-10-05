@@ -32,6 +32,8 @@ namespace Files.Platform.Tests.SystemIntegration
 
 			public string[] Uris { get; set; } = [];
 
+			public string? HandleToken { get; set; }
+
 			public string Path => "/org/freedesktop/portal/desktop";
 
 			public bool HandlesChildPaths => false;
@@ -64,7 +66,7 @@ namespace Files.Platform.Tests.SystemIntegration
 				lock (Calls)
 					Calls.Add(new Call(request.MemberAsString ?? "", parent, title, options));
 
-				var handle = "/org/freedesktop/portal/desktop/request/fake/" + token;
+				var handle = "/org/freedesktop/portal/desktop/request/fake/" + (HandleToken ?? token);
 				using (var reply = context.CreateReplyWriter("o"))
 				{
 					reply.WriteObjectPath(handle);
@@ -214,6 +216,33 @@ namespace Files.Platform.Tests.SystemIntegration
 			portal.ResponseCode = 0;
 			portal.Uris = ["https://example.com/x"];
 			Assert.AreEqual(FileChooserStatus.Cancelled, (await service.ChooseAsync(new FileChooserRequest())).Status);
+		}
+
+		[TestMethod]
+		public async Task FollowsTheHandleTheMethodReturned()
+		{
+			using var bus = PrivateBus.Start();
+			using var portal = await FakePortal.StartAsync(bus.Address);
+			using var service = new PortalFileChooserService(bus.Address);
+			portal.HandleToken = "differenttoken";
+			portal.Uris = ["file:///tmp/x"];
+
+			var result = await service.ChooseAsync(new FileChooserRequest());
+
+			CollectionAssert.AreEqual(new[] { "/tmp/x" }, result.Paths.ToArray());
+		}
+
+		[TestMethod]
+		public async Task AnAlreadyCancelledTokenSendsNothing()
+		{
+			using var bus = PrivateBus.Start();
+			using var portal = await FakePortal.StartAsync(bus.Address);
+			using var service = new PortalFileChooserService(bus.Address);
+			using var cts = new System.Threading.CancellationTokenSource();
+			cts.Cancel();
+
+			await Assert.ThrowsAsync<OperationCanceledException>(() => service.ChooseAsync(new FileChooserRequest(), cts.Token));
+			Assert.AreEqual(0, portal.Calls.Count);
 		}
 
 		[TestMethod]

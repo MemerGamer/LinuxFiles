@@ -96,7 +96,7 @@ namespace Files.App.ViewModels.Settings
 
 			LoadAppThemeFontFamilyOptions();
 
-			SelectImageCommand = new RelayCommand(SelectBackgroundImage);
+			SelectImageCommand = new AsyncRelayCommand(SelectBackgroundImageAsync);
 			RemoveImageCommand = new RelayCommand(RemoveBackgroundImage);
 			CustomizeToolbarCommand = new AsyncRelayCommand(() => CommandManager.CustomizeToolbar.ExecuteAsync());
 		}
@@ -104,7 +104,7 @@ namespace Files.App.ViewModels.Settings
 		/// <summary>
 		/// Opens a file picker to select a background image
 		/// </summary>
-		private void SelectBackgroundImage()
+		private async Task SelectBackgroundImageAsync()
 		{
 			string[] extensions =
 			[
@@ -118,7 +118,7 @@ namespace Files.App.ViewModels.Settings
 				"WEBP", "*.webp",
 			];
 
-			var result = CommonDialogService.Open_FileOpenDialog(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.MyPictures, out var filePath, _backgroundImagePickerClientGuid);
+			var (result, filePath) = await CommonDialogService.OpenFileOpenDialogAsync(MainWindow.Instance.WindowHandle, false, extensions, Environment.SpecialFolder.MyPictures, _backgroundImagePickerClientGuid);
 			if (result)
 				AppThemeBackgroundImageSource = filePath;
 		}

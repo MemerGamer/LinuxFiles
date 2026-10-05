@@ -327,6 +327,9 @@ namespace Files.App.Data.Items
 #if !WINDOWS
 				var info = await Task.Run(() =>
 				{
+					if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Find(Path) is { } synthetic)
+						return (Total: (long)synthetic.TotalBytes, Free: (long)synthetic.FreeBytes, Format: synthetic.FileSystem);
+
 					var driveInfo = new SystemIO.DriveInfo(Path ?? throw new InvalidOperationException("The drive path has not been initialized."));
 					return (Total: driveInfo.TotalSize, Free: driveInfo.AvailableFreeSpace, Format: driveInfo.DriveFormat);
 				}).WithTimeoutAsync(TimeSpan.FromSeconds(5));

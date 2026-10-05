@@ -28,6 +28,18 @@ namespace Files.App.Utils
 		{
 			var entries = new List<DriveEntry>();
 
+			// Headless sandbox runs show only the synthetic drives: no UDisks2, no GVfs, no real mounts
+			if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Current is not null)
+			{
+				foreach (var mount in DriveHelpers.GetMounts())
+				{
+					var captured = mount;
+					entries.Add(new DriveEntry(mount.MountPoint, $"{mount.Source}|{mount.FsType}", () => CreateMountedAsync(captured, null)));
+				}
+
+				return entries;
+			}
+
 			IReadOnlyList<VolumeInfo> volumes = [];
 			if (Ioc.Default.GetService<IVolumeService>() is { } volumeService)
 			{
@@ -79,6 +91,9 @@ namespace Files.App.Utils
 
 		public static async Task<IFolder?> CreateMountedAsync(LinuxMount mount, VolumeInfo? volume)
 		{
+			if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Find(mount.MountPoint) is { } synthetic)
+				return await CreateSyntheticAsync(synthetic).ConfigureAwait(false);
+
 			try
 			{
 				var drive = new DriveInfo(mount.MountPoint);
@@ -119,6 +134,16 @@ namespace Files.App.Utils
 				App.Logger.LogWarning(ex, $"Failed to load the drive {mount.MountPoint}");
 				return null;
 			}
+		}
+
+		private static async Task<IFolder?> CreateSyntheticAsync(Files.Platform.Linux.Volumes.HeadlessDrive drive)
+		{
+			var res = await FilesystemTasks.Wrap(() => StorageFolder.GetFolderFromPathAsync(drive.MountPoint).AsTask());
+			if (!res)
+				return null;
+
+			var type = drive.IsRemovable ? Data.Items.DriveType.Removable : Data.Items.DriveType.Fixed;
+			return await DriveItem.CreateFromPropertiesAsync(res.Result!, drive.MountPoint, drive.Label, type);
 		}
 
 		private static Data.Items.DriveType ClassifyDrive(DriveInfo drive, VolumeInfo? volume)

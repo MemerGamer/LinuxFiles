@@ -151,6 +151,18 @@ namespace Files.App.Views.Layouts
 		{
 			IsSourceGrouped = true,
 		};
+		/// <summary>
+		/// Items source for the layout lists. On Uno the CollectionView built over the bulk-updated collection never
+		/// generates item containers, so the non-grouped list binds to the source collection directly.
+		/// </summary>
+		// LINUX-TODO(listing): fall back to CollectionViewSource.View once Uno's CollectionView handles bulk Reset
+		public object? LayoutItemsSource
+#if WINDOWS
+			=> CollectionViewSource.View;
+#else
+			=> CollectionViewSource.IsSourceGrouped ? CollectionViewSource.View : CollectionViewSource.Source;
+#endif
+
 		public CollectionViewSource CollectionViewSource
 		{
 			get => collectionViewSource;
@@ -165,6 +177,7 @@ namespace Files.App.Views.Layouts
 				collectionViewSource = value;
 
 				NotifyPropertyChanged(nameof(CollectionViewSource));
+				NotifyPropertyChanged(nameof(LayoutItemsSource));
 
 				if (collectionViewSource.View is not null)
 					collectionViewSource.View.VectorChanged += View_VectorChanged;
@@ -502,6 +515,22 @@ namespace Files.App.Views.Layouts
 		protected void NotifyPropertyChanged([CallerMemberName] string propertyName = "")
 		{
 			PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+		}
+
+		/// <summary>
+		/// Uno's SemanticZoom does not realize its ZoomedInView on Skia desktop (the list never loads), so the
+		/// zoomed-in view is hoisted into the SemanticZoom's parent panel instead. Semantic zoom grouping jumps are lost.
+		/// </summary>
+		// LINUX-TODO(listing): restore grouped semantic zoom once Uno's SemanticZoom template works
+		protected static void HoistSemanticZoomContent(SemanticZoom zoom)
+		{
+			if (zoom.ZoomedInView is not UIElement content || zoom.Parent is not Panel panel)
+				return;
+
+			var index = panel.Children.IndexOf(zoom);
+			zoom.ZoomedInView = null;
+			zoom.ZoomedOutView = null;
+			panel.Children.Insert(index + 1, content);
 		}
 
 		protected override async void OnNavigatedTo(NavigationEventArgs e)

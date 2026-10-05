@@ -90,6 +90,9 @@ namespace Files.App.Views.Layouts
 		public DetailsLayoutPage() : base()
 		{
 			InitializeComponent();
+#if !WINDOWS
+			HoistSemanticZoomContent(RootGridZoom);
+#endif
 			DataContext = this;
 			var selectionRectangle = RectangleSelection.Create(FileList, SelectionRectangle, FileList_SelectionChanged);
 			selectionRectangle.SelectionStarted += SelectionRectangle_SelectionStarted;
@@ -1074,6 +1077,7 @@ namespace Files.App.Views.Layouts
 			ContentScroller = FileList.FindDescendant<ScrollViewer>(x => x.Name == "ScrollViewer");
 			const double OffsetCorrection = 88; // HeaderGrid (40) + ListViewHeaderItem (44 + 4 margin)
 
+			if (RootGridZoom is not null)
 			RootGridZoom.ViewChangeStarted += (_, args) =>
 			{
 				if (args.IsSourceZoomedInView || ContentScroller is not { } scroller)
@@ -1120,36 +1124,52 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(ListViewItem))]
 		private new void FileList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
 		{
-			var selectionCheckbox = GetSelectionCheckbox(args.ItemContainer);
+			try
+			{
+				// Uno raises this before the container's content template is realized, so the checkbox may not exist yet
+				var selectionCheckbox = args.ItemContainer.ContentTemplateRoot is null ? null : GetSelectionCheckbox(args.ItemContainer);
 
-			selectionCheckbox.PointerEntered -= SelectionCheckbox_PointerEntered;
-			selectionCheckbox.PointerExited -= SelectionCheckbox_PointerExited;
-			selectionCheckbox.PointerCanceled -= SelectionCheckbox_PointerCanceled;
-			selectionCheckbox.Checked -= ItemSelected_Checked;
-			selectionCheckbox.Unchecked -= ItemSelected_Unchecked;
+				if (selectionCheckbox is not null)
+				{
+					selectionCheckbox.PointerEntered -= SelectionCheckbox_PointerEntered;
+					selectionCheckbox.PointerExited -= SelectionCheckbox_PointerExited;
+					selectionCheckbox.PointerCanceled -= SelectionCheckbox_PointerCanceled;
+					selectionCheckbox.Checked -= ItemSelected_Checked;
+					selectionCheckbox.Unchecked -= ItemSelected_Unchecked;
+				}
 
-			base.FileList_ContainerContentChanging(sender, args);
-			if (args.InRecycleQueue)
-				return;
+				base.FileList_ContainerContentChanging(sender, args);
+				if (args.InRecycleQueue)
+					return;
 
-			SetCheckboxSelectionState(args.Item, args.ItemContainer as ListViewItem);
+				SetCheckboxSelectionState(args.Item, args.ItemContainer as ListViewItem);
 
-			selectionCheckbox.PointerEntered += SelectionCheckbox_PointerEntered;
-			selectionCheckbox.PointerExited += SelectionCheckbox_PointerExited;
-			selectionCheckbox.PointerCanceled += SelectionCheckbox_PointerCanceled;
+				if (selectionCheckbox is not null)
+				{
+					selectionCheckbox.PointerEntered += SelectionCheckbox_PointerEntered;
+					selectionCheckbox.PointerExited += SelectionCheckbox_PointerExited;
+					selectionCheckbox.PointerCanceled += SelectionCheckbox_PointerCanceled;
+				}
+			}
+			catch (Exception ex)
+			{
+				Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, ex, "Failed to prepare list item container");
+			}
 		}
 
 		private readonly ConditionalWeakTable<SelectorItem, Tuple<object?, CheckBox>> selectionCheckboxCache = new();
 
 		// The template-root identity check invalidates the cache when a container is re-templated
 		[DynamicWindowsRuntimeCast(typeof(CheckBox))]
-		private CheckBox GetSelectionCheckbox(SelectorItem container)
+		private CheckBox? GetSelectionCheckbox(SelectorItem container)
 		{
 			var root = container.ContentTemplateRoot;
 			if (selectionCheckboxCache.TryGetValue(container, out var cached) && ReferenceEquals(cached.Item1, root))
 				return cached.Item2;
 
-			var checkbox = (CheckBox)container.FindDescendant("SelectionCheckbox")!;
+			var checkbox = container.FindDescendant("SelectionCheckbox") as CheckBox;
+			if (checkbox is null)
+				return null;
 			selectionCheckboxCache.AddOrUpdate(container, new Tuple<object?, CheckBox>(root, checkbox));
 			return checkbox;
 		}

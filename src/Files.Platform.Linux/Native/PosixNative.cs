@@ -255,12 +255,6 @@ namespace Files.Platform.Linux.Native
 		[LibraryImport("libc", EntryPoint = "openat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int openat(int dirfd, string pathname, int flags, uint mode);
 
-		[LibraryImport("libc", EntryPoint = "mkdirat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
-		private static partial int mkdirat(int dirfd, string pathname, uint mode);
-
-		[LibraryImport("libc", EntryPoint = "symlinkat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
-		private static partial int symlinkat(string target, int newdirfd, string linkpath);
-
 		[LibraryImport("libc", EntryPoint = "flock", SetLastError = true)]
 		private static partial int flock(int fd, int operation);
 

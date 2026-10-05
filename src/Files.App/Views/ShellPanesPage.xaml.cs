@@ -536,6 +536,9 @@ namespace Files.App.Views
 			// Focus
 			ActivePane = GetPane(GetPaneCount() - 1);
 
+#if !WINDOWS
+			RootGrid.Margin = GetPaneCount() > 1 ? new Thickness(0, 0, 8, 0) : new Thickness(0);
+#endif
 			NotifyPropertyChanged(nameof(IsMultiPaneActive));
 		}
 
@@ -600,6 +603,9 @@ namespace Files.App.Views
 			}
 
 			Pane_ContentChanged(null, null!);
+#if !WINDOWS
+			RootGrid.Margin = GetPaneCount() > 1 ? new Thickness(0, 0, 8, 0) : new Thickness(0);
+#endif
 			NotifyPropertyChanged(nameof(IsMultiPaneActive));
 		}
 

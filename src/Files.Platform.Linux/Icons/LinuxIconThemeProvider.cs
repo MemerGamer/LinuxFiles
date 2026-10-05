@@ -87,7 +87,7 @@ namespace Files.Platform.Linux.Icons
 	public sealed class LinuxIconThemeProvider : IIconThemeProvider
 	{
 		private static readonly string[] FallbackThemes = ["breeze", "Adwaita", "gnome", "Papirus"];
-		private static readonly string[] Extensions = [".png", ".svg", ".xpm"];
+		private static readonly string[] Extensions = [".svg", ".png", ".xpm"];
 
 		private readonly LinuxIconThemeOptions _options;
 		private readonly Lazy<string> _themeName;
@@ -219,7 +219,8 @@ namespace Files.Platform.Linux.Icons
 			if (!visited.Add(theme) || GetTheme(theme) is not { } index)
 				yield break;
 
-			foreach (var directory in index.Directories.OrderBy(d => d.Matches(size, scale) ? 0 : 1).ThenBy(d => d.Distance(size, scale)))
+			// Without an exact match, scalable artwork beats resampling a raster frame
+			foreach (var directory in index.Directories.OrderBy(d => d.Matches(size, scale) ? 0 : d.Type == IconDirectoryType.Scalable ? 1 : 2).ThenBy(d => d.Distance(size, scale)))
 			{
 				foreach (var baseDir in _options.IconDirectories)
 				{

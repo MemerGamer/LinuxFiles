@@ -149,6 +149,7 @@ namespace Files.App.UnoVirtualization
 			private double _cellExtent = 140d;
 			private int _itemsPerRow = 1;
 			private bool _cellMeasured;
+			private bool _measurementQueued;
 			private int _consecutiveResizes;
 
 			public override Orientation ScrollOrientation => Orientation;
@@ -179,6 +180,8 @@ namespace Files.App.UnoVirtualization
 				var changed = false;
 				if (GetFirstMaterializedLine()?.FirstView is { IsLoaded: true } view)
 				{
+					// Measure the template's natural size, not the provisional virtual strip.
+					view.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
 					var breadth = GetBreadth(view.DesiredSize);
 					var extent = GetExtent(view.DesiredSize);
 					if (breadth >= MinReliableSize && extent >= MinReliableSize &&
@@ -320,6 +323,15 @@ namespace Files.App.UnoVirtualization
 				var flat = GetFlatItemIndex(nextVisibleItem);
 				var view = Generator.DequeueViewForItem(flat)!;
 				AddView(view, fillDirection, extentOffset, 0);
+				if (!_cellMeasured && !_measurementQueued)
+				{
+					_measurementQueued = true;
+					OwnerPanel.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () =>
+					{
+						_measurementQueued = false;
+						OwnerPanel.InvalidateMeasure();
+					});
+				}
 
 				// Pin the virtual strip: a container whose template has not sized itself yet must not distort the line positions
 				var strip = StripExtent;

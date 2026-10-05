@@ -24,6 +24,7 @@ namespace Files.App.ViewModels.Properties
 		{
 			var list = new List<FileProperty>();
 
+			ReadBasic(path, list);
 			ReadTagLib(path, list);
 			ReadImageSize(path, list);
 
@@ -44,6 +45,25 @@ namespace Files.App.ViewModels.Properties
 				return;
 
 			list.Add(new FileProperty(nameKey, section) { Value = text, ID = nameKey });
+		}
+
+		// Every file has these, so the Details page is never empty
+		private static void ReadBasic(string path, List<FileProperty> list)
+		{
+			try
+			{
+				var info = new FileInfo(path);
+				if (!info.Exists)
+					return;
+
+				Add(list, CoreSection, "Name", info.Name);
+				Add(list, CoreSection, "Size", info.Length.ToLongSizeString());
+				Add(list, CoreSection, "PropertyDateCreated", new DateTimeOffset(info.CreationTime).ToString("f", CultureInfo.CurrentCulture));
+				Add(list, CoreSection, "PropertyDateModified", new DateTimeOffset(info.LastWriteTime).ToString("f", CultureInfo.CurrentCulture));
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+			}
 		}
 
 		private static void ReadTagLib(string path, List<FileProperty> list)

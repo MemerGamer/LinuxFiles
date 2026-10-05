@@ -24,7 +24,7 @@ namespace Files.Platform.Tests.Storables
 		[TestMethod]
 		[DataRow("ftp://host", "host", 21, "/", "ftp://host")]
 		[DataRow("ftp://host/", "host", 21, "/", "ftp://host")]
-		[DataRow("FTP://Host:2121/a/b c", "Host", 2121, "/a/b c", "ftp://Host:2121/a/b c")]
+		[DataRow("FTP://Host:2121/a/b c", "host", 2121, "/a/b c", "ftp://host:2121/a/b c")]
 		[DataRow("ftps://host/x", "host", 990, "/x", "ftps://host/x")]
 		[DataRow("ftpes://host:21/x", "host", 21, "/x", "ftpes://host:21/x")]
 		[DataRow("ftp://[::1]:2121/p", "::1", 2121, "/p", "ftp://[::1]:2121/p")]
@@ -53,12 +53,13 @@ namespace Files.Platform.Tests.Storables
 		}
 
 		[TestMethod]
-		public void Parse_PasswordContainingAt_UsesLastAt()
+		public void Parse_EncodedAtInPassword_IsAccepted_RawSecondAtIsRejected()
 		{
-			var parsed = FtpUrl.Parse("ftp://user:p@ss@host/");
+			var parsed = FtpUrl.Parse("ftp://user:p%40ss@host/");
 
 			Assert.AreEqual("p@ss", parsed.Password);
 			Assert.AreEqual("host", parsed.Host);
+			Assert.IsFalse(FtpUrl.TryParse("ftp://user:p@ss@host/", out _));
 		}
 
 		[TestMethod]
@@ -71,6 +72,27 @@ namespace Files.Platform.Tests.Storables
 		[DataRow("ftp://[::1/")]
 		[DataRow("ftp://[host]/")]
 		[DataRow("ftp://::1/")]
+		[DataRow("ftp://a@evil.com@good.com/")]
+		[DataRow("ftp://good.com\\@evil.com/")]
+		[DataRow("ftp://good.com%2e/")]
+		[DataRow("ftp://good.com%00.evil/")]
+		[DataRow("ftp://good .com/")]
+		[DataRow("ftp://good.com\t/")]
+		[DataRow("ftp://good.com?x@evil.com/")]
+		[DataRow("ftp://good.com#@evil.com/")]
+		[DataRow("ftp://%3a:pw@host/")]
+		[DataRow("ftp://host:/")]
+		[DataRow("ftp://host:+21/")]
+		[DataRow("ftp://host:65536/")]
+		[DataRow("ftp://@host/")]
+		[DataRow("ftp://.host/")]
+		[DataRow("ftp://a..b/")]
+		[DataRow("ftp://127.1/")]
+		[DataRow("ftp://0177.0.0.1/")]
+		[DataRow("ftp://2130706433/")]
+		[DataRow("ftp://0x7f.0.0.1/")]
+		[DataRow("ftp://[fe80::1%25eth0]/")]
+		[DataRow("ftp://host/a\nb")]
 		[DataRow("/home/user")]
 		[DataRow("")]
 		public void TryParse_RejectsInvalid(string url)
@@ -227,6 +249,22 @@ namespace Files.Platform.Tests.Storables
 		public void CredentialKey_NormalizesSameHostOnly(string a, string b, bool same)
 		{
 			Assert.AreEqual(same, FtpUrl.Parse(a).GetCredentialKey() == FtpUrl.Parse(b).GetCredentialKey());
+		}
+
+		[TestMethod]
+		[DataRow("ftp://good.com:21@evil.com/", "evil.com")]
+		[DataRow("ftp://u:p@GOOD.com./", "good.com")]
+		[DataRow("ftp://[::ffff:1.2.3.4]/", "1.2.3.4")]
+		[DataRow("ftp://1.2.3.4/", "1.2.3.4")]
+		[DataRow("ftp://[0:0:0:0:0:0:0:1]/", "::1")]
+		public void Parse_KeyHostAlwaysEqualsConnectHost(string url, string expectedHost)
+		{
+			var parsed = FtpUrl.Parse(url);
+
+			Assert.AreEqual(expectedHost, parsed.Host);
+			var keyHost = parsed.GetCredentialKey()["ftp://".Length..parsed.GetCredentialKey().LastIndexOf(':')].Trim('[', ']');
+			Assert.AreEqual(parsed.Host, keyHost);
+			Assert.AreEqual(FtpUrl.Parse("ftp://[::ffff:1.2.3.4]/").GetCredentialKey(), FtpUrl.Parse("ftp://1.2.3.4/").GetCredentialKey());
 		}
 
 		[TestMethod]

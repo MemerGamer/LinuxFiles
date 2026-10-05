@@ -40,6 +40,10 @@ namespace Files.Platform.Abstractions.Archives
 		/// </summary>
 		Task<ArchiveListing> ListAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default);
 
+		/// <summary>Lists headers for in-app browsing, applying the fixed browsing size, ratio and entry limits. Use <see cref="ListAsync"/> for encryption and structure checks.</summary>
+		Task<ArchiveListing> ListForBrowsingAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
+			=> ListAsync(archivePath, password, fileNameEncoding, cancellationToken);
+
 		/// <summary>Opens one safe entry as a caller-owned, read-only stream with fixed browsing size and ratio limits.</summary>
 		Task<Stream> OpenEntryAsync(string archivePath, string entryPath, string? password = null, CancellationToken cancellationToken = default);
 

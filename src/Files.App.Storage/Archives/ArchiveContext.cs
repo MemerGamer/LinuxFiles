@@ -15,9 +15,9 @@ using OwlCore.Storage;
 
 namespace Files.App.Storage.Archives
 {
-	internal sealed class ArchiveContext(string path, IArchiveService service, IArchivePasswordPrompt? prompt)
+	internal sealed class ArchiveContext(string path, IArchiveService service, IArchivePasswordPrompt? prompt, System.Collections.Concurrent.ConcurrentDictionary<string, string>? passwordCache = null)
 	{
-		private string? password;
+		private string? password = passwordCache is not null && passwordCache.TryGetValue(path, out var cached) ? cached : null;
 		private Dictionary<string, ArchiveEntryInfo>? entries;
 		private readonly SemaphoreSlim gate = new(1, 1);
 		public string Path { get; } = path;
@@ -31,7 +31,13 @@ namespace Files.App.Storage.Archives
 				for (var attempt = 0; ; attempt++)
 				{
 					cancellationToken.ThrowIfCancellationRequested();
-					try { return await operation(password).ConfigureAwait(false); }
+					try
+					{
+						var result = await operation(password).ConfigureAwait(false);
+						if (password is not null && passwordCache is not null)
+							passwordCache[Path] = password;
+						return result;
+					}
 					catch (ArchivePasswordException) when (prompt is not null && attempt < 3)
 					{
 						password = await prompt.RequestPasswordAsync(Path, password is not null, cancellationToken).ConfigureAwait(false);
@@ -48,7 +54,7 @@ namespace Files.App.Storage.Archives
 			cancellationToken.ThrowIfCancellationRequested();
 			if (entries is { } cached)
 				return cached;
-			var listing = await WithPasswordAsync(password => Service.ListAsync(Path, password, cancellationToken: cancellationToken), cancellationToken).ConfigureAwait(false);
+			var listing = await WithPasswordAsync(password => Service.ListForBrowsingAsync(Path, password, cancellationToken: cancellationToken), cancellationToken).ConfigureAwait(false);
 			var result = new Dictionary<string, ArchiveEntryInfo>(StringComparer.Ordinal);
 			foreach (var entry in listing.Entries)
 			{

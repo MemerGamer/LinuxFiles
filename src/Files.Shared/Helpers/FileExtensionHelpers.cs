@@ -142,11 +142,20 @@ namespace Files.Shared.Helpers
 				return false;
 			}
 
+			if (OperatingSystem.IsWindows())
+			{
+				// Windows keeps the original substring matching
+				ext = new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".lzh", ".mrpack", ".jar" }
+					.FirstOrDefault(x => filePath.Contains(x, StringComparison.OrdinalIgnoreCase));
+
+				return ext is not null;
+			}
+
 			ext = null;
 			foreach (var component in filePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries))
 			{
 				var candidate = Path.GetExtension(component);
-				if (new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".tgz", ".tbz2", ".txz", ".tzst", ".mrpack", ".jar" }.Contains(candidate, StringComparer.OrdinalIgnoreCase) || OperatingSystem.IsWindows() && candidate.Equals(".lzh", StringComparison.OrdinalIgnoreCase))
+				if (new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".tgz", ".tbz2", ".txz", ".tzst", ".mrpack", ".jar" }.Contains(candidate, StringComparer.OrdinalIgnoreCase))
 				{
 					ext = candidate;
 					break;

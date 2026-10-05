@@ -80,7 +80,7 @@ namespace Files.Platform.Linux.Archives
 			return null;
 		}
 
-		private static Codec? SingleFileCodec(string lowerName)
+		internal static Codec? SingleFileCodec(string lowerName)
 		{
 			if (lowerName.EndsWith(".gz", StringComparison.Ordinal))
 				return Codec.GZip;

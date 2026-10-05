@@ -70,7 +70,7 @@ namespace Files.Platform.Linux.Archives
 							{
 								throw new ArchivePasswordException("The archive password is wrong.", ex);
 							}
-							return new MemoryStream(output.ToArray(), writable: false);
+							return new MemoryStream(output.GetBuffer(), 0, (int)output.Length, writable: false);
 						}
 					}
 					throw new FileNotFoundException("The archive entry was not found.");

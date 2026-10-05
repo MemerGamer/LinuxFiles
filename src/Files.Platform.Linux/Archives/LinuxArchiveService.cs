@@ -27,6 +27,8 @@ namespace Files.Platform.Linux.Archives
 			".zip", ".jar", ".mrpack", ".7z", ".rar", ".tar", ".gz", ".bz2", ".xz", ".zst", ".lz",
 		];
 
+		private const int MaxListedEntries = 5_000_000;
+
 		private readonly ISevenZipRunner sevenZip;
 
 		/// <summary>
@@ -86,6 +88,29 @@ namespace Files.Platform.Linux.Archives
 		{
 			return Task.Run(() =>
 			{
+				using var archive = OpenArchive(archivePath, password, fileNameEncoding, null, cancellationToken);
+				var fallback = GetDefaultExtractFolderName(archivePath);
+				var entries = new List<ArchiveEntryInfo>();
+				var encrypted = false;
+
+				foreach (var (entry, _) in archive.Entries(headersOnly: true))
+				{
+					cancellationToken.ThrowIfCancellationRequested();
+					if (entries.Count >= MaxListedEntries)
+						throw new ArchiveSecurityException("The archive entry count limit was exceeded.");
+					encrypted |= entry.IsEncrypted;
+					entries.Add(ToInfo(entry, fallback));
+				}
+
+				return new ArchiveListing(entries, encrypted, archive.IsSolid);
+			}, cancellationToken);
+		}
+
+		/// <inheritdoc/>
+		public Task<ArchiveListing> ListForBrowsingAsync(string archivePath, string? password = null, Encoding? fileNameEncoding = null, CancellationToken cancellationToken = default)
+		{
+			return Task.Run(() =>
+			{
 				using var archive = OpenArchive(archivePath, password, fileNameEncoding, BrowsingLimits.MaxTotalBytes, cancellationToken);
 				var fallback = GetDefaultExtractFolderName(archivePath);
 				var entries = new List<ArchiveEntryInfo>();
@@ -104,32 +129,50 @@ namespace Files.Platform.Linux.Archives
 					if (nameChars > 1024 * 1024)
 						throw new ArchiveSecurityException("The archive name limit was exceeded.");
 					encrypted |= entry.IsEncrypted;
-					entries.Add(new ArchiveEntryInfo(
-						(entry.Key ?? fallback).Replace('\\', '/'),
-						entry.IsDirectory,
-						Math.Max(entry.Size, 0),
-						Math.Max(entry.CompressedSize, 0),
-						entry.Modified,
-						entry.IsEncrypted,
-						IsLink(entry) ? entry.LinkTarget ?? string.Empty : null));
+					entries.Add(ToInfo(entry, fallback));
 				}
 
 				return new ArchiveListing(entries, encrypted, archive.IsSolid);
 			}, cancellationToken);
 		}
 
+		private static ArchiveEntryInfo ToInfo(EntryData entry, string fallback) => new(
+			(entry.Key ?? fallback).Replace('\\', '/'),
+			entry.IsDirectory,
+			Math.Max(entry.Size, 0),
+			Math.Max(entry.CompressedSize, 0),
+			entry.Modified,
+			entry.IsEncrypted,
+			IsLink(entry) ? entry.LinkTarget ?? string.Empty : null);
+
 		/// <inheritdoc/>
-		public async Task<bool> IsEncryptedAsync(string archivePath, CancellationToken cancellationToken = default)
+		public Task<bool> IsEncryptedAsync(string archivePath, CancellationToken cancellationToken = default)
 		{
-			try
+			// Tar and single-file compression formats have no encryption
+			var name = Path.GetFileName(archivePath).ToLowerInvariant();
+			if (ArchiveSource.TarCodec(name) is not null || ArchiveSource.SingleFileCodec(name) is not null)
+				return Task.FromResult(false);
+
+			return Task.Run(() =>
 			{
-				return (await ListAsync(archivePath, null, null, cancellationToken).ConfigureAwait(false)).IsEncrypted;
-			}
-			catch (ArchivePasswordException)
-			{
-				// Encrypted headers
-				return true;
-			}
+				try
+				{
+					using var archive = OpenArchive(archivePath, null, null, null, cancellationToken);
+					foreach (var (entry, _) in archive.Entries(headersOnly: true))
+					{
+						cancellationToken.ThrowIfCancellationRequested();
+						if (entry.IsEncrypted)
+							return true;
+					}
+
+					return false;
+				}
+				catch (ArchivePasswordException)
+				{
+					// Encrypted headers
+					return true;
+				}
+			}, cancellationToken);
 		}
 
 		private static string? FindExtension(string path)

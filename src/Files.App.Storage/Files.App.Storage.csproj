@@ -58,7 +58,4 @@
         <ProjectReference Include="..\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
     </ItemGroup>
 
-    <ItemGroup>
-        <ProjectReference Include="..\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
-    </ItemGroup>
 </Project>

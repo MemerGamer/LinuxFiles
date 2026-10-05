@@ -17,6 +17,9 @@ namespace Files.App.Storage.Archives
 	/// <summary>Routes archive roots and members before the local file system route.</summary>
 	public sealed class ArchiveStorableRoute(IArchiveService service, IArchivePasswordPrompt? passwordPrompt = null) : IStorableRoute
 	{
+		// Session-only; avoids re-prompting on every navigation into an encrypted archive
+		private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> passwords = new(StringComparer.Ordinal);
+
 		public int Order => 100;
 
 		public async Task<StorableResult> TryGetAsync(string path, CancellationToken cancellationToken = default)
@@ -36,7 +39,7 @@ namespace Files.App.Storage.Archives
 					var attributes = File.GetAttributes(container);
 					if (attributes.HasFlag(FileAttributes.Directory))
 						continue;
-					var context = new ArchiveContext(container, service, passwordPrompt);
+					var context = new ArchiveContext(container, service, passwordPrompt, passwords);
 					var entryPath = ArchiveContext.Normalize(path[end..].TrimStart('/'));
 					var listing = await context.ListAsync(cancellationToken).ConfigureAwait(false);
 					if (entryPath.Length == 0)

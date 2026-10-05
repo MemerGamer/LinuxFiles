@@ -649,6 +649,9 @@ namespace Files.App.Views.Layouts
 			shellViewModel.UpdateGroupOptions();
 
 			UpdateCollectionViewSource();
+			// Layout switches reuse enumerated items; refresh after the new layout has its source.
+			if (OperatingSystem.IsLinux())
+				UpdateSelectionSize();
 			folderSettings.IsLayoutModeChanging = false;
 
 			SetSelectedItemsOnNavigation();

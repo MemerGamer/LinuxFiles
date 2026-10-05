@@ -40,7 +40,7 @@
 					<Button.Flyout>
 						<MenuFlyout>
 							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyAppVersionCommand}" Text="{helpers:ResourceString Key=AppVersion}" />
-							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyWindowsVersionCommand}" Text="{helpers:ResourceString Key=WindowsVersion}" />
+							<MenuFlyoutItem Visibility="{x:Bind ViewModel.WindowsOnlyVisibility}" Command="{x:Bind ViewModel.CopyWindowsVersionCommand}" Text="{helpers:ResourceString Key=WindowsVersion}" />
 							<MenuFlyoutItem Command="{x:Bind ViewModel.CopyUserIDCommand}" Text="{helpers:ResourceString Key=UserID}" />
 						</MenuFlyout>
 					</Button.Flyout>

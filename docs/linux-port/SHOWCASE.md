@@ -5,7 +5,7 @@ home directory with synthetic drives (random labels, made-up sizes), so they nev
 
 The shots use the public "Win11" icon theme, selected the way the app does on a real desktop (kdeglobals `[Icons] Theme=`, GTK settings) inside the sandbox. The theme is copied into the sandbox only and is not part of this repository. Folder icons in the file lists render blank with this theme; the Home and sidebar icons come from it.
 
-Last updated: commit `8d4ccd67b`, 2026-10-05 (see `showcase/captured.txt` for the exact shot list).
+Last updated: commit `e1eaca8dc`, 2026-10-06 (see `showcase/captured.txt` for the exact shot list).
 
 ## What works today
 
@@ -24,6 +24,11 @@ Taken from the merged state of `main` and [PLAN.md](PLAN.md).
 - [x] Archive browsing (open a zip like a folder, with the Extract actions in the context menu)
 - [x] Grid layout virtualization (wrapping Cards grid instead of a single sideways row)
 - [x] Renamed to LinuxFiles
+- [x] Virtualized grouped views in the Grid, List and Cards layouts (Downloads grouping restored)
+- [x] KDE service menus under "Show more options"
+- [x] Root actions through a polkit-gated elevation helper
+- [x] Labelled Sort and Layout toolbar buttons
+- [x] HiDPI scaling from the desktop settings
 
 ## Not working yet
 
@@ -39,7 +44,7 @@ Home page: Quick access, and the Drives widget with usage bars. The drives are s
 
 ![Folder in Details layout](showcase/folder-details.png)
 
-A folder in Details layout.
+A folder in Details layout, with the labelled Sort and Layout toolbar buttons.
 
 ![Folder in Cards layout](showcase/folder-grid.png)
 

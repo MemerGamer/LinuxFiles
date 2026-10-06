@@ -44,7 +44,7 @@ namespace Files.Platform.Linux.ElevationHelper
 			visited = 0;
 			Descriptor? destination = null;
 			uint? destinationGroup = null;
-			var opened = new List<(string Path, Descriptor? Parent, Node? Source, string Error)>();
+			var opened = new List<(string Path, Descriptor? Parent, Node? Source, bool OthersReach, string Error)>();
 			try
 			{
 				if (request.Operation is "copy" or "move")
@@ -59,17 +59,18 @@ namespace Files.Platform.Linux.ElevationHelper
 					Node? source = null;
 					try
 					{
-						parent = OpenDirectoryPath(Path.GetDirectoryName(path)!);
+						parent = OpenDirectoryPath(Path.GetDirectoryName(path)!, out var othersReach);
 						hook?.Invoke("after-parent-open", path);
 						source = Snapshot(parent.Fd, Path.GetFileName(path), Inspect(parent.Fd)!.Value.Mount, 0,
 							request.Operation is "copy" or "move");
 						if (destination is not null) RefuseContainedDestination(source, destination.Fd);
-						opened.Add((path, parent, source, ""));
+						if (destinationGroup is not null) RefuseLinkedFiles(source);
+						opened.Add((path, parent, source, othersReach, ""));
 					}
 					catch (Exception ex) when (IsOperationError(ex))
 					{
 						source?.Dispose(); parent?.Dispose();
-						opened.Add((path, null, null, Error(ex)));
+						opened.Add((path, null, null, false, Error(ex)));
 					}
 				}
 				hook?.Invoke("plan-pinned", "");
@@ -113,7 +114,7 @@ namespace Files.Platform.Linux.ElevationHelper
 									if (destinationGroup is { } group)
 									{
 										ValidateTree(destination.Fd, copy, true);
-										AssignCopyOwnership(source, copy, group);
+										AssignCopyOwnership(source, copy, group, item.OthersReach);
 										ValidateTree(destination.Fd, copy, true);
 										SyncParent(destination.Fd);
 									}
@@ -147,7 +148,10 @@ namespace Files.Platform.Linux.ElevationHelper
 			}
 		}
 
-		private Descriptor OpenDirectoryPath(string path)
+		private Descriptor OpenDirectoryPath(string path) => OpenDirectoryPath(path, out _);
+
+		// othersReach: every directory on the path grants search to others, so non-members could reach its entries.
+		private Descriptor OpenDirectoryPath(string path, out bool othersReach)
 		{
 			// The filesystem root is the only absolute native open. All subsequent names are single components.
 			var rootFd = PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PathOnly | PosixNative.ODirectory | PosixNative.ONofollow, out var errno);
@@ -155,13 +159,16 @@ namespace Files.Platform.Linux.ElevationHelper
 			var current = new Descriptor(rootFd);
 			try
 			{
-				TrustDirectory(Inspect(current.Fd)!.Value);
+				var stamp = Inspect(current.Fd)!.Value;
+				TrustDirectory(stamp);
+				othersReach = (stamp.Mode & 0x1) != 0;
 				foreach (var name in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
 				{
 					hook?.Invoke("before-component-open", name);
 					var next = new Descriptor(Open(current.Fd, name, PathOnly | PosixNative.ODirectory, forceFallback));
-					try { TrustDirectory(Inspect(next.Fd)!.Value); }
+					try { stamp = Inspect(next.Fd)!.Value; TrustDirectory(stamp); }
 					catch { next.Dispose(); throw; }
+					othersReach &= (stamp.Mode & 0x1) != 0;
 					current.Dispose(); current = next;
 				}
 				return current;
@@ -205,6 +212,13 @@ namespace Files.Platform.Linux.ElevationHelper
 			if (source.Stamp.SameObject(target) || source.Children.Any(child => child.Stamp.Directory && Contains(child, target)))
 				throw new IOException("Destination lies inside source tree.");
 			static bool Contains(Node node, Stamp target) => node.Stamp.SameObject(target) || node.Children.Any(child => Contains(child, target));
+		}
+
+		// A hard link can alias data outside the approved tree; never hand such content to the caller.
+		private static void RefuseLinkedFiles(Node node)
+		{
+			if (!node.Stamp.Directory && node.Stamp.Links != 1) throw new IOException("Hard-linked files cannot be handed to the caller.");
+			foreach (var child in node.Children) RefuseLinkedFiles(child);
 		}
 
 		private static void RequireSame(Stamp expected, Stamp actual)
@@ -269,11 +283,11 @@ namespace Files.Platform.Linux.ElevationHelper
 			catch { copy.Dispose(); throw; }
 		}
 
-		private void AssignCopyOwnership(Node source, Node copy, uint group)
+		private void AssignCopyOwnership(Node source, Node copy, uint group, bool othersReach)
 		{
-			for (var i = 0; i < source.Children.Count; i++) AssignCopyOwnership(source.Children[i], copy.Children[i], group);
+			for (var i = 0; i < source.Children.Count; i++) AssignCopyOwnership(source.Children[i], copy.Children[i], group, othersReach);
 			hook?.Invoke("before-output-ownership", copy.Name);
-			var mode = source.Stamp.Directory ? 0x1EDU : source.Stamp.Mode & 0x1A4U; // 0755 / source masked by 0644
+			var mode = HandoverMode(source.Stamp.Mode, source.Stamp.Directory, source.Stamp.Group == group, othersReach, HasAccessAcl(source.Descriptor.Fd));
 			SetOwnership(copy.Descriptor.Fd, callerUid, group, mode);
 			Sync(copy.Descriptor.Fd);
 			var current = Inspect(copy.Descriptor.Fd)!.Value;
@@ -296,6 +310,17 @@ namespace Files.Platform.Linux.ElevationHelper
 				if (source.Stamp.Size != Inspect(copy.Descriptor.Fd)!.Value.Size || !Hash(source).AsSpan().SequenceEqual(Hash(copy)))
 					throw new IOException("Copy bytes differ from source.");
 			}
+		}
+
+		/// <summary>Permissions for a copy handed to the caller: never wider for anyone than the source granted.</summary>
+		public static uint HandoverMode(uint sourceMode, bool directory, bool sameGroup, bool othersReach, bool hasAccessAcl)
+		{
+			var mode = sourceMode & (directory ? 0x1EDU : 0x1A4U); // at most 0755 / 0644; no setid, sticky or group/other write
+			// ACL mode bits are a mask, not real grants; group/other access survives only where others could reach the source.
+			if (hasAccessAcl || !othersReach) return mode & 0x1C0U;
+			if (sameGroup) return mode;
+			// Former group members become "others" in the copy, so others keep only what both classes had.
+			return (mode & 0x1C0U) | (mode & (mode >> 3) & 0x7U);
 		}
 
 		private static byte[] Hash(Node node)
@@ -336,6 +361,14 @@ namespace Files.Platform.Linux.ElevationHelper
 		}
 
 		private static bool IsOperationError(Exception ex) => ex is IOException or UnauthorizedAccessException or System.Text.DecoderFallbackException;
-		private static string Error(Exception ex) => ex.Message.Length <= 512 ? ex.Message : ex.Message[..512];
+		// Errno messages embed entry names the caller may never have been shown; report only the failure class.
+		private static string Error(Exception ex) => ex switch
+		{
+			FileNotFoundException or DirectoryNotFoundException => "An item does not exist.",
+			UnauthorizedAccessException => "Access is denied.",
+			IOException { HResult: > 0 and < 4096 } => $"The operation failed with errno {ex.HResult}.",
+			IOException when ex.GetType() == typeof(IOException) && ex.Message.Length <= 512 => ex.Message, // helper's fixed texts
+			_ => "The operation failed.",
+		};
 	}
 }

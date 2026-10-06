@@ -61,7 +61,8 @@ namespace Files.Platform.Tests.SystemIntegration
 			Assert.IsTrue(copied.Items.Single().Succeeded, copied.Items.Single().Error);
 			Assert.AreEqual("confirmed bytes", File.ReadAllText(Path.Combine(target, "tree", "a")));
 			Assert.IsTrue(Directory.Exists(folder));
-			Assert.AreEqual((UnixFileMode)0x1A4, File.GetUnixFileMode(Path.Combine(target, "tree", "a")));
+			// The 0700 test root hides the source from other users, so the copy stays owner-only.
+			Assert.AreEqual((UnixFileMode)0x180, File.GetUnixFileMode(Path.Combine(target, "tree", "a")));
 			var second = Directory.CreateDirectory(Path.Combine(root, "second")).FullName;
 			var moved = Run("move", [folder], second, fallback: fallback);
 			Assert.IsTrue(moved.Items.Single().Succeeded, moved.Items.Single().Error);
@@ -256,7 +257,7 @@ namespace Files.Platform.Tests.SystemIntegration
 			Assert.IsTrue(result.Items.Single().Succeeded, result.Items.Single().Error);
 			Assert.AreEqual(2, stages);
 			Assert.AreEqual((UnixFileMode)0x100, File.GetUnixFileMode(Path.Combine(target, "tree", "read-only")));
-			Assert.AreEqual((UnixFileMode)0x1ED, File.GetUnixFileMode(Path.Combine(target, "tree")));
+			Assert.AreEqual((UnixFileMode)0x1C0, File.GetUnixFileMode(Path.Combine(target, "tree")));
 			Assert.IsTrue(new StatxFileOwnershipInspector().TryGetInfo(Path.Combine(target, "tree", "read-only"), out var info));
 			Assert.AreEqual(ProcessIdentityNative.CurrentUserId, info.OwnerUserId);
 			Assert.AreEqual("confirmed bytes", File.ReadAllText(Path.Combine(target, "tree", "read-only")));
@@ -298,7 +299,79 @@ namespace Files.Platform.Tests.SystemIntegration
 			Assert.IsFalse(result.Items.Single().Succeeded);
 			Assert.AreEqual("unrelated", File.ReadAllText(output));
 			Assert.AreEqual((UnixFileMode)0x180, File.GetUnixFileMode(output));
-			Assert.AreEqual((UnixFileMode)0x1A4, File.GetUnixFileMode(displaced));
+			Assert.AreEqual((UnixFileMode)0x180, File.GetUnixFileMode(displaced));
+		}
+
+		[TestMethod]
+		public void HandoverNeverWidensSourcePermissions()
+		{
+			// A shared parent lets other users reach the source, so same-group group/other bits may survive.
+			var shared = Path.Combine(Path.GetTempPath(), "files-elevation-shared-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(shared, (UnixFileMode)0x1ED);
+			try
+			{
+				File.SetUnixFileMode(shared, (UnixFileMode)0x1ED);
+				var origin = Directory.CreateDirectory(Path.Combine(shared, "origin")).FullName;
+				File.SetUnixFileMode(origin, (UnixFileMode)0x1ED);
+				var hidden = Directory.CreateDirectory(Path.Combine(origin, "hidden")).FullName;
+				File.SetUnixFileMode(hidden, (UnixFileMode)0x1C0);
+				var key = FileAt(hidden, "key"); File.SetUnixFileMode(key, (UnixFileMode)0x1A4);
+				var team = FileAt(origin, "team"); File.SetUnixFileMode(team, (UnixFileMode)0x1A0);
+				var result = Run("copy", [hidden, team], target);
+				Assert.IsTrue(result.Items.All(item => item.Succeeded), string.Join("; ", result.Items.Select(item => item.Error)));
+				Assert.AreEqual((UnixFileMode)0x1C0, File.GetUnixFileMode(Path.Combine(target, "hidden")), "A 0700 folder must not become 0755.");
+				Assert.AreEqual((UnixFileMode)0x1A4, File.GetUnixFileMode(Path.Combine(target, "hidden", "key")));
+				Assert.AreEqual((UnixFileMode)0x1A0, File.GetUnixFileMode(Path.Combine(target, "team")));
+			}
+			finally { Directory.Delete(shared, true); }
+		}
+
+		[TestMethod]
+		[DataRow(0x1C0U, true, true, true, false, 0x1C0U)] // private folder stays private
+		[DataRow(0x3FFU, true, true, true, false, 0x1EDU)] // sticky and group/other write are dropped
+		[DataRow(0x1A0U, false, false, true, false, 0x180U)] // 0640 root:shadow never reaches the caller's group
+		[DataRow(0x1A4U, false, false, true, false, 0x184U)] // others keep read; the foreign group's read is not transferred
+		[DataRow(0x1A4U, false, true, false, false, 0x180U)] // the source lived where others could not reach it
+		[DataRow(0x1A4U, false, true, true, true, 0x180U)] // ACL masks are not real group grants
+		[DataRow(0x1C4U, false, false, true, false, 0x180U)] // others never gain what the source group lacked
+		[DataRow(0x1A4U, false, true, true, false, 0x1A4U)]
+		[DataRow(0x9EDU, false, true, true, false, 0x1A4U)]
+		public void HandoverModeMasksEveryClass(uint source, bool directory, bool sameGroup, bool othersReach, bool acl, uint expected)
+			=> Assert.AreEqual(expected, HelperEngine.HandoverMode(source | (directory ? 0x4000U : 0x8000U), directory, sameGroup, othersReach, acl));
+
+		[TestMethod]
+		public void HardLinkedFilesAreNotHandedToCaller()
+		{
+			var folder = Directory.CreateDirectory(Path.Combine(source, "tree")).FullName;
+			var file = FileAt(folder, "a");
+			using (var link = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("/usr/bin/ln", ["--", file, Path.Combine(root, "alias")]) { UseShellExecute = false })!)
+			{
+				link.WaitForExit();
+				Assert.AreEqual(0, link.ExitCode);
+			}
+			var result = Run("move", [folder], target);
+			Assert.IsFalse(result.Items.Single().Succeeded);
+			Assert.IsFalse(Directory.Exists(Path.Combine(target, "tree")), "The refusal happens before any output is created.");
+			Assert.IsTrue(File.Exists(file));
+		}
+
+		[TestMethod]
+		public void ErrorsDoNotNameNestedEntries()
+		{
+			var folder = Directory.CreateDirectory(Path.Combine(source, "tree")).FullName;
+			FileAt(folder, "nested-secret-name");
+			var result = Run("copy", [folder], target, (stage, name) =>
+			{
+				if (stage == "before-output-create" && name == "nested-secret-name") FileAt(Path.Combine(target, "tree"), name, "collision");
+			});
+			Assert.IsFalse(result.Items.Single().Succeeded);
+			StringAssert.Contains(result.Items.Single().Error, "errno 17");
+			Assert.IsFalse(result.Items.Single().Error.Contains("nested-secret-name"), result.Items.Single().Error);
+			result = Run("delete", [folder], hook: (stage, name) =>
+			{
+				if (stage == "before-entry-open" && name == "nested-secret-name") throw new UnauthorizedAccessException($"Access to '{name}' is denied.");
+			});
+			Assert.AreEqual("Access is denied.", result.Items.Single().Error);
 		}
 
 		[TestMethod]

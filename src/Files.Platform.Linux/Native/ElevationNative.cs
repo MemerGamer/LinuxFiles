@@ -45,6 +45,13 @@ namespace Files.Platform.Linux.Native
 		[LibraryImport("libc", EntryPoint = "fchmod", SetLastError = true)]
 		private static partial int Fchmod(int fd, uint mode);
 
+		[LibraryImport("libc", EntryPoint = "fgetxattr", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial nint FGetXattr(int fd, string name, byte* value, nuint size);
+
+		// Mode group bits are only the ACL mask when an access ACL exists; unknown errors count as an ACL.
+		internal static bool HasAccessAcl(int fd)
+			=> FGetXattr(fd, "system.posix_acl_access", null, 0) >= 0 || Marshal.GetLastPInvokeError() is not (61 or 95); // ENODATA, EOPNOTSUPP
+
 		internal static uint PrimaryGroup(uint uid)
 		{
 			for (var length = 16384; length <= 1048576; length *= 2)
@@ -69,7 +76,7 @@ namespace Files.Platform.Linux.Native
 		}
 
 		internal readonly record struct Stamp(uint Mode, uint Owner, uint Group, ulong Inode, ulong Size, ulong Mount, uint Major, uint Minor,
-			long ModifiedSeconds, uint ModifiedNanos, long ChangedSeconds, uint ChangedNanos)
+			long ModifiedSeconds, uint ModifiedNanos, long ChangedSeconds, uint ChangedNanos, uint Links)
 		{
 			public bool Directory => (Mode & 0xF000) == 0x4000;
 			public bool Regular => (Mode & 0xF000) == 0x8000;
@@ -82,7 +89,7 @@ namespace Files.Platform.Linux.Native
 
 		internal static Stamp? Inspect(int fd, string name = "", bool allowMissing = false)
 		{
-			const uint required = 0x1 | 0x2 | 0x8 | 0x10 | 0x40 | 0x80 | 0x100 | 0x200 | 0x1000;
+			const uint required = 0x1 | 0x2 | 0x4 | 0x8 | 0x10 | 0x40 | 0x80 | 0x100 | 0x200 | 0x1000;
 			var buffer = new byte[256];
 			fixed (byte* pointer = buffer)
 			{
@@ -96,11 +103,12 @@ namespace Files.Platform.Linux.Native
 			if ((BitConverter.ToUInt32(buffer, 0) & required) != required) throw new IOException("Required statx identity fields unavailable.");
 			return new Stamp(BitConverter.ToUInt16(buffer, 28), BitConverter.ToUInt32(buffer, 20), BitConverter.ToUInt32(buffer, 24), BitConverter.ToUInt64(buffer, 32),
 				BitConverter.ToUInt64(buffer, 40), BitConverter.ToUInt64(buffer, 144), BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140),
-				BitConverter.ToInt64(buffer, 112), BitConverter.ToUInt32(buffer, 120), BitConverter.ToInt64(buffer, 96), BitConverter.ToUInt32(buffer, 104));
+				BitConverter.ToInt64(buffer, 112), BitConverter.ToUInt32(buffer, 120), BitConverter.ToInt64(buffer, 96), BitConverter.ToUInt32(buffer, 104),
+				BitConverter.ToUInt32(buffer, 16));
 		}
 
-		[LibraryImport("libc", EntryPoint = "dup", SetLastError = true)]
-		private static partial int Duplicate(int fd);
+		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]
+		private static partial int Fcntl(int fd, int command, int argument);
 		[LibraryImport("libc", EntryPoint = "fdopendir", SetLastError = true)]
 		private static partial nint OpenDirectory(int fd);
 		[LibraryImport("libc", EntryPoint = "readdir", SetLastError = true)]
@@ -112,7 +120,7 @@ namespace Files.Platform.Linux.Native
 
 		internal static System.Collections.Generic.List<string> Names(int fd)
 		{
-			var duplicate = Duplicate(fd);
+			var duplicate = Fcntl(fd, 1030, 0); // F_DUPFD_CLOEXEC: no descriptor survives an exec
 			if (duplicate < 0) throw new IOException("Cannot duplicate directory descriptor.");
 			var directory = OpenDirectory(duplicate);
 			if (directory == 0) { PosixNative.Close(duplicate); throw new IOException("Cannot enumerate directory."); }
@@ -131,7 +139,10 @@ namespace Files.Platform.Linux.Native
 					var length = 0;
 					while (length < 256 && entry[19 + length] != 0) length++;
 					if (length == 256) throw new IOException("Invalid directory entry.");
-					var name = new System.Text.UTF8Encoding(false, true).GetString(new ReadOnlySpan<byte>(entry + 19, length));
+					string name;
+					// The decoder message would echo raw name bytes back to the caller.
+					try { name = new System.Text.UTF8Encoding(false, true).GetString(new ReadOnlySpan<byte>(entry + 19, length)); }
+					catch (System.Text.DecoderFallbackException) { throw new IOException("Names that are not valid UTF-8 are refused."); }
 					if (name is "." or "..") continue;
 					if (name.Length == 0 || name.Contains('/')) throw new IOException("Invalid directory entry.");
 					if (names.Count >= 4096) throw new IOException("Tree exceeds entry limit.");

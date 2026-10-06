@@ -483,12 +483,13 @@ namespace Files.App.Views.Layouts
 		/// <summary>
 		/// Uno bubbles taps from inside the rename box up to the list, where they would end the rename or open the item.
 		/// </summary>
+		[DynamicWindowsRuntimeCast(typeof(DependencyObject))]
 		protected bool IsInRenameTextBox(object? source)
 		{
 			if (!IsRenamingItem || renameTextBox is null)
 				return false;
 
-			for (var element = source as DependencyObject; element is not null; element = VisualTreeHelper.GetParent(element))
+			for (var element = source as DependencyObject; element is not null and not Microsoft.UI.Xaml.Controls.ListViewBase; element = VisualTreeHelper.GetParent(element))
 			{
 				if (element == renameTextBox)
 					return true;

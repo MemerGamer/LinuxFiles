@@ -7,6 +7,8 @@ The shots use the public "Win11" icon theme, selected the way the app does on a 
 
 Last updated: commit `e1eaca8dc`, 2026-10-06 (see `showcase/captured.txt` for the exact shot list).
 
+Install instructions for the 0.1.0-alpha1 release (AUR, AppImage, Flatpak, tarball) are in the [README](../../.github/README.md#install).
+
 ## What works today
 
 Taken from the merged state of `main` and [PLAN.md](PLAN.md).

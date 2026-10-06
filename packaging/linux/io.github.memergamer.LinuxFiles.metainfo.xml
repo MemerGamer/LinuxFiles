@@ -28,6 +28,11 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.1.0-alpha1" date="2026-10-06" type="development"/>
+    <release version="0.1.0-alpha1" date="2026-10-06" type="development">
+      <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha1</url>
+      <description>
+        <p>First public alpha of LinuxFiles. Faster grouped views, KDE service menus, optional root actions and root mode, native file pickers, opening files inside archives and a client-side title bar with tabs.</p>
+      </description>
+    </release>
   </releases>
 </component>

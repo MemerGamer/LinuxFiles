@@ -15,32 +15,88 @@ Files is created and maintained by the [Files Community](https://github.com/file
 
 This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.
 
-## Installing LinuxFiles
+## Install
 
-Packages are coming soon; until then, install from a local build:
+[![Latest release](https://img.shields.io/github/v/release/MemerGamer/LinuxFiles?include_prereleases&filter=linux-v*&label=release)](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha1)
 
-| Method | Status |
-|---|---|
-| AppImage | coming soon |
-| Flatpak (`io.github.memergamer.LinuxFiles`) | coming soon |
-| AUR `linuxfiles-bin` | coming soon |
-| `scripts/linux/install-local.sh` | available now |
+> [!NOTE]
+> **0.1.0-alpha1 is the first public release and an alpha.** Expect rough edges and missing features, and keep backups of anything you care about. Please report problems in the [issue tracker](https://github.com/MemerGamer/LinuxFiles/issues).
+
+Grab the assets from the [0.1.0-alpha1 release page](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha1). Requirements: x86_64 Linux with an X11 session or XWayland (Wayland desktops work through XWayland); the packages are self-contained, so no .NET install is needed.
+
+### Arch Linux (AUR)
+
+```sh
+yay -S linuxfiles-bin    # or: paru -S linuxfiles-bin
+```
+
+This is the only format that also installs the polkit helper for the optional [root actions](#root-actions).
+
+### AppImage
+
+```sh
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha1/Files-x86_64.AppImage
+chmod +x Files-x86_64.AppImage
+./Files-x86_64.AppImage
+```
+
+### Flatpak bundle
+
+```sh
+flatpak install --user Files-x86_64.flatpak
+flatpak run io.github.memergamer.LinuxFiles
+```
+
+The bundle needs the `org.freedesktop.Platform//25.08` runtime; Flatpak offers to install it from Flathub.
+
+### Tarball
+
+```sh
+tar xzf files-linux-x64.tar.gz
+./linux-x64/Files                      # run it in place
+```
+
+To install it for your user (menu entry, icons, `files` launcher in `~/.local`), use the script from a clone of this repository, which also supplies the desktop entry and icons:
 
 ```sh
 git clone https://github.com/MemerGamer/LinuxFiles.git
 cd LinuxFiles
-scripts/linux/install-local.sh
+scripts/linux/install-local.sh --from /path/to/linux-x64
+```
+
+`files-packaging.tar.gz` holds only the desktop entry, metainfo, icons, launcher and licence, for packagers (the AUR package consumes it together with the tarball above). `scripts/linux/uninstall-local.sh` reverses a local install.
+
+### Root actions
+
+Optional. **Open in terminal as root** works everywhere (it asks your terminal elevation tool: run0, sudo or pkexec). The polkit-authenticated Delete/Rename/Paste-as-root actions need the root helper, which only the AUR package installs; they are off in the AppImage and Flatpak. Start a root-mode window with:
+
+```sh
+files --root
+```
+
+or pick **Open in Root Mode** from the launcher's desktop actions. Each action asks for authentication for that exact operation, and the GUI itself stays unprivileged. See the [elevation threat model](../docs/linux-port/threat-model-elevation.md).
+
+### Verify downloads
+
+Download `SHA256SUMS` next to the files you fetched and check them (missing files are reported, not fatal, with `--ignore-missing`):
+
+```sh
+sha256sum -c --ignore-missing SHA256SUMS
 ```
 
 ### Nightly builds
 
-Every merge to `main` publishes a tarball and AppImage to the rolling [nightly pre-release](https://github.com/MemerGamer/LinuxFiles/releases/tag/nightly). Run it with:
+Every merge to `main` publishes a tarball and AppImage to the rolling [nightly pre-release](https://github.com/MemerGamer/LinuxFiles/releases/tag/nightly). It is untested bleeding edge. Run it with:
 
 ```sh
 curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/LinuxFiles-nightly-x86_64.AppImage && chmod +x LinuxFiles-nightly-x86_64.AppImage && ./LinuxFiles-nightly-x86_64.AppImage
 ```
 
-See [docs/linux-port/packaging.md](../docs/linux-port/packaging.md) for packaging details and [docs/linux-port/PLAN.md](../docs/linux-port/PLAN.md) for the roadmap.
+### More
+
+- [CHANGELOG.md](../CHANGELOG.md): what is in each release
+- [Showcase](../docs/linux-port/SHOWCASE.md): screenshots and the feature checklist
+- [Packaging details](../docs/linux-port/packaging.md) and the [roadmap](../docs/linux-port/PLAN.md)
 
 ## Reporting bugs
 

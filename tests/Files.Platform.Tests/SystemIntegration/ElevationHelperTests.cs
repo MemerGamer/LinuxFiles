@@ -339,6 +339,61 @@ namespace Files.Platform.Tests.SystemIntegration
 		public void HandoverModeMasksEveryClass(uint source, bool directory, bool sameGroup, bool othersReach, bool acl, uint expected)
 			=> Assert.AreEqual(expected, HelperEngine.HandoverMode(source | (directory ? 0x4000U : 0x8000U), directory, sameGroup, othersReach, acl));
 
+		private static (int ExitCode, string Output) Tool(string file, params string[] arguments)
+		{
+			try
+			{
+				using var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(file, arguments)
+				{ UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true })!;
+				var output = process.StandardOutput.ReadToEnd(); process.StandardError.ReadToEnd();
+				process.WaitForExit();
+				return (process.ExitCode, output);
+			}
+			catch (System.ComponentModel.Win32Exception) { return (-1, ""); }
+		}
+
+		private static void RequireAcl(params string[] arguments)
+		{
+			if (Tool("/usr/bin/setfacl", arguments).ExitCode != 0) Assert.Inconclusive("setfacl or ACL support on the temporary filesystem is unavailable.");
+		}
+
+		[TestMethod]
+		public void InheritedDefaultAclIsDroppedAtHandover()
+		{
+			RequireAcl("-d", "-m", "u:nobody:rwx", target);
+			var folder = Directory.CreateDirectory(Path.Combine(source, "tree")).FullName;
+			FileAt(folder, "a");
+			var result = Run("copy", [folder], target);
+			Assert.IsTrue(result.Items.Single().Succeeded, result.Items.Single().Error);
+			foreach (var output in new[] { Path.Combine(target, "tree"), Path.Combine(target, "tree", "a") })
+			{
+				var acl = Tool("/usr/bin/getfacl", "-c", "-p", output);
+				Assert.AreEqual(0, acl.ExitCode);
+				Assert.IsFalse(acl.Output.Split('\n').Any(line => line.StartsWith("user:nobody", StringComparison.Ordinal)), output + ":\n" + acl.Output);
+			}
+		}
+
+		[TestMethod]
+		[DataRow(0x1EDU, true)] // an access ACL on an ancestor may deny named users that the mode bits suggest can search
+		[DataRow(0x1E5U, false)] // group members never fall through to the other search bit
+		public void AncestorThatNotEveryoneCanSearchHidesSource(uint ancestorMode, bool acl)
+		{
+			var shared = Path.Combine(Path.GetTempPath(), "files-elevation-shared-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(shared, (UnixFileMode)0x1ED);
+			try
+			{
+				File.SetUnixFileMode(shared, (UnixFileMode)ancestorMode);
+				if (acl) RequireAcl("-m", "u:nobody:---", shared);
+				var origin = Directory.CreateDirectory(Path.Combine(shared, "origin")).FullName;
+				File.SetUnixFileMode(origin, (UnixFileMode)0x1ED);
+				var file = FileAt(origin, "a"); File.SetUnixFileMode(file, (UnixFileMode)0x1A4);
+				var result = Run("copy", [file], target);
+				Assert.IsTrue(result.Items.Single().Succeeded, result.Items.Single().Error);
+				Assert.AreEqual((UnixFileMode)0x180, File.GetUnixFileMode(Path.Combine(target, "a")));
+			}
+			finally { Directory.Delete(shared, true); }
+		}
+
 		[TestMethod]
 		public void HardLinkedFilesAreNotHandedToCaller()
 		{

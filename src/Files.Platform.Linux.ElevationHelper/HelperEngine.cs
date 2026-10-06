@@ -148,10 +148,10 @@ namespace Files.Platform.Linux.ElevationHelper
 			}
 		}
 
-		private Descriptor OpenDirectoryPath(string path) => OpenDirectoryPath(path, out _);
+		private Descriptor OpenDirectoryPath(string path) => OpenDirectoryPath(path, out _, checkReach: false);
 
-		// othersReach: every directory on the path grants search to others, so non-members could reach its entries.
-		private Descriptor OpenDirectoryPath(string path, out bool othersReach)
+		// othersReach: every directory on the path lets every non-root user search it, so anyone could reach its entries.
+		private Descriptor OpenDirectoryPath(string path, out bool othersReach, bool checkReach = true)
 		{
 			// The filesystem root is the only absolute native open. All subsequent names are single components.
 			var rootFd = PosixNative.OpenAt(PosixNative.AtFdCwd, "/", PathOnly | PosixNative.ODirectory | PosixNative.ONofollow, out var errno);
@@ -161,19 +161,33 @@ namespace Files.Platform.Linux.ElevationHelper
 			{
 				var stamp = Inspect(current.Fd)!.Value;
 				TrustDirectory(stamp);
-				othersReach = (stamp.Mode & 0x1) != 0;
+				othersReach = checkReach && EveryoneCanSearch(current.Fd, stamp);
 				foreach (var name in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
 				{
 					hook?.Invoke("before-component-open", name);
 					var next = new Descriptor(Open(current.Fd, name, PathOnly | PosixNative.ODirectory, forceFallback));
 					try { stamp = Inspect(next.Fd)!.Value; TrustDirectory(stamp); }
 					catch { next.Dispose(); throw; }
-					othersReach &= (stamp.Mode & 0x1) != 0;
+					othersReach = othersReach && EveryoneCanSearch(next.Fd, stamp);
 					current.Dispose(); current = next;
 				}
 				return current;
 			}
 			catch { current.Dispose(); throw; }
+		}
+
+		// Owner, group and other search bits must all be set: a matching class never falls through to "other".
+		// Ancestor ACLs are read through a readable reopen of the pinned O_PATH descriptor; any doubt means unreachable.
+		private bool EveryoneCanSearch(int pinnedFd, Stamp stamp)
+		{
+			if ((stamp.Mode & 0x49) != 0x49) return false;
+			try
+			{
+				using var readable = new Descriptor(Open(pinnedFd, ".", PosixNative.ReadOnlyFlags | PosixNative.ODirectory, forceFallback));
+				RequireSame(stamp, Inspect(readable.Fd)!.Value);
+				return !HasAccessAcl(readable.Fd);
+			}
+			catch (Exception ex) when (IsOperationError(ex)) { return false; }
 		}
 
 		private void TrustDirectory(Stamp stamp)

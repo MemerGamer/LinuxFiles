@@ -48,6 +48,9 @@ namespace Files.Platform.Linux.Native
 		[LibraryImport("libc", EntryPoint = "fgetxattr", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial nint FGetXattr(int fd, string name, byte* value, nuint size);
 
+		[LibraryImport("libc", EntryPoint = "fremovexattr", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial int FRemoveXattr(int fd, string name);
+
 		// Mode group bits are only the ACL mask when an access ACL exists; unknown errors count as an ACL.
 		internal static bool HasAccessAcl(int fd)
 			=> FGetXattr(fd, "system.posix_acl_access", null, 0) >= 0 || Marshal.GetLastPInvokeError() is not (61 or 95); // ENODATA, EOPNOTSUPP
@@ -71,7 +74,9 @@ namespace Files.Platform.Linux.Native
 
 		internal static void SetOwnership(int fd, uint uid, uint gid, uint mode)
 		{
-			if (Fchown(fd, uid, gid) != 0 || Fchmod(fd, mode) != 0)
+			// An ACL inherited from the destination's default ACL would gain an effective mask from fchmod.
+			if ((FRemoveXattr(fd, "system.posix_acl_access") != 0 && Marshal.GetLastPInvokeError() is not (61 or 95)) // ENODATA, EOPNOTSUPP
+				|| Fchown(fd, uid, gid) != 0 || Fchmod(fd, mode) != 0 || HasAccessAcl(fd))
 				throw new IOException("Unable to set verified copy ownership and permissions.");
 		}
 
@@ -108,7 +113,7 @@ namespace Files.Platform.Linux.Native
 		}
 
 		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]
-		private static partial int Fcntl(int fd, int command, int argument);
+		private static partial int Fcntl(int fd, int command, nint argument);
 		[LibraryImport("libc", EntryPoint = "fdopendir", SetLastError = true)]
 		private static partial nint OpenDirectory(int fd);
 		[LibraryImport("libc", EntryPoint = "readdir", SetLastError = true)]

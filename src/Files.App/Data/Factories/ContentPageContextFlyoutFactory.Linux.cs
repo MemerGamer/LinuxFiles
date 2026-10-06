@@ -6,6 +6,7 @@ using Files.Platform.Abstractions;
 using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
+using Files.Platform.Linux.Mime;
 using Microsoft.Extensions.Logging;
 
 namespace Files.App.Data.Factories
@@ -15,9 +16,12 @@ namespace Files.App.Data.Factories
 		private static async Task<List<ContextMenuFlyoutItemViewModel>> GetLinuxItemContextCommandsAsync(
 			string? workingDir, List<ListedItem> selectedItems, bool shiftPressed, bool showOpenMenu, CancellationToken cancellationToken)
 		{
-			var items = await ShellContextFlyoutFactory.GetShellContextmenuAsync(shiftPressed, showOpenMenu, workingDir, selectedItems, cancellationToken);
+			var items = await ShellContextFlyoutFactory.GetShellContextmenuAsync(shiftPressed: shiftPressed, showOpenMenu: showOpenMenu,
+				workingDirectory: workingDir, selectedItems: selectedItems, cancellationToken: cancellationToken);
+			if (selectedItems.Count == 0 || selectedItems.Any(i => i.IsArchive || i.IsRecycleBinItem || i.IsFtpItem))
+				return items;
 			var targets = selectedItems.Select(i => i.ItemPath ?? string.Empty).ToArray();
-			if (targets.Length == 0 || targets.Any(p => string.IsNullOrEmpty(p) || !p.StartsWith('/')))
+			if (!await Task.Run(() => targets.All(LinuxServiceMenuService.IsLocalFileSystemTarget), cancellationToken))
 				return items;
 
 			try

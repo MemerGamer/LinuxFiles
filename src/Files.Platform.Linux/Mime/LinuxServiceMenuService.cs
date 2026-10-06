@@ -3,6 +3,8 @@
 
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -22,14 +24,21 @@ namespace Files.Platform.Linux.Mime
 		private readonly IMimeTypeService mimeTypes;
 		private readonly CultureInfo culture;
 		private readonly MimeHierarchy hierarchy;
+		private readonly ILogger<LinuxServiceMenuService> logger;
 
-		public LinuxServiceMenuService(XdgDirectories directories, IMimeTypeService mimeTypes, CultureInfo culture)
+		public LinuxServiceMenuService(XdgDirectories directories, IMimeTypeService mimeTypes, CultureInfo culture, ILogger<LinuxServiceMenuService>? logger = null)
 		{
 			this.directories = directories;
 			this.mimeTypes = mimeTypes;
 			this.culture = culture;
+			this.logger = logger ?? NullLogger<LinuxServiceMenuService>.Instance;
 			hierarchy = new MimeHierarchy(directories);
 		}
+
+		/// <summary>Whether a target names an existing local file or directory rather than a virtual path.</summary>
+		public static bool IsLocalFileSystemTarget(string? path) =>
+			!string.IsNullOrEmpty(path) && path.StartsWith('/') && !path.StartsWith("//", StringComparison.Ordinal) && !path.Contains('\0') &&
+			(File.Exists(path) || Directory.Exists(path));
 
 		public async Task<IReadOnlyList<ServiceMenuAction>> GetActionsAsync(IReadOnlyList<string> targets, CancellationToken cancellationToken = default)
 		{
@@ -61,13 +70,21 @@ namespace Files.Platform.Linux.Mime
 							if (++scanned > MaxScannedFiles || result.Count >= MaxActions)
 								return Ordered(result);
 							if (!path.EndsWith(".desktop", StringComparison.Ordinal) || !seen.Add(Path.GetFileName(path))) continue;
-							var menu = Read(path, culture, out _);
-							if (menu is null || !menu.Matches(targets, types, hierarchy)) continue;
-							result.AddRange(menu.Actions.Take(MaxActions - result.Count));
+							try
+							{
+								var menu = Read(path, culture, out _, logger);
+								if (menu is null || !menu.Matches(targets, types, hierarchy)) continue;
+								result.AddRange(menu.Actions.Take(MaxActions - result.Count));
+							}
+							catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException or OperationCanceledException))
+							{
+								logger.LogWarning(ex, "Failed to load service menu {Path}", DisplaySanitizer.Field(path));
+							}
 						}
 					}
 					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 					{
+						logger.LogWarning(ex, "Failed to scan service-menu directory {Path}", DisplaySanitizer.Field(Path.Combine(data, relative)));
 					}
 				}
 			}
@@ -79,7 +96,7 @@ namespace Files.Platform.Linux.Mime
 			.ThenBy(a => a.Submenu ?? a.Application.Name, StringComparer.CurrentCulture)
 			.ToArray();
 
-		internal static ServiceMenuEntry? Read(string path, CultureInfo culture, out FileIdentity? identity)
+		internal static ServiceMenuEntry? Read(string path, CultureInfo culture, out FileIdentity? identity, ILogger? logger = null)
 		{
 			identity = FileIdentity.TryCapture(path);
 			if (identity is null) return null;
@@ -92,6 +109,7 @@ namespace Files.Platform.Linux.Mime
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
 			{
+				logger?.LogWarning(ex, "Failed to read service menu {Path}", DisplaySanitizer.Field(path));
 				return null;
 			}
 		}

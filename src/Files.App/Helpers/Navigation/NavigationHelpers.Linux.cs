@@ -283,10 +283,15 @@ namespace Files.App.Helpers
 
 		internal static async Task<bool> RunServiceMenuLinuxAsync(ServiceMenuAction action, IReadOnlyList<string> targets)
 		{
-			var servicePlan = ServiceMenuLaunchPlan.Create(action, targets, CultureInfo.CurrentUICulture);
+			var culture = CultureInfo.CurrentUICulture;
+			var tooManyInvocations = false;
+			var servicePlan = await Task.Run(() => ServiceMenuLaunchPlan.Create(action, targets, culture, out tooManyInvocations));
 			if (servicePlan is null)
 			{
-				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenRefusedTitle.GetLocalizedResource(), Strings.LinuxServiceMenuRefusedText.GetLocalizedResource());
+				var message = tooManyInvocations
+					? Strings.LinuxServiceMenuTooManyTargetsText.GetLocalizedFormatResource(ServiceMenuLaunchPlan.MaxPerTargetLaunches)
+					: Strings.LinuxServiceMenuRefusedText.GetLocalizedResource();
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxServiceMenuTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(action.Application.Name, 60)), message);
 				return false;
 			}
 			var plan = new LinuxOpenPlan(OpenAction.LaunchDesktopConfirm, action.Application.DesktopFilePath, servicePlan.Identity,
@@ -426,7 +431,9 @@ namespace Files.App.Helpers
 
 			var dialog = new DynamicDialog(new DynamicDialogViewModel()
 			{
-				TitleText = Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+				TitleText = isServiceMenu
+					? Strings.LinuxServiceMenuTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(claimedName, 60))
+					: Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
 				SubtitleText = (isServiceMenu ? Strings.LinuxServiceMenuConfirmationText : Strings.LinuxUntrustedLauncherText).GetLocalizedResource(),
 				DisplayControl = panel,
 				PrimaryButtonText = Strings.Run.GetLocalizedResource(),

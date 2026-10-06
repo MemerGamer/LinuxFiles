@@ -89,12 +89,13 @@ namespace Files.Platform.Tests.SystemIntegration
 		}
 
 		[TestMethod]
-		public async Task DismissedAuthorizationIsDistinctFromStartupFailure()
+		public async Task DismissedOrDeniedAuthorizationIsDistinctFromHelperFailure()
 		{
 			var runner = new Runner { ExitCode = 126 }; var service = Service(FakeFs.Standard(), runner);
 			var plan = service.PlanDelete(["/home/u/a"]).Plan!;
 			Assert.IsTrue((await service.RunAsync(plan)).WasDismissed);
-			runner.ExitCode = 127; Assert.IsFalse((await service.RunAsync(plan)).WasDismissed);
+			runner.ExitCode = 127; Assert.IsTrue((await service.RunAsync(plan)).WasDismissed);
+			runner.ExitCode = 2; Assert.IsFalse((await service.RunAsync(plan)).WasDismissed);
 		}
 
 		[TestMethod]

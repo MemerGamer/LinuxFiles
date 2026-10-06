@@ -28,7 +28,47 @@ namespace Files.Platform.Linux.Native
 		internal static partial uint Umask(uint mode);
 
 
-		internal readonly record struct Stamp(uint Mode, uint Owner, ulong Inode, ulong Size, ulong Mount, uint Major, uint Minor,
+		[StructLayout(LayoutKind.Sequential)]
+		private struct Passwd
+		{
+			public nint Name, Password;
+			public uint Uid, Gid;
+			public nint Gecos, Home, Shell;
+		}
+
+		[LibraryImport("libc", EntryPoint = "getpwuid_r")]
+		private static partial int GetPasswd(uint uid, ref Passwd entry, byte* buffer, nuint length, out nint result);
+
+		[LibraryImport("libc", EntryPoint = "fchown", SetLastError = true)]
+		private static partial int Fchown(int fd, uint uid, uint gid);
+
+		[LibraryImport("libc", EntryPoint = "fchmod", SetLastError = true)]
+		private static partial int Fchmod(int fd, uint mode);
+
+		internal static uint PrimaryGroup(uint uid)
+		{
+			for (var length = 16384; length <= 1048576; length *= 2)
+			{
+				var buffer = new byte[length];
+				var entry = new Passwd();
+				fixed (byte* pointer = buffer)
+				{
+					var error = GetPasswd(uid, ref entry, pointer, (nuint)length, out var result);
+					if (error == 34) continue; // ERANGE
+					if (error != 0 || result == 0 || entry.Uid != uid) throw new IOException("Caller primary group unavailable.");
+					return entry.Gid;
+				}
+			}
+			throw new IOException("Caller account exceeds safety limits.");
+		}
+
+		internal static void SetOwnership(int fd, uint uid, uint gid, uint mode)
+		{
+			if (Fchown(fd, uid, gid) != 0 || Fchmod(fd, mode) != 0)
+				throw new IOException("Unable to set verified copy ownership and permissions.");
+		}
+
+		internal readonly record struct Stamp(uint Mode, uint Owner, uint Group, ulong Inode, ulong Size, ulong Mount, uint Major, uint Minor,
 			long ModifiedSeconds, uint ModifiedNanos, long ChangedSeconds, uint ChangedNanos)
 		{
 			public bool Directory => (Mode & 0xF000) == 0x4000;
@@ -42,7 +82,7 @@ namespace Files.Platform.Linux.Native
 
 		internal static Stamp? Inspect(int fd, string name = "", bool allowMissing = false)
 		{
-			const uint required = 0x1 | 0x2 | 0x8 | 0x40 | 0x80 | 0x100 | 0x200 | 0x1000;
+			const uint required = 0x1 | 0x2 | 0x8 | 0x10 | 0x40 | 0x80 | 0x100 | 0x200 | 0x1000;
 			var buffer = new byte[256];
 			fixed (byte* pointer = buffer)
 			{
@@ -54,7 +94,7 @@ namespace Files.Platform.Linux.Native
 				}
 			}
 			if ((BitConverter.ToUInt32(buffer, 0) & required) != required) throw new IOException("Required statx identity fields unavailable.");
-			return new Stamp(BitConverter.ToUInt16(buffer, 28), BitConverter.ToUInt32(buffer, 20), BitConverter.ToUInt64(buffer, 32),
+			return new Stamp(BitConverter.ToUInt16(buffer, 28), BitConverter.ToUInt32(buffer, 20), BitConverter.ToUInt32(buffer, 24), BitConverter.ToUInt64(buffer, 32),
 				BitConverter.ToUInt64(buffer, 40), BitConverter.ToUInt64(buffer, 144), BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140),
 				BitConverter.ToInt64(buffer, 112), BitConverter.ToUInt32(buffer, 120), BitConverter.ToInt64(buffer, 96), BitConverter.ToUInt32(buffer, 104));
 		}

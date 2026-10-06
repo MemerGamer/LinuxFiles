@@ -61,7 +61,7 @@ namespace Files.Platform.Tests.SystemIntegration
 			Assert.IsTrue(copied.Items.Single().Succeeded, copied.Items.Single().Error);
 			Assert.AreEqual("confirmed bytes", File.ReadAllText(Path.Combine(target, "tree", "a")));
 			Assert.IsTrue(Directory.Exists(folder));
-			Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(Path.Combine(target, "tree", "a")));
+			Assert.AreEqual((UnixFileMode)0x1A4, File.GetUnixFileMode(Path.Combine(target, "tree", "a")));
 			var second = Directory.CreateDirectory(Path.Combine(root, "second")).FullName;
 			var moved = Run("move", [folder], second, fallback: fallback);
 			Assert.IsTrue(moved.Items.Single().Succeeded, moved.Items.Single().Error);
@@ -215,6 +215,90 @@ namespace Files.Platform.Tests.SystemIntegration
 			Assert.IsTrue(result.Items.Single().Succeeded, result.Items.Single().Error);
 			Assert.IsFalse(File.Exists(Path.Combine(protectedTree, "a")));
 			Assert.AreEqual("confirmed bytes", File.ReadAllText(Path.Combine(target + "-old", "a")));
+		}
+
+		[TestMethod]
+		public void ProtectedSourcesAreRefusedBeforeFilesystemAccess()
+		{
+			foreach (var path in new[] { "/", "/usr", "/etc", "/boot", "/bin", "/lib", "/lib32", "/lib64", "/libx32", "/sbin",
+				"/var", "/home", "/root", "/proc", "/sys", "/dev", "/run", "/srv", "/opt", "/mnt", "/media", "/tmp" })
+				foreach (var operation in new[] { "delete", "move", "rename" })
+					Assert.ThrowsExactly<InvalidDataException>(() => Run(operation, [path], operation == "delete" ? null :
+						operation == "rename" ? path + "-renamed" : target,
+						(_, _) => Assert.Fail("A protected plan reached filesystem access.")), path + " " + operation);
+		}
+
+		[TestMethod]
+		public void VirtualFilesystemDestinationsAreRefusedBeforeOpeningSources()
+		{
+			foreach (var path in new[] { "/proc", "/proc/1", "/sys", "/sys/kernel", "/dev", "/dev/shm" })
+				foreach (var operation in new[] { "copy", "move" })
+					Assert.ThrowsExactly<InvalidDataException>(() => Run(operation, [Path.Combine(source, "a")], path,
+						(_, _) => Assert.Fail("A virtual destination reached filesystem access.")));
+			ElevationHelperProtocol.Validate(new(1, "copy", ["/tmp/a"], "/device"));
+		}
+
+		[TestMethod]
+		[DataRow("copy", false)]
+		[DataRow("move", true)]
+		public void CallerOwnedDestinationGetsUsableVerifiedCopies(string operation, bool fallback)
+		{
+			var folder = Directory.CreateDirectory(Path.Combine(source, "tree")).FullName;
+			var file = FileAt(folder, "read-only");
+			File.SetUnixFileMode(file, (UnixFileMode)0x100);
+			var stages = 0;
+			var result = Run(operation, [folder], target, (stage, name) =>
+			{
+				if (stage != "before-output-ownership") return;
+				stages++;
+				if (name == "read-only") Assert.AreEqual((UnixFileMode)0x180, File.GetUnixFileMode(Path.Combine(target, "tree", name)));
+			}, fallback);
+			Assert.IsTrue(result.Items.Single().Succeeded, result.Items.Single().Error);
+			Assert.AreEqual(2, stages);
+			Assert.AreEqual((UnixFileMode)0x100, File.GetUnixFileMode(Path.Combine(target, "tree", "read-only")));
+			Assert.AreEqual((UnixFileMode)0x1ED, File.GetUnixFileMode(Path.Combine(target, "tree")));
+			Assert.IsTrue(new StatxFileOwnershipInspector().TryGetInfo(Path.Combine(target, "tree", "read-only"), out var info));
+			Assert.AreEqual(ProcessIdentityNative.CurrentUserId, info.OwnerUserId);
+			Assert.AreEqual("confirmed bytes", File.ReadAllText(Path.Combine(target, "tree", "read-only")));
+		}
+
+		[TestMethod]
+		public void RootOwnedDestinationKeepsPrivateOutputModes()
+		{
+			var destination = Path.GetTempPath().TrimEnd('/');
+			Assert.IsTrue(new StatxFileOwnershipInspector().TryGetInfo(destination, out var info));
+			if (info.OwnerUserId == ProcessIdentityNative.CurrentUserId) Assert.Inconclusive("Requires root-owned temporary directory.");
+			var name = "files-private-copy-" + Guid.NewGuid().ToString("N");
+			var folder = Directory.CreateDirectory(Path.Combine(source, name)).FullName;
+			FileAt(folder, "a");
+			var output = Path.Combine(destination, name);
+			try
+			{
+				var result = Run("copy", [folder], destination);
+				Assert.IsTrue(result.Items.Single().Succeeded, result.Items.Single().Error);
+				Assert.AreEqual((UnixFileMode)0x1C0, File.GetUnixFileMode(output));
+				Assert.AreEqual((UnixFileMode)0x180, File.GetUnixFileMode(Path.Combine(output, "a")));
+			}
+			finally { if (Directory.Exists(output)) Directory.Delete(output, true); }
+		}
+
+		[TestMethod]
+		public void OwnershipIsAppliedToVerifiedDescriptorDespiteLeafReplacement()
+		{
+			var file = FileAt(source, "a");
+			var output = Path.Combine(target, "a");
+			var displaced = Path.Combine(target, "pinned");
+			var result = Run("copy", [file], target, (stage, _) =>
+			{
+				if (stage != "before-output-ownership") return;
+				File.Move(output, displaced);
+				FileAt(target, "a", "unrelated");
+				File.SetUnixFileMode(output, (UnixFileMode)0x180);
+			});
+			Assert.IsFalse(result.Items.Single().Succeeded);
+			Assert.AreEqual("unrelated", File.ReadAllText(output));
+			Assert.AreEqual((UnixFileMode)0x180, File.GetUnixFileMode(output));
+			Assert.AreEqual((UnixFileMode)0x1A4, File.GetUnixFileMode(displaced));
 		}
 
 		[TestMethod]

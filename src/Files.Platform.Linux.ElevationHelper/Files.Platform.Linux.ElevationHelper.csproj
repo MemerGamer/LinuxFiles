@@ -8,6 +8,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsAotCompatible>true</IsAotCompatible>
     <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DefineConstants>$(DefineConstants);ELEVATION_HELPER</DefineConstants>
     <EnableMSTestRunner>false</EnableMSTestRunner>
@@ -18,5 +19,7 @@
     <ProjectReference Include="../Files.Platform.Abstractions/Files.Platform.Abstractions.csproj" />
     <Compile Include="../Files.Platform.Linux/Native/PosixNative.cs" Link="Native/PosixNative.cs" />
     <Compile Include="../Files.Platform.Linux/Native/ElevationNative.cs" Link="Native/ElevationNative.cs" />
+    <Compile Include="../Files.Platform.Linux/Elevation/HelperAuthorization.cs" Link="Elevation/HelperAuthorization.cs" />
+    <Compile Include="../Files.Platform.Linux/Launching/DisplaySanitizer.cs" Link="Launching/DisplaySanitizer.cs" />
   </ItemGroup>
 </Project>

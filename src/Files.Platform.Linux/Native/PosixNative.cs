@@ -189,6 +189,8 @@ namespace Files.Platform.Linux.Native
 			return ok;
 		}
 
+
+#if !ELEVATION_HELPER
 		/// <summary>Creates a symbolic link <paramref name="name"/> to <paramref name="target"/> relative to <paramref name="dirfd"/>.</summary>
 		public static bool SymlinkAt(string target, int dirfd, string name, out int errno)
 		{
@@ -197,6 +199,8 @@ namespace Files.Platform.Linux.Native
 			return ok;
 		}
 
+
+#endif
 		/// <summary>Removes a file, link or (with <see cref="AtRemoveDir"/>) empty directory relative to <paramref name="dirfd"/>.</summary>
 		public static void UnlinkAt(int dirfd, string name, int flags, string displayPath)
 		{
@@ -277,8 +281,6 @@ namespace Files.Platform.Linux.Native
 #if ELEVATION_HELPER
 		[LibraryImport("libc", EntryPoint = "mkdirat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
 		private static partial int mkdirat(int fd, string name, uint mode);
-		[LibraryImport("libc", EntryPoint = "symlinkat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
-		private static partial int symlinkat(string target, int fd, string name);
 #endif
 
 		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]

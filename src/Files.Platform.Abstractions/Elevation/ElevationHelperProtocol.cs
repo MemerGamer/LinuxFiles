@@ -15,6 +15,7 @@ namespace Files.Platform.Abstractions.Elevation
 	public sealed record HelperResponse(int Version, HelperItemResult[] Items, string Error);
 
 	[JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow)]
+	[JsonSerializable(typeof(string))]
 	[JsonSerializable(typeof(HelperRequest))]
 	[JsonSerializable(typeof(HelperResponse))]
 	public partial class ElevationJsonContext : JsonSerializerContext { }
@@ -62,7 +63,14 @@ namespace Files.Platform.Abstractions.Elevation
 			if (request.Version != 1 || request.Operation is not ("delete" or "copy" or "move" or "rename")
 				|| request.Sources is null || request.Sources.Length is < 1 or > MaximumItems)
 				throw new InvalidDataException("Invalid plan.");
-			foreach (var source in request.Sources) ValidatePath(source);
+			foreach (var source in request.Sources)
+			{
+				ValidatePath(source);
+				if (request.Operation is "delete" or "move" or "rename" && source is
+					"/usr" or "/etc" or "/boot" or "/bin" or "/lib" or "/lib32" or "/lib64" or "/libx32" or "/sbin" or
+					"/var" or "/home" or "/root" or "/proc" or "/sys" or "/dev" or "/run" or "/srv" or "/opt" or "/mnt" or "/media" or "/tmp")
+					throw new InvalidDataException("Protected system directory.");
+			}
 			if (request.Sources.Distinct(StringComparer.Ordinal).Count() != request.Sources.Length)
 				throw new InvalidDataException("Duplicate source.");
 			foreach (var source in request.Sources)
@@ -75,6 +83,9 @@ namespace Files.Platform.Abstractions.Elevation
 			else
 			{
 				ValidatePath(request.Target);
+				if (request.Operation is "copy" or "move" && new[] { "/proc", "/sys", "/dev" }.Any(path =>
+					request.Target == path || request.Target!.StartsWith(path + "/", StringComparison.Ordinal)))
+					throw new InvalidDataException("Virtual filesystem destination refused.");
 				if (request.Operation == "rename")
 				{
 					if (request.Sources.Length != 1 || Path.GetDirectoryName(request.Sources[0]) != Path.GetDirectoryName(request.Target))

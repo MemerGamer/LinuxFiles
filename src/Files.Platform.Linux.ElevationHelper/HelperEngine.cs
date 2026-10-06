@@ -13,7 +13,7 @@ using static Files.Platform.Linux.Native.ElevationNative;
 
 namespace Files.Platform.Linux.ElevationHelper
 {
-	// Hooks are only an in-process test seam; the executable accepts no switches or hook configuration.
+	// Hooks are only an in-process test seam; argv and stdin cannot enable them.
 	public sealed class HelperEngine(uint callerUid, Action<string, string>? hook = null, bool forceFallback = false, uint trustedRootUid = 0)
 	{
 		private const int PathOnly = 0x200000 | 0x80000;
@@ -43,10 +43,15 @@ namespace Files.Platform.Linux.ElevationHelper
 			ElevationHelperProtocol.Validate(request);
 			visited = 0;
 			Descriptor? destination = null;
+			uint? destinationGroup = null;
 			var opened = new List<(string Path, Descriptor? Parent, Node? Source, string Error)>();
 			try
 			{
-				if (request.Operation is "copy" or "move") destination = OpenDirectoryPath(request.Target!);
+				if (request.Operation is "copy" or "move")
+				{
+					destination = OpenDirectoryPath(request.Target!);
+					if (Inspect(destination.Fd)!.Value.Owner == callerUid) destinationGroup = PrimaryGroup(callerUid);
+				}
 				// Pin the complete plan before starting any mutation.
 				foreach (var path in request.Sources)
 				{
@@ -104,6 +109,14 @@ namespace Files.Platform.Linux.ElevationHelper
 									SyncParent(destination.Fd);
 									ValidateTree(parent.Fd, source, true);
 									ValidateTree(destination.Fd, copy, true);
+									// Hand over before removing move originals, so an ownership failure preserves them.
+									if (destinationGroup is { } group)
+									{
+										ValidateTree(destination.Fd, copy, true);
+										AssignCopyOwnership(source, copy, group);
+										ValidateTree(destination.Fd, copy, true);
+										SyncParent(destination.Fd);
+									}
 									if (request.Operation == "move")
 									{
 										hook?.Invoke("before-delete", item.Path);
@@ -254,6 +267,20 @@ namespace Files.Platform.Linux.ElevationHelper
 				return copy;
 			}
 			catch { copy.Dispose(); throw; }
+		}
+
+		private void AssignCopyOwnership(Node source, Node copy, uint group)
+		{
+			for (var i = 0; i < source.Children.Count; i++) AssignCopyOwnership(source.Children[i], copy.Children[i], group);
+			hook?.Invoke("before-output-ownership", copy.Name);
+			var mode = source.Stamp.Directory ? 0x1EDU : source.Stamp.Mode & 0x1A4U; // 0755 / source masked by 0644
+			SetOwnership(copy.Descriptor.Fd, callerUid, group, mode);
+			Sync(copy.Descriptor.Fd);
+			var current = Inspect(copy.Descriptor.Fd)!.Value;
+			RequireSame(copy.Stamp, current);
+			if (current.Owner != callerUid || current.Group != group || (current.Mode & 0xFFF) != mode)
+				throw new IOException("Copy ownership or permissions could not be verified.");
+			copy.Stamp = current;
 		}
 
 		private static void VerifyCopy(Node source, Node copy)

@@ -76,9 +76,17 @@ namespace Files.Platform.Linux.Elevation
 			var blocks = new List<string>();
 			foreach (var command in plan.Commands)
 			{
-				var lines = DisplaySanitizer.FullArguments(command.Program == ElevationHelperProtocol.HelperPath
-					? ["pkexec", command.Program, "stdin (JSON)", .. command.Arguments]
-					: ["pkexec", command.Program, .. command.Arguments]);
+				IReadOnlyList<string> arguments = command.Arguments;
+				if (command.Program == ElevationHelperProtocol.HelperPath && arguments.Count == 1)
+				{
+					try
+					{
+						var request = ElevationHelperProtocol.ParseRequest(arguments[0]);
+						arguments = [.. HelperAuthorization.Arguments(arguments[0]), "stdin (JSON)", HelperAuthorization.DisplayJson(request)];
+					}
+					catch (Exception) { return null; }
+				}
+				var lines = DisplaySanitizer.FullArguments(["pkexec", command.Program, .. arguments]);
 				if (lines is null)
 					return null;
 

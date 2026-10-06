@@ -30,7 +30,7 @@ namespace Files.Platform.Linux.Elevation
 	/// <summary>
 	/// Starts real processes.
 	/// </summary>
-	public sealed class ProcessElevatedRunner : IElevatedProcessRunner, IRootHelperProcessRunner
+	public sealed class ProcessElevatedRunner(Action<Process>? terminate = null) : IElevatedProcessRunner, IRootHelperProcessRunner
 	{
 		/// <inheritdoc/>
 		public async Task<(int ExitCode, string StandardError)> RunAsync(string fileName, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
@@ -58,45 +58,66 @@ namespace Files.Platform.Linux.Elevation
 			}
 			catch (OperationCanceledException)
 			{
-				try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+				TryKill(process, null);
 				throw;
 			}
 
 			await stdout.ConfigureAwait(false);
 			return (process.ExitCode, await stderr.ConfigureAwait(false));
 		}
+
+		// Killing a child that already became root fails with EPERM; callers then wait for its real exit.
+		private static void TryKill(Process process, Action<Process>? terminate)
+		{
+			try
+			{
+				if (terminate is null) process.Kill(entireProcessTree: true);
+				else terminate(process);
+			}
+			catch (InvalidOperationException) { }
+			catch (System.ComponentModel.Win32Exception) { }
+			catch (AggregateException ex) when (ex.InnerExceptions.All(inner => inner is System.ComponentModel.Win32Exception or InvalidOperationException)) { }
+		}
+
 		public async Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string json, CancellationToken cancellationToken)
 		{
+			cancellationToken.ThrowIfCancellationRequested();
 			var info = new ProcessStartInfo(pkexec)
 			{
 				UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true,
-				RedirectStandardError = true, CreateNoWindow = true,
+				RedirectStandardError = true, CreateNoWindow = true, StandardInputEncoding = new UTF8Encoding(false, true),
 			};
 			info.Environment.Clear();
 			info.Environment["LANG"] = "C";
 			info.ArgumentList.Add(ElevationHelperProtocol.HelperPath);
+			foreach (var argument in HelperAuthorization.Arguments(json)) info.ArgumentList.Add(argument);
 			using var process = Process.Start(info) ?? throw new IOException("Unable to start authorization.");
+			var output = ReadBoundedAsync(process.StandardOutput, CancellationToken.None, Stop);
+			var error = ReadBoundedAsync(process.StandardError, CancellationToken.None, Stop);
+			var send = SendAsync();
 			try
 			{
-				var output = ReadBoundedAsync(process.StandardOutput, cancellationToken, () => process.Kill(entireProcessTree: true));
-				var error = ReadBoundedAsync(process.StandardError, cancellationToken, () => process.Kill(entireProcessTree: true));
-				var send = SendAsync();
-				await Task.WhenAll(send, output, error, process.WaitForExitAsync(cancellationToken)).ConfigureAwait(false);
-				return (process.ExitCode, await output.ConfigureAwait(false), await error.ConfigureAwait(false));
-				async Task SendAsync()
+				try { await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false); }
+				catch (OperationCanceledException)
 				{
-					try { await process.StandardInput.WriteAsync(json.AsMemory(), cancellationToken).ConfigureAwait(false); }
-					catch (IOException) { } // A dismissed prompt can close its input without reading the plan.
-					finally { process.StandardInput.Close(); }
+					Stop();
+					// A root child may reject SIGKILL with EPERM. Its actual result remains authoritative.
+					await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
 				}
+				await Task.WhenAll(send, output, error).ConfigureAwait(false);
+				return (process.ExitCode, await output.ConfigureAwait(false), await error.ConfigureAwait(false));
 			}
 			finally
 			{
-				if (!process.HasExited)
-				{
-					try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
-					await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-				}
+				if (!process.HasExited) Stop();
+				await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+			}
+			void Stop() => TryKill(process, terminate);
+			async Task SendAsync()
+			{
+				try { await process.StandardInput.WriteAsync(json.AsMemory(), CancellationToken.None).ConfigureAwait(false); }
+				catch (IOException) { } // A dismissed prompt can close its input without reading the plan.
+				finally { process.StandardInput.Close(); }
 			}
 		}
 
@@ -105,15 +126,19 @@ namespace Files.Platform.Linux.Elevation
 			var text = new StringBuilder();
 			var buffer = new char[4096];
 			int count;
+			var exceeded = false;
 			while ((count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) != 0)
 			{
+				if (exceeded) continue;
 				if (text.Length + count > ElevationHelperProtocol.MaximumResultBytes)
 				{
 					try { stop(); } catch (InvalidOperationException) { }
-					throw new IOException("Helper output exceeds protocol limit.");
+					exceeded = true;
+					continue;
 				}
 				text.Append(buffer, 0, count);
 			}
+			if (exceeded) throw new IOException("Helper output exceeds protocol limit.");
 			return text.ToString();
 		}
 
@@ -206,7 +231,7 @@ namespace Files.Platform.Linux.Elevation
 				if (plan.Commands.Count != 1 || plan.Commands[0].Program != ElevationHelperProtocol.HelperPath || !plan.Commands[0].Arguments.SequenceEqual(new[] { json }))
 					return Failure("The operation no longer matches what was confirmed.");
 				var (exitCode, output, error) = await runner.RunHelperAsync(pkexec, json, cancellationToken).ConfigureAwait(false);
-				if (exitCode == 126) return new(false, true, exitCode, error);
+				if (exitCode is 126 or 127) return new(false, true, exitCode, error);
 				if (exitCode is not (0 or 1)) return new(false, false, exitCode, error);
 				var response = ElevationHelperProtocol.ParseResponse(output);
 				if (response.Error.Length != 0) return new(false, false, exitCode, response.Error);

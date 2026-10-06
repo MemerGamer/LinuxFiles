@@ -3,21 +3,19 @@
 
 using Files.Platform.Abstractions.Elevation;
 using Files.Platform.Linux.Native;
+using Files.Platform.Linux.Elevation;
 using System;
 using System.Globalization;
 using System.IO;
-using System.Text;
 
 namespace Files.Platform.Linux.ElevationHelper
 {
 	internal static class Program
 	{
-		private static int Main(string[] args)
-		{
-			try
+		private static int Main(string[] args) => HelperEntryPoint.Run(() =>
 			{
 				if (!OperatingSystem.IsLinux() || System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture is not (System.Runtime.InteropServices.Architecture.X64 or System.Runtime.InteropServices.Architecture.Arm64)
-					|| args.Length != 0 || ElevationNative.GetEffectiveUid() != 0
+					|| args.Length != 2 || ElevationNative.GetEffectiveUid() != 0
 					|| !uint.TryParse(Environment.GetEnvironmentVariable("PKEXEC_UID"), NumberStyles.None, CultureInfo.InvariantCulture, out var caller) || caller == 0)
 					throw new InvalidDataException("This helper requires pkexec authorization.");
 				foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
@@ -33,14 +31,25 @@ namespace Files.Platform.Linux.ElevationHelper
 					if (data.Length + count > ElevationHelperProtocol.MaximumBytes) throw new InvalidDataException("Plan too large.");
 					data.Write(buffer, 0, count);
 				}
-				var request = ElevationHelperProtocol.ParseRequest(new UTF8Encoding(false, true).GetString(data.ToArray()));
-				var response = new HelperEngine(caller).Execute(request);
-				Console.WriteLine(ElevationHelperProtocol.Serialize(response));
-				return Array.TrueForAll(response.Items, item => item.Succeeded) ? 0 : 1;
-			}
-			catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or System.Text.DecoderFallbackException or System.Text.Json.JsonException or ArgumentException)
+				var request = HelperAuthorization.Verify(data.ToArray(), args);
+				return new HelperEngine(caller).Execute(request);
+			}, Console.Out);
+	}
+
+	public static class HelperEntryPoint
+	{
+		public static int Run(Func<HelperResponse> execute, TextWriter output)
+		{
+			try
 			{
-				Console.WriteLine(ElevationHelperProtocol.Serialize(new HelperResponse(1, [], ex.Message.Length > 512 ? ex.Message[..512] : ex.Message)));
+				var response = execute();
+				output.WriteLine(ElevationHelperProtocol.Serialize(response));
+				return response.Error.Length == 0 && Array.TrueForAll(response.Items, item => item.Succeeded) ? 0 : 1;
+			}
+			catch (Exception)
+			{
+				try { output.WriteLine("{\"version\":1,\"items\":[],\"error\":\"Privileged operation failed.\"}"); }
+				catch (Exception) { }
 				return 1;
 			}
 		}

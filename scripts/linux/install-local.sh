@@ -48,8 +48,9 @@ if command -v gtk-update-icon-cache >/dev/null; then gtk-update-icon-cache -q -t
 
 if [[ "$install_helper" == true ]]; then
   [[ -x "$from/elevation-helper/files-elevation-helper" ]] || { echo "Missing AOT helper in publish output" >&2; exit 1; }
-  # Explicit opt-in: this installs only the fixed helper and policy as root, not the app.
-  /usr/bin/sudo /usr/bin/python3 "$root/scripts/linux/install-root-helper.py" --from "$from/elevation-helper"
+  # Equivalent to sudo make install: trust this installer and the published build.
+  read -r helper_hash _ < <(/usr/bin/sha256sum -- "$from/elevation-helper/files-elevation-helper")
+  /usr/bin/sudo /usr/bin/python3 "$root/scripts/linux/install-root-helper.py" --from "$from/elevation-helper" --sha256 "$helper_hash"
 fi
 
 echo "Installed to $libdir; launcher at $prefix/bin/files"

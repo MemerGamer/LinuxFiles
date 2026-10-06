@@ -23,6 +23,7 @@ namespace Files.Platform.Linux.Launching
 		private readonly IProcessStarter starter;
 		private readonly TerminalResolver terminals;
 		private readonly RootTerminalResolver rootTerminals;
+		private readonly Lazy<TerminalSpec?> rootTerminal;
 
 		/// <summary>
 		/// Creates the launcher.
@@ -34,6 +35,7 @@ namespace Files.Platform.Linux.Launching
 			this.starter = starter;
 			this.terminals = terminals;
 			this.rootTerminals = rootTerminals ?? new RootTerminalResolver();
+			rootTerminal = new Lazy<TerminalSpec?>(terminals.Resolve);
 		}
 
 		/// <inheritdoc/>
@@ -169,14 +171,14 @@ namespace Files.Platform.Linux.Launching
 			return TryStartAsync(new ProcessLaunch(terminal.FileName, terminal.BuildOpenArguments(folderPath), folderPath), cancellationToken);
 		}
 
-		public bool CanOpenTerminalAsRoot => terminals.Resolve() is not null && rootTerminals.Resolve("/") is not null;
+		public bool CanOpenTerminalAsRoot => rootTerminal.Value is not null && rootTerminals.Resolve("/") is not null;
 
 		public Task<bool> OpenTerminalAsRootAsync(string folderPath, CancellationToken cancellationToken = default)
 		{
 			if (string.IsNullOrEmpty(folderPath) || !folderPath.StartsWith('/') || folderPath.StartsWith("//", StringComparison.Ordinal) ||
 				folderPath.Contains('\0') || !Directory.Exists(folderPath))
 				return Task.FromResult(false);
-			var terminal = terminals.Resolve();
+			var terminal = rootTerminal.Value;
 			var command = rootTerminals.Resolve(folderPath);
 			if (terminal is null || command is null) return Task.FromResult(false);
 			return TryStartAsync(new ProcessLaunch(terminal.FileName, terminal.BuildExecuteArguments(command, folderPath), folderPath), cancellationToken);

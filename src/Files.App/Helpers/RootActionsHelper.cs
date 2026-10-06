@@ -22,11 +22,16 @@ namespace Files.App.Helpers
 
 		public static bool IsAvailable => OperatingSystem.IsLinux() && RootActionsAvailability.Mode.AllowHelper && (Elevation?.IsAvailable ?? false);
 
-		public static bool CanOpenTerminal => OperatingSystem.IsLinux() && RootActionsAvailability.Mode.AllowRootTerminal &&
-			(Ioc.Default.GetService<ILauncherService>()?.CanOpenTerminalAsRoot ?? false);
+		private static Task<bool>? terminalAvailability;
 
-		public static Task OpenTerminalAsync(string folder) =>
-			Ioc.Default.GetRequiredService<ILauncherService>().OpenTerminalAsRootAsync(folder);
+		public static void InitializeTerminalAvailability() => terminalAvailability = Task.Run(() =>
+			OperatingSystem.IsLinux() && RootActionsAvailability.Mode.AllowRootTerminal &&
+			(Ioc.Default.GetService<ILauncherService>()?.CanOpenTerminalAsRoot ?? false));
+
+		public static bool CanOpenTerminal => terminalAvailability is { IsCompletedSuccessfully: true, Result: true };
+
+		public static Task OpenTerminalAsync(string folder) => Task.Run(() =>
+			Ioc.Default.GetRequiredService<ILauncherService>().OpenTerminalAsRootAsync(folder));
 
 		private static bool dialogOpen;
 

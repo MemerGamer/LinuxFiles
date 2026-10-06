@@ -46,6 +46,8 @@ modules:
       - install -Dm755 packaging/linux/files /app/bin/files
       - install -Dm644 packaging/linux/io.github.memergamer.LinuxFiles.desktop
         /app/share/applications/io.github.memergamer.LinuxFiles.desktop
+      - sed -i 's/\r$//; /^\[Desktop Action root-mode\]/,$d; /^Actions=/s/root-mode;//'
+        /app/share/applications/io.github.memergamer.LinuxFiles.desktop
       - install -Dm644 packaging/linux/io.github.memergamer.LinuxFiles.metainfo.xml
         /app/share/metainfo/io.github.memergamer.LinuxFiles.metainfo.xml
       - for s in 16 24 32 48 64 128 256 512; do

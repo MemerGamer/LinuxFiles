@@ -43,7 +43,7 @@ namespace Files.App.Data.Factories
 				? (selectedItems.Count == 1 && !selectedItems[0].IsArchive && !selectedItems[0].IsRecycleBinItem && !selectedItems[0].IsFtpItem
 					? (selectedItems[0].PrimaryItemAttribute == StorageItemTypes.Folder ? selectedItems[0].ItemPath : Path.GetDirectoryName(selectedItems[0].ItemPath)) : null)
 				: workingDirectory;
-			if (RootActionsHelper.CanOpenTerminal && !string.IsNullOrEmpty(terminalTarget) && terminalTarget.StartsWith('/') && Directory.Exists(terminalTarget))
+			if (RootActionsHelper.CanOpenTerminal && !string.IsNullOrEmpty(terminalTarget) && terminalTarget.StartsWith('/'))
 			{
 				items.Add(new ContextMenuFlyoutItemViewModel
 				{

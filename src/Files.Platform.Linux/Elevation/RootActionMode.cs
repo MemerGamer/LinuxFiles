@@ -15,7 +15,7 @@ namespace Files.Platform.Linux.Elevation
 			if (effectiveUserId == 0)
 				return new(RootModeIndicator.RunningAsRoot, false, false, false);
 
-			return new(requested ? RootModeIndicator.RootMode : RootModeIndicator.None,
+			return new(requested && !disabled ? RootModeIndicator.RootMode : RootModeIndicator.None,
 				requested && !disabled, !disabled, !requested);
 		}
 

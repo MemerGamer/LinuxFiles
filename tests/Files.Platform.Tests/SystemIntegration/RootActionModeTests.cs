@@ -17,7 +17,7 @@ namespace Files.Platform.Tests.SystemIntegration
 		[DataRow(false, 1000u, false, RootModeIndicator.None, false, true, true)]
 		[DataRow(true, 1000u, false, RootModeIndicator.RootMode, true, true, false)]
 		[DataRow(false, 1000u, true, RootModeIndicator.None, false, false, true)]
-		[DataRow(true, 1000u, true, RootModeIndicator.RootMode, false, false, false)]
+		[DataRow(true, 1000u, true, RootModeIndicator.None, false, false, false)]
 		[DataRow(false, 0u, false, RootModeIndicator.RunningAsRoot, false, false, false)]
 		[DataRow(true, 0u, false, RootModeIndicator.RunningAsRoot, false, false, false)]
 		[DataRow(false, 0u, true, RootModeIndicator.RunningAsRoot, false, false, false)]
@@ -56,6 +56,26 @@ namespace Files.Platform.Tests.SystemIntegration
 				Assert.IsNull(overrides[name]);
 			Assert.ThrowsExactly<IOException>(() => RootStartupEnvironment.GetOverrides("relative"));
 			Assert.ThrowsExactly<IOException>(() => RootStartupEnvironment.GetOverrides("/"));
+		}
+
+		[TestMethod]
+		[DataRow("XDG_DATA_DIRS", "/usr/local/share:/usr/share")]
+		[DataRow("XDG_CONFIG_DIRS", "/etc/xdg")]
+		[DataRow("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")]
+		[DataRow("TERMINAL", null)]
+		[DataRow("EDITOR", null)]
+		[DataRow("VISUAL", null)]
+		[DataRow("BROWSER", null)]
+		[DataRow("SHELL", null)]
+		[DataRow("XDG_CURRENT_DESKTOP", null)]
+		public void RootEnvironmentReplacesInheritedDiscoveryAndExecutableOverrides(string variable, string? expected)
+		{
+			var inherited = new Dictionary<string, string?> { [variable] = "/home/user/untrusted" };
+			foreach (var entry in RootStartupEnvironment.GetOverrides("/root")) inherited[entry.Key] = entry.Value;
+			Assert.AreEqual(expected, inherited[variable]);
+			var directories = new Files.Platform.Linux.Mime.XdgDirectories(name => inherited.GetValueOrDefault(name));
+			CollectionAssert.AreEqual(new[] { "/usr/local/share", "/usr/share" }, new List<string>(directories.DataDirs));
+			CollectionAssert.AreEqual(new[] { "/etc/xdg" }, new List<string>(directories.ConfigDirs));
 		}
 
 		private sealed class Inspector : IFileOwnershipInspector

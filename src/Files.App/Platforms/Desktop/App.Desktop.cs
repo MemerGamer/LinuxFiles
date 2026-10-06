@@ -32,6 +32,7 @@ namespace Files.App
 			{
 				var serviceProvider = AppLifecycleHelper.ConfigureHost(AppModel);
 				Ioc.Default.ConfigureServices(serviceProvider);
+				RootActionsHelper.InitializeTerminalAvailability();
 
 				if (AppLifecycleHelper.AppEnvironment is not AppEnvironment.Dev)
 					AppLifecycleHelper.ConfigureSentry();
@@ -88,7 +89,7 @@ namespace Files.App
 				});
 			};
 
-			// FileManager1 (other applications' "Show in folder"): only claimed when the user opted in
+			// FileManager1 shares the single-instance guard above: root-mode and uid-0 processes never claim it.
 			_ = Task.Run(async () =>
 			{
 				try

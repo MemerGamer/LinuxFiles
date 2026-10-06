@@ -32,6 +32,37 @@ namespace Files.Platform.Tests.SystemIntegration
 			}
 		}
 
+		[TestMethod]
+		[DataRow("run0")]
+		[DataRow("sudo")]
+		[DataRow("pkexec")]
+		public void TerminalElevationToolsRequireRootOwnedNonWritableSystemChains(string name)
+		{
+			var fs = FakeFs.Standard();
+			fs.File("/usr/bin/" + name);
+			fs.Dir("/home/u/bin", 1000);
+			fs.File("/home/u/bin/" + name, 1000);
+			var resolver = new SystemToolResolver(new ElevationPathChecker(fs, 1000));
+			Assert.AreEqual("/usr/bin/" + name, resolver.Resolve(name));
+			var tool = fs.Entries["/usr/bin/" + name];
+			foreach (var unsafeTool in new[] { tool with { OwnerUserId = 1000 },
+				tool with { Mode = tool.Mode | UnixFileMode.GroupWrite }, tool with { Mode = tool.Mode | UnixFileMode.OtherWrite } })
+			{
+				fs.Entries["/usr/bin/" + name] = unsafeTool;
+				Assert.IsNull(resolver.Resolve(name));
+			}
+			fs.Entries["/usr/bin/" + name] = tool;
+			foreach (var ancestor in new[] { "/", "/usr", "/usr/bin" })
+			{
+				var safe = fs.Entries[ancestor];
+				fs.Entries[ancestor] = safe with { Mode = safe.Mode | UnixFileMode.OtherWrite };
+				Assert.IsNull(resolver.Resolve(name));
+				fs.Entries[ancestor] = safe;
+			}
+			fs.Entries.Remove("/usr/bin/" + name);
+			Assert.IsNull(resolver.Resolve(name));
+		}
+
 		private sealed class Runner : IRootHelperProcessRunner
 		{
 			public int Calls;

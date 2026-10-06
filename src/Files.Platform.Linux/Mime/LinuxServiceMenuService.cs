@@ -75,7 +75,8 @@ namespace Files.Platform.Linux.Mime
 							{
 								var menu = Read(path, culture, out _, logger);
 								if (menu is null || !menu.Matches(targets, types, hierarchy)) continue;
-								result.AddRange(menu.Actions.Take(MaxActions - result.Count));
+								result.AddRange(menu.Actions.Where(a => DesktopExecExpander.ExpandServiceMenu(a.Application, targets).Count > 0)
+									.Take(MaxActions - result.Count));
 							}
 							catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException or OperationCanceledException))
 							{

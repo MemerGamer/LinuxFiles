@@ -446,6 +446,10 @@ namespace Files.App.Helpers
 
 				startInfo.Environment["FILES_NO_SINGLE_INSTANCE"] = "1";
 				startInfo.ArgumentList.Add("--new-window");
+#if !WINDOWS
+				if (Files.Platform.Linux.Elevation.RootActionMode.IsRequested(Program.LaunchArguments))
+					startInfo.ArgumentList.Add("--root");
+#endif
 				System.Diagnostics.Process.Start(startInfo)?.Dispose();
 			}
 			catch (Exception ex)

@@ -7,7 +7,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.IO;
 using System.Text;
 
 namespace Files.Platform.Linux.Mime
@@ -72,10 +71,6 @@ namespace Files.Platform.Linux.Mime
 				var exec = values.GetValueOrDefault("Exec");
 				if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(exec) || exec.Any(char.IsControl))
 					return null;
-				// Normalize only Ghostty's shipped directory action; generic embedded field codes remain forbidden.
-				if (Path.GetFileName(path) == "com.mitchellh.ghostty.desktop" &&
-					exec == "ghostty --working-directory=%F --gtk-single-instance=false")
-					exec = "env --chdir %f ghostty --working-directory=inherit --gtk-single-instance=false";
 				var app = new DesktopApplication(id, name, exec, path, values.GetValueOrDefault("Icon") ?? root.GetValueOrDefault("Icon"),
 					RunInTerminal: (values.GetValueOrDefault("Terminal") ?? root.GetValueOrDefault("Terminal")) == "true");
 				if (HasUnsupportedConditions(values)) continue;

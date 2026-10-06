@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Linux.Launching;
+using Files.Platform.Linux.Elevation;
 using Files.Platform.Linux.Mime;
 using Files.Platform.Tests.Mime;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -18,6 +19,44 @@ namespace Files.Platform.Tests.Launching
 	[TestClass]
 	public sealed class LauncherServiceTests
 	{
+		private sealed class FakeTools(params string[] available) : ITrustedToolResolver
+		{
+			public string? Resolve(string name) => available.Contains(name) ? "/usr/bin/" + name : null;
+		}
+
+		[TestMethod]
+		[DataRow("pkexec version 0.105", false)]
+		[DataRow("pkexec version 0.120", false)]
+		[DataRow("pkexec version 0.121", true)]
+		[DataRow("pkexec version 0.122\n", true)]
+		[DataRow("pkexec version 126", true)]
+		[DataRow(null, false)]
+		[DataRow("unknown", false)]
+		public void RootTerminal_PkexecKeepCwdRequiresSupportedVersionAndCachesResolution(string? output, bool supported)
+		{
+			var probes = 0;
+			var disabled = false;
+			var resolver = new RootTerminalResolver(new FakeTools("pkexec"), new FakeLocator("/bin/sh"), _ => null,
+				() => disabled, path => { Assert.AreEqual("/usr/bin/pkexec", path); probes++; return output; });
+			Assert.AreEqual(supported, RootTerminalResolver.SupportsKeepCwd(output));
+			var command = resolver.Resolve("/folder")!;
+			CollectionAssert.AreEqual(supported ? new[] { "/usr/bin/pkexec", "--keep-cwd", "/usr/bin//bin/sh" } :
+				new[] { "/usr/bin/pkexec", "/usr/bin//bin/sh" }, command.ToArray());
+			CollectionAssert.AreEqual(command.ToArray(), resolver.Resolve("/another")!.ToArray());
+			Assert.AreEqual(1, probes);
+			disabled = true;
+			Assert.IsNull(resolver.Resolve("/folder"));
+		}
+
+		[TestMethod]
+		public void RootTerminal_NeverUsesUserPathToResolveElevationTools()
+		{
+			var userPath = new FakeLocator("run0", "sudo", "pkexec", "/bin/sh");
+			var resolver = new RootTerminalResolver(new FakeTools(), userPath, _ => null, () => false,
+				_ => throw new AssertFailedException("An untrusted pkexec must never be probed."));
+			Assert.IsNull(resolver.Resolve("/folder"));
+		}
+
 		private sealed class RecordingStarter : IProcessStarter
 		{
 			public List<ProcessLaunch> Launches { get; } = [];
@@ -44,7 +83,7 @@ namespace Files.Platform.Tests.Launching
 				new LinuxApplicationRegistry(fx.Directories, culture, locator),
 				starter,
 				new TerminalResolver(locator, name => env is not null && env.TryGetValue(name, out var v) ? v : null),
-				new RootTerminalResolver(locator, name => env is not null && env.TryGetValue(name, out var v) ? v : null, () => false));
+				new RootTerminalResolver(new FakeTools(executables), locator, name => env is not null && env.TryGetValue(name, out var v) ? v : null, () => false, _ => "pkexec version 0.121"));
 			return (service, starter);
 		}
 
@@ -184,7 +223,7 @@ namespace Files.Platform.Tests.Launching
 			Assert.IsFalse(missingTerminal.Service.CanOpenTerminalAsRoot);
 			Assert.IsFalse(await missingTerminal.Service.OpenTerminalAsRootAsync(fx.Home));
 			Assert.AreEqual(0, missingTerminal.Starter.Launches.Count);
-			var disabled = new RootTerminalResolver(new FakeLocator("run0", "sudo", "pkexec"), _ => null, () => true);
+			var disabled = new RootTerminalResolver(new FakeTools("run0", "sudo", "pkexec"), new FakeLocator(), _ => null, () => true);
 			Assert.IsNull(disabled.Resolve(fx.Home));
 		}
 

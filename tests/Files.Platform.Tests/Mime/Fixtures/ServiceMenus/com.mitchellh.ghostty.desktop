@@ -8,4 +8,3 @@ Actions=RunGhosttyDir
 Name=Open Ghostty Here
 Icon=com.mitchellh.ghostty
 Exec=ghostty --working-directory=%F --gtk-single-instance=false
-

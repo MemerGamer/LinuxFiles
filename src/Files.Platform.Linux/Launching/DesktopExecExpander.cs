@@ -108,7 +108,7 @@ namespace Files.Platform.Linux.Launching
 			return result;
 		}
 
-		/// <summary>Service menus never invoke a shell. Target field codes must occupy complete argv elements.</summary>
+		/// <summary>Service menus never invoke a shell. Only a single target may fill a long option's entire value.</summary>
 		public static IReadOnlyList<IReadOnlyList<string>> ExpandServiceMenu(DesktopApplication app, IReadOnlyList<string> targets)
 		{
 			// Refuse shell syntax conservatively, even if quoted. Substituted paths are not inspected as command text.
@@ -117,8 +117,10 @@ namespace Files.Platform.Linux.Launching
 			if (tokens is null || tokens.Count == 0 || tokens[0].Contains('%') || tokens[0].Contains('=') ||
 				tokens.Any(t => Shells.Contains(System.IO.Path.GetFileName(t))) ||
 				(System.IO.Path.GetFileName(tokens[0]) == "env" && tokens.Any(t => t.StartsWith("-S", StringComparison.Ordinal) || t.StartsWith("--split-string", StringComparison.Ordinal)))) return [];
-			if (tokens.Count(t => t is "%f" or "%F" or "%u" or "%U") > 1 ||
-				(tokens.Any(t => t is "%f" or "%F") && targets.Any(t => !ToPathOrUri(t).StartsWith('/')))) return [];
+			var targetCodes = tokens.Select(t => t is "%f" or "%F" or "%u" or "%U" ? t[1] : LongOptionTargetCode(t)).ToArray();
+			if (targetCodes.Count(c => c != '\0') > 1 ||
+				(targetCodes.Any(c => c is 'f' or 'F' or 'd' or 'D') && targets.Any(t => !ToPathOrUri(t).StartsWith('/'))) ||
+				(tokens.Any(t => LongOptionTargetCode(t) != '\0') && targets.Count != 1)) return [];
 			var single = tokens.Any(t => t is "%f" or "%u");
 			var result = new List<IReadOnlyList<string>>();
 			foreach (var target in single ? targets : new string[] { string.Empty })
@@ -138,6 +140,14 @@ namespace Files.Platform.Linux.Launching
 							if (!string.IsNullOrEmpty(app.IconName)) { argv.Add("--icon"); argv.Add(app.IconName); }
 							break;
 						default:
+							var code = LongOptionTargetCode(token);
+							if (code != '\0')
+							{
+								var value = code is 'u' or 'U' ? ToUri(targets[0]) : PathArgument(targets[0]);
+								if (code is 'd' or 'D') value = System.IO.Path.GetDirectoryName(value) ?? "/";
+								argv.Add(token[..^2] + value);
+								break;
+							}
 							var literal = new StringBuilder();
 							for (var i = 0; i < token.Length; i++)
 							{
@@ -153,6 +163,18 @@ namespace Files.Platform.Linux.Launching
 				result.Add(argv.ToArray());
 			}
 			return result;
+		}
+
+		// Accept only --name=%x with an ASCII option name and no surrounding value text.
+		private static char LongOptionTargetCode(string token)
+		{
+			var equals = token.IndexOf('=');
+			if (!token.StartsWith("--", StringComparison.Ordinal) || equals < 3 || equals != token.Length - 3 ||
+				token[equals + 1] != '%' || token[^1] is not ('f' or 'F' or 'u' or 'U' or 'd' or 'D') ||
+				!char.IsAsciiLetterOrDigit(token[2])) return '\0';
+			for (var i = 3; i < equals; i++)
+				if (!char.IsAsciiLetterOrDigit(token[i]) && token[i] != '-') return '\0';
+			return token[^1];
 		}
 
 		/// <summary>

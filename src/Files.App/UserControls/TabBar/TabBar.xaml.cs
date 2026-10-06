@@ -90,6 +90,10 @@ namespace Files.App.UserControls.TabBar
 				{
 					case nameof(AppearanceSettingsService.ShowTabActions):
 						NotifyPropertyChanged(nameof(ShowTabActionsButton));
+#if !WINDOWS
+						if (OperatingSystem.IsLinux())
+							UpdateLinuxCaptionButtons();
+#endif
 						break;
 				}
 			};

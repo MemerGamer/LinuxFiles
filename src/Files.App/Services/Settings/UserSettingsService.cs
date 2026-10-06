@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.App.Utils.Serialization.Implementation;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using System.Collections.Concurrent;
@@ -90,7 +91,7 @@ namespace Files.App.Services.Settings
 
 		public UserSettingsService()
 		{
-			var settingsSerializer = new DefaultSettingsSerializer();
+			var settingsSerializer = new DefaultSettingsSerializer(message => App.Logger.LogWarning(message));
 			SettingsSerializer = settingsSerializer;
 
 			#if WINDOWS

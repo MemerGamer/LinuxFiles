@@ -28,9 +28,10 @@ namespace Files.App.Views.Properties
 			// FileIcon's x:Bind/x:Load expressions never refresh on Uno, so the icon is set directly.
 			ViewModel.PropertyChanged += (_, e) =>
 			{
-				if (e.PropertyName == nameof(SelectedItemsPropertiesViewModel.IconData))
+				if (e.PropertyName is nameof(SelectedItemsPropertiesViewModel.IconData) or nameof(SelectedItemsPropertiesViewModel.LoadCombinedItemsGlyph))
 					_ = UpdateIconAsync();
 			};
+			Loaded += (_, _) => _ = UpdateIconAsync();
 
 			_updateDateDisplayTimer = DispatcherQueue.CreateTimer();
 			_updateDateDisplayTimer.Interval = TimeSpan.FromSeconds(1);
@@ -40,15 +41,23 @@ namespace Files.App.Views.Properties
 
 		private async Task UpdateIconAsync()
 		{
+			CombinedItemsIcon.Visibility = ViewModel.IconData is null && ViewModel.LoadCombinedItemsGlyph
+				? Visibility.Visible
+				: Visibility.Collapsed;
+
 			if (ViewModel.IconData is not { } data)
+			{
+				Icon.Source = null;
 				return;
+			}
 
 			var image = new BitmapImage();
 			using var stream = new InMemoryRandomAccessStream();
 			await stream.WriteAsync(data.AsBuffer());
 			stream.Seek(0);
 			await image.SetSourceAsync(stream);
-			Icon.Source = image;
+			if (ReferenceEquals(ViewModel.IconData, data))
+				Icon.Source = image;
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(UIElement))]

@@ -35,7 +35,7 @@ namespace Files.App.Services.Settings
 
 		public FileTagsSettingsService()
 		{
-			var settingsSerializer = new DefaultSettingsSerializer();
+			var settingsSerializer = new DefaultSettingsSerializer(message => App.Logger.LogWarning(message));
 			SettingsSerializer = settingsSerializer;
 
 			#if WINDOWS

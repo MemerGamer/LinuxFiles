@@ -27,11 +27,17 @@ out="$root/artifacts/$rid"
 rm -rf "$out"
 
 # Trimming and AOT are intentionally not enabled.
-dotnet publish "$root/src/Files.App/Files.App.csproj" \
+MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet publish "$root/src/Files.App/Files.App.csproj" \
   -f net10.0-desktop -c Release -r "$rid" \
   --self-contained "$self_contained" \
   -p:PublishTrimmed=false -p:PublishAot=false \
-  -o "$out"
+  -nodeReuse:false -m:2 -o "$out"
+
+# This AOT executable is installed separately, root-owned, by native packages only.
+MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet publish \
+  "$root/src/Files.Platform.Linux.ElevationHelper/Files.Platform.Linux.ElevationHelper.csproj" \
+  -c Release -r "$rid" --self-contained -nodeReuse:false -m:2 \
+  -o "$out/elevation-helper"
 
 echo "Published to $out ($(du -sh "$out" | cut -f1))"
 

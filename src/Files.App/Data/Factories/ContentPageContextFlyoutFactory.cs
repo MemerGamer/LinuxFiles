@@ -473,6 +473,7 @@ namespace Files.App.Data.Factories
 						new ContextMenuFlyoutItemViewModelBuilder(Commands.SetAsAppBackground).Build(),
 					]
 				},
+				GetRootActionsItem(selectedItems, itemsSelected, itemViewModel?.WorkingDirectory),
 				new ContextMenuFlyoutItemViewModelBuilder(Commands.RotateLeft)
 				{
 					IsVisible = !currentInstanceViewModel.IsPageTypeRecycleBin

@@ -141,3 +141,11 @@ Try it: `curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nig
 - Whether an SVG logo can be supplied for `scalable/`.
 - Runtime behaviour of the Flatpak (sandboxed run, portals) and a `namcap` lint of the AUR package.
 - arm64 publishing has not been tested.
+
+## Root actions
+
+Native AUR packages install a root-owned Native AOT helper at `/usr/lib/linuxfiles/files-elevation-helper` and `packaging/linux/io.github.memergamer.LinuxFiles.root-actions.policy` under `/usr/share/polkit-1/actions/`. Install polkit to enable the menu. The helper is never setuid; the action uses `auth_admin` without retaining authorization. AOT publishing requires clang and zlib development files.
+
+For local installation, publish normally and opt in with `scripts/linux/install-local.sh --install-root-helper`. This separately runs `sudo python3 scripts/linux/install-root-helper.py --from artifacts/linux-x64/elevation-helper`; the app stays in the user prefix. To inspect the package layout without privileges, run `python3 scripts/linux/install-root-helper.py --from <published-helper-dir> --destdir <temporary-staging-dir>`. Remove the system helper and policy as administrator when uninstalling; the user-local uninstaller intentionally cannot remove system files.
+
+AppImage and Flatpak omit the helper, install no policy, and disable Root actions. They cannot supply host elevation, even when the native helper is installed separately. See [the elevation threat model](threat-model-elevation.md) for protocol, failure semantics and limitations.

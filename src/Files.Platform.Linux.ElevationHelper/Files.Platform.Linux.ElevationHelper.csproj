@@ -1,0 +1,22 @@
+<!-- Copyright (c) Files Community. Licensed under the MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>files-elevation-helper</AssemblyName>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <IsAotCompatible>true</IsAotCompatible>
+    <PublishAot>true</PublishAot>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DefineConstants>$(DefineConstants);ELEVATION_HELPER</DefineConstants>
+    <EnableMSTestRunner>false</EnableMSTestRunner>
+    <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <DirectPInvoke Include="libc" />
+    <ProjectReference Include="../Files.Platform.Abstractions/Files.Platform.Abstractions.csproj" />
+    <Compile Include="../Files.Platform.Linux/Native/PosixNative.cs" Link="Native/PosixNative.cs" />
+    <Compile Include="../Files.Platform.Linux/Native/ElevationNative.cs" Link="Native/ElevationNative.cs" />
+  </ItemGroup>
+</Project>

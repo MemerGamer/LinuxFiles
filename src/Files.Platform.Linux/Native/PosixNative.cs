@@ -274,6 +274,13 @@ namespace Files.Platform.Linux.Native
 				_ => new IOException($"The operation on '{path}' failed with errno {errno}.", errno),
 			};
 
+#if ELEVATION_HELPER
+		[LibraryImport("libc", EntryPoint = "mkdirat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial int mkdirat(int fd, string name, uint mode);
+		[LibraryImport("libc", EntryPoint = "symlinkat", StringMarshalling = StringMarshalling.Utf8, SetLastError = true)]
+		private static partial int symlinkat(string target, int fd, string name);
+#endif
+
 		[LibraryImport("libc", EntryPoint = "fcntl", SetLastError = true)]
 		private static partial int fcntl(int fd, int command, int argument);
 
@@ -311,6 +318,7 @@ namespace Files.Platform.Linux.Native
 		private static partial void rewinddir(nint stream);
 	}
 
+#if !ELEVATION_HELPER
 	/// <summary>
 	/// An open directory descriptor that child operations are performed relative to.
 	/// </summary>
@@ -501,4 +509,5 @@ namespace Files.Platform.Linux.Native
 			}
 		}
 	}
+#endif
 }

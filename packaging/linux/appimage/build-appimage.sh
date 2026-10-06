@@ -54,6 +54,10 @@ fetch "https://github.com/AppImage/type2-runtime/releases/download/20251108/runt
 rm -rf "$appdir"
 mkdir -p "$appdir/usr/bin" "$appdir/usr/lib/linuxfiles" "$appdir/usr/share"
 cp -a "$from/." "$appdir/usr/lib/linuxfiles/"
+# Portable images cannot install the host polkit policy or privileged helper.
+rm -rf "$appdir/usr/lib/linuxfiles/elevation-helper"
+rm -f "$appdir/usr/lib/linuxfiles/files-elevation-helper"
+touch "$appdir/usr/lib/linuxfiles/.root-actions-disabled"
 install -Dm755 "$root/packaging/linux/files" "$appdir/usr/bin/files"
 install -Dm644 "$root/packaging/linux/$app_id.desktop" "$appdir/usr/share/applications/$app_id.desktop"
 install -Dm644 "$root/packaging/linux/$app_id.metainfo.xml" "$appdir/usr/share/metainfo/$app_id.metainfo.xml"
@@ -68,6 +72,7 @@ cat > "$appdir/AppRun" <<'RUN'
 #!/bin/sh
 here="$(dirname "$(readlink -f "$0")")"
 export FILES_LIBDIR="$here/usr/lib/linuxfiles"
+export FILES_DISABLE_ROOT_ACTIONS=1
 exec "$here/usr/bin/files" "$@"
 RUN
 chmod +x "$appdir/AppRun"

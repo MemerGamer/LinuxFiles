@@ -8,6 +8,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ver="${1:?version required, e.g. 0.1.0}"
+ver="${ver//-/}"  # pkgver may not contain hyphens: 0.1.0-alpha1 -> 0.1.0alpha1
 dir="${2:?directory with release tarballs required}"
 out="${3:-$root/artifacts/aur}"
 tpl="$root/packaging/linux/aur/linuxfiles-bin/PKGBUILD"

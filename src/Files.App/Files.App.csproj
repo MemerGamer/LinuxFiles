@@ -54,6 +54,9 @@
 
     <!--  Uno Platform (Skia desktop) target  -->
     <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <Version>0.1.0-alpha1</Version>
+        <AssemblyVersion>0.1.0.0</AssemblyVersion>
+        <FileVersion>0.1.0.0</FileVersion>
         <!--  Enables Files.Core.SourceGenerator's UnoDependencyPropertyGenerator ([GeneratedDependencyProperty] stand-in)  -->
         <FilesUnoDependencyProperty>true</FilesUnoDependencyProperty>
         <!--  XAML cannot see generator output on Uno; ICommandManager is checked in under Platforms/Desktop/Generated  -->

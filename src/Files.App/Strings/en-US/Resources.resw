@@ -4990,4 +4990,7 @@
   <data name="OpenArchiveAsFolderDescription" xml:space="preserve">
     <value>Browse the contents of the selected archive like a folder</value>
   </data>
+  <data name="LinuxFileSystemRoot" xml:space="preserve">
+    <value>File System</value>
+  </data>
 </root>

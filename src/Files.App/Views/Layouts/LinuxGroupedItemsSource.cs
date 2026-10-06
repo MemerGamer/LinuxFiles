@@ -22,6 +22,7 @@ namespace Files.App.Views.Layouts
 		private HashSet<string?>? pendingSelection;
 		private bool rebuildPending;
 		private bool disposed;
+		private bool initialBuild = true;
 
 		public BulkConcurrentObservableCollection<object> Items { get; } = [];
 
@@ -102,6 +103,9 @@ namespace Files.App.Views.Layouts
 				return;
 			}
 
+			// The first build has no recycled containers, and a selection restored after a layout switch can already be in place
+			var removeStale = !initialBuild;
+			initialBuild = false;
 			var selectedPaths = pendingSelection ?? owner.SelectedItems.OfType<ListedItem>().Select(item => item.ItemPath).ToHashSet(StringComparer.Ordinal);
 			pendingSelection = null;
 			var previous = Items.ToHashSet(ReferenceEqualityComparer.Instance);
@@ -128,8 +132,11 @@ namespace Files.App.Views.Layouts
 					return;
 
 				// Recycled containers can carry a stale selection onto inserted rows
-				foreach (var item in owner.SelectedItems.OfType<ListedItem>().Where(item => inserted.Contains(item) && !selectedPaths.Contains(item.ItemPath)).ToList())
-					owner.SelectedItems.Remove(item);
+				if (removeStale)
+				{
+					foreach (var item in owner.SelectedItems.OfType<ListedItem>().Where(item => inserted.Contains(item) && !selectedPaths.Contains(item.ItemPath)).ToList())
+						owner.SelectedItems.Remove(item);
+				}
 
 				var selected = owner.SelectedItems.ToHashSet(ReferenceEqualityComparer.Instance);
 				foreach (var item in Items.OfType<ListedItem>().Where(item => selectedPaths.Contains(item.ItemPath) && !selected.Contains(item)).ToList())

@@ -232,6 +232,7 @@
 
 						<TextBlock
 							x:Name="ItemName"
+							Foreground="{ThemeResource TextFillColorPrimaryBrush}"
 							Grid.Column="2"
 							Height="60"
 							HorizontalAlignment="Stretch"
@@ -385,6 +386,7 @@
 					<!--  Item Name  -->
 					<TextBlock
 						x:Name="ItemName"
+						Foreground="{ThemeResource TextFillColorPrimaryBrush}"
 						Grid.Column="1"
 						Margin="5,0,5,0"
 						HorizontalAlignment="Left"
@@ -568,6 +570,7 @@
 								<!--  Item Name  -->
 								<TextBlock
 									x:Name="ItemName"
+									Foreground="{ThemeResource TextFillColorPrimaryBrush}"
 									MaxLines="{Binding ElementName=PageRoot, Path=CardsViewItemNameMaxLines, Mode=OneWay}"
 									Opacity="{x:Bind Opacity, Mode=OneWay}"
 									Style="{ThemeResource App.Theme.BodyStrongTextBlockStyle}"

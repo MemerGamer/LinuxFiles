@@ -268,7 +268,9 @@ namespace Files.App.Data.Items
 			};
 #else
 			// The label already is the display name (volume label, "<size> Volume" or "File System")
-			item.Text = !string.IsNullOrEmpty(label) ? label : root.DisplayName;
+			item.Text = !string.IsNullOrWhiteSpace(label) ? label : root.DisplayName;
+			if (string.IsNullOrWhiteSpace(item.Text) && root.Path is "/")
+				item.Text = Strings.LinuxFileSystemRoot.GetLocalizedResource();
 #endif
 			item.Type = type;
 			item.MenuOptions = new ContextMenuOptions

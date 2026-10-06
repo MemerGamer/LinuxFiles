@@ -104,6 +104,10 @@ namespace Files.App.Views.Layouts
 			ItemManipulationModel.ScrollToTopInvoked += ItemManipulationModel_ScrollToTopInvoked;
 			ItemManipulationModel.RefreshItemThumbnailInvoked += ItemManipulationModel_RefreshItemThumbnail;
 			ItemManipulationModel.RefreshItemsThumbnailInvoked += ItemManipulationModel_RefreshItemsThumbnail;
+#if !WINDOWS
+			ActualThemeChanged -= LinuxPage_ActualThemeChanged;
+			ActualThemeChanged += LinuxPage_ActualThemeChanged;
+#endif
 		}
 
 		protected override void UnhookEvents()
@@ -304,6 +308,13 @@ namespace Files.App.Views.Layouts
 				ListViewBase.SelectedItems.Remove(header);
 #endif
 			var selectedItems = ListViewBase.SelectedItems.OfType<ListedItem>().ToList();
+#if !WINDOWS
+			if (e is not null)
+			{
+				foreach (var added in e.AddedItems)
+					ApplyPageThemeToContainer(ListViewBase.ContainerFromItem(added) as FrameworkElement);
+			}
+#endif
 
 			if (SelectedItems is not null && SelectedItems.SequenceEqual(selectedItems))
 				return;
@@ -334,6 +345,27 @@ namespace Files.App.Views.Layouts
 		/// Uno can leave a container (and the rename box inside it) with the application theme instead of the page's
 		/// theme after the rename box takes focus, which paints dark-theme text on a light row and vice versa.
 		/// </summary>
+#if !WINDOWS
+		/// <summary>
+		/// A selected container resolves its text brushes against the application theme instead of the page theme on Uno,
+		/// which paints white text on a light selection, so the page theme is pinned on the container.
+		/// </summary>
+		private void ApplyPageThemeToContainer(FrameworkElement? container)
+		{
+			if (container is not null && ActualTheme is not ElementTheme.Default && container.RequestedTheme != ActualTheme)
+				container.RequestedTheme = ActualTheme;
+		}
+
+		private void LinuxPage_ActualThemeChanged(FrameworkElement sender, object args)
+		{
+			if (ListViewBase?.ItemsPanelRoot is not { } panel)
+				return;
+
+			foreach (var child in panel.Children)
+				ApplyPageThemeToContainer(child as FrameworkElement);
+		}
+#endif
+
 		protected void SyncContainerTheme(FrameworkElement? container)
 		{
 			if (container is not null && container.ActualTheme != ActualTheme)

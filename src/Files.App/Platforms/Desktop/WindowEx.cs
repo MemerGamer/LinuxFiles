@@ -89,15 +89,17 @@ namespace Files.App.Data.Items
 		}
 
 		/// <summary>
-		/// Sizes the window to 80% of the primary work area (at most 1280x800 scaled up to 1600x1000 on big screens), centered.
+		/// Sizes the window to 80% of the primary work area (capped at 1600x1000 logical pixels), centered.
 		/// </summary>
 		private void ApplyDefaultSize()
 		{
 			try
 			{
 				var work = DisplayArea.Primary.WorkArea;
-				var width = Math.Clamp((int)(work.Width * 0.8), Math.Min(MinWidth, work.Width), 1600);
-				var height = Math.Clamp((int)(work.Height * 0.8), Math.Min(MinHeight, work.Height), 1000);
+				// AppWindow sizes are physical pixels; the caps are logical
+				var scale = Files.Platform.Linux.Windowing.DisplayScaleResolver.GetEffectiveScale();
+				var width = Math.Clamp((int)(work.Width * 0.8), Math.Min((int)(MinWidth * scale), work.Width), (int)(1600 * scale));
+				var height = Math.Clamp((int)(work.Height * 0.8), Math.Min((int)(MinHeight * scale), work.Height), (int)(1000 * scale));
 				AppWindow.Resize(new Windows.Graphics.SizeInt32 { Width = width, Height = height });
 				AppWindow.Move(new Windows.Graphics.PointInt32 { X = work.X + (work.Width - width) / 2, Y = work.Y + (work.Height - height) / 2 });
 			}

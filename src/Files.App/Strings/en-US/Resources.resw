@@ -4993,4 +4993,28 @@
   <data name="LinuxFileSystemRoot" xml:space="preserve">
     <value>File System</value>
   </data>
+  <data name="ToggleSidebarPane" xml:space="preserve">
+    <value>Toggle sidebar</value>
+  </data>
+  <data name="StatusCenterToggleDetails" xml:space="preserve">
+    <value>Show or hide details</value>
+  </data>
+  <data name="ShowToolbarSortViewLabels" xml:space="preserve">
+    <value>Show labels on the Sort and Layout buttons</value>
+  </data>
+  <data name="Error" xml:space="preserve">
+    <value>Error</value>
+  </data>
+  <data name="FolderItemAutomation" xml:space="preserve">
+    <value>Folder</value>
+  </data>
+  <data name="CommitsNumber" xml:space="preserve">
+    <value>Commits: {0}</value>
+  </data>
+  <data name="SettingsAboutAppName" xml:space="preserve">
+    <value>LinuxFiles</value>
+  </data>
+  <data name="StatusCenter_PrepareInProgress" xml:space="preserve">
+    <value>Preparing...</value>
+  </data>
 </root>

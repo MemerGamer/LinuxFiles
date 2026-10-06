@@ -170,6 +170,7 @@
 									Height="32"
 									Padding="0"
 									x:Load="{x:Bind IsSpeedAndProgressAvailable, Mode=OneWay}"
+									AutomationProperties.Name="{helpers:ResourceString Key=StatusCenterToggleDetails}"
 									Background="Transparent"
 									BorderBrush="Transparent"
 									IsChecked="{x:Bind IsExpanded, Mode=TwoWay}">

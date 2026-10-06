@@ -160,7 +160,7 @@
 				AccessKeyInvoked="AppBarButton_AccessKeyInvoked"
 				AutomationProperties.Name="{helpers:ResourceString Key=Sort}"
 				Label="{helpers:ResourceString Key=Sort}"
-				LabelPosition="Collapsed"
+				LabelPosition="Default"
 				Style="{StaticResource ToolBarAppBarButtonFlyoutStyle}"
 				ToolTipService.ToolTip="{helpers:ResourceString Key=Sort}">
 
@@ -271,7 +271,7 @@
 				AccessKeyInvoked="AppBarButton_AccessKeyInvoked"
 				AutomationProperties.Name="{helpers:ResourceString Key=Layout}"
 				Label="{helpers:ResourceString Key=Layout}"
-				LabelPosition="Collapsed"
+				LabelPosition="Default"
 				Style="{StaticResource ToolBarAppBarButtonFlyoutStyle}"
 				ToolTipService.ToolTip="{helpers:ResourceString Key=Layout}">
 

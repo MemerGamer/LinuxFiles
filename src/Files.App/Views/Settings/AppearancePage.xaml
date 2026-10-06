@@ -287,6 +287,12 @@
 					IsOn="{x:Bind ViewModel.ShowToolbar, Mode=TwoWay}" />
 
 				<wctcontrols:SettingsExpander.Items>
+					<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=ShowToolbarSortViewLabels}">
+						<ToggleSwitch
+							AutomationProperties.AutomationControlType="Custom"
+							AutomationProperties.Name="{helpers:ResourceString Key=ShowToolbarSortViewLabels}"
+							IsOn="{x:Bind ViewModel.ShowToolbarSortViewLabels, Mode=TwoWay}" />
+					</wctcontrols:SettingsCard>
 					<wctcontrols:SettingsCard
 						Command="{x:Bind ViewModel.CustomizeToolbarCommand, Mode=OneWay}"
 						Header="{helpers:ResourceString Key=CustomizeToolbarDescription}"

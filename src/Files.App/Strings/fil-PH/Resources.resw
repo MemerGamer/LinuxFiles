@@ -117,17 +117,11 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="NewWindow" xml:space="preserve">
-    <value/>
-  </data>
   <data name="CopyPath" xml:space="preserve">
     <value>Kopyahin ang daan</value>
   </data>
   <data name="CopyItemPath" xml:space="preserve">
     <value>Kopyahin ang Path</value>
-  </data>
-  <data name="CopyPathWithQuotes" xml:space="preserve">
-    <value/>
   </data>
   <data name="CopyItemPathWithQuotes" xml:space="preserve">
     <value>Kopyahin ang path ng item kasama ang quotes</value>
@@ -167,12 +161,6 @@
   </data>
   <data name="SelectAll" xml:space="preserve">
     <value>Piliin lahat</value>
-  </data>
-  <data name="InvertSelection" xml:space="preserve">
-    <value/>
-  </data>
-  <data name="ClearSelection" xml:space="preserve">
-    <value/>
   </data>
   <data name="PropertiesModified.Text" xml:space="preserve">
     <value>Nabago:</value>
@@ -308,9 +296,6 @@
   </data>
   <data name="Delete" xml:space="preserve">
     <value>Burahin</value>
-  </data>
-  <data name="PinFolderToSidebar" xml:space="preserve">
-    <value/>
   </data>
   <data name="WelcomeDialogTitle" xml:space="preserve">
     <value>Welcome to Files!</value>

@@ -44,6 +44,9 @@ namespace Files.App
 
 			LaunchArguments = args;
 
+			// Uno reads Xft.dpi itself; this covers sessions that only export GDK/Qt scale variables
+			Files.Platform.Linux.Windowing.DisplayScaleResolver.ApplyToProcess();
+
 			// Single instance: D-Bus name (socket fallback). A second launch forwards its arguments to the running instance and exits.
 			// FILES_NO_SINGLE_INSTANCE=1 skips this (for running several instances side by side while developing).
 			var noSingleInstance = Environment.GetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE") == "1";

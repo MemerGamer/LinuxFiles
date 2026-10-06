@@ -101,7 +101,7 @@
 				Height="32"
 				Padding="0"
 				x:Load="{x:Bind IsSidebarPaneOpenToggleButtonVisible, Mode=OneWay}"
-				AutomationProperties.Name="ToggleSidebarPane"
+				AutomationProperties.Name="{helpers:ResourceString Key=ToggleSidebarPane}"
 				Background="Transparent"
 				BorderBrush="Transparent"
 				Click="SidebarPaneToggleButton_Click"
@@ -148,6 +148,7 @@
 
 			<Button
 				x:Name="FlyoutButton"
+				AutomationProperties.Name="{helpers:ResourceString Key=SeeMore}"
 				LosingFocus="NavigationButtonOverflowFlyoutButton_LosingFocus"
 				Style="{StaticResource AddressToolbarButtonStyle}"
 				ToolTipService.ToolTip="{helpers:ResourceString Key=SeeMore}"

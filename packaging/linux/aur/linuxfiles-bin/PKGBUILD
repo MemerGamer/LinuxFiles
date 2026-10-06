@@ -5,7 +5,8 @@
 # Regenerate checksums and .SRCINFO for a release with scripts/linux/gen-aur.sh.
 pkgname=linuxfiles-bin
 _pkgname=linuxfiles
-pkgver=0.1.0alpha1
+_tag=0.1.0-alpha1  # release tag without the linux-v prefix; scripts/linux/gen-aur.sh sets it
+pkgver=0.1.0alpha1  # the tag with hyphens removed
 pkgrel=1
 pkgdesc='LinuxFiles, Files for Linux: unofficial port of Files by the Files Community (Uno Platform), prebuilt binaries'
 arch=('x86_64')
@@ -21,7 +22,7 @@ optdepends=('polkit: authenticated root actions'
 provides=("$_pkgname")
 conflicts=("$_pkgname")
 options=('!strip' '!debug')  # stripping breaks the self-contained .NET binaries
-_base="$url/releases/download/linux-v${pkgver/alpha/-alpha}"  # 0.1.0alpha1 -> tag linux-v0.1.0-alpha1
+_base="$url/releases/download/linux-v$_tag"
 source=("$pkgname-$pkgver.tar.gz::$_base/files-linux-x64.tar.gz"
         "$pkgname-packaging-$pkgver.tar.gz::$_base/files-packaging.tar.gz")
 noextract=("$pkgname-$pkgver.tar.gz" "$pkgname-packaging-$pkgver.tar.gz")

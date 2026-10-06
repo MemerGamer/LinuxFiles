@@ -365,6 +365,20 @@ namespace Files.App.ViewModels.Settings
 			}
 		}
 
+		public bool ShowToolbarSortViewLabels
+		{
+			get => UserSettingsService.AppearanceSettingsService.ShowToolbarSortViewLabels;
+			set
+			{
+				if (value != UserSettingsService.AppearanceSettingsService.ShowToolbarSortViewLabels)
+				{
+					UserSettingsService.AppearanceSettingsService.ShowToolbarSortViewLabels = value;
+
+					OnPropertyChanged();
+				}
+			}
+		}
+
 		public bool ShowStatusBar
 		{
 			get => UserSettingsService.AppearanceSettingsService.ShowStatusBar;

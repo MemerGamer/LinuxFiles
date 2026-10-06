@@ -42,6 +42,9 @@ namespace Files.Platform.Linux.Native
 		public static partial int XCloseDisplay(nint display);
 
 		[LibraryImport(LibX11)]
+		public static partial nint XResourceManagerString(nint display);
+
+		[LibraryImport(LibX11)]
 		public static partial int XConnectionNumber(nint display);
 
 		[LibraryImport(LibX11)]

@@ -123,6 +123,8 @@ namespace Files.Platform.Tests.Launching
 		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=safe\n[Desktop Action a]\nName=unused\0name\n")]
 		[DataRow("[Desktop Action a]\nName=unused\0name\n[Desktop Entry]\nType=Application\nName=X\nExec=safe\n")]
 		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=a\n[Desktop Action a]\nExec=unused\n[Desktop Entry]\nExec=b\n")]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=safe\n\v[Foo]\nName=y\n")]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=safe\n[Foo]\f\nName=y\n")]
 		public void StrictParse_RejectsAmbiguousEntries(string text)
 		{
 			Assert.IsNull(Strict(text, out var error));

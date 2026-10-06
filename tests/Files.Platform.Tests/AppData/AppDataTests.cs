@@ -135,6 +135,26 @@ namespace Files.Platform.Tests.AppData
 		}
 
 		[TestMethod]
+		public void UserDirectories_EnvironmentVariablesOverrideFile()
+		{
+			var cfg = Path.Combine(_root, "cfg");
+			Directory.CreateDirectory(cfg);
+			File.WriteAllText(Path.Combine(cfg, "user-dirs.dirs"), "XDG_DESKTOP_DIR=\"$HOME/D\"\nXDG_DOWNLOAD_DIR=\"$HOME/F\"\n");
+
+			var d = new LinuxUserDirectories(Env(new()
+			{
+				["XDG_CONFIG_HOME"] = cfg,
+				["XDG_DESKTOP_DIR"] = "/data/desk",
+				["XDG_DOWNLOAD_DIR"] = "relative",
+				["XDG_MUSIC_DIR"] = _root,
+			}), _root);
+
+			Assert.AreEqual("/data/desk", d.Desktop);
+			Assert.AreEqual(Path.Combine(_root, "F"), d.Downloads, "relative env value ignored");
+			Assert.AreEqual(Path.Combine(_root, "Music"), d.Music, "$HOME means disabled");
+		}
+
+		[TestMethod]
 		public void Settings_RoundTripsSupportedTypes_AcrossInstances()
 		{
 			var file = Path.Combine(_root, "sub", "local.json");

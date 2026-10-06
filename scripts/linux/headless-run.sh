@@ -9,6 +9,7 @@
 #      FILES_SANDBOX_SEED (optional script run as "script <sandbox-home>" after the default sample content is created),
 #      FILES_HEADLESS_WM (optional window manager command to run on the private display, e.g. "kwin_x11"; default none),
 #      FILES_EXEC (path to a packaged launcher, e.g. Files-x86_64.AppImage or packaging/linux/files; run instead of "dotnet Files.dll"),
+#      FILES_HEADLESS_XFT_DPI (optional Xft.dpi for the private display, e.g. 144 = 1.5x), UNO_DISPLAY_SCALE_OVERRIDE (passed through),
 #      FILES_BIN (default src/Files.App/bin/Debug/net10.0-desktop), XVFB_SIZE (default 1600x1000).
 set -euo pipefail
 
@@ -59,6 +60,10 @@ if [[ -n "${FILES_HEADLESS_WM:-}" ]]; then
 	wm_pid=$!
 	sleep 3
 fi
+
+# Optional HiDPI test: FILES_HEADLESS_XFT_DPI=120 writes Xft.dpi into the private display's X resources (Uno derives the scale from it);
+# UNO_DISPLAY_SCALE_OVERRIDE=1.5 is passed through to the app as is.
+[[ -n "${FILES_HEADLESS_XFT_DPI:-}" ]] && echo "Xft.dpi: ${FILES_HEADLESS_XFT_DPI}" | DISPLAY=":$display" xrdb -merge
 
 shot() {
 	ffmpeg -loglevel error -y -f x11grab -video_size "$size" -i ":$display" -frames:v 1 "$outdir/$1.png"

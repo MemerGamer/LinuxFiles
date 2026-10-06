@@ -57,11 +57,16 @@ namespace Files.App.Services.Desktop
 				defaults.AddRange(ReadGtkBookmarks().Where(p => !defaults.Contains(p)));
 
 				// The trash is pinned by default like on other desktops
+				var foundFolders = defaults.Count > 1 || defaults.Count == 1 && defaults[0] != Constants.UserEnvironmentPaths.RecycleBinPath;
 				defaults.Add(Constants.UserEnvironmentPaths.RecycleBinPath);
 
-				try { Write(defaults); }
-				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+				// Persist only a real seed, so a first run that could not see the user folders retries next launch.
+				if (foundFolders)
 				{
+					try { Write(defaults); }
+					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+					{
+					}
 				}
 
 				return defaults;

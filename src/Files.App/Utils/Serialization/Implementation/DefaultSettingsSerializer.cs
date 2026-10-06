@@ -2,6 +2,9 @@
 // Licensed under the MIT License.
 
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading;
 #if WINDOWS
 using Windows.Win32;
 using Windows.Win32.Storage.FileSystem;
@@ -69,6 +72,35 @@ namespace Files.App.Utils.Serialization.Implementation
 #else
 			return ReadStringFromFile(_filePath) ?? string.Empty;
 #endif
+		}
+
+		public bool WithWriteLock(Func<bool> writeSettings)
+		{
+			ArgumentNullException.ThrowIfNull(_filePath);
+			var path = Path.GetFullPath(_filePath);
+			if (OperatingSystem.IsWindows())
+				path = path.ToUpperInvariant();
+
+			// Serialize the entire read/merge/write across processes sharing this settings file.
+			var name = "Files.Settings." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(path)));
+			using var mutex = new Mutex(false, name);
+			try
+			{
+				mutex.WaitOne();
+			}
+			catch (AbandonedMutexException)
+			{
+				// The previous writer exited; this thread now owns the mutex.
+			}
+
+			try
+			{
+				return writeSettings();
+			}
+			finally
+			{
+				mutex.ReleaseMutex();
+			}
 		}
 
 		public bool WriteToFile(string text)

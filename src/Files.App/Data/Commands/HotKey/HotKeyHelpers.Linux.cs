@@ -12,14 +12,11 @@ namespace Files.App.Data.Commands
 		private const uint FirstDigitKeycode = 10;
 		private const uint LastDigitKeycode = 19;
 
-		public static Keys GetHotKeyKey(KeyRoutedEventArgs e)
-			=> (Keys)GetHotKeyVirtualKey(e);
-
 		/// <summary>
 		/// X11 reports the shifted symbol (e.g. "!") for Shift+digit, which Uno maps to
 		/// <see cref="VirtualKey.None"/>. Falls back to the physical digit-row key so Ctrl+Shift+1..0 match.
 		/// </summary>
-		public static VirtualKey GetHotKeyVirtualKey(KeyRoutedEventArgs e)
+		public static partial VirtualKey GetHotKeyVirtualKey(KeyRoutedEventArgs e)
 		{
 			if (e.Key is VirtualKey.None && e.KeyStatus.ScanCode is >= FirstDigitKeycode and <= LastDigitKeycode)
 			{

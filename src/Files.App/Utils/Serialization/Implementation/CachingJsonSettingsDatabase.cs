@@ -7,6 +7,8 @@ namespace Files.App.Utils.Serialization.Implementation
 {
 	internal sealed class CachingJsonSettingsDatabase : DefaultJsonSettingsDatabase
 	{
+		private readonly object _cacheLock = new();
+		private readonly HashSet<string> _dirtyKeys = [];
 		private ConcurrentDictionary<string, JsonElement>? _settingsCache;
 
 		public CachingJsonSettingsDatabase(
@@ -19,54 +21,85 @@ namespace Files.App.Utils.Serialization.Implementation
 
 		public override TValue? GetValue<TValue>(string key, TValue? defaultValue = default) where TValue : default
 		{
-			_settingsCache ??= GetFreshSettings();
-
-			if (_settingsCache.TryGetValue(key, out var objVal))
+			lock (_cacheLock)
 			{
-				return GetValueFromElement<TValue>(objVal) ?? defaultValue;
-			}
-			else
-			{
-				var defaultElement = GetElementFromValue(defaultValue);
-				// Persist cached defaults with the next settings change, not during reads.
-				_settingsCache.TryAdd(key, defaultElement);
+				_settingsCache ??= GetFreshSettings();
 
+				if (_settingsCache.TryGetValue(key, out var objVal))
+					return GetValueFromElement<TValue>(objVal) ?? defaultValue;
+
+				// Reading a default does not count as changing the setting.
+				_settingsCache.TryAdd(key, GetElementFromValue(defaultValue));
 				return defaultValue;
 			}
 		}
 
 		public override bool SetValue<TValue>(string key, TValue? newValue) where TValue : default
 		{
-			_settingsCache ??= GetFreshSettings();
-			var newElement = GetElementFromValue(newValue);
+			lock (_cacheLock)
+			{
+				_settingsCache ??= GetFreshSettings();
+				var newElement = GetElementFromValue(newValue);
 
-			if (_settingsCache.TryAdd(key, newElement))
-				return SaveSettings(_settingsCache);
+				if (_settingsCache.TryGetValue(key, out var oldElement) && JsonElement.DeepEquals(oldElement, newElement))
+					return _dirtyKeys.Count > 0 && SaveChangedSettings();
 
-			if (JsonElement.DeepEquals(_settingsCache[key], newElement))
-				return false;
-
-			_settingsCache[key] = newElement;
-			return SaveSettings(_settingsCache);
+				_settingsCache[key] = newElement;
+				_dirtyKeys.Add(key);
+				return SaveChangedSettings();
+			}
 		}
 
 		public override bool RemoveKey(string key)
 		{
-			_settingsCache ??= GetFreshSettings();
+			lock (_cacheLock)
+			{
+				_settingsCache ??= GetFreshSettings();
 
-			return _settingsCache.TryRemove(key, out _) && SaveSettings(_settingsCache);
+				if (!_settingsCache.TryRemove(key, out _) && !_dirtyKeys.Contains(key))
+					return false;
+
+				_dirtyKeys.Add(key);
+				return SaveChangedSettings();
+			}
+		}
+
+		private bool SaveChangedSettings()
+		{
+			return SettingsSerializer.WithWriteLock(() =>
+			{
+				var settings = GetFreshSettings();
+				foreach (var key in _dirtyKeys)
+				{
+					if (_settingsCache!.TryGetValue(key, out var value))
+						settings[key] = value;
+					else
+						settings.TryRemove(key, out _);
+				}
+
+				if (!SaveSettings(settings))
+					return false;
+
+				_settingsCache = settings;
+				_dirtyKeys.Clear();
+				return true;
+			});
 		}
 
 		public override bool ImportSettings(object? import)
 		{
-			if (base.ImportSettings(import))
+			lock (_cacheLock)
 			{
-				_settingsCache = GetFreshSettings();
+				return SettingsSerializer.WithWriteLock(() =>
+				{
+					if (!base.ImportSettings(import))
+						return false;
 
-				return true;
+					_settingsCache = GetFreshSettings();
+					_dirtyKeys.Clear();
+					return true;
+				});
 			}
-
-			return false;
 		}
 	}
 }

@@ -10,5 +10,7 @@ namespace Files.App.Utils.Serialization
 		string ReadFromFile();
 
 		bool WriteToFile(string text);
+
+		bool WithWriteLock(Func<bool> writeSettings);
 	}
 }

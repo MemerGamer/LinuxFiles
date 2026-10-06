@@ -84,6 +84,15 @@
 						VerticalAlignment="Center"
 						AutomationProperties.AccessibilityView="Raw" />
 
+					<FontIcon
+						x:Name="CombinedItemsIcon"
+						HorizontalAlignment="Center"
+						VerticalAlignment="Center"
+						AutomationProperties.AccessibilityView="Raw"
+						FontSize="48"
+						Glyph="&#xE8F1;"
+						Visibility="Collapsed" />
+
 					<!--  Edit Album Cover Button  -->
 					<Button
 						x:Name="EditAlbumCoverButton"

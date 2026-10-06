@@ -2,7 +2,7 @@
 
 > **Branching (2026-10-05):** `main` is the single integration branch. `linux/main` is retired (frozen at the last merge). Releases are tags: the rolling `nightly` pre-release (every push to `main`) and stable `linux-v*` tags.
 
-Status: draft v1 · 2026-10-04 · fork base `0e3c17ca4` (in sync with `files-community/Files` main)
+Status: phases 0–7 done (2026-10-06); phase 8 optional · draft v1 · 2026-10-04 · fork base `0e3c17ca4` (in sync with `files-community/Files` main)
 
 ## 0. Revision 2 (2026-10-04): Linux-first
 
@@ -41,14 +41,14 @@ The owner decided to focus on Linux first. Windows support is revisited only aft
 ### Revised roadmap (replaces §5 ordering)
 | Phase | Goal | Parallelism |
 |---|---|---|
-| 0 | Toolchain, CI, Uno spike, research. Extra spikes: **P0-PERF** (10k/100k items) and **P0-DND** (outbound XDND + file clipboard prototype) | parallel |
-| 1 | Abstraction skeleton (`Files.Platform.*`, tests, DI) | serial, small |
+| 0 | Toolchain, CI, Uno spike, research. Extra spikes: **P0-PERF** (10k/100k items) and **P0-DND** (outbound XDND + file clipboard prototype) **✅ Done (2026-10-04).** | parallel |
+| 1 | Abstraction skeleton (`Files.Platform.*`, tests, DI) **✅ Done (2026-10-04).** | serial, small |
 | 2 | **Linux bring-up: make `Files.App` compile and launch on Uno `net10.0-desktop`.** Retarget Controls + App to Uno. Exclude Windows-only folders (`Compile Remove`). Replace Win32/WinRT calls with interface calls, backed by stub or simple Linux implementations. Fix compile errors folder by folder. **✅ Done (2026-10-05):** the app compiles, launches and runs on Linux; the compat-off criterion moved to Phase 4. | parallel by folder ownership |
-| 3 | Real Linux backends per interface (enumeration, watcher, file ops, trash, launcher, thumbnails, drives, clipboard…), with unit tests | parallel, one agent per interface |
+| 3 | Real Linux backends per interface (enumeration, watcher, file ops, trash, launcher, thumbnails, drives, clipboard…), with unit tests **✅ Done (2026-10-05):** every interface has a Linux backend with unit tests. | parallel, one agent per interface |
 | 4 | Replace the legacy WinRT storage layer (`BaseStorageFile`/`Folder`) with OwlCore storables, then switch Win32 compat mode off (moved from Phase 2). **✅ Done (2026-10-05, P4-Z):** compat mode is off by default and the desktop build has 0 errors, which also meets Phase 2's criterion | parallel work packages (see Phase 4 plan, Revision 3) |
-| 5 | UI blockers and UX parity: L-DND, SpeedGraph, StickyHeader, title bar, previews, single instance | parallel |
-| 6 | Desktop integration and packaging (FileManager1 D-Bus, `.desktop`, Flatpak/AppImage/AUR) | parallel |
-| 7 | Hardening (performance, HiDPI, themes, localisation) | parallel |
+| 5 | UI blockers and UX parity: L-DND, SpeedGraph, StickyHeader, title bar, previews, single instance **✅ Done (2026-10-06):** drag and drop, client-side title bar with tabs, previews, grouped virtualization, KDE service menus. | parallel |
+| 6 | Desktop integration and packaging (FileManager1 D-Bus, `.desktop`, Flatpak/AppImage/AUR) **✅ Done (2026-10-06):** AppImage, Flatpak and AUR packaging, nightly CI, idempotent tagged releases; 0.1.0-alpha1 is drafted. | parallel |
+| 7 | Hardening (performance, HiDPI, themes, localisation) **✅ Done (2026-10-06):** HiDPI scale detection, translation fallback and key checks, keyboard accessibility, authenticated root actions. Known gap: light-theme toolbar focus fading. | parallel |
 | 8 | (Optional) Restore Windows: multi-target again, Windows backends behind the same interfaces | later |
 
 The Phase 2 workstreams in §7.3 still define folder ownership. Their goal is now "compiles and works on Linux",

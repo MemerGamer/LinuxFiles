@@ -65,5 +65,26 @@ namespace Files.Platform.Tests.Windowing
 			Assert.AreEqual(2.0, DisplayScaleResolver.GetEffectiveScale(_ => null, "Xft.dpi:\t192\n"));
 			Assert.AreEqual(1.0, DisplayScaleResolver.GetEffectiveScale(_ => null, null));
 		}
+
+		[TestMethod]
+		public void MalformedScreenFactors_DoNotThrow()
+		{
+			foreach (var value in new[] { ";", ";;", "=", "DP-1=", "DP-1=abc;", " ; ", "DP-1=0" })
+				Assert.IsNull(Resolve(null, ("QT_SCREEN_SCALE_FACTORS", value)), value);
+		}
+
+		[TestMethod]
+		public void QtFactors_AreComposed()
+		{
+			Assert.AreEqual("2", Resolve(null, ("QT_SCALE_FACTOR", "1"), ("QT_SCREEN_SCALE_FACTORS", "DP-1=2")));
+			Assert.AreEqual("3", Resolve(null, ("QT_SCALE_FACTOR", "1.5"), ("QT_SCREEN_SCALE_FACTORS", "DP-1=2")));
+		}
+
+		[TestMethod]
+		public void XftDpi_ToleratesWhitespaceBeforeColon()
+		{
+			Assert.IsNull(Resolve("Xft.dpi : 144\n", ("GDK_SCALE", "2")));
+			Assert.AreEqual(1.5, DisplayScaleResolver.GetEffectiveScale(_ => null, "  Xft.dpi\t:\t144\r\n"));
+		}
 	}
 }

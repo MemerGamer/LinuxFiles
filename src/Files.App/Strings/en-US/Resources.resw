@@ -5011,9 +5011,6 @@
   <data name="CommitsNumber" xml:space="preserve">
     <value>Commits: {0}</value>
   </data>
-  <data name="SettingsAboutAppName" xml:space="preserve">
-    <value>LinuxFiles</value>
-  </data>
   <data name="StatusCenter_PrepareInProgress" xml:space="preserve">
     <value>Preparing...</value>
   </data>

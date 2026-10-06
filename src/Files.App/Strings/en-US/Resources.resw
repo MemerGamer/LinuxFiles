@@ -5014,4 +5014,16 @@
   <data name="StatusCenter_PrepareInProgress" xml:space="preserve">
     <value>Preparing...</value>
   </data>
+  <data name="LinuxServiceMenuConfirmationText" xml:space="preserve">
+    <value>This service-menu action will run the command shown below on your selection. Only run actions from sources you trust.</value>
+  </data>
+  <data name="LinuxServiceMenuRefusedText" xml:space="preserve">
+    <value>This service-menu action has changed, is too large, or uses an unsupported command. Shell commands and embedded file substitutions are not supported.</value>
+  </data>
+  <data name="LinuxServiceMenuTitle" xml:space="preserve">
+    <value>Run service-menu action “{0}”?</value>
+  </data>
+  <data name="LinuxServiceMenuTooManyTargetsText" xml:space="preserve">
+    <value>This service-menu action runs a separate command for each item. Select at most {0} items and try again.</value>
+  </data>
 </root>

@@ -88,6 +88,30 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
+		[DataRow("[Desktop Action a]\nExec=evil\nExec=other\n")]
+		[DataRow("[Desktop Action a]\nExec[fr]=evil\n")]
+		[DataRow("[Desktop Action a]\nnot a key\n")]
+		[DataRow("[Desktop Action a]\nName=unused\u0001control\n")]
+		[DataRow("[Desktop Action a]\n[Desktop Action a]\nExec=evil\n")]
+		[DataRow("[Malformed group\nnot a key\n")]
+		public void StrictParse_IgnoresUnusedGroups(string unused)
+		{
+			var entry = Strict(unused + "[Desktop Entry]\nType=Application\nName=X\nExec=safe %f\n" + unused, out var error);
+			Assert.IsNotNull(entry);
+			Assert.IsNull(error);
+			Assert.AreEqual("safe %f", entry.Application.Exec);
+		}
+
+		[TestMethod]
+		public void StrictParse_IgnoresLinesWithoutKeys()
+		{
+			var entry = Strict("not a key\n[Desktop Entry]\nType=Application\nName=X\nnot a key\n=value\nExec=safe\n", out var error);
+			Assert.IsNotNull(entry);
+			Assert.IsNull(error);
+			Assert.AreEqual("safe", entry.Application.Exec);
+		}
+
+		[TestMethod]
 		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=a\nExec=b\n")]
 		[DataRow("[Desktop Entry]\nType=Application\nType=Application\nName=X\nExec=a\n")]
 		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=a\n[Desktop Entry]\nExec=b\n")]
@@ -95,6 +119,10 @@ namespace Files.Platform.Tests.Launching
 		[DataRow("[Desktop Entry]\nType=Application\nName=X\n")]
 		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=a\\nb\n")]
 		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=a\0b\n")]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=a\u0001b\n")]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=safe\n[Desktop Action a]\nName=unused\0name\n")]
+		[DataRow("[Desktop Action a]\nName=unused\0name\n[Desktop Entry]\nType=Application\nName=X\nExec=safe\n")]
+		[DataRow("[Desktop Entry]\nType=Application\nName=X\nExec=a\n[Desktop Action a]\nExec=unused\n[Desktop Entry]\nExec=b\n")]
 		public void StrictParse_RejectsAmbiguousEntries(string text)
 		{
 			Assert.IsNull(Strict(text, out var error));

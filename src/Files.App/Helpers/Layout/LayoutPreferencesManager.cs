@@ -624,9 +624,11 @@ namespace Files.App.Helpers
 			if (string.IsNullOrEmpty(path))
 				return new();
 
-#if WINDOWS
-			// LINUX-TODO(listing): grouped Grid and Cards layouts are not virtualized on Linux, so a large Downloads folder would stall; not grouped by default
-			if (path == Constants.UserEnvironmentPaths.DownloadsPath)
+			if (path == Constants.UserEnvironmentPaths.DownloadsPath
+#if !WINDOWS
+				&& Files.App.UnoVirtualization.VirtualizingWrapGrid.IsSupported(out _)
+#endif
+				)
 			{
 				// Default for downloads folder is to group by date created
 				return new()
@@ -636,9 +638,7 @@ namespace Files.App.Helpers
 					DirectoryGroupByDateUnit = GroupByDateUnit.Year
 				};
 			}
-			else
-#endif
-			if (LibraryManager.IsLibraryPath(path))
+			else if (LibraryManager.IsLibraryPath(path))
 			{
 				// Default for libraries is to group by folder path
 				return new()

@@ -28,5 +28,30 @@ if base:
     t = re.sub(r'^_base=.*$', '_base="%s"' % base, t, flags=re.M)
 open(dst, "w").write(t)
 PY
-(cd "$out" && makepkg --printsrcinfo > .SRCINFO)
+# makepkg only exists on Arch; elsewhere (CI runs on Ubuntu) emit the same fields by sourcing the PKGBUILD.
+srcinfo() {
+	if command -v makepkg >/dev/null 2>&1 && [[ "${AUR_SRCINFO_FALLBACK:-}" != 1 ]]; then
+		(cd "$out" && makepkg --printsrcinfo)
+		return
+	fi
+	(
+		# shellcheck disable=SC1091
+		source "$out/PKGBUILD"
+		list() { local k="$1"; shift; local v; for v in "$@"; do printf '\t%s = %s\n' "$k" "$v"; done; }
+		printf 'pkgbase = %s\n' "$pkgname"
+		printf '\tpkgdesc = %s\n\tpkgver = %s\n\tpkgrel = %s\n\turl = %s\n' "$pkgdesc" "$pkgver" "$pkgrel" "$url"
+		list arch "${arch[@]}"
+		list license "${license[@]}"
+		list depends "${depends[@]}"
+		list optdepends "${optdepends[@]}"
+		list provides "${provides[@]}"
+		list conflicts "${conflicts[@]}"
+		list noextract "${noextract[@]}"
+		list options "${options[@]}"
+		list source "${source[@]}"
+		list sha256sums "${sha256sums[@]}"
+		printf '\npkgname = %s\n' "$pkgname"
+	)
+}
+srcinfo > "$out/.SRCINFO"
 echo "Wrote $out/PKGBUILD and $out/.SRCINFO"

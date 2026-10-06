@@ -87,7 +87,17 @@ unpacks the self-contained publish tarball, so there is no .NET SDK, NuGet resto
 (Flathub-friendly: for a release, point the `file` source at the release URL with its sha256).
 `scripts/linux/build-flatpak.sh [--bundle]` runs `flatpak-builder` (needs the 25.08 Platform and Sdk installed) into
 `artifacts/flatpak-repo` and optionally writes `artifacts/Files-x86_64.flatpak`; without `flatpak-builder` it only
-validates the manifest structure. Built locally; not yet installed or run inside the sandbox.
+validates the manifest structure. Built locally, installed from a throwaway `FLATPAK_USER_DIR` and run inside the sandbox on a private Xvfb.
+
+XDG user folders (Quick access / Pinned): `user-dirs.dirs` is visible in the sandbox (flatpak bind-mounts the host
+file at `$XDG_CONFIG_HOME`, which is remapped to `~/.var/app/<id>/config`), `$HOME` is the real home, and
+`--filesystem=host` exposes the folders, so no extra finish-arg is needed (`xdg-*` permissions would be redundant).
+With a seeded real-path HOME the Desktop/Downloads/Documents/Pictures/Music/Videos pins appear, also when
+`user-dirs.dirs` is missing (fallback to `$HOME/<default names>`). What does hide them is a HOME under `/tmp`:
+flatpak gives the app a private `/tmp`, so a HOME seeded there looks empty (only the Recycle Bin is pinned). Seed
+test homes outside `/tmp`. Defensive changes: `LinuxUserDirectories` honours `XDG_<NAME>_DIR` environment variables
+before the file, and the first-run seed of `pinned_folders.json` is persisted only when at least one folder was
+found, so a launch that could not see the folders retries instead of freezing an empty list.
 
 `finish-args` rationale (each line is the minimum for a feature that exists in the code):
 
@@ -114,6 +124,26 @@ tags and uploads both; push them to the AUR repo by hand). `AUR_BASE_URL=file://
 files, which is how the package was build-tested with `makepkg` here (resulting file list checked). `namcap` is not
 installed on the dev box, so the package is not linted. `aur/linuxfiles/PKGBUILD` (from source) is unchanged and
 unbuilt.
+
+### Publishing a release (exact procedure)
+
+The draft release `linux-vX.Y.Z[-pre]` already holds hand-uploaded assets; CI replaces them with its own build.
+
+1. Undraft the release (GitHub UI, or `gh release edit linux-vX.Y.Z-pre -R MemerGamer/LinuxFiles --draft=false`).
+   Publishing creates the tag, which triggers `package-linux.yml`. The `release` job finds the existing release
+   (drafts included) and runs `gh release upload --clobber` for `files-linux-x64.tar.gz`, `files-packaging.tar.gz`,
+   `Files-x86_64.AppImage`, `Files-x86_64.flatpak`, a regenerated `SHA256SUMS`, and the AUR `PKGBUILD` and `SRCINFO`
+   (the `.SRCINFO`; release assets cannot start with a dot). Notes and prerelease state are untouched. If no release
+   exists for the tag, it creates one (prerelease when the tag contains `-`). Wait for the run to finish: the CI
+   tarballs differ from the hand-built ones, so the checksums in the PKGBUILD only match the CI assets.
+2. Download the CI's recipe and commit it in the AUR clone:
+   ```
+   cd ~/Documents/aur/linuxfiles-bin
+   gh release download linux-vX.Y.Z-pre -R MemerGamer/LinuxFiles -p PKGBUILD -p SRCINFO --clobber
+   mv -f SRCINFO .SRCINFO
+   git add PKGBUILD .SRCINFO && git commit -m "Update to X.Y.Z-pre"
+   ```
+3. `git push aur` (from the same directory; the remote is the AUR `linuxfiles-bin` repo).
 
 ## Nightly builds
 

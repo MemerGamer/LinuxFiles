@@ -28,6 +28,7 @@ namespace Files.Platform.Linux
 		public LinuxUserDirectories(Func<string, string?> getEnvironmentVariable, string home)
 		{
 			Home = home;
+			_getEnvironmentVariable = getEnvironmentVariable;
 
 			var configHome = getEnvironmentVariable("XDG_CONFIG_HOME");
 			if (string.IsNullOrEmpty(configHome) || !Path.IsPathRooted(configHome))
@@ -72,8 +73,15 @@ namespace Files.Platform.Linux
 		/// <inheritdoc/>
 		public string PublicShare { get; }
 
+		private readonly Func<string, string?> _getEnvironmentVariable;
+
 		private string Resolve(Dictionary<string, string> configured, string key, string defaultName)
 		{
+			// XDG_<NAME>_DIR in the environment (set by some sandboxes and sessions) wins over the file.
+			if (_getEnvironmentVariable($"XDG_{key}_DIR") is { Length: > 0 } fromEnv
+				&& Path.IsPathRooted(fromEnv) && !IsHome(fromEnv))
+				return fromEnv;
+
 			// Like xdg-user-dirs, a value equal to $HOME means the directory is disabled.
 			return configured.TryGetValue(key, out var path) && !IsHome(path)
 				? path

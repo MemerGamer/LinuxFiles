@@ -75,11 +75,12 @@ namespace Files.Platform.Linux.Mime
 		/// <summary>
 		/// Strictly parses a desktop file that is about to be executed on the user's confirmation. Unlike <see cref="Parse"/> it
 		/// rejects anything ambiguous, so what is shown is exactly what is run: multiple [Desktop Entry] groups, duplicate keys,
-		/// a missing or repeated Type/Exec, NUL or control characters, and a Type other than Application.
+		/// a missing or repeated Type/Exec, NUL anywhere or control characters in [Desktop Entry], and a Type other than Application.
+		/// Malformed lines and unused groups are ignored, as they are by <see cref="Parse"/>.
 		/// </summary>
 		public static Entry? ParseStrict(IReadOnlyList<string> lines, string path, string desktopId, CultureInfo culture, out string? error)
 		{
-			var groups = ReadStrictGroups(lines, out error);
+			var groups = ReadStrictGroups(lines, out error, desktopEntryOnly: true);
 			if (groups is null)
 				return null;
 
@@ -105,21 +106,38 @@ namespace Files.Platform.Linux.Mime
 			return entry;
 		}
 
-		/// <summary>Strictly reads all groups, sharing the same validation and unescaping for applications and service menus.</summary>
-		internal static Dictionary<string, Dictionary<string, string>>? ReadStrictGroups(IReadOnlyList<string> lines, out string? error)
+		/// <summary>Validates every service-menu group, or just the application's [Desktop Entry] group.</summary>
+		internal static Dictionary<string, Dictionary<string, string>>? ReadStrictGroups(IReadOnlyList<string> lines, out string? error, bool desktopEntryOnly = false)
 		{
 			error = null;
 			var groups = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 			Dictionary<string, string>? values = null;
 			foreach (var rawLine in lines)
 			{
+				// NUL remains forbidden even in unused groups.
+				if (rawLine.Contains('\0'))
+				{
+					error = "NUL character";
+					return null;
+				}
+
+				var line = rawLine.Trim();
+				if (desktopEntryOnly)
+				{
+					if (line.StartsWith('[') && line != "[Desktop Entry]")
+					{
+						values = null;
+						continue;
+					}
+					if (values is null && line != "[Desktop Entry]")
+						continue;
+				}
+
 				if (rawLine.TrimEnd('\r').Any(c => char.IsControl(c) && c != '\t'))
 				{
 					error = "control character";
 					return null;
 				}
-
-				var line = rawLine.Trim();
 				if (line.Length == 0 || line[0] == '#')
 					continue;
 				if (line[0] == '[')
@@ -135,6 +153,7 @@ namespace Files.Platform.Linux.Mime
 				var eq = line.IndexOf('=');
 				if (values is null || eq <= 0)
 				{
+					if (desktopEntryOnly) continue;
 					error = "key outside a group or missing equals sign";
 					return null;
 				}

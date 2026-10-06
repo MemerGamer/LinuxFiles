@@ -4,11 +4,14 @@
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Files.Platform.Tests.Mime
@@ -52,6 +55,15 @@ namespace Files.Platform.Tests.Mime
 		public void Parse_RejectsAmbiguousOrInvalidEntries(string before, string after) => Assert.IsNull(Parse(Text().Replace(before, after)));
 
 		[TestMethod]
+		[DataRow("not a key\n")]
+		[DataRow("[Unused]\nnot a key\n")]
+		[DataRow("[Unused]\nName=a\nName=b\n")]
+		[DataRow("[Unused]\nName=a\u0001b\n")]
+		[DataRow("[Unused]\nExec[fr]=evil\n")]
+		[DataRow("[Malformed group\nName=a\n")]
+		public void Parse_RemainsStrictEvenForUnusedGroups(string suffix) => Assert.IsNull(Parse(Text() + suffix));
+
+		[TestMethod]
 		public void Filter_RequiresEveryMimeAndProtocol_AndHonorsUrlCounts()
 		{
 			using var fx = new XdgFixture();
@@ -89,6 +101,33 @@ namespace Files.Platform.Tests.Mime
 		public void Parse_RefusesMalformedConstraints(string extra) => Assert.IsNull(Parse(Text(extra)));
 
 		[TestMethod]
+		public void LocalTargets_IncludeFilesDirectoriesAndArchiveFilesButNotArchiveMembers()
+		{
+			using var fx = new XdgFixture();
+			var file = fx.Write("home/file.png", "image");
+			var archive = fx.Write("home/archive.zip", "archive");
+			Assert.IsTrue(LinuxServiceMenuService.IsLocalFileSystemTarget(file));
+			Assert.IsTrue(LinuxServiceMenuService.IsLocalFileSystemTarget(fx.Home));
+			Assert.IsTrue(LinuxServiceMenuService.IsLocalFileSystemTarget(archive));
+			Assert.IsFalse(LinuxServiceMenuService.IsLocalFileSystemTarget(archive + "/file.png"));
+			Assert.IsFalse(LinuxServiceMenuService.IsLocalFileSystemTarget(fx.Home + "/missing.png"));
+			Assert.IsFalse(LinuxServiceMenuService.IsLocalFileSystemTarget("/" + file));
+		}
+
+		[TestMethod]
+		[DataRow(null)]
+		[DataRow("")]
+		[DataRow("relative/file.png")]
+		[DataRow("ftp://host/file.png")]
+		[DataRow("smb://host/file.png")]
+		[DataRow("network://host/file.png")]
+		[DataRow("trash:///file.png")]
+		[DataRow("Shell:RecycleBinFolder")]
+		[DataRow("file:///tmp/file.png")]
+		[DataRow("/tmp/file\0.png")]
+		public void LocalTargets_RejectVirtualAndInvalidPaths(string? path) => Assert.IsFalse(LinuxServiceMenuService.IsLocalFileSystemTarget(path));
+
+		[TestMethod]
 		public async Task Scan_UserOverridesSystem_AndFindsOldDirectories_AndOrdersPriority()
 		{
 			using var fx = new XdgFixture();
@@ -101,6 +140,60 @@ namespace Files.Platform.Tests.Mime
 			Assert.AreEqual(2, actions.Count);
 			Assert.AreEqual("b.desktop", Path.GetFileName(actions[0].Application.DesktopFilePath));
 			Assert.AreEqual("c.desktop", Path.GetFileName(actions[1].Application.DesktopFilePath));
+		}
+
+		[TestMethod]
+		public async Task Scan_BadFilesDoNotHideValidMenusInSameDirectory()
+		{
+			using var fx = new XdgFixture();
+			fx.Write("usr-share/mime/globs2", "50:image/png:*.png\n");
+			fx.Write("data/kio/servicemenus/invalid.desktop", Text(exec: "tool %F\nExec=evil"));
+			fx.Write("data/kio/servicemenus/control.desktop", Text() + "[Unused]\nName=a\u0001b\n");
+			fx.Write("data/kio/servicemenus/valid.desktop", Text());
+			var actions = await Service(fx).GetActionsAsync(["/a.png"]);
+			Assert.AreEqual(1, actions.Count);
+			Assert.AreEqual("valid.desktop", Path.GetFileName(actions[0].Application.DesktopFilePath));
+		}
+
+		[TestMethod]
+		public async Task Scan_UnreadableFileIsLoggedAndOtherMenusRemainAvailable()
+		{
+			if (!OperatingSystem.IsLinux())
+			{
+				Assert.Inconclusive("Linux file permissions required");
+				return;
+			}
+			if (Environment.UserName == "root")
+				Assert.Inconclusive("root bypasses permission checks");
+			using var fx = new XdgFixture();
+			fx.Write("usr-share/mime/globs2", "50:image/png:*.png\n");
+			var unreadable = fx.Write("data/kio/servicemenus/unreadable.desktop", Text());
+			fx.Write("data/kio/servicemenus/valid.desktop", Text());
+			File.SetUnixFileMode(unreadable, UnixFileMode.None);
+			try
+			{
+				var logger = new MenuLogger();
+				var service = new LinuxServiceMenuService(fx.Directories, new LinuxMimeTypeService(fx.Directories, CultureInfo.InvariantCulture),
+					CultureInfo.GetCultureInfo("fr-FR"), logger);
+				var actions = await service.GetActionsAsync(["/a.png"]);
+				Assert.AreEqual(1, actions.Count);
+				Assert.AreEqual("valid.desktop", Path.GetFileName(actions[0].Application.DesktopFilePath));
+				Assert.AreEqual(1, logger.Warnings.Count);
+				Assert.IsInstanceOfType<UnauthorizedAccessException>(logger.Warnings[0].Exception);
+				StringAssert.Contains(logger.Warnings[0].Message, "unreadable.desktop");
+			}
+			finally
+			{
+				File.SetUnixFileMode(unreadable, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+			}
+		}
+
+		[TestMethod]
+		public async Task Scan_DoesNotSwallowCancellation()
+		{
+			using var fx = new XdgFixture();
+			fx.Write("data/kio/servicemenus/valid.desktop", Text());
+			await Assert.ThrowsExactlyAsync<OperationCanceledException>(() => Service(fx).GetActionsAsync(["/a.png"], new CancellationToken(canceled: true)));
 		}
 
 		[TestMethod]
@@ -149,6 +242,32 @@ namespace Files.Platform.Tests.Mime
 		}
 
 		[TestMethod]
+		[DataRow("%f", 16, 16, false)]
+		[DataRow("%f", 17, 0, true)]
+		[DataRow("%f", 256, 0, true)]
+		[DataRow("%u", 16, 16, false)]
+		[DataRow("%u", 17, 0, true)]
+		[DataRow("%u", 256, 0, true)]
+		[DataRow("%F", 256, 1, false)]
+		[DataRow("%U", 256, 1, false)]
+		public void Plan_CapsPerTargetLaunchesWithoutLimitingBatchActions(string field, int count, int expectedInvocations, bool expectedTooMany)
+		{
+			using var fx = new XdgFixture();
+			var text = Text(exec: "tool " + field);
+			var path = fx.Write("data/kio/servicemenus/run.desktop", text);
+			var action = ServiceMenuParser.ParseStrict(text.Split('\n'), path, CultureInfo.InvariantCulture)!.Actions[0];
+			var plan = ServiceMenuLaunchPlan.Create(action, Enumerable.Repeat("/a.png", count).ToArray(), CultureInfo.InvariantCulture, out var tooMany);
+			Assert.AreEqual(expectedTooMany, tooMany);
+			if (expectedTooMany)
+				Assert.IsNull(plan);
+			else
+			{
+				Assert.IsNotNull(plan);
+				Assert.AreEqual(expectedInvocations, plan.Invocations.Count);
+			}
+		}
+
+		[TestMethod]
 		[DataRow("%f", false, true)]
 		[DataRow("%F", false, false)]
 		[DataRow("%u", true, true)]
@@ -191,6 +310,17 @@ namespace Files.Platform.Tests.Mime
 			Assert.IsNull(ServiceMenuLaunchPlan.Create(action, ["/" + new string('a', DisplaySanitizer.MaxExecutedCharacters)], CultureInfo.InvariantCulture));
 			var remote = new DesktopApplication("run", "Run", "tool %F", path);
 			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(remote, ["smb://host/file.png"]).Count);
+		}
+
+		private sealed class MenuLogger : ILogger<LinuxServiceMenuService>
+		{
+			public List<(Exception? Exception, string Message)> Warnings { get; } = [];
+			public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+			public bool IsEnabled(LogLevel logLevel) => logLevel == LogLevel.Warning;
+			public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+			{
+				if (IsEnabled(logLevel)) Warnings.Add((exception, formatter(state, exception)));
+			}
 		}
 
 		[TestMethod]

@@ -8,6 +8,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
 using Windows.System;
 using Windows.UI.Core;
@@ -477,6 +478,24 @@ namespace Files.App.Views.Layouts
 				textBlock.Visibility = Visibility.Visible;
 				textBlock.Opacity = item.Opacity;
 			}
+		}
+
+		/// <summary>
+		/// Uno bubbles taps from inside the rename box up to the list, where they would end the rename or open the item.
+		/// </summary>
+		[DynamicWindowsRuntimeCast(typeof(DependencyObject))]
+		protected bool IsInRenameTextBox(object? source)
+		{
+			if (!IsRenamingItem || renameTextBox is null)
+				return false;
+
+			for (var element = source as DependencyObject; element is not null and not Microsoft.UI.Xaml.Controls.ListViewBase; element = VisualTreeHelper.GetParent(element))
+			{
+				if (element == renameTextBox)
+					return true;
+			}
+
+			return false;
 		}
 
 		protected async void DeferRenameTextBoxHitTesting(TextBox textBox)

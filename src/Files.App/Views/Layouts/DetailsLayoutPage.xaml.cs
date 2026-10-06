@@ -668,6 +668,9 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(TextBlock))]
 		private async void FileList_ItemTapped(object sender, TappedRoutedEventArgs e)
 		{
+			if (IsInRenameTextBox(e.OriginalSource))
+				return;
+
 			var clickedItem = e.OriginalSource as FrameworkElement;
 			var ctrlPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control).HasFlag(CoreVirtualKeyStates.Down);
 			var shiftPressed = InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down);
@@ -760,6 +763,9 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(ListView))]
 		private async void FileList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
 		{
+			if (IsInRenameTextBox(e.OriginalSource))
+				return;
+
 			// Skip opening selected items if the double tap doesn't capture an item
 			var originalElement = e.OriginalSource as FrameworkElement;
 			var dataContext = originalElement?.DataContext;

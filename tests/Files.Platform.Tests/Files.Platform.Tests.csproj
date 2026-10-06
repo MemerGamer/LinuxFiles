@@ -55,4 +55,7 @@
         <Compile Include="../../src/Files.App/Utils/Serialization/IJsonSettingsDatabase.cs" Link="Settings/IJsonSettingsDatabase.cs" />
         <Compile Include="../../src/Files.App/Utils/Serialization/Implementation/*.cs" LinkBase="Settings/Implementation" />
     </ItemGroup>
+    <ItemGroup>
+        <None Update="Mime/Fixtures/ServiceMenus/*.desktop" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
 </Project>

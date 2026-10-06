@@ -107,7 +107,7 @@ namespace Files.Platform.Linux.Mime
 		}
 
 		/// <summary>Validates every service-menu group, or just the application's [Desktop Entry] group.</summary>
-		internal static Dictionary<string, Dictionary<string, string>>? ReadStrictGroups(IReadOnlyList<string> lines, out string? error, bool desktopEntryOnly = false)
+		internal static Dictionary<string, Dictionary<string, string>>? ReadStrictGroups(IReadOnlyList<string> lines, out string? error, bool desktopEntryOnly = false, bool allowIdenticalDisplayKeys = false)
 		{
 			error = null;
 			var groups = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
@@ -164,8 +164,13 @@ namespace Files.Platform.Linux.Mime
 					return null;
 				}
 				var key = line[..eq].TrimEnd();
+				var value = Unescape(line[(eq + 1)..].TrimStart());
+				if (allowIdenticalDisplayKeys && (key == "Name" || key.StartsWith("Name[", StringComparison.Ordinal) ||
+					key == "X-KDE-Submenu" || key.StartsWith("X-KDE-Submenu[", StringComparison.Ordinal)) &&
+					values.TryGetValue(key, out var existing) && existing == value)
+					continue;
 				if (new[] { "Exec[", "Type[", "Terminal[", "Path[", "TryExec[" }.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal)) ||
-					!values.TryAdd(key, Unescape(line[(eq + 1)..].TrimStart())))
+					!values.TryAdd(key, value))
 				{
 					error = "duplicate or localized execution key " + key;
 					return null;

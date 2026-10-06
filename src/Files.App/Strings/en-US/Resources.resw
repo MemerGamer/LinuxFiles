@@ -5051,4 +5051,7 @@
   <data name="LinuxServiceMenuTooManyTargetsText" xml:space="preserve">
     <value>This service-menu action runs a separate command for each item. Select at most {0} items and try again.</value>
   </data>
+  <data name="OpenTerminalAsRootLinux" xml:space="preserve">
+    <value>Open in terminal as root</value>
+  </data>
 </root>

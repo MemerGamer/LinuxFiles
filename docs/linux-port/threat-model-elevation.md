@@ -1,6 +1,6 @@
 # Threat model: root actions (Linux)
 
-Root actions offers delete, rename and paste (copy or move). It stays hidden in virtual locations and in AppImage/Flatpak, and unless pkexec, the native helper and its policy are installed at trusted system locations. AppImage/Flatpak neither install nor execute a host elevation helper.
+Root file operations offer delete, rename and paste (copy or move). It stays hidden in virtual locations and in AppImage/Flatpak, and unless pkexec, the native helper and its policy are installed at trusted system locations. AppImage/Flatpak neither install nor execute a host elevation helper.
 
 ## Privilege boundary
 
@@ -52,3 +52,5 @@ Non-root tests run HelperEngine directly against private temp trees, substitutin
 ## Not implemented
 
 Open terminal as root and edit as root remain outside this helper's protocol. Symlink copying, timestamp/permission preservation, transactional rollback and concurrent-writer snapshots are unsupported.
+
+The submenu also offers an interactive root terminal independently of helper installation, using the same packaging disable gate. Its broader root-shell authorization and terminal launch behavior are documented in [threat-model-launching.md](threat-model-launching.md#built-in-root-terminal).

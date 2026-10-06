@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Clipboard;
+using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Elevation;
 using Files.Platform.Linux.Elevation;
 using Files.Platform.Linux.Launching;
@@ -13,13 +14,19 @@ namespace Files.App.Helpers
 {
 	/// <summary>
 	/// Linux "Root actions" (like Dolphin's): delete, rename and paste as root through <see cref="IElevationService"/>.
-	/// Every operation shows the exact command first and the system's polkit prompt authenticates it.
+	/// File operations show the exact command first and authenticate through polkit; interactive terminals use the launcher.
 	/// </summary>
 	internal static class RootActionsHelper
 	{
 		private static IElevationService? Elevation => OperatingSystem.IsLinux() ? Ioc.Default.GetService<IElevationService>() : null;
 
 		public static bool IsAvailable => Elevation?.IsAvailable ?? false;
+
+		public static bool CanOpenTerminal => OperatingSystem.IsLinux() &&
+			(Ioc.Default.GetService<ILauncherService>()?.CanOpenTerminalAsRoot ?? false);
+
+		public static Task OpenTerminalAsync(string folder) =>
+			Ioc.Default.GetRequiredService<ILauncherService>().OpenTerminalAsRootAsync(folder);
 
 		private static bool dialogOpen;
 

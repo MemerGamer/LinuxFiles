@@ -20,6 +20,7 @@ namespace Files.Platform.Linux.Mime
 		public const int MaxScannedFiles = 512;
 		public const int MaxActions = 256;
 		public const int MaxSelection = 256;
+		public const int MaxKeys = 1000;
 		private readonly XdgDirectories directories;
 		private readonly IMimeTypeService mimeTypes;
 		private readonly CultureInfo culture;
@@ -103,7 +104,7 @@ namespace Files.Platform.Linux.Mime
 			try
 			{
 				var lines = DesktopEntryDisplay.ReadLinesBounded(path);
-				if (lines is null || lines.Count(l => l.Contains('=')) > DesktopEntryDisplay.MaxKeys) return null;
+				if (lines is null || lines.Count(l => l.Contains('=')) > MaxKeys) return null;
 				var menu = ServiceMenuParser.ParseStrict(lines, path, culture);
 				return identity.Value.StillMatches(path) ? menu : null;
 			}

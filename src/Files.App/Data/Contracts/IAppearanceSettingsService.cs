@@ -103,6 +103,11 @@ namespace Files.App.Data.Contracts
 		bool ShowToolbar { get; set; }
 
 		/// <summary>
+		/// Gets or sets a value whether the Sort and Layout toolbar buttons show a text label next to the icon.
+		/// </summary>
+		bool ShowToolbarSortViewLabels { get; set; }
+
+		/// <summary>
 		/// Gets or sets a value whether the status bar should be displayed.
 		/// </summary>
 		bool ShowStatusBar { get; set; }

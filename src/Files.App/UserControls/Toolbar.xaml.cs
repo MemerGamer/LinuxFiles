@@ -50,6 +50,7 @@ namespace Files.App.UserControls
 		{
 			App.AppModel.PropertyChanged += AppModel_PropertyChanged;
 			foreach (var cmd in Commands) cmd.PropertyChanged += Command_PropertyChanged;
+			ApplySortViewLabels();
 			RequestToolbarRefresh(true);
 			UserSettingsService.AppearanceSettingsService.PropertyChanged += AppearanceSettings_PropertyChanged;
 		}
@@ -158,6 +159,18 @@ namespace Files.App.UserControls
 		{
 			if (e.PropertyName is nameof(IAppearanceSettingsService.CustomToolbarItems))
 				RequestToolbarRefresh(true);
+			else if (e.PropertyName is nameof(IAppearanceSettingsService.ShowToolbarSortViewLabels))
+				DispatcherQueue.TryEnqueue(ApplySortViewLabels);
+		}
+
+		private void ApplySortViewLabels()
+		{
+			var position = UserSettingsService.AppearanceSettingsService.ShowToolbarSortViewLabels
+				? CommandBarLabelPosition.Default
+				: CommandBarLabelPosition.Collapsed;
+
+			ArrangementOptions.LabelPosition = position;
+			LayoutOptionsButton.LabelPosition = position;
 		}
 
 		private async void EditTagsMenu_TagsChanged(object? sender, EventArgs e)

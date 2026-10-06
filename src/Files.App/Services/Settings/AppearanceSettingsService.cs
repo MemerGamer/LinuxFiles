@@ -143,6 +143,13 @@ namespace Files.App.Services.Settings
 		}
 
 		/// <inheritdoc/>
+		public bool ShowToolbarSortViewLabels
+		{
+			get => Get(true);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
 		public bool ShowStatusBar
 		{
 			get => Get(true);

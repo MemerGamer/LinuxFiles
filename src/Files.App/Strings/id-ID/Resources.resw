@@ -3297,9 +3297,6 @@
   <data name="OpenProperties" xml:space="preserve">
     <value>Properti</value>
   </data>
-  <data name="OpenClassicProperties" xml:space="preserve">
-    <value/>
-  </data>
   <data name="OpenPropertiesDescription" xml:space="preserve">
     <value>Buka jendela properti</value>
   </data>

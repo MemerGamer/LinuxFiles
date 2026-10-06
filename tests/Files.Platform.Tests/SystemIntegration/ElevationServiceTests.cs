@@ -113,6 +113,18 @@ namespace Files.Platform.Tests.SystemIntegration
 		}
 
 		[TestMethod]
+		public async Task RootProcessNeverInvokesHelper()
+		{
+			var runner = new Runner();
+			var plan = Service(FakeFs.Standard(), runner).PlanDelete(["/home/u/a"]).Plan!;
+			var rootService = new PkexecElevationService(new ElevationPathChecker(FakeFs.Standard(), 0), null, runner, () => false);
+			Assert.IsFalse(rootService.IsAvailable);
+			Assert.IsNull(rootService.PlanDelete(["/home/u/a"]).Plan);
+			Assert.IsFalse((await rootService.RunAsync(plan)).Succeeded);
+			Assert.AreEqual(0, runner.Calls);
+		}
+
+		[TestMethod]
 		public void RenamePreviewUsesAbsoluteTargetAndRejectsUnsafeNames()
 		{
 			var service = Service(FakeFs.Standard(), new Runner());

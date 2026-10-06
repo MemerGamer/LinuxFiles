@@ -14,7 +14,7 @@ namespace Files.Platform.Linux.Launching
 		private readonly Func<string, string?> environment;
 		private readonly Func<bool> disabled;
 
-		public RootTerminalResolver() : this(new PathExecutableLocator(), Environment.GetEnvironmentVariable, () => RootActionsAvailability.IsDisabled) { }
+		public RootTerminalResolver() : this(new PathExecutableLocator(), Environment.GetEnvironmentVariable, () => !RootActionsAvailability.Mode.AllowRootTerminal) { }
 
 		public RootTerminalResolver(IExecutableLocator locator, Func<string, string?> environment, Func<bool> disabled)
 		{

@@ -5054,4 +5054,10 @@
   <data name="OpenTerminalAsRootLinux" xml:space="preserve">
     <value>Open in terminal as root</value>
   </data>
+  <data name="LinuxRootModeSuffix" xml:space="preserve">
+    <value> (Root mode)</value>
+  </data>
+  <data name="LinuxRunningAsRootSuffix" xml:space="preserve">
+    <value> (Running as root)</value>
+  </data>
 </root>

@@ -3,6 +3,7 @@
 
 using Files.Platform.Abstractions.Instance;
 using Files.Platform.Linux.Instance;
+using Files.Platform.Linux.Elevation;
 using System.Text;
 using Uno.UI.Hosting;
 
@@ -37,6 +38,17 @@ namespace Files.App
 		[STAThread]
 		public static int Main(string[] args)
 		{
+			try
+			{
+				RootStartupEnvironment.Apply();
+			}
+			catch (System.IO.IOException)
+			{
+				Console.Error.WriteLine("[Files] Refusing root startup: root's account and settings directories must be exclusively controlled by root.");
+				return 1;
+			}
+			RootActionsAvailability.Configure(args);
+
 			Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 			// Selawik weights (Regular/Semibold/Bold/Light) are matched by family name + weight through fontconfig
@@ -47,9 +59,10 @@ namespace Files.App
 			// Uno reads Xft.dpi itself; this covers sessions that only export GDK/Qt scale variables
 			Files.Platform.Linux.Windowing.DisplayScaleResolver.ApplyToProcess();
 
-			// Single instance: D-Bus name (socket fallback). A second launch forwards its arguments to the running instance and exits.
+			// Root-mode launches use a separate process so they never change or forward into an ordinary window.
+			// Ordinary second launches forward through D-Bus (socket fallback).
 			// FILES_NO_SINGLE_INSTANCE=1 skips this (for running several instances side by side while developing).
-			var noSingleInstance = Environment.GetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE") == "1";
+			var noSingleInstance = !RootActionsAvailability.Mode.UseSingleInstance || Environment.GetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE") == "1";
 
 			// Keep the flag from leaking into apps and terminals launched from this instance
 			Environment.SetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE", null);

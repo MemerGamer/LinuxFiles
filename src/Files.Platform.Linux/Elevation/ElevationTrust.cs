@@ -40,6 +40,8 @@ namespace Files.Platform.Linux.Elevation
 		/// <summary>Gets the inspector used for all lookups.</summary>
 		public IFileOwnershipInspector Inspector => inspector;
 
+		internal uint CurrentUserId => userId;
+
 		/// <summary>
 		/// Resolves every symbolic link in <paramref name="absolutePath"/>, including the last component. Returns null for broken links or loops.
 		/// </summary>

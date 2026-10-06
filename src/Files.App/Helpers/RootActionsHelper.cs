@@ -20,9 +20,9 @@ namespace Files.App.Helpers
 	{
 		private static IElevationService? Elevation => OperatingSystem.IsLinux() ? Ioc.Default.GetService<IElevationService>() : null;
 
-		public static bool IsAvailable => Elevation?.IsAvailable ?? false;
+		public static bool IsAvailable => OperatingSystem.IsLinux() && RootActionsAvailability.Mode.AllowHelper && (Elevation?.IsAvailable ?? false);
 
-		public static bool CanOpenTerminal => OperatingSystem.IsLinux() &&
+		public static bool CanOpenTerminal => OperatingSystem.IsLinux() && RootActionsAvailability.Mode.AllowRootTerminal &&
 			(Ioc.Default.GetService<ILauncherService>()?.CanOpenTerminalAsRoot ?? false);
 
 		public static Task OpenTerminalAsync(string folder) =>
@@ -32,19 +32,19 @@ namespace Files.App.Helpers
 
 		public static async Task DeleteAsync(IReadOnlyList<string> paths)
 		{
-			if (Elevation is { } elevation)
+			if (IsAvailable && Elevation is { } elevation)
 				await ConfirmAndRunAsync(elevation, new ElevationPlanPreview(_ => elevation.PlanDelete(paths)), null);
 		}
 
 		public static async Task RenameAsync(string path)
 		{
-			if (Elevation is { } elevation)
+			if (IsAvailable && Elevation is { } elevation)
 				await ConfirmAndRunAsync(elevation, new ElevationPlanPreview(name => elevation.PlanRename(path, name)), Path.GetFileName(path));
 		}
 
 		public static async Task PasteAsync(string destinationFolder)
 		{
-			if (Elevation is not { } elevation || Ioc.Default.GetService<IClipboardService>() is not { } clipboard)
+			if (!IsAvailable || Elevation is not { } elevation || Ioc.Default.GetService<IClipboardService>() is not { } clipboard)
 				return;
 
 			var files = await clipboard.GetFilesAsync();

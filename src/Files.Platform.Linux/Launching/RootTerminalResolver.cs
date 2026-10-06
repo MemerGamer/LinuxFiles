@@ -14,36 +14,41 @@ namespace Files.Platform.Linux.Launching
 	/// <summary>Builds an interactive elevation command without interpreting file paths as code.</summary>
 	public sealed class RootTerminalResolver
 	{
-		private sealed record Configuration(string Tool, string? Shell = null, bool KeepWorkingDirectory = false);
+		private sealed record Configuration(string Tool, string Shell, bool KeepWorkingDirectory = false);
 		private readonly Func<bool> disabled;
 		private readonly Lazy<Configuration?> configuration;
 
 		public RootTerminalResolver() : this(
 			new SystemToolResolver(new ElevationPathChecker(new StatxFileOwnershipInspector(), ProcessIdentityNative.CurrentUserId)),
-			new PathExecutableLocator(), Environment.GetEnvironmentVariable, () => !RootActionsAvailability.Mode.AllowRootTerminal) { }
+			new PathExecutableLocator(), Environment.GetEnvironmentVariable, () => !RootActionsAvailability.Mode.AllowRootTerminal,
+			rootShell: () => ElevationNative.LoginShell(0)) { }
 
+		// The shell comes from root's passwd entry, not the caller's $SHELL, so root's own shell and config are used.
 		public RootTerminalResolver(ITrustedToolResolver tools, IExecutableLocator locator, Func<string, string?> environment,
-			Func<bool> disabled, Func<string, string?>? version = null)
+			Func<bool> disabled, Func<string, string?>? version = null, Func<string?>? rootShell = null)
 		{
 			this.disabled = disabled;
 			configuration = new Lazy<Configuration?>(() =>
 			{
-				if (tools.Resolve("run0") is { } run0) return new(run0);
-				if (tools.Resolve("sudo") is { } sudo) return new(sudo);
+				var shell = rootShell?.Invoke() is { } configured && configured.StartsWith('/') ? locator.Locate(configured) : null;
+				shell ??= locator.Locate("/bin/sh");
+				if (shell is null) return null;
+				if (tools.Resolve("run0") is { } run0) return new(run0, shell);
+				if (tools.Resolve("sudo") is { } sudo) return new(sudo, shell);
 				if (tools.Resolve("pkexec") is not { } pkexec) return null;
-				var shell = environment("SHELL");
-				var executable = shell is not null && shell.StartsWith('/') ? locator.Locate(shell) : null;
-				executable ??= locator.Locate("/bin/sh");
-				return executable is null ? null : new(pkexec, executable, SupportsKeepCwd((version ?? ReadVersion)(pkexec)));
+				return new(pkexec, shell, SupportsKeepCwd((version ?? ReadVersion)(pkexec)));
 			});
 		}
 
 		public IReadOnlyList<string>? Resolve(string folder)
 		{
 			if (disabled() || configuration.Value is not { } command) return null;
-			if (command.Shell is { } shell)
-				return command.KeepWorkingDirectory ? [command.Tool, "--keep-cwd", shell] : [command.Tool, shell];
-			return Path.GetFileName(command.Tool) == "run0" ? [command.Tool, "--chdir=" + folder] : [command.Tool, "-s"];
+			return Path.GetFileName(command.Tool) switch
+			{
+				"run0" => [command.Tool, "--chdir=" + folder, "--", command.Shell],
+				"sudo" => [command.Tool, "--", command.Shell],
+				_ => command.KeepWorkingDirectory ? [command.Tool, "--keep-cwd", command.Shell] : [command.Tool, command.Shell],
+			};
 		}
 
 		public static bool SupportsKeepCwd(string? output)

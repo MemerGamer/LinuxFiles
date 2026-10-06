@@ -3,10 +3,14 @@
 
 using Files.Platform.Abstractions.Elevation;
 using Files.Platform.Linux.Launching;
+using Files.Platform.Linux.Native;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -26,7 +30,7 @@ namespace Files.Platform.Linux.Elevation
 	/// <summary>
 	/// Starts real processes.
 	/// </summary>
-	public sealed class ProcessElevatedRunner : IElevatedProcessRunner
+	public sealed class ProcessElevatedRunner(Action<Process>? terminate = null) : IElevatedProcessRunner, IRootHelperProcessRunner
 	{
 		/// <inheritdoc/>
 		public async Task<(int ExitCode, string StandardError)> RunAsync(string fileName, IReadOnlyList<string> arguments, CancellationToken cancellationToken)
@@ -54,90 +58,193 @@ namespace Files.Platform.Linux.Elevation
 			}
 			catch (OperationCanceledException)
 			{
-				try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
+				TryKill(process, null);
 				throw;
 			}
 
 			await stdout.ConfigureAwait(false);
 			return (process.ExitCode, await stderr.ConfigureAwait(false));
 		}
-	}
 
-	/// <summary>
-	/// Runs single privileged operations through <c>pkexec</c> (polkit shows the authentication dialog).
-	/// Only fixed, argument-vector commands are run (<c>rm</c>, <c>cp</c>); paths are never interpolated into a shell.
-	/// </summary>
-	public sealed class PkexecElevationService : IElevationService
-	{
-		// pkexec: 126 = the user dismissed the dialog or is not authorized, 127 = authentication failed or could not be started
-		private const int PkexecNotAuthorized = 126;
-		private const int PkexecAuthFailed = 127;
-
-		private readonly IExecutableLocator locator;
-		private readonly IElevatedProcessRunner runner;
-
-		/// <summary>
-		/// Creates the service.
-		/// </summary>
-		public PkexecElevationService(IExecutableLocator locator, IElevatedProcessRunner runner)
+		// Killing a child that already became root fails with EPERM; callers then wait for its real exit.
+		private static void TryKill(Process process, Action<Process>? terminate)
 		{
-			this.locator = locator;
-			this.runner = runner;
-		}
-
-		/// <inheritdoc/>
-		public bool IsAvailable => locator.Locate("pkexec") is not null;
-
-		/// <inheritdoc/>
-		public Task<ElevatedResult> DeleteAsync(string path, CancellationToken cancellationToken = default)
-		{
-			if (!IsSafeAbsolutePath(path) || IsFilesystemRoot(path))
-				return Task.FromResult(Failure("Refusing to delete this path."));
-
-			return RunPrivilegedAsync("rm", ["-rf", "--", Normalize(path)], cancellationToken);
-		}
-
-		/// <inheritdoc/>
-		public Task<ElevatedResult> CopyAsync(string sourcePath, string destinationFolder, CancellationToken cancellationToken = default)
-		{
-			if (!IsSafeAbsolutePath(sourcePath) || !IsSafeAbsolutePath(destinationFolder))
-				return Task.FromResult(Failure("Paths must be absolute."));
-
-			// -a keeps the source's mode and timestamps; -T is not used so an existing destination folder receives the item
-			return RunPrivilegedAsync("cp", ["-a", "--", Normalize(sourcePath), Normalize(destinationFolder) + "/"], cancellationToken);
-		}
-
-		private async Task<ElevatedResult> RunPrivilegedAsync(string program, string[] arguments, CancellationToken cancellationToken)
-		{
-			var pkexec = locator.Locate("pkexec");
-			if (pkexec is null)
-				return Failure("pkexec is not installed.");
-
-			var target = locator.Locate(program);
-			if (target is null)
-				return Failure($"{program} was not found.");
-
-			var full = new List<string>(arguments.Length + 1) { target };
-			full.AddRange(arguments);
-
 			try
 			{
-				var (exitCode, error) = await runner.RunAsync(pkexec, full, cancellationToken).ConfigureAwait(false);
-				var dismissed = exitCode is PkexecNotAuthorized or PkexecAuthFailed;
-				return new ElevatedResult(exitCode == 0, dismissed, exitCode, error);
+				if (terminate is null) process.Kill(entireProcessTree: true);
+				else terminate(process);
 			}
-			catch (Exception ex) when (ex is IOException or InvalidOperationException or System.ComponentModel.Win32Exception)
+			catch (InvalidOperationException) { }
+			catch (System.ComponentModel.Win32Exception) { }
+			catch (AggregateException ex) when (ex.InnerExceptions.All(inner => inner is System.ComponentModel.Win32Exception or InvalidOperationException)) { }
+		}
+
+		public async Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string json, CancellationToken cancellationToken)
+		{
+			cancellationToken.ThrowIfCancellationRequested();
+			var info = new ProcessStartInfo(pkexec)
+			{
+				UseShellExecute = false, RedirectStandardInput = true, RedirectStandardOutput = true,
+				RedirectStandardError = true, CreateNoWindow = true, StandardInputEncoding = new UTF8Encoding(false, true),
+			};
+			info.Environment.Clear();
+			info.Environment["LANG"] = "C";
+			info.ArgumentList.Add(ElevationHelperProtocol.HelperPath);
+			foreach (var argument in HelperAuthorization.Arguments(json)) info.ArgumentList.Add(argument);
+			using var process = Process.Start(info) ?? throw new IOException("Unable to start authorization.");
+			var output = ReadBoundedAsync(process.StandardOutput, CancellationToken.None, Stop);
+			var error = ReadBoundedAsync(process.StandardError, CancellationToken.None, Stop);
+			var send = SendAsync();
+			try
+			{
+				try { await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false); }
+				catch (OperationCanceledException)
+				{
+					Stop();
+					// A root child may reject SIGKILL with EPERM. Its actual result remains authoritative.
+					await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+				}
+				await Task.WhenAll(send, output, error).ConfigureAwait(false);
+				return (process.ExitCode, await output.ConfigureAwait(false), await error.ConfigureAwait(false));
+			}
+			finally
+			{
+				if (!process.HasExited) Stop();
+				await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
+			}
+			void Stop() => TryKill(process, terminate);
+			async Task SendAsync()
+			{
+				try { await process.StandardInput.WriteAsync(json.AsMemory(), CancellationToken.None).ConfigureAwait(false); }
+				catch (IOException) { } // A dismissed prompt can close its input without reading the plan.
+				finally { process.StandardInput.Close(); }
+			}
+		}
+
+		private static async Task<string> ReadBoundedAsync(StreamReader reader, CancellationToken cancellationToken, Action stop)
+		{
+			var text = new StringBuilder();
+			var buffer = new char[4096];
+			int count;
+			var exceeded = false;
+			while ((count = await reader.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false)) != 0)
+			{
+				if (exceeded) continue;
+				if (text.Length + count > ElevationHelperProtocol.MaximumResultBytes)
+				{
+					try { stop(); } catch (InvalidOperationException) { }
+					exceeded = true;
+					continue;
+				}
+				text.Append(buffer, 0, count);
+			}
+			if (exceeded) throw new IOException("Helper output exceeds protocol limit.");
+			return text.ToString();
+		}
+
+	}
+
+	public interface IRootHelperProcessRunner
+	{
+		Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string json, CancellationToken cancellationToken);
+	}
+
+	/// <summary>Plans root actions and sends the frozen plan to the installed fd-relative helper through pkexec.</summary>
+	public sealed class PkexecElevationService : IElevationService
+	{
+		private readonly ElevationPathChecker checker;
+		private readonly ITrustedToolResolver tools;
+		private readonly IRootHelperProcessRunner runner;
+		private readonly Func<bool> packagedWithoutHelper;
+
+		public PkexecElevationService(IRootHelperProcessRunner runner)
+			: this(new ElevationPathChecker(new StatxFileOwnershipInspector(), ProcessIdentityNative.CurrentUserId), null, runner) { }
+
+		public PkexecElevationService(ElevationPathChecker checker, ITrustedToolResolver? tools, IRootHelperProcessRunner runner, Func<bool>? packagedWithoutHelper = null)
+		{
+			this.checker = checker;
+			this.tools = tools ?? new SystemToolResolver(checker);
+			this.runner = runner;
+			this.packagedWithoutHelper = packagedWithoutHelper ?? (() => File.Exists("/.flatpak-info") || File.Exists(Path.Combine(AppContext.BaseDirectory, ".root-actions-disabled"))
+				|| Environment.GetEnvironmentVariable("APPIMAGE") is not null || Environment.GetEnvironmentVariable("APPDIR") is not null
+				|| Environment.GetEnvironmentVariable("FILES_DISABLE_ROOT_ACTIONS") == "1");
+		}
+
+		public bool IsAvailable => !packagedWithoutHelper() && tools.Resolve("pkexec") is not null && tools.Resolve("files-elevation-helper") == ElevationHelperProtocol.HelperPath;
+
+		public ElevatedPlanResult PlanDelete(IReadOnlyList<string> paths) => Plan(ElevatedOperation.Delete, paths, null);
+		public ElevatedPlanResult PlanCopy(IReadOnlyList<string> sources, string destinationFolder) => Plan(ElevatedOperation.Copy, sources, destinationFolder);
+		public ElevatedPlanResult PlanMove(IReadOnlyList<string> sources, string destinationFolder) => Plan(ElevatedOperation.Move, sources, destinationFolder);
+
+		public ElevatedPlanResult PlanRename(string path, string newName)
+		{
+			if (string.IsNullOrEmpty(newName) || newName is "." or ".." || newName.IndexOfAny(['/', '\0']) >= 0)
+				return ElevatedPlanResult.Refuse("The new name is not a plain file name.");
+			return Plan(ElevatedOperation.Rename, [path], newName);
+		}
+
+		private ElevatedPlanResult Plan(ElevatedOperation operation, IReadOnlyList<string> sources, string? target)
+		{
+			try
+			{
+				if (!IsAvailable) return ElevatedPlanResult.Refuse("The privileged helper is not installed in a trusted location.");
+				var paths = sources.Select(path =>
+				{
+					ElevationHelperProtocol.ValidatePath(path);
+					var parent = checker.Canonicalize(Path.GetDirectoryName(path)!);
+					if (parent is null || checker.CheckDirectoryChain(parent) is { }) throw new IOException("The source parent is not trusted.");
+					return Path.Combine(parent, Path.GetFileName(path));
+				}).ToArray();
+				string? absoluteTarget = null;
+				if (operation == ElevatedOperation.Rename) absoluteTarget = Path.Combine(Path.GetDirectoryName(paths.Single())!, target!);
+				else if (target is not null)
+				{
+					ElevationHelperProtocol.ValidatePath(target);
+					absoluteTarget = checker.Canonicalize(target);
+					if (absoluteTarget is null || checker.CheckDirectoryChain(absoluteTarget) is { }) throw new IOException("The destination is not trusted.");
+				}
+				var request = new HelperRequest(1, operation.ToString().ToLowerInvariant(), paths, absoluteTarget);
+				ElevationHelperProtocol.Validate(request);
+				var json = ElevationHelperProtocol.Serialize(request);
+				// Parsing here also enforces the wire size bound before offering confirmation.
+				ElevationHelperProtocol.ParseRequest(json);
+				return ElevatedPlanResult.Ok(new ElevatedPlan(operation, Array.AsReadOnly(paths), operation == ElevatedOperation.Rename ? target : absoluteTarget,
+					Array.AsReadOnly(new[] { new ElevatedCommand(ElevationHelperProtocol.HelperPath, Array.AsReadOnly(new[] { json })) })));
+			}
+			catch (Exception ex) when (ex is InvalidDataException or IOException or ArgumentException or InvalidOperationException or JsonException)
+			{
+				return ElevatedPlanResult.Refuse(ex.Message);
+			}
+		}
+
+		public async Task<ElevatedResult> RunAsync(ElevatedPlan plan, CancellationToken cancellationToken = default)
+		{
+			if (!IsAvailable || tools.Resolve("pkexec") is not { } pkexec) return Failure("The privileged helper is unavailable.");
+			try
+			{
+				// Rebuild only the serialized data: filesystem authority and post-verification belong to the helper.
+				var target = plan.Operation == ElevatedOperation.Rename ? Path.Combine(Path.GetDirectoryName(plan.Sources.Single())!, plan.Target!) : plan.Target;
+				var request = new HelperRequest(1, plan.Operation.ToString().ToLowerInvariant(), plan.Sources.ToArray(), target);
+				ElevationHelperProtocol.Validate(request);
+				var json = ElevationHelperProtocol.Serialize(request);
+				ElevationHelperProtocol.ParseRequest(json);
+				if (plan.Commands.Count != 1 || plan.Commands[0].Program != ElevationHelperProtocol.HelperPath || !plan.Commands[0].Arguments.SequenceEqual(new[] { json }))
+					return Failure("The operation no longer matches what was confirmed.");
+				var (exitCode, output, error) = await runner.RunHelperAsync(pkexec, json, cancellationToken).ConfigureAwait(false);
+				if (exitCode is 126 or 127) return new(false, true, exitCode, error);
+				if (exitCode is not (0 or 1)) return new(false, false, exitCode, error);
+				var response = ElevationHelperProtocol.ParseResponse(output);
+				if (response.Error.Length != 0) return new(false, false, exitCode, response.Error);
+				if (!response.Items.Select(item => item.Source).SequenceEqual(request.Sources)) return Failure("Helper returned incomplete or mismatched results.");
+				if (exitCode == 0 && response.Items.All(item => item.Succeeded)) return new(true, false, 0, "");
+				return new(false, false, exitCode, string.Join("\n", response.Items.Where(item => !item.Succeeded).Select(item => item.Source + ": " + item.Error)));
+			}
+			catch (Exception ex) when (ex is InvalidDataException or IOException or InvalidOperationException or ArgumentException or JsonException or System.ComponentModel.Win32Exception)
 			{
 				return Failure(ex.Message);
 			}
 		}
 
-		private static ElevatedResult Failure(string message) => new(false, false, -1, message);
-
-		private static bool IsSafeAbsolutePath(string path) => !string.IsNullOrEmpty(path) && path.StartsWith('/') && !path.Contains('\0');
-
-		private static string Normalize(string path) => Path.GetFullPath(path).TrimEnd('/') is { Length: > 0 } full ? full : "/";
-
-		private static bool IsFilesystemRoot(string path) => Normalize(path) == "/";
+		private static ElevatedResult Failure(string error) => new(false, false, -1, error);
 	}
 }

@@ -27,6 +27,7 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
         <ProjectReference Include="..\..\src\Files.Platform.Linux\Files.Platform.Linux.csproj" />
+        <ProjectReference Include="../../src/Files.Platform.Linux.ElevationHelper/Files.Platform.Linux.ElevationHelper.csproj" Aliases="ElevationHelper" />
         <ProjectReference Include="..\..\src\Files.Core.Storage\Files.Core.Storage.csproj" />
     </ItemGroup>
 

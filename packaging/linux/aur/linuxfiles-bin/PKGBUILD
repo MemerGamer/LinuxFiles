@@ -14,7 +14,8 @@ url='https://github.com/MemerGamer/LinuxFiles'
 license=('MIT')
 # The runtime is bundled; these are the native libraries Skia/Uno load at runtime.
 depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'mesa' 'glib2' 'hicolor-icon-theme')
-optdepends=('gvfs: network and MTP locations'
+optdepends=('polkit: authenticated root actions'
+            'gvfs: network and MTP locations'
             'udisks2: mount and eject drives'
             'libsecret: saved network credentials (Secret Service provider)'
             'gnome-disk-utility: format and manage drives')
@@ -39,6 +40,10 @@ package() {
 
   install -dm755 "$pkgdir/usr/lib/$_pkgname"
   cp -a app/. "$pkgdir/usr/lib/$_pkgname/"
+  install -Dm755 app/elevation-helper/files-elevation-helper "$pkgdir/usr/lib/linuxfiles/files-elevation-helper"
+  rm -rf "$pkgdir/usr/lib/$_pkgname/elevation-helper"
+  install -Dm644 packaging/linux/io.github.memergamer.LinuxFiles.root-actions.policy \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy"
   # The launcher finds /usr/lib/linuxfiles/Files.dll on its own.
   install -Dm755 packaging/linux/files "$pkgdir/usr/bin/files"
 

@@ -13,6 +13,7 @@ sdk: org.freedesktop.Sdk
 command: files
 
 finish-args:
+  - --env=FILES_DISABLE_ROOT_ACTIONS=1
   - --share=ipc
   # Uno Skia desktop is X11-only; Wayland sessions use XWayland.
   - --socket=x11
@@ -40,6 +41,8 @@ modules:
     build-commands:
       - tar -xzf files-linux-x64.tar.gz
       - mkdir -p /app/lib/linuxfiles && cp -a linux-x64/. /app/lib/linuxfiles/
+      - rm -rf /app/lib/linuxfiles/elevation-helper && rm -f /app/lib/linuxfiles/files-elevation-helper
+      - touch /app/lib/linuxfiles/.root-actions-disabled
       - install -Dm755 packaging/linux/files /app/bin/files
       - install -Dm644 packaging/linux/io.github.memergamer.LinuxFiles.desktop
         /app/share/applications/io.github.memergamer.LinuxFiles.desktop

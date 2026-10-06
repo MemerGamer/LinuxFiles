@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>LinuxFiles</vendor>
+  <vendor_url>https://github.com/MemerGamer/LinuxFiles</vendor_url>
+  <action id="io.github.memergamer.LinuxFiles.root-actions">
+    <description>Perform the confirmed Files root operation</description>
+    <message>Authentication grants root file access to the listed source and target paths (including their contents). Review the operation and request SHA-256: $(command_line). Program: $(program)</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/linuxfiles/files-elevation-helper</annotate>
+  </action>
+</policyconfig>

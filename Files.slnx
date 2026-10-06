@@ -28,6 +28,7 @@
     </Project>
   </Folder>
   <Folder Name="/src/platforms/">
+    <Project Path="src/Files.Platform.Linux.ElevationHelper/Files.Platform.Linux.ElevationHelper.csproj" />
     <Project Path="src/Files.App.BackgroundTasks/Files.App.BackgroundTasks.csproj">
       <Platform Solution="*|arm64" Project="arm64" />
       <Platform Solution="*|x64" Project="x64" />

@@ -10,8 +10,8 @@ url='https://github.com/MemerGamer/LinuxFiles'
 license=('MIT')
 # Self-contained publish bundles the runtime; native libs below are loaded by Skia/Uno at runtime.
 depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'mesa' 'glib2' 'hicolor-icon-theme')
-makedepends=('dotnet-sdk>=10.0' 'git')
-optdepends=('gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives')
+makedepends=('dotnet-sdk>=10.0' 'git' 'clang' 'zlib')
+optdepends=('polkit: authenticated root actions' 'gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives')
 options=('!strip')  # .NET single-file/self-contained binaries break when stripped
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/linux-v$pkgver.tar.gz")
 sha256sums=('SKIP')  # replace with the real checksum on release
@@ -23,10 +23,13 @@ build() {
     aarch64) _rid=linux-arm64 ;;
   esac
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
-  dotnet publish src/Files.App/Files.App.csproj \
+  MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet publish src/Files.App/Files.App.csproj \
     -f net10.0-desktop -c Release -r "$_rid" --self-contained \
     -p:PublishTrimmed=false -p:PublishAot=false \
-    -o "$srcdir/publish"
+    -nodeReuse:false -m:2 -o "$srcdir/publish"
+  MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet publish \
+    src/Files.Platform.Linux.ElevationHelper/Files.Platform.Linux.ElevationHelper.csproj \
+    -c Release -r "$_rid" --self-contained -nodeReuse:false -m:2 -o "$srcdir/helper"
 }
 
 package() {
@@ -35,6 +38,9 @@ package() {
 
   install -dm755 "$pkgdir/usr/lib/linuxfiles"
   cp -a "$srcdir/publish/." "$pkgdir/usr/lib/linuxfiles/"
+  install -Dm755 "$srcdir/helper/files-elevation-helper" "$pkgdir/usr/lib/linuxfiles/files-elevation-helper"
+  install -Dm644 packaging/linux/io.github.memergamer.LinuxFiles.root-actions.policy \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy"
   # The launcher finds /usr/lib/linuxfiles/Files.dll on its own.
   install -Dm755 packaging/linux/files "$pkgdir/usr/bin/files"
 

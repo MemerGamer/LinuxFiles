@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <root>
   <!-- 
     Microsoft ResX Schema 
@@ -4992,6 +4992,31 @@
   </data>
   <data name="LinuxFileSystemRoot" xml:space="preserve">
     <value>File System</value>
+  </data>
+  <data name="RootActions" xml:space="preserve">
+    <value>Root actions</value>
+    <comment>Context menu submenu on Linux. Each action asks the system to authenticate and runs as root.</comment>
+  </data>
+  <data name="RootDeleteAction" xml:space="preserve">
+    <value>Delete as root</value>
+  </data>
+  <data name="RootRenameAction" xml:space="preserve">
+    <value>Rename as root</value>
+  </data>
+  <data name="RootPasteAction" xml:space="preserve">
+    <value>Paste here as root</value>
+  </data>
+  <data name="RootConfirmTitle" xml:space="preserve">
+    <value>Run as root?</value>
+  </data>
+  <data name="RootConfirmContent" xml:space="preserve">
+    <value>Your system will ask you to authenticate, then run exactly:</value>
+  </data>
+  <data name="RootRunButton" xml:space="preserve">
+    <value>Run as root</value>
+  </data>
+  <data name="RootActionFailed" xml:space="preserve">
+    <value>The operation failed: {0}</value>
   </data>
   <data name="ToggleSidebarPane" xml:space="preserve">
     <value>Toggle sidebar</value>

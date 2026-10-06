@@ -9,6 +9,7 @@ global using System.Text.Json.Serialization;
 
 using System.Collections.Concurrent;
 using System.IO;
+using System.Runtime.Versioning;
 using System.Threading.Tasks;
 using Files.App.Utils.Serialization;
 using Files.App.Utils.Serialization.Implementation;
@@ -17,6 +18,7 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Files.Platform.Tests.Settings
 {
 	[TestClass]
+	[SupportedOSPlatform("linux")]
 	public sealed class CachingJsonSettingsDatabaseTests
 	{
 		private string _root = null!;
@@ -165,6 +167,54 @@ namespace Files.Platform.Tests.Settings
 			Assert.IsTrue(database.SetValue("hidden", true));
 			Assert.AreEqual(3, ReadSettings().GetProperty("sort").GetInt32());
 			Assert.IsFalse(ReadSettings().TryGetProperty("extensions", out _));
+		}
+
+		[TestMethod]
+		public void CorruptFile_DoesNotWipeCachedKeys()
+		{
+			var database = CreateDatabase();
+			Assert.IsFalse(database.GetValue<bool>("hidden"));
+			File.WriteAllText(SettingsPath, "{ not json");
+			Assert.IsTrue(database.SetValue("extensions", true));
+			var settings = ReadSettings();
+			Assert.IsTrue(settings.GetProperty("extensions").GetBoolean());
+			Assert.AreEqual(0, settings.GetProperty("sort").GetInt32());
+		}
+
+		[TestMethod]
+		public void WriteLock_UsesPrivateLockFile()
+		{
+			Assert.IsTrue(CreateDatabase().SetValue("hidden", true));
+			var mode = File.GetUnixFileMode(SettingsPath + ".lock");
+			Assert.AreEqual(UnixFileMode.None, mode & (UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.OtherRead | UnixFileMode.OtherWrite));
+		}
+
+		[TestMethod]
+		public void HeldLock_TimesOutAndStillSaves()
+		{
+			string? warning = null;
+			var serializer = new DefaultSettingsSerializer(message => warning = message);
+			Assert.IsTrue(serializer.CreateFile(SettingsPath));
+			var database = CreateDatabase(serializer);
+
+			using (var held = Files.Platform.Linux.Native.FileLockNative.TryAcquire(SettingsPath + ".lock", TimeSpan.Zero, out _))
+			{
+				Assert.IsNotNull(held);
+				Assert.IsTrue(database.SetValue("hidden", true));
+			}
+
+			Assert.IsNotNull(warning);
+			Assert.IsTrue(ReadSettings().GetProperty("hidden").GetBoolean());
+		}
+
+		[TestMethod]
+		public void SymlinkedLockFile_IsRejected()
+		{
+			var target = Path.Combine(_root, "elsewhere");
+			File.CreateSymbolicLink(SettingsPath + ".lock", target);
+			Assert.IsNull(Files.Platform.Linux.Native.FileLockNative.TryAcquire(SettingsPath + ".lock", TimeSpan.Zero, out var error));
+			Assert.IsNotNull(error);
+			Assert.IsFalse(File.Exists(target));
 		}
 
 		private sealed class FailingSettingsSerializer(DefaultSettingsSerializer inner) : ISettingsSerializer

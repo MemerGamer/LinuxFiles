@@ -68,7 +68,8 @@ namespace Files.App.Utils.Serialization.Implementation
 		{
 			return SettingsSerializer.WithWriteLock(() =>
 			{
-				var settings = GetFreshSettings();
+				// Never let an empty, unreadable or corrupt file wipe the keys this window still holds.
+				var settings = TryGetFreshSettings() ?? new ConcurrentDictionary<string, JsonElement>(_settingsCache!);
 				foreach (var key in _dirtyKeys)
 				{
 					if (_settingsCache!.TryGetValue(key, out var value))

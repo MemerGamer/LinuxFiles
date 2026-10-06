@@ -30,23 +30,27 @@ namespace Files.App.Utils.Serialization.Implementation
 		}
 
 		protected ConcurrentDictionary<string, JsonElement> GetFreshSettings()
+			=> TryGetFreshSettings() ?? [];
+
+		/// <summary>
+		/// Reads the settings file; null when it is empty, unreadable or holds invalid json.
+		/// </summary>
+		protected ConcurrentDictionary<string, JsonElement>? TryGetFreshSettings()
 		{
 			string data = SettingsSerializer.ReadFromFile();
 
 			if (string.IsNullOrWhiteSpace(data))
-			{
-				data = "null";
-			}
+				return null;
 
 			try
 			{
-				return JsonSettingsSerializer.DeserializeFromJson(data, SettingsTypeInfo) ?? [];
+				return JsonSettingsSerializer.DeserializeFromJson(data, SettingsTypeInfo);
 			}
 			catch (Exception)
 			{
 				// Occurs if the settings file has invalid json
 				// TODO Display prompt to notify user #710
-				return JsonSettingsSerializer.DeserializeFromJson("null", SettingsTypeInfo) ?? [];
+				return null;
 			}
 		}
 

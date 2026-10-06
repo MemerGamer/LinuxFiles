@@ -42,6 +42,9 @@ namespace Files.App
 			ExtendsContentIntoTitleBar = UseClientSideDecorations;
 #endif
 			Title = OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : "Files";
+#if !WINDOWS
+			Title = FormatRootModeTitle(Title);
+#endif
 			AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonPressedBackgroundColor = Colors.Transparent;

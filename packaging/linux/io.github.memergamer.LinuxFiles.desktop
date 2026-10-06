@@ -17,8 +17,12 @@ StartupWMClass=Files
 Categories=System;FileTools;FileManager;Utility;
 MimeType=inode/directory;
 Keywords=files;folders;directory;explorer;browse;manager;
-Actions=new-window;
+Actions=new-window;root-mode;
 
 [Desktop Action new-window]
 Name=New Window
 Exec=files --new-window
+
+[Desktop Action root-mode]
+Name=Open in Root Mode
+Exec=files --root

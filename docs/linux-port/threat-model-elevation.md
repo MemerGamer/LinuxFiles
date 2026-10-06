@@ -1,6 +1,6 @@
 # Threat model: root actions (Linux)
 
-Root actions offers delete, rename and paste (copy or move). It stays hidden in virtual locations and in AppImage/Flatpak, and unless pkexec, the native helper and its policy are installed at trusted system locations. AppImage/Flatpak neither install nor execute a host elevation helper.
+Root file operations offer delete, rename and paste (copy or move). It stays hidden in virtual locations and in AppImage/Flatpak, and unless pkexec, the native helper and its policy are installed at trusted system locations. AppImage/Flatpak neither install nor execute a host elevation helper.
 
 ## Privilege boundary
 
@@ -21,6 +21,18 @@ ElevationPlanPreview copies the plan into read-only collections and shows the ex
 The application compares the complete serialized request with the displayed command data before sending it. Its path checks are UI preflight only. It never trusts unprivileged post-operation filesystem checks, including for destinations under `/root`.
 
 The helper independently requires version 1, exactly the known JSON fields, unique property names, a known operation, 1–64 unique, non-overlapping sources, and normalized absolute paths with no NUL, empty components, dot components or root `/`. Delete/move/rename refuse `/` and top-level FHS sources `/usr /etc /boot /bin /lib /lib32 /lib64 /libx32 /sbin /var /home /root /proc /sys /dev /run /srv /opt /mnt /media /tmp` before opening paths. Copy/move refuse `/proc`, `/sys` and `/dev` targets and their descendants. Rename carries an absolute target in the same parent; copy/move cannot target the source or its descendants or introduce duplicate destination names. Input is strict UTF-8, at most 64 KiB, with bounded JSON depth. Unknown/missing fields, trailing data and unsupported versions fail closed. Results have one ordered entry per source; malformed, missing, duplicate or mismatched results can never become success in the app.
+
+## Root mode and process identity
+
+A normal non-root launch exposes only **Root actions → Open in terminal as root**. Delete, Rename and Paste as root appear only after an explicit `files --root` launch (or the desktop entry's **Open in Root Mode** action), and only when the trusted native helper/policy are installed. Root mode keeps the GUI unprivileged; each helper action still previews its frozen plan and requests fresh polkit authentication. Every tab and the window title carry the localized **(Root mode)** suffix only when helper actions are allowed by the package/disable gates.
+
+Each `--root` launch bypasses single-instance forwarding and opens a separate process/window, including when a normal instance or another root-mode instance already exists. Ordinary launches continue forwarding to the normal instance. **New Window** in a `--root` process passes `--root` to the new process. Mode is fixed for that process and is never transferred to an existing ordinary window; the root-mode process does not claim the normal instance name or FileManager1. `--root` is recognized only before `--` and never as the operand of `--select`.
+
+When `geteuid() == 0` (including `sudo files`), tabs/title instead show **(Running as root)**. Normal file operations already have root privileges; the helper actions and root-terminal item are hidden, and the elevation service itself refuses helper invocation for uid 0. The ordinary **Open in terminal** command remains available. This privileged GUI is outside the helper's restricted-operation boundary.
+
+Before Uno, fonts, settings or application services initialize, every uid-0 launch resolves root's home through `getpwuid_r(0)` and replaces inherited HOME and all four XDG config/data/cache/state directories with root's own defaults, regardless of SUDO_UID. `XDG_DATA_DIRS` and `XDG_CONFIG_DIRS` are reset to the specification defaults `/usr/local/share:/usr/share` and `/etc/xdg`; thumbnailers, desktop-entry trust and service menus therefore derive their directories from these sanitized values. `PATH` is reset to `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`. Inherited TERMINAL, EDITOR, VISUAL, BROWSER, SHELL and XDG_CURRENT_DESKTOP are cleared, along with user runtime/session-bus, GVfs and TMPDIR overrides. The home and existing XDG directory ancestors must be root-owned real directories without group/other write access; unsafe or unavailable roots abort startup with a stderr diagnostic before settings are written. Thus a sudo-preserved user HOME/XDG environment cannot select the invoking user's settings directories. Administrator-controlled contents inside root's own home remain trusted configuration. Automated tests check the environment plan without changing the real process environment or writing root's settings.
+
+AppImage, Flatpak and the existing explicit disable gates hide and refuse all elevation actions, including the root terminal, in every mode. Their desktop files omit **Open in Root Mode**, and `--root` shows no root-mode indicator when helper actions are disabled; it cannot enable packaged elevation. No sandbox exception is introduced.
 
 ## Descriptor-relative execution
 
@@ -52,3 +64,5 @@ Non-root tests run HelperEngine directly against private temp trees, substitutin
 ## Not implemented
 
 Open terminal as root and edit as root remain outside this helper's protocol. Symlink copying, timestamp/permission preservation, transactional rollback and concurrent-writer snapshots are unsupported.
+
+The submenu also offers an interactive root terminal independently of helper installation, using the same packaging disable gate. Its broader root-shell authorization and terminal launch behavior are documented in [threat-model-launching.md](threat-model-launching.md#built-in-root-terminal).

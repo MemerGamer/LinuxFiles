@@ -188,6 +188,10 @@ namespace Files.App.Helpers
 					}
 				}
 			}
+#if !WINDOWS
+			foreach (var tab in MainPageViewModel.AppInstances.Where(tab => !string.IsNullOrEmpty(tab.Header)))
+				tab.Header = MainWindow.FormatRootModeTitle(tab.Header!);
+#endif
 		}
 
 		private static string[] AncestorHints(string? path)
@@ -386,7 +390,7 @@ namespace Files.App.Helpers
 				{
 					var title = $"{windowTitle} - {(OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : "Files")}";
 #if !WINDOWS
-					title = Files.Platform.Linux.Windowing.X11WindowChrome.SanitizeTitle(title);
+					title = Files.Platform.Linux.Windowing.X11WindowChrome.SanitizeTitle(MainWindow.FormatRootModeTitle(title));
 					MainWindow.Instance.UpdateLinuxWindowTitle(title);
 #endif
 					MainWindow.Instance.AppWindow.Title = title;
@@ -442,6 +446,10 @@ namespace Files.App.Helpers
 
 				startInfo.Environment["FILES_NO_SINGLE_INSTANCE"] = "1";
 				startInfo.ArgumentList.Add("--new-window");
+#if !WINDOWS
+				if (Files.Platform.Linux.Elevation.RootActionMode.IsRequested(Program.LaunchArguments))
+					startInfo.ArgumentList.Add("--root");
+#endif
 				System.Diagnostics.Process.Start(startInfo)?.Dispose();
 			}
 			catch (Exception ex)

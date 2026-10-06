@@ -15,7 +15,7 @@ namespace Files.Platform.Linux.Elevation
 	public interface ITrustedToolResolver
 	{
 		/// <summary>
-		/// Returns the absolute path of <paramref name="name"/> (<c>pkexec</c> or <c>files-elevation-helper</c>), or null if it is not installed in a trusted location.
+		/// Returns the absolute path of <paramref name="name"/> (<c>run0</c>, <c>sudo</c>, <c>pkexec</c> or <c>files-elevation-helper</c>), or null if it is not installed in a trusted location.
 		/// </summary>
 		string? Resolve(string name);
 	}
@@ -39,6 +39,8 @@ namespace Files.Platform.Linux.Elevation
 
 		/// <summary>Gets the inspector used for all lookups.</summary>
 		public IFileOwnershipInspector Inspector => inspector;
+
+		internal uint CurrentUserId => userId;
 
 		/// <summary>
 		/// Resolves every symbolic link in <paramref name="absolutePath"/>, including the last component. Returns null for broken links or loops.
@@ -132,7 +134,7 @@ namespace Files.Platform.Linux.Elevation
 	/// </summary>
 	public sealed class SystemToolResolver : ITrustedToolResolver
 	{
-		private static readonly HashSet<string> Allowed = new(StringComparer.Ordinal) { "pkexec" };
+		private static readonly HashSet<string> Allowed = new(StringComparer.Ordinal) { "run0", "sudo", "pkexec" };
 		private static readonly string[] Directories = ["/usr/bin", "/bin"];
 		private readonly ElevationPathChecker checker;
 

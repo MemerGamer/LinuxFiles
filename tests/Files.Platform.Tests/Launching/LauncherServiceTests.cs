@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Linux.Launching;
+using Files.Platform.Linux.Elevation;
 using Files.Platform.Linux.Mime;
 using Files.Platform.Tests.Mime;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -18,6 +19,44 @@ namespace Files.Platform.Tests.Launching
 	[TestClass]
 	public sealed class LauncherServiceTests
 	{
+		private sealed class FakeTools(params string[] available) : ITrustedToolResolver
+		{
+			public string? Resolve(string name) => available.Contains(name) ? "/usr/bin/" + name : null;
+		}
+
+		[TestMethod]
+		[DataRow("pkexec version 0.105", false)]
+		[DataRow("pkexec version 0.120", false)]
+		[DataRow("pkexec version 0.121", true)]
+		[DataRow("pkexec version 0.122\n", true)]
+		[DataRow("pkexec version 126", true)]
+		[DataRow(null, false)]
+		[DataRow("unknown", false)]
+		public void RootTerminal_PkexecKeepCwdRequiresSupportedVersionAndCachesResolution(string? output, bool supported)
+		{
+			var probes = 0;
+			var disabled = false;
+			var resolver = new RootTerminalResolver(new FakeTools("pkexec"), new FakeLocator("/bin/sh"), _ => null,
+				() => disabled, path => { Assert.AreEqual("/usr/bin/pkexec", path); probes++; return output; });
+			Assert.AreEqual(supported, RootTerminalResolver.SupportsKeepCwd(output));
+			var command = resolver.Resolve("/folder")!;
+			CollectionAssert.AreEqual(supported ? new[] { "/usr/bin/pkexec", "--keep-cwd", "/usr/bin//bin/sh" } :
+				new[] { "/usr/bin/pkexec", "/usr/bin//bin/sh" }, command.ToArray());
+			CollectionAssert.AreEqual(command.ToArray(), resolver.Resolve("/another")!.ToArray());
+			Assert.AreEqual(1, probes);
+			disabled = true;
+			Assert.IsNull(resolver.Resolve("/folder"));
+		}
+
+		[TestMethod]
+		public void RootTerminal_NeverUsesUserPathToResolveElevationTools()
+		{
+			var userPath = new FakeLocator("run0", "sudo", "pkexec", "/bin/sh");
+			var resolver = new RootTerminalResolver(new FakeTools(), userPath, _ => null, () => false,
+				_ => throw new AssertFailedException("An untrusted pkexec must never be probed."));
+			Assert.IsNull(resolver.Resolve("/folder"));
+		}
+
 		private sealed class RecordingStarter : IProcessStarter
 		{
 			public List<ProcessLaunch> Launches { get; } = [];
@@ -43,7 +82,8 @@ namespace Files.Platform.Tests.Launching
 				new LinuxMimeTypeService(fx.Directories, culture),
 				new LinuxApplicationRegistry(fx.Directories, culture, locator),
 				starter,
-				new TerminalResolver(locator, name => env is not null && env.TryGetValue(name, out var v) ? v : null));
+				new TerminalResolver(locator, name => env is not null && env.TryGetValue(name, out var v) ? v : null),
+				new RootTerminalResolver(new FakeTools(executables), locator, name => env is not null && env.TryGetValue(name, out var v) ? v : null, () => false, _ => "pkexec version 0.121"));
 			return (service, starter);
 		}
 
@@ -136,6 +176,55 @@ namespace Files.Platform.Tests.Launching
 
 			Assert.AreEqual("xdg-open", starter.Launches.Single().FileName);
 			CollectionAssert.AreEqual(new[] { "/a.txt" }, starter.Launches.Single().Arguments.ToArray());
+		}
+
+		[TestMethod]
+		[DataRow("konsole")]
+		[DataRow("gnome-terminal")]
+		[DataRow("xdg-terminal-exec")]
+		[DataRow("xterm")]
+		[DataRow("ghostty")]
+		public async Task RootTerminal_PreservesLiteralDirectoryAndUsesPreferredTool(string terminal)
+		{
+			using var fx = new XdgFixture();
+			var folder = Path.Combine(fx.Home, "a 'quoted' $(touch nope); dir");
+			Directory.CreateDirectory(folder);
+			var (service, starter) = Create(fx, new() { ["TERMINAL"] = terminal }, terminal, "run0", "sudo", "pkexec");
+			Assert.IsTrue(service.CanOpenTerminalAsRoot);
+			Assert.IsTrue(await service.OpenTerminalAsRootAsync(folder));
+			var launch = starter.Launches.Single();
+			Assert.AreEqual(terminal, launch.FileName);
+			Assert.AreEqual(folder, launch.WorkingDirectory);
+			CollectionAssert.AreEqual(new[] { "/usr/bin/run0", "--chdir=" + folder }, launch.Arguments.TakeLast(2).ToArray());
+			Assert.IsFalse(launch.Arguments.Contains("-c"));
+		}
+
+		[TestMethod]
+		public async Task RootTerminal_FallbacksRefusalsAndPackageGate()
+		{
+			using var fx = new XdgFixture();
+			var (sudo, starter) = Create(fx, null, "konsole", "sudo", "pkexec");
+			Assert.IsTrue(await sudo.OpenTerminalAsRootAsync(fx.Home));
+			CollectionAssert.AreEqual(new[] { "--workdir", fx.Home, "-e", "/usr/bin/sudo", "-s" }, starter.Launches.Single().Arguments.ToArray());
+			var (pkexec, pkStarter) = Create(fx, new() { ["SHELL"] = "/bin/zsh" }, "konsole", "pkexec", "/bin/zsh");
+			Assert.IsTrue(await pkexec.OpenTerminalAsRootAsync(fx.Home));
+			CollectionAssert.AreEqual(new[] { "/usr/bin/pkexec", "--keep-cwd", "/usr/bin//bin/zsh" }, pkStarter.Launches.Single().Arguments.TakeLast(3).ToArray());
+			var (fallback, fallbackStarter) = Create(fx, new() { ["SHELL"] = "sh -c code" }, "konsole", "pkexec", "/bin/sh");
+			Assert.IsTrue(await fallback.OpenTerminalAsRootAsync(fx.Home));
+			Assert.AreEqual("/usr/bin//bin/sh", fallbackStarter.Launches.Single().Arguments.Last());
+			Assert.IsFalse(await sudo.OpenTerminalAsRootAsync("relative"));
+			Assert.IsFalse(await sudo.OpenTerminalAsRootAsync(fx.Home + "/missing"));
+			Assert.IsFalse(await sudo.OpenTerminalAsRootAsync("file:///tmp"));
+			var missingTool = Create(fx, null, "konsole");
+			Assert.IsFalse(missingTool.Service.CanOpenTerminalAsRoot);
+			Assert.IsFalse(await missingTool.Service.OpenTerminalAsRootAsync(fx.Home));
+			Assert.AreEqual(0, missingTool.Starter.Launches.Count);
+			var missingTerminal = Create(fx, null, "sudo");
+			Assert.IsFalse(missingTerminal.Service.CanOpenTerminalAsRoot);
+			Assert.IsFalse(await missingTerminal.Service.OpenTerminalAsRootAsync(fx.Home));
+			Assert.AreEqual(0, missingTerminal.Starter.Launches.Count);
+			var disabled = new RootTerminalResolver(new FakeTools("run0", "sudo", "pkexec"), new FakeLocator(), _ => null, () => true);
+			Assert.IsNull(disabled.Resolve(fx.Home));
 		}
 
 		[TestMethod]

@@ -60,11 +60,13 @@ rm -f "$appdir/usr/lib/linuxfiles/files-elevation-helper"
 touch "$appdir/usr/lib/linuxfiles/.root-actions-disabled"
 install -Dm755 "$root/packaging/linux/files" "$appdir/usr/bin/files"
 install -Dm644 "$root/packaging/linux/$app_id.desktop" "$appdir/usr/share/applications/$app_id.desktop"
+# Portable images have no root mode; remove both its action and its menu registration.
+sed -i 's/\r$//; /^\[Desktop Action root-mode\]/,$d; /^Actions=/s/root-mode;//' "$appdir/usr/share/applications/$app_id.desktop"
 install -Dm644 "$root/packaging/linux/$app_id.metainfo.xml" "$appdir/usr/share/metainfo/$app_id.metainfo.xml"
 cp -a "$root/packaging/linux/icons/hicolor" "$appdir/usr/share/icons"
 
 # AppImage root entries
-cp "$root/packaging/linux/$app_id.desktop" "$appdir/$app_id.desktop"
+cp "$appdir/usr/share/applications/$app_id.desktop" "$appdir/$app_id.desktop"
 cp "$root/packaging/linux/icons/hicolor/256x256/apps/$app_id.png" "$appdir/$app_id.png"
 ln -s "$app_id.png" "$appdir/.DirIcon"
 

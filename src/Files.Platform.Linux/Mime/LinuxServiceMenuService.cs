@@ -20,6 +20,7 @@ namespace Files.Platform.Linux.Mime
 		public const int MaxScannedFiles = 512;
 		public const int MaxActions = 256;
 		public const int MaxSelection = 256;
+		public const int MaxKeys = 1000;
 		private readonly XdgDirectories directories;
 		private readonly IMimeTypeService mimeTypes;
 		private readonly CultureInfo culture;
@@ -74,7 +75,8 @@ namespace Files.Platform.Linux.Mime
 							{
 								var menu = Read(path, culture, out _, logger);
 								if (menu is null || !menu.Matches(targets, types, hierarchy)) continue;
-								result.AddRange(menu.Actions.Take(MaxActions - result.Count));
+								result.AddRange(menu.Actions.Where(a => DesktopExecExpander.ExpandServiceMenu(a.Application, targets).Count > 0)
+									.Take(MaxActions - result.Count));
 							}
 							catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException or OperationCanceledException))
 							{
@@ -103,7 +105,7 @@ namespace Files.Platform.Linux.Mime
 			try
 			{
 				var lines = DesktopEntryDisplay.ReadLinesBounded(path);
-				if (lines is null || lines.Count(l => l.Contains('=')) > DesktopEntryDisplay.MaxKeys) return null;
+				if (lines is null || lines.Count(l => l.Contains('=')) > MaxKeys) return null;
 				var menu = ServiceMenuParser.ParseStrict(lines, path, culture);
 				return identity.Value.StillMatches(path) ? menu : null;
 			}

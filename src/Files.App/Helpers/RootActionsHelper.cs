@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Clipboard;
+using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Elevation;
 using Files.Platform.Linux.Elevation;
 using Files.Platform.Linux.Launching;
@@ -13,31 +14,42 @@ namespace Files.App.Helpers
 {
 	/// <summary>
 	/// Linux "Root actions" (like Dolphin's): delete, rename and paste as root through <see cref="IElevationService"/>.
-	/// Every operation shows the exact command first and the system's polkit prompt authenticates it.
+	/// File operations show the exact command first and authenticate through polkit; interactive terminals use the launcher.
 	/// </summary>
 	internal static class RootActionsHelper
 	{
 		private static IElevationService? Elevation => OperatingSystem.IsLinux() ? Ioc.Default.GetService<IElevationService>() : null;
 
-		public static bool IsAvailable => Elevation?.IsAvailable ?? false;
+		public static bool IsAvailable => OperatingSystem.IsLinux() && RootActionsAvailability.Mode.AllowHelper && (Elevation?.IsAvailable ?? false);
+
+		private static Task<bool>? terminalAvailability;
+
+		public static void InitializeTerminalAvailability() => terminalAvailability = Task.Run(() =>
+			OperatingSystem.IsLinux() && RootActionsAvailability.Mode.AllowRootTerminal &&
+			(Ioc.Default.GetService<ILauncherService>()?.CanOpenTerminalAsRoot ?? false));
+
+		public static bool CanOpenTerminal => terminalAvailability is { IsCompletedSuccessfully: true, Result: true };
+
+		public static Task OpenTerminalAsync(string folder) => Task.Run(() =>
+			Ioc.Default.GetRequiredService<ILauncherService>().OpenTerminalAsRootAsync(folder));
 
 		private static bool dialogOpen;
 
 		public static async Task DeleteAsync(IReadOnlyList<string> paths)
 		{
-			if (Elevation is { } elevation)
+			if (IsAvailable && Elevation is { } elevation)
 				await ConfirmAndRunAsync(elevation, new ElevationPlanPreview(_ => elevation.PlanDelete(paths)), null);
 		}
 
 		public static async Task RenameAsync(string path)
 		{
-			if (Elevation is { } elevation)
+			if (IsAvailable && Elevation is { } elevation)
 				await ConfirmAndRunAsync(elevation, new ElevationPlanPreview(name => elevation.PlanRename(path, name)), Path.GetFileName(path));
 		}
 
 		public static async Task PasteAsync(string destinationFolder)
 		{
-			if (Elevation is not { } elevation || Ioc.Default.GetService<IClipboardService>() is not { } clipboard)
+			if (!IsAvailable || Elevation is not { } elevation || Ioc.Default.GetService<IClipboardService>() is not { } clipboard)
 				return;
 
 			var files = await clipboard.GetFilesAsync();

@@ -237,8 +237,7 @@ namespace Files.Platform.Tests.Mime
 			Assert.IsFalse(plan.Identity.StillMatches(path));
 			Assert.IsNull(ServiceMenuLaunchPlan.Create(action, ["/a.png"], CultureInfo.InvariantCulture));
 			File.WriteAllText(path, Text(exec: "sh -c '%F'"));
-			var shell = ServiceMenuParser.ParseStrict(File.ReadAllLines(path), path, CultureInfo.InvariantCulture)!.Actions[0];
-			Assert.IsNull(ServiceMenuLaunchPlan.Create(shell, ["/a.png"], CultureInfo.InvariantCulture));
+			Assert.AreEqual(0, ServiceMenuParser.ParseStrict(File.ReadAllLines(path), path, CultureInfo.InvariantCulture)!.Actions.Count);
 		}
 
 		[TestMethod]
@@ -294,12 +293,40 @@ namespace Files.Platform.Tests.Mime
 		[DataRow("tool *.txt")]
 		[DataRow("tool ~")]
 		[DataRow("tool %f %U")]
-		[DataRow("tool --input=%f")]
+		[DataRow("tool --input=prefix%f")]
+		[DataRow("tool --input=%f/suffix")]
+		[DataRow("tool -i=%f")]
+		[DataRow("tool --=%f")]
+		[DataRow("tool --input=%f%f")]
+		[DataRow("tool --input=%c")]
+		[DataRow("tool --input=%f %U")]
+		[DataRow("tool --input=%f --other=%f")]
 		[DataRow("tool '%F suffix'")]
 		[DataRow("tool %D")]
 		[DataRow("tool 'unterminated")]
 		public void Expansion_RefusesShellsSyntaxAndEmbeddedTargetCodes(string exec) =>
 			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a.png"]).Count);
+
+		[TestMethod]
+		[DataRow("f")]
+		[DataRow("F")]
+		[DataRow("u")]
+		[DataRow("U")]
+		[DataRow("d")]
+		[DataRow("D")]
+		public void Expansion_LongOptionValueUsesExactlyOneLiteralTarget(string code)
+		{
+			var target = "/tmp/a 'quoted' $(touch bad); directory/file.png";
+			var app = new DesktopApplication("run", "Run", "tool --long-option=%" + code, "/any-name.desktop");
+			var commands = DesktopExecExpander.ExpandServiceMenu(app, [target]);
+			var value = code is "u" or "U" ? DesktopExecExpander.ToUri(target) : code is "d" or "D" ? Path.GetDirectoryName(target) : target;
+			CollectionAssert.AreEqual(new[] { "tool", "--long-option=" + value }, commands.Single().ToArray());
+			Assert.IsNotNull(DisplaySanitizer.FullArguments(commands[0]));
+			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(app, []).Count);
+			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(app, [target, "/another"]).Count);
+			if (code is "f" or "F" or "d" or "D")
+				Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(app, ["smb://host/file"]).Count);
+		}
 
 		[TestMethod]
 		public void Plan_RefusesArgvThatCannotBeDisplayedInFull()
@@ -310,6 +337,101 @@ namespace Files.Platform.Tests.Mime
 			Assert.IsNull(ServiceMenuLaunchPlan.Create(action, ["/" + new string('a', DisplaySanitizer.MaxExecutedCharacters)], CultureInfo.InvariantCulture));
 			var remote = new DesktopApplication("run", "Run", "tool %F", path);
 			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(remote, ["smb://host/file.png"]).Count);
+		}
+
+		private static string Fixture(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Mime", "Fixtures", "ServiceMenus", name + ".desktop"));
+
+		[TestMethod]
+		public async Task Scan_DistroRootMenusKeepAllLiteralActionsAndPinTheirCommands()
+		{
+			using var fx = new XdgFixture();
+			foreach (var name in new[] { "10-rootactions-folders", "11-rootactions-files", "com.mitchellh.ghostty", "converseen_import", "installfont", "konsolerun", "mat2" })
+				fx.Write("data/kio/servicemenus/" + name + ".desktop", Fixture(name));
+			var service = new LinuxServiceMenuService(fx.Directories, new LinuxMimeTypeService(fx.Directories, CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+			var folders = await service.GetActionsAsync([fx.Home]);
+			var rootFolders = folders.Where(a => a.Submenu == "Root Actions").ToArray();
+			Assert.AreEqual(11, rootFolders.Length);
+			Assert.AreEqual(12, folders.Count);
+			Assert.AreEqual("RunGhosttyDir", folders.Last().ActionId);
+			var multipleFolders = await service.GetActionsAsync([fx.Home, fx.Home]);
+			Assert.IsFalse(multipleFolders.Any(a => a.ActionId == "RunGhosttyDir"));
+			Assert.IsTrue(rootFolders.All(a => a.Priority == "TopLevel"));
+			Assert.AreEqual("OpenInKonsole", rootFolders[0].ActionId);
+			var file = fx.Write("home/unrecognized.file", "data");
+			var files = await service.GetActionsAsync([file]);
+			CollectionAssert.AreEqual(new[] { "EditAsText", "OpenWithCustom", "Copy", "Rename", "Compress", "Delete", "ChangeRoot", "ChangeUser", "ChangeCustom", "ChangePerm" }, files.Select(a => a.ActionId).ToArray());
+			foreach (var action in rootFolders.Concat(files))
+				Assert.IsNotNull(ServiceMenuLaunchPlan.Create(action, [file], CultureInfo.InvariantCulture), action.ActionId);
+		}
+
+		[TestMethod]
+		public void Plan_DistroGhosttyUsesLiteralLongOptionWithoutRewritingExec()
+		{
+			using var fx = new XdgFixture();
+			var text = Fixture("com.mitchellh.ghostty");
+			var path = fx.Write("data/kio/servicemenus/com.mitchellh.ghostty.desktop", text);
+			var action = ServiceMenuParser.ParseStrict(text.Split('\n'), path, CultureInfo.InvariantCulture)!.Actions.Single();
+			var directory = Path.Combine(fx.Home, "a 'quoted' $(touch bad); folder");
+			Directory.CreateDirectory(directory);
+			var plan = ServiceMenuLaunchPlan.Create(action, [directory], CultureInfo.InvariantCulture);
+			Assert.IsNotNull(plan);
+			Assert.AreEqual(1, plan.Invocations.Count);
+			CollectionAssert.AreEqual(new[] { "ghostty", "--working-directory=" + directory, "--gtk-single-instance=false" }, plan.Invocations[0].ToArray());
+			Assert.AreEqual("ghostty --working-directory=%F --gtk-single-instance=false", action.Application.Exec);
+			Assert.IsTrue(plan.Identity.StillMatches(path));
+			Assert.AreEqual(1, ServiceMenuParser.ParseStrict(text.Split('\n'), "/other.desktop", CultureInfo.InvariantCulture)!.Actions.Count);
+			Assert.IsNull(ServiceMenuLaunchPlan.Create(action, [directory, fx.Home], CultureInfo.InvariantCulture));
+			var modified = text.Replace("--gtk-single-instance=false", "--gtk-single-instance=false --title=%f");
+			Assert.AreEqual(0, ServiceMenuParser.ParseStrict(modified.Split('\n'), path, CultureInfo.InvariantCulture)!.Actions.Count);
+		}
+
+		[TestMethod]
+		public void Parse_DistroLegacyMimeFiltersAndUnsupportedShellMenus()
+		{
+			using var fx = new XdgFixture();
+			var hierarchy = new MimeHierarchy(fx.Directories);
+			var fonts = Parse(Fixture("installfont"));
+			Assert.IsNotNull(fonts);
+			Assert.IsTrue(fonts.Matches(["/a.ttf"], ["font/ttf"], hierarchy));
+			Assert.IsFalse(fonts.Matches(["/a.png"], ["image/png"], hierarchy));
+			Assert.IsNull(Parse(Fixture("mat2")));
+			Assert.AreEqual(0, Parse(Fixture("mat2").Replace("Exec[de]=", "IgnoredExec[de]="))!.Actions.Count);
+			Assert.IsNull(Parse(Fixture("converseen_import"))); // Duplicate execution metadata stays ambiguous.
+			Assert.IsFalse(Parse(Fixture("konsolerun"))!.Matches(["/a"], ["application/x-executable"], hierarchy));
+		}
+
+		[TestMethod]
+		[DataRow("X-KDE-AuthorizeAction=shell_access\n")]
+		[DataRow("X-KDE-ShowIfRunning=application\n")]
+		[DataRow("X-KDE-ShowIfDBusCall=org.example / method\n")]
+		public void Filter_HidesConditionsThatCannotBeEvaluated(string extra)
+		{
+			using var fx = new XdgFixture();
+			Assert.IsFalse(Parse(Text(extra))!.Matches(["/a.png"], ["image/png"], new MimeHierarchy(fx.Directories)));
+		}
+
+		[TestMethod]
+		public void Parse_SkipsUnsupportedActionsWithoutDiscardingLiteralActions()
+		{
+			var text = Text("X-KDE-Submenu=&Root && Other\n", "tool --input=prefix%f")
+				.Replace("Actions=run;", "Actions=run;safe;") + "[Desktop Action safe]\nName=Safe\nExec=tool %U\n";
+			var menu = Parse(text)!;
+			Assert.AreEqual(1, menu.Actions.Count);
+			Assert.AreEqual("safe", menu.Actions[0].ActionId);
+			Assert.AreEqual("Root & Other", menu.Actions[0].Submenu);
+			Assert.IsNull(Parse(text.Replace("Name=Safe", "Name=Safe\nName=Different")));
+			Assert.IsNull(Parse(text.Replace("Exec=tool %U", "Exec=tool %U\nExec=tool %U")));
+		}
+
+		[TestMethod]
+		public void Filter_CombinesMimeListsAndRequiresMaximumCount()
+		{
+			using var fx = new XdgFixture();
+			var menu = Parse(Text("ServiceTypes=KonqPopupMenu/Plugin,font/ttf\nX-KDE-ServiceTypes=KonqPopupMenu/Plugin;inode/directory;\nX-KDE-MaxNumberOfUrls=1\n"))!;
+			var hierarchy = new MimeHierarchy(fx.Directories);
+			Assert.IsTrue(menu.Matches(["/font"], ["font/ttf"], hierarchy));
+			Assert.IsTrue(menu.Matches(["file:///dir"], ["inode/directory"], hierarchy));
+			Assert.IsFalse(menu.Matches(["/a.png", "/b.png"], ["image/png", "image/png"], hierarchy));
 		}
 
 		private sealed class MenuLogger : ILogger<LinuxServiceMenuService>

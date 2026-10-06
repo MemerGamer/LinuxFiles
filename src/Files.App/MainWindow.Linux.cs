@@ -4,6 +4,7 @@
 #if !WINDOWS
 using Files.Platform.Abstractions;
 using Files.Platform.Linux.Windowing;
+using Files.Platform.Linux.Elevation;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Uno.UI.NativeElementHosting;
@@ -22,6 +23,13 @@ namespace Files.App
 		public bool HasClientSideDecorations => _linuxChrome?.SupportsClientSideDecorations == true && UseClientSideDecorations;
 		public bool IsLinuxWindowMaximized => _linuxChrome?.IsMaximized ?? false;
 		public event EventHandler? LinuxChromeChanged;
+
+		internal static string FormatRootModeTitle(string title) => title + (RootActionsAvailability.Mode.Indicator switch
+		{
+			RootModeIndicator.RootMode => Strings.LinuxRootModeSuffix.GetLocalizedResource(),
+			RootModeIndicator.RunningAsRoot => Strings.LinuxRunningAsRootSuffix.GetLocalizedResource(),
+			_ => string.Empty,
+		});
 
 		public void InitializeLinuxChrome()
 		{

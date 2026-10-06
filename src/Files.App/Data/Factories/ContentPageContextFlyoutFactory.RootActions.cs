@@ -2,14 +2,15 @@
 // Licensed under the MIT License.
 
 using Windows.Storage;
+using System.IO;
 
 namespace Files.App.Data.Factories
 {
 	public static partial class ContentPageContextFlyoutFactory
 	{
 		/// <summary>
-		/// LINUX-TODO(root-actions): "Open terminal here as root" and "Edit as root", see docs/linux-port/threat-model-elevation.md.
-		/// The Linux "Root actions" submenu (hidden on Windows and when pkexec is missing). Each entry asks polkit to authenticate.
+		/// The Linux "Root actions" submenu. File operations use the installed helper; terminals authenticate through their elevation tool.
+		/// LINUX-TODO(root-actions): "Edit as root", see docs/linux-port/threat-model-elevation.md.
 		/// </summary>
 		internal static ContextMenuFlyoutItemViewModel GetRootActionsItem(List<ListedItem> selectedItems, bool itemsSelected, string? workingDirectory)
 		{
@@ -36,6 +37,19 @@ namespace Files.App.Data.Factories
 						});
 					}
 				}
+			}
+
+			var terminalTarget = itemsSelected
+				? (selectedItems.Count == 1 && !selectedItems[0].IsArchive && !selectedItems[0].IsRecycleBinItem && !selectedItems[0].IsFtpItem
+					? (selectedItems[0].PrimaryItemAttribute == StorageItemTypes.Folder ? selectedItems[0].ItemPath : Path.GetDirectoryName(selectedItems[0].ItemPath)) : null)
+				: workingDirectory;
+			if (RootActionsHelper.CanOpenTerminal && !string.IsNullOrEmpty(terminalTarget) && terminalTarget.StartsWith('/'))
+			{
+				items.Add(new ContextMenuFlyoutItemViewModel
+				{
+					Text = Strings.OpenTerminalAsRootLinux.GetLocalizedResource(),
+					Command = new AsyncRelayCommand(() => RootActionsHelper.OpenTerminalAsync(terminalTarget)),
+				});
 			}
 
 			// Paste goes into the open folder, or into the single selected folder

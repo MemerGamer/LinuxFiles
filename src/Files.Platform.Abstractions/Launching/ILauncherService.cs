@@ -40,6 +40,12 @@ namespace Files.Platform.Abstractions.Launching
 		/// </summary>
 		Task<bool> OpenTerminalAsync(string folderPath, CancellationToken cancellationToken = default);
 
+		/// <summary>Whether an interactive root terminal is available and permitted by the package.</summary>
+		bool CanOpenTerminalAsRoot => false;
+
+		/// <summary>Opens a terminal in a folder running an interactive elevation command.</summary>
+		Task<bool> OpenTerminalAsRootAsync(string folderPath, CancellationToken cancellationToken = default) => Task.FromResult(false);
+
 		/// <summary>
 		/// Starts an executable detached from this process.
 		/// </summary>

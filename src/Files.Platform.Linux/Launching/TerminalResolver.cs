@@ -36,9 +36,9 @@ namespace Files.Platform.Linux.Launching
 		/// <summary>
 		/// Builds the argument vector that runs <paramref name="command"/> inside the terminal.
 		/// </summary>
-		public List<string> BuildExecuteArguments(IReadOnlyList<string> command)
+		public List<string> BuildExecuteArguments(IReadOnlyList<string> command, string? folder = null)
 		{
-			var args = new List<string>(LeadingArguments);
+			var args = folder is null ? new List<string>(LeadingArguments) : BuildOpenArguments(folder);
 			args.AddRange(ExecuteArguments);
 			args.AddRange(command);
 			return args;
@@ -51,7 +51,7 @@ namespace Files.Platform.Linux.Launching
 	public sealed class TerminalResolver
 	{
 		private static readonly string[] KnownTerminals =
-			["konsole", "gnome-terminal", "kgx", "alacritty", "kitty", "wezterm", "foot", "xterm"];
+			["konsole", "gnome-terminal", "kgx", "alacritty", "kitty", "wezterm", "foot", "ghostty", "xterm"];
 
 		private readonly IExecutableLocator locator;
 		private readonly Func<string, string?> getEnvironmentVariable;
@@ -108,6 +108,7 @@ namespace Files.Platform.Linux.Launching
 				"alacritty" => new(program, extraArguments, f => ["--working-directory", f], ["-e"]),
 				"kitty" => new(program, extraArguments, f => ["--directory", f], []),
 				"foot" => new(program, extraArguments, f => [$"--working-directory={f}"], []),
+				"ghostty" => new(program, extraArguments, f => [$"--working-directory={f}"], ["-e"]),
 				"xdg-terminal-exec" => new(program, extraArguments, null, []),
 				_ => new(program, extraArguments, null, ["-e"]),
 			};

@@ -165,12 +165,10 @@ namespace Files.Platform.Linux.Elevation
 			this.checker = checker;
 			this.tools = tools ?? new SystemToolResolver(checker);
 			this.runner = runner;
-			this.packagedWithoutHelper = packagedWithoutHelper ?? (() => File.Exists("/.flatpak-info") || File.Exists(Path.Combine(AppContext.BaseDirectory, ".root-actions-disabled"))
-				|| Environment.GetEnvironmentVariable("APPIMAGE") is not null || Environment.GetEnvironmentVariable("APPDIR") is not null
-				|| Environment.GetEnvironmentVariable("FILES_DISABLE_ROOT_ACTIONS") == "1");
+			this.packagedWithoutHelper = packagedWithoutHelper ?? (() => RootActionsAvailability.IsDisabled);
 		}
 
-		public bool IsAvailable => !packagedWithoutHelper() && tools.Resolve("pkexec") is not null && tools.Resolve("files-elevation-helper") == ElevationHelperProtocol.HelperPath;
+		public bool IsAvailable => checker.CurrentUserId != 0 && !packagedWithoutHelper() && tools.Resolve("pkexec") is not null && tools.Resolve("files-elevation-helper") == ElevationHelperProtocol.HelperPath;
 
 		public ElevatedPlanResult PlanDelete(IReadOnlyList<string> paths) => Plan(ElevatedOperation.Delete, paths, null);
 		public ElevatedPlanResult PlanCopy(IReadOnlyList<string> sources, string destinationFolder) => Plan(ElevatedOperation.Copy, sources, destinationFolder);

@@ -17,7 +17,7 @@
         <PackageReference Include="Uno.WinUI" />
         <!--  Also emits IgnoresAccessChecksTo so the runtime lets the layout subclass Uno.UI's internal types  -->
         <PackageReference Include="Krafs.Publicizer" PrivateAssets="all" />
-        <Publicize Include="Uno.UI;Uno.Foundation" IncludeVirtualMembers="true" />
+        <Publicize Include="Uno.UI;Uno.Foundation" IncludeVirtualMembers="true" IncludeCompilerGeneratedMembers="false" />
     </ItemGroup>
 
 </Project>

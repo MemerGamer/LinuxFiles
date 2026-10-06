@@ -424,6 +424,34 @@ namespace Files.App.Helpers
 			return Launcher.LaunchUriAsync(new Uri($"files-dev:?tab={Uri.EscapeDataString(tabArgs)}{drop}")).AsTask();
 		}
 
+		// The Linux app has one window per process, so a new window is a second process that skips single instance forwarding
+		private static Task LaunchNewLinuxInstance()
+		{
+			try
+			{
+				var processPath = Environment.ProcessPath;
+				if (string.IsNullOrEmpty(processPath))
+					return Task.CompletedTask;
+
+				var startInfo = new System.Diagnostics.ProcessStartInfo(processPath) { UseShellExecute = false };
+
+				// Started through the dotnet host (development): the first argument is the app assembly
+				if (System.IO.Path.GetFileNameWithoutExtension(processPath) == "dotnet" &&
+					Environment.GetCommandLineArgs() is { Length: > 0 } commandLine)
+					startInfo.ArgumentList.Add(commandLine[0]);
+
+				startInfo.Environment["FILES_NO_SINGLE_INSTANCE"] = "1";
+				startInfo.ArgumentList.Add("--new-window");
+				System.Diagnostics.Process.Start(startInfo)?.Dispose();
+			}
+			catch (Exception ex)
+			{
+				Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, ex, "Failed to open a new window.");
+			}
+
+			return Task.CompletedTask;
+		}
+
 		public static void OpenInSecondaryPane(IShellPage associatedInstance, ListedItem listedItem, ShellPaneArrangement arrangement = ShellPaneArrangement.None)
 		{
 			if (associatedInstance is null || listedItem is null)
@@ -436,6 +464,9 @@ namespace Files.App.Helpers
 
 		public static Task LaunchNewWindowAsync()
 		{
+			if (OperatingSystem.IsLinux())
+				return LaunchNewLinuxInstance();
+
 			return Launcher.LaunchUriAsync(new Uri("files-dev:?window=")).AsTask();
 		}
 

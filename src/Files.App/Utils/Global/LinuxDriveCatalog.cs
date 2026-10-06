@@ -101,7 +101,7 @@ namespace Files.App.Utils
 				// IsReady and the label read can block for a long time, so give each probe its own thread
 				var probe = await Task.Factory.StartNew<(string Label, Data.Items.DriveType Type)?>(
 					() => drive.IsReady
-						? (volume?.Label is { Length: > 0 } label ? label : DriveHelpers.GetExtendedDriveLabel(drive), ClassifyDrive(drive, volume))
+						? (mount.MountPoint != "/" && volume?.Label is { Length: > 0 } label ? label : DriveHelpers.GetExtendedDriveLabel(drive), ClassifyDrive(drive, volume))
 						: null,
 					CancellationToken.None,
 					TaskCreationOptions.LongRunning,

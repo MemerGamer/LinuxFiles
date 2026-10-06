@@ -67,24 +67,45 @@ namespace Files.App.ViewModels.UserControls
 		{
 			get
 			{
-				if (!OperatingSystem.IsLinux())
+				if (!OperatingSystem.IsLinux() || PathComponents.LastOrDefault()?.Path?.StartsWith('/') != true)
 					return PathComponents;
 
-				var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('/');
-				var path = PathComponents.LastOrDefault()?.Path?.TrimEnd('/');
-				if (string.IsNullOrEmpty(home) || path is null ||
-					(path != home && !path.StartsWith(home + "/", StringComparison.Ordinal)))
-					return PathComponents;
+				// Under the home folder the root is "Home" and the home folder is the first segment;
+				// elsewhere the root is the file system root, which has no segment of its own.
+				var home = GetHomePath();
+				if (IsUnderHome(home))
+					return PathComponents.Where(item => item.Path?.TrimEnd('/') is { } component &&
+						(component == home || component.StartsWith(home + "/", StringComparison.Ordinal))).ToArray();
 
-				return PathComponents.Where(item => item.Path?.TrimEnd('/') is { } component &&
-					component.StartsWith(home + "/", StringComparison.Ordinal)).ToArray();
+				return PathComponents.Where(item => item.Path != "/").ToArray();
 			}
 		}
 
 		public Visibility BreadcrumbHomeLabelVisibility => string.IsNullOrEmpty(BreadcrumbHomeLabel) ? Visibility.Collapsed : Visibility.Visible;
 
-		public string BreadcrumbHomeLabel => OperatingSystem.IsLinux() && PathComponents.LastOrDefault()?.Path?.StartsWith('/') == true
-			? Strings.Home.GetLocalizedResource() : string.Empty;
+		public string BreadcrumbHomeLabel => !OperatingSystem.IsLinux() || PathComponents.LastOrDefault()?.Path?.StartsWith('/') != true
+			? string.Empty
+			: IsBreadcrumbRootFileSystem ? Strings.LinuxFileSystemRoot.GetLocalizedResource() : Strings.Home.GetLocalizedResource();
+
+		/// <summary>
+		/// Gets whether the breadcrumb root stands for the file system root (the path is outside the home folder).
+		/// </summary>
+		public bool IsBreadcrumbRootFileSystem
+			=> OperatingSystem.IsLinux() && PathComponents.LastOrDefault()?.Path?.StartsWith('/') == true && !IsUnderHome(GetHomePath());
+
+		public Visibility BreadcrumbHomeIconVisibility => IsBreadcrumbRootFileSystem ? Visibility.Collapsed : Visibility.Visible;
+
+		public Visibility BreadcrumbFileSystemIconVisibility => IsBreadcrumbRootFileSystem ? Visibility.Visible : Visibility.Collapsed;
+
+		private static string GetHomePath()
+			=> Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('/');
+
+		private bool IsUnderHome(string home)
+		{
+			var path = PathComponents.LastOrDefault()?.Path?.TrimEnd('/');
+			return !string.IsNullOrEmpty(home) && path is not null &&
+				(path == home || path.StartsWith(home + "/", StringComparison.Ordinal));
+		}
 
 		public ObservableCollection<NavigationBarSuggestionItem> NavigationBarSuggestions { get; } = [];
 
@@ -320,6 +341,9 @@ namespace Files.App.ViewModels.UserControls
 				OnPropertyChanged(nameof(BreadcrumbComponents));
 				OnPropertyChanged(nameof(BreadcrumbHomeLabel));
 				OnPropertyChanged(nameof(BreadcrumbHomeLabelVisibility));
+				OnPropertyChanged(nameof(IsBreadcrumbRootFileSystem));
+				OnPropertyChanged(nameof(BreadcrumbHomeIconVisibility));
+				OnPropertyChanged(nameof(BreadcrumbFileSystemIconVisibility));
 			};
 			UserSettingsService.OnSettingChangedEvent += UserSettingsService_OnSettingChangedEvent;
 			UpdateService.PropertyChanged += UpdateService_OnPropertyChanged;

@@ -265,7 +265,13 @@
 								<Image
 									Width="16"
 									Height="16"
-									Source="/Assets/FluentIcons/SidebarSections/Home.png" />
+									Source="/Assets/FluentIcons/SidebarSections/Home.png"
+									Visibility="{x:Bind ViewModel.BreadcrumbHomeIconVisibility, Mode=OneWay}" />
+								<Image
+									Width="16"
+									Height="16"
+									Source="/Assets/FluentIcons/SidebarSections/Drives.png"
+									Visibility="{x:Bind ViewModel.BreadcrumbFileSystemIconVisibility, Mode=OneWay}" />
 								<TextBlock VerticalAlignment="Center" Text="{x:Bind ViewModel.BreadcrumbHomeLabel, Mode=OneWay}" Visibility="{x:Bind ViewModel.BreadcrumbHomeLabelVisibility, Mode=OneWay}" />
 							</StackPanel>
 						</controls:BreadcrumbBar.RootItem>

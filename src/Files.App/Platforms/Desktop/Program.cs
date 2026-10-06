@@ -46,7 +46,12 @@ namespace Files.App
 
 			// Single instance: D-Bus name (socket fallback). A second launch forwards its arguments to the running instance and exits.
 			// FILES_NO_SINGLE_INSTANCE=1 skips this (for running several instances side by side while developing).
-			if (Environment.GetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE") != "1")
+			var noSingleInstance = Environment.GetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE") == "1";
+
+			// Keep the flag from leaking into apps and terminals launched from this instance
+			Environment.SetEnvironmentVariable("FILES_NO_SINGLE_INSTANCE", null);
+
+			if (!noSingleInstance)
 			{
 				var singleInstance = new LinuxSingleInstanceService();
 				var request = new InstanceRequest(InstanceRequestKind.CommandLine, Environment.CurrentDirectory, args);

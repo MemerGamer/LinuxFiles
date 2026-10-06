@@ -78,8 +78,9 @@ namespace Files.App.Utils.Serialization.Implementation
 #if !WINDOWS
 			try
 			{
-				// Write to a temp file and rename so a crash never leaves a truncated settings file
-				var tmp = _filePath + ".tmp";
+				// Write to a temp file and rename so a crash never leaves a truncated settings file;
+				// the temp name is per process because several instances (new windows) share the settings folder
+				var tmp = $"{_filePath}.{Environment.ProcessId}.tmp";
 				File.WriteAllText(tmp, text);
 				File.Move(tmp, _filePath, true);
 				return true;

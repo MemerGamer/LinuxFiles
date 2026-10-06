@@ -488,7 +488,7 @@ namespace Files.App.Utils.Storage
 			{
 				var mountPoint = drive.Name.Length > 1 ? drive.Name.TrimEnd('/') : drive.Name;
 				if (mountPoint == "/")
-					return Strings.FileSystem.GetLocalizedResource();
+					return Strings.LinuxFileSystemRoot.GetLocalizedResource();
 
 				var mount = GetMounts().FirstOrDefault(m => m.MountPoint == mountPoint);
 				if (mount is not null)

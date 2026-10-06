@@ -388,7 +388,7 @@ namespace Files.App.UserControls.TabBar
 
 			// The tab-actions button that normally hosts the pane commands is not rendered by Uno's TabView header
 			flyout.Items.Add(new MenuFlyoutSeparator());
-			foreach (var command in new IRichCommand[] { Commands.SplitPaneVertically, Commands.SplitPaneHorizontally, Commands.FocusOtherPane, Commands.CloseActivePane })
+			foreach (var command in new IRichCommand[] { Commands.NewWindow, Commands.SplitPaneVertically, Commands.SplitPaneHorizontally, Commands.FocusOtherPane, Commands.CloseActivePane })
 			{
 				flyout.Items.Add(new MenuFlyoutItem
 				{

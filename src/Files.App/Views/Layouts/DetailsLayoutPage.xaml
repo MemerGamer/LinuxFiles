@@ -1015,6 +1015,7 @@
 
 										<TextBlock
 											x:Name="ItemName"
+											Foreground="{ThemeResource TextFillColorPrimaryBrush}"
 											Padding="6,0,0,0"
 											VerticalAlignment="Center"
 											Opacity="{x:Bind Opacity, Mode=OneWay}"

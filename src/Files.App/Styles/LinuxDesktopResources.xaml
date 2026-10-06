@@ -95,6 +95,7 @@
 				HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
 				VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"
 				Background="{TemplateBinding Background}"
+				Foreground="{ThemeResource TextFillColorPrimaryBrush}"
 				Content="{TemplateBinding Content}"
 				ContentTemplate="{TemplateBinding ContentTemplate}"
 				ContentTransitions="{TemplateBinding ContentTransitions}" />
@@ -113,20 +114,20 @@
 					</VisualState>
 					<VisualState x:Name="Selected">
 						<VisualState.Setters>
-							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelected}" />
-							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Item.BorderSelected}" />
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Tile.BackgroundSelected}" />
+							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Tile.BorderSelected}" />
 						</VisualState.Setters>
 					</VisualState>
 					<VisualState x:Name="PointerOverSelected">
 						<VisualState.Setters>
-							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelectedPointerOver}" />
-							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Item.BorderSelected}" />
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Tile.BackgroundSelectedPointerOver}" />
+							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Tile.BorderSelected}" />
 						</VisualState.Setters>
 					</VisualState>
 					<VisualState x:Name="PressedSelected">
 						<VisualState.Setters>
-							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Item.BackgroundSelectedPressed}" />
-							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Item.BorderSelected}" />
+							<Setter Target="SelectionBackground.Background" Value="{ThemeResource Files.Tile.BackgroundSelectedPressed}" />
+							<Setter Target="SelectionBackground.BorderBrush" Value="{ThemeResource Files.Tile.BorderSelected}" />
 						</VisualState.Setters>
 					</VisualState>
 				</VisualStateGroup>
@@ -151,6 +152,10 @@
 			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPointerOver" Color="#1A000000" />
 			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPressed" Color="#10000000" />
 			<SolidColorBrush x:Key="Files.Item.BorderSelected" Color="Transparent" />
+			<SolidColorBrush x:Key="Files.Tile.BackgroundSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.16" />
+			<SolidColorBrush x:Key="Files.Tile.BackgroundSelectedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.22" />
+			<SolidColorBrush x:Key="Files.Tile.BackgroundSelectedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.12" />
+			<SolidColorBrush x:Key="Files.Tile.BorderSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.5" />
 		</ResourceDictionary>
 		<ResourceDictionary x:Key="Dark">
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#14FFFFFF" />
@@ -166,6 +171,10 @@
 			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPointerOver" Color="#22FFFFFF" />
 			<SolidColorBrush x:Key="Files.Item.BackgroundSelectedPressed" Color="#14FFFFFF" />
 			<SolidColorBrush x:Key="Files.Item.BorderSelected" Color="Transparent" />
+			<SolidColorBrush x:Key="Files.Tile.BackgroundSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.28" />
+			<SolidColorBrush x:Key="Files.Tile.BackgroundSelectedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.34" />
+			<SolidColorBrush x:Key="Files.Tile.BackgroundSelectedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.22" />
+			<SolidColorBrush x:Key="Files.Tile.BorderSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.6" />
 		</ResourceDictionary>
 	</ResourceDictionary.ThemeDictionaries>
 

@@ -318,6 +318,12 @@ namespace Files.App.UserControls
 
 			if (args.IsRootItem)
 			{
+				if (viewModel.IsBreadcrumbRootFileSystem)
+				{
+					await viewModel.HandleFolderNavigationAsync("/");
+					return;
+				}
+
 				await viewModel.HandleItemNavigationAsync("Home");
 				return;
 			}
@@ -420,7 +426,7 @@ namespace Files.App.UserControls
 						var path = storable.Id;
 						var flyoutItem = new MenuFlyoutItem()
 						{
-							Text = string.IsNullOrEmpty(storable.Name) ? path : storable.Name,
+							Text = path is "/" ? Strings.LinuxFileSystemRoot.GetLocalizedResource() : string.IsNullOrEmpty(storable.Name) ? path : storable.Name,
 							Icon = new FontIcon() { Glyph = "\uE8B7" }, // As a placeholder
 						};
 						e.Flyout.Items.Add(flyoutItem);

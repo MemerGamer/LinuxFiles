@@ -88,7 +88,8 @@ namespace Files.App.Data.Items
 
 		private GridLength _UserLength = new(200, GridUnitType.Pixel);
 
-		[RegistryIgnore]
+		// Persisted through UserLengthPixels: JSON can't read a GridLength back and would reset the width to 0
+		[RegistryIgnore, JsonIgnore]
 		public GridLength UserLength
 		{
 			get => _UserLength;

@@ -75,8 +75,11 @@ namespace Files.App.Helpers
 				var entries = new List<LayoutPreferencesFileEntry>();
 				foreach (var item in items ?? [])
 				{
-					if (!string.IsNullOrEmpty(item.FilePath))
-						entries.Add(new LayoutPreferencesFileEntry { FilePath = item.FilePath, FileId = GetId(item.FilePath), Preferences = item.LayoutPreferencesManager });
+					if (string.IsNullOrEmpty(item.FilePath))
+						continue;
+
+					RepairColumnWidths(item.LayoutPreferencesManager);
+					entries.Add(new LayoutPreferencesFileEntry { FilePath = item.FilePath, FileId = GetId(item.FilePath), Preferences = item.LayoutPreferencesManager });
 				}
 
 				Save(entries);
@@ -140,6 +143,9 @@ namespace Files.App.Helpers
 				var path = DatabasePath;
 				if (File.Exists(path))
 					entries = JsonSerializer.Deserialize(File.ReadAllText(path), AppJsonSerializerContext.Default.ListLayoutPreferencesFileEntry) ?? entries;
+
+				foreach (var entry in entries)
+					RepairColumnWidths(entry.Preferences);
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
 			{
@@ -147,6 +153,32 @@ namespace Files.App.Helpers
 			}
 
 			return _entries = entries;
+		}
+
+		// Earlier builds saved every column width as 0 (the GridLength round trip), which renders Details rows empty.
+		// Widths of 0 are never valid, since hidden columns are tracked separately, so they fall back to the default width.
+		private static void RepairColumnWidths(LayoutPreferencesItem? preferences)
+		{
+			if (preferences?.ColumnsViewModel is not { } columns)
+				return;
+
+			var stored = Columns(columns);
+			if (stored.All(column => column.UserLengthPixels > 0))
+				return;
+
+			var defaults = Columns(new LayoutPreferencesItem().ColumnsViewModel);
+			for (var i = 0; i < stored.Length; i++)
+			{
+				if (!(stored[i].UserLengthPixels > 0))
+					stored[i].UserLengthPixels = defaults[i].UserLengthPixels;
+			}
+
+			static DetailsLayoutColumnItem[] Columns(ColumnsViewModel c) =>
+			[
+				c.IconColumn, c.GitStatusColumn, c.GitLastCommitDateColumn, c.GitLastCommitMessageColumn, c.GitCommitAuthorColumn,
+				c.GitLastCommitShaColumn, c.TagColumn, c.NameColumn, c.StatusColumn, c.DateModifiedColumn, c.PathColumn,
+				c.OriginalPathColumn, c.ItemTypeColumn, c.DateDeletedColumn, c.DateCreatedColumn, c.SizeColumn,
+			];
 		}
 
 		private void Save(List<LayoutPreferencesFileEntry> entries)

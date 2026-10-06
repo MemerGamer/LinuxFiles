@@ -90,6 +90,24 @@ namespace Files.Platform.Linux.Native
 			throw new IOException("Root account exceeds safety limits.");
 		}
 
+		internal static string? LoginShell(uint uid)
+		{
+			for (var length = 16384; length <= 1048576; length *= 2)
+			{
+				var buffer = new byte[length];
+				var entry = new Passwd();
+				fixed (byte* pointer = buffer)
+				{
+					var error = GetPasswd(uid, ref entry, pointer, (nuint)length, out var result);
+					if (error == 34) continue; // ERANGE
+					if (error != 0 || result == 0 || entry.Uid != uid || entry.Shell == 0)
+						return null;
+					return Marshal.PtrToStringUTF8(entry.Shell);
+				}
+			}
+			return null;
+		}
+
 		internal static void SetOwnership(int fd, uint uid, uint gid, uint mode)
 		{
 			// An ACL inherited from the destination's default ACL would gain an effective mask from fchmod.

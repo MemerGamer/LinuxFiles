@@ -24,6 +24,8 @@ namespace Files.Platform.Linux.Mime
 			services.TryAddSingleton<IMimeTypeService>(sp => new LinuxMimeTypeService(sp.GetRequiredService<XdgDirectories>(), CultureInfo.CurrentUICulture));
 			services.TryAddSingleton<IApplicationRegistry>(sp => new LinuxApplicationRegistry(
 				sp.GetRequiredService<XdgDirectories>(), CultureInfo.CurrentUICulture, sp.GetRequiredService<IExecutableLocator>()));
+			services.TryAddSingleton<IServiceMenuService>(sp => new LinuxServiceMenuService(
+				sp.GetRequiredService<XdgDirectories>(), sp.GetRequiredService<IMimeTypeService>(), CultureInfo.CurrentUICulture));
 			return services;
 		}
 	}

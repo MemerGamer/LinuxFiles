@@ -134,7 +134,7 @@ The draft release `linux-vX.Y.Z[-pre]` already holds hand-uploaded assets; CI re
    (drafts included) and runs `gh release upload --clobber` for `files-linux-x64.tar.gz`, `files-packaging.tar.gz`,
    `Files-x86_64.AppImage`, `Files-x86_64.flatpak`, a regenerated `SHA256SUMS`, and the AUR `PKGBUILD` and `SRCINFO`
    (the `.SRCINFO`; release assets cannot start with a dot). Notes and prerelease state are untouched. If no release
-   exists for the tag, it creates one (prerelease when the tag contains `-`). Wait for the run to finish: the CI
+   exists for the tag, it creates one (prerelease when the version after `linux-v` contains `-`). `gen-aur.sh` validates the version strictly and keeps the real tag for the download URLs (`_tag`), while `pkgver` drops hyphens. Wait for the run to finish: the CI
    tarballs differ from the hand-built ones, so the checksums in the PKGBUILD only match the CI assets.
 2. Download the CI's recipe and commit it in the AUR clone:
    ```

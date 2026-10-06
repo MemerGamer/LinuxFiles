@@ -7,8 +7,11 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ver="${1:?version required, e.g. 0.1.0}"
-ver="${ver//-/}"  # pkgver may not contain hyphens: 0.1.0-alpha1 -> 0.1.0alpha1
+tag="${1:?version required, e.g. 0.1.0 or 0.1.0-alpha1}"
+[[ "$tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]] || { echo "Invalid version: $tag" >&2; exit 2; }
+if [[ -n "${AUR_BASE_URL:-}" && ! "$AUR_BASE_URL" =~ ^[A-Za-z0-9:/._~%@+-]+$ ]]; then
+	echo "Invalid AUR_BASE_URL" >&2; exit 2
+fi
 dir="${2:?directory with release tarballs required}"
 out="${3:-$root/artifacts/aur}"
 tpl="$root/packaging/linux/aur/linuxfiles-bin/PKGBUILD"
@@ -18,14 +21,15 @@ bin_sum="$(sum files-linux-x64.tar.gz)"
 pkg_sum="$(sum files-packaging.tar.gz)"
 
 mkdir -p "$out"
-python3 - "$tpl" "$out/PKGBUILD" "$ver" "$bin_sum" "$pkg_sum" "${AUR_BASE_URL:-}" <<'PY'
+python3 - "$tpl" "$out/PKGBUILD" "$tag" "$bin_sum" "$pkg_sum" "${AUR_BASE_URL:-}" <<'PY'
 import re, sys
 tpl, dst, ver, a, b, base = sys.argv[1:7]
 t = open(tpl).read()
-t = re.sub(r"^pkgver=.*$", "pkgver=" + ver, t, flags=re.M)
-t = re.sub(r"sha256sums=\('SKIP'\n\s+'SKIP'\)", "sha256sums=('%s'\n            '%s')" % (a, b), t)
+t = re.sub(r"^_tag=.*$", lambda m: "_tag=" + ver, t, flags=re.M)
+t = re.sub(r"^pkgver=.*$", lambda m: "pkgver=" + ver.replace("-", ""), t, flags=re.M)
+t = re.sub(r"sha256sums=\('SKIP'\n\s+'SKIP'\)", lambda m: "sha256sums=('%s'\n            '%s')" % (a, b), t)
 if base:
-    t = re.sub(r'^_base=.*$', '_base="%s"' % base, t, flags=re.M)
+    t = re.sub(r'^_base=.*$', lambda m: '_base="%s"' % base, t, flags=re.M)
 open(dst, "w").write(t)
 PY
 # makepkg only exists on Arch; elsewhere (CI runs on Ubuntu) emit the same fields by sourcing the PKGBUILD.

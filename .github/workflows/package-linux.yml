@@ -116,12 +116,13 @@ jobs:
       run: |
         cd dist
         assets=(files-linux-x64.tar.gz files-packaging.tar.gz Files-x86_64.AppImage Files-x86_64.flatpak SHA256SUMS PKGBUILD SRCINFO)
-        # `gh release list` includes drafts; a tag lookup does not, so a pre-made draft is found here.
-        if gh release list --limit 200 --json tagName --jq '.[].tagName' | grep -Fxq "$TAG"; then
+        # A direct lookup also finds drafts for a token with write access.
+        if gh release view "$TAG" >/dev/null 2>&1; then
           # Draft or already published: keep its notes and state, replace the assets with the fresh build.
           gh release upload "$TAG" "${assets[@]}" --clobber
         else
           flags=()
-          [[ "$TAG" == *-* ]] && flags+=(--prerelease)
+          # linux-v0.1.0-alpha1 is a prerelease; linux-v0.1.0 is stable.
+          [[ "${TAG#linux-v}" == *-* ]] && flags+=(--prerelease)
           gh release create "$TAG" "${assets[@]}" --title "$TAG" --generate-notes "${flags[@]}"
         fi

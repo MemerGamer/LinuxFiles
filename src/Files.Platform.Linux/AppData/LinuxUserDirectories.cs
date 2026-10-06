@@ -78,9 +78,8 @@ namespace Files.Platform.Linux
 		private string Resolve(Dictionary<string, string> configured, string key, string defaultName)
 		{
 			// XDG_<NAME>_DIR in the environment (set by some sandboxes and sessions) wins over the file.
-			if (_getEnvironmentVariable($"XDG_{key}_DIR") is { Length: > 0 } fromEnv
-				&& Path.IsPathRooted(fromEnv) && !IsHome(fromEnv))
-				return fromEnv;
+			if (_getEnvironmentVariable($"XDG_{key}_DIR") is { Length: > 0 } fromEnv && Path.IsPathRooted(fromEnv))
+				return IsHome(fromEnv) ? Path.Combine(Home, defaultName) : fromEnv;
 
 			// Like xdg-user-dirs, a value equal to $HOME means the directory is disabled.
 			return configured.TryGetValue(key, out var path) && !IsHome(path)

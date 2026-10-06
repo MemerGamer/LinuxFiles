@@ -47,6 +47,17 @@ namespace Files.App.UnoVirtualization
 
 		public Row GetRow(int index) => rows[itemRows[index]];
 
+		public bool TryGetRow(int index, out Row row)
+		{
+			if (index < 0 || index >= Count)
+			{
+				row = default;
+				return false;
+			}
+			row = GetRow(index);
+			return true;
+		}
+
 		public Row? FindRow(double offset)
 		{
 			if (rows.Count == 0)
@@ -65,8 +76,11 @@ namespace Files.App.UnoVirtualization
 			return rows[low];
 		}
 
-		public int Navigate(int index, bool acrossLines, bool forward)
+		public int Navigate(int index, bool acrossLines, bool forward, int? currentCount = null, bool dirty = false)
 		{
+			if (dirty || (currentCount.HasValue && currentCount.Value != Count))
+				return -1;
+
 			var direction = forward ? 1 : -1;
 			if (index < 0)
 			{
@@ -96,5 +110,11 @@ namespace Files.App.UnoVirtualization
 			}
 			return -1;
 		}
+	}
+
+	internal sealed record GroupedLayoutAnchor(object Item, double WithinRow)
+	{
+		public double? GetOffset(GroupedWrapLayout geometry, Func<object, int> indexOf) =>
+			geometry.TryGetRow(indexOf(Item), out var row) ? row.Start + Math.Clamp(WithinRow, -row.Start, row.Extent) : null;
 	}
 }

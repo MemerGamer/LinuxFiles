@@ -202,7 +202,11 @@ namespace Files.App.Views.Layouts
 #if !WINDOWS
 			if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid grouped)
 			{
-				grouped.EnsureItemVisible(FileList.Items.IndexOf(e));
+				grouped.EnsureItemVisible(e, () =>
+				{
+					if (FileList.Items.Contains(e))
+						FileList.ScrollIntoView(e);
+				});
 				return;
 			}
 #endif
@@ -239,7 +243,14 @@ namespace Files.App.Views.Layouts
 			{
 #if !WINDOWS
 				if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid grouped)
-					grouped.EnsureItemVisible(FileList.Items.IndexOf(SelectedItems.Last()));
+				{
+					var item = SelectedItems.Last();
+					grouped.EnsureItemVisible(item, () =>
+					{
+						if (FileList.Items.Contains(item))
+							FileList.ScrollIntoView(item);
+					});
+				}
 				else
 #endif
 					FileList.ScrollIntoView(SelectedItems.Last());

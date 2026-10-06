@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using System.Collections.Generic;
 using Files.App.UnoVirtualization;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -47,6 +48,58 @@ namespace Files.Platform.Tests.Listing
 			Assert.AreEqual(resized, narrow.FindRow(resized.Start)!.Value);
 			Assert.IsTrue(resized.First > 8000);
 			Assert.IsTrue(narrow.Extent > wide.Extent);
+		}
+
+		[TestMethod]
+		public void NavigationRejectsDirtyAndCountMismatchedGeometry()
+		{
+			var layout = new GroupedWrapLayout(6, 2, 100, i => i == 0 ? 40 : null);
+			Assert.AreEqual(-1, layout.Navigate(3, true, true, 6, dirty: true));
+			Assert.AreEqual(-1, layout.Navigate(3, true, true, 4));
+			Assert.AreEqual(-1, layout.Navigate(3, true, true, 8));
+			Assert.AreEqual(-1, layout.Navigate(6, false, false));
+			Assert.AreEqual(5, layout.Navigate(3, true, true, 6));
+		}
+
+		[TestMethod]
+		public void RowLookupRejectsRetiredSeedsAndEmptySources()
+		{
+			var layout = new GroupedWrapLayout(3, 2, 100, _ => null);
+			Assert.IsFalse(layout.TryGetRow(-1, out _));
+			Assert.IsFalse(layout.TryGetRow(3, out _));
+			Assert.IsFalse(layout.TryGetRow(int.MaxValue, out _));
+			Assert.IsTrue(layout.TryGetRow(2, out var row));
+			Assert.AreEqual(layout.GetRow(2), row);
+			Assert.IsFalse(new GroupedWrapLayout(0, 2, 100, _ => null).TryGetRow(0, out _));
+		}
+
+		[TestMethod]
+		public void AnchorFollowsItemThroughInsertionAndRegrouping()
+		{
+			var item = new object();
+			var items = new List<object> { new(), item, new() };
+			var anchor = new GroupedLayoutAnchor(item, 25);
+			items.Insert(0, new object());
+			var inserted = new GroupedWrapLayout(items.Count, 1, 100, _ => null);
+			Assert.AreEqual(225d, anchor.GetOffset(inserted, items.IndexOf));
+			items.Remove(item);
+			items.Add(new object());
+			items.Add(item);
+			var regrouped = new GroupedWrapLayout(items.Count, 2, 100, i => i is 0 or 3 ? 40 : null);
+			Assert.AreEqual(205d, anchor.GetOffset(regrouped, items.IndexOf));
+			items.Remove(item);
+			Assert.IsNull(anchor.GetOffset(regrouped, items.IndexOf));
+		}
+
+		[TestMethod]
+		public void HeaderAnchorKeepsItsDistanceToTheFollowingTile()
+		{
+			var item = new object();
+			var anchor = new GroupedLayoutAnchor(item, -30);
+			var layout = new GroupedWrapLayout(3, 1, 100, i => i == 0 ? 44 : null);
+			Assert.AreEqual(14d, anchor.GetOffset(layout, _ => 1));
+			var resized = new GroupedLayoutAnchor(item, 150);
+			Assert.AreEqual(144d, resized.GetOffset(layout, _ => 1));
 		}
 
 		[TestMethod]

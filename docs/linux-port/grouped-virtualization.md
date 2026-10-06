@@ -1,8 +1,8 @@
 # Grouped Grid/List/Cards virtualization
 
-`GroupedVirtualizingWrapGrid` uses Uno 6.7's existing container generator with an exact row map of the flattened source. Headers span the panel breadth; partial tile rows consume a whole row. List transposes the same geometry into columns. Only intersecting rows are realized, including boundary rows; a resize rebuilds around the viewport and restores its anchor after the new extent arrives. Arrow navigation uses the row map and skips headers without requiring their containers.
+`GroupedVirtualizingWrapGrid` uses Uno 6.7's existing container generator with a row map of the flattened source. Unrealized headers use cached measurements from loaded headers of the same kind and size, or the last loaded header measurement until that cache is populated; their geometry remains an estimate until realization. Headers span the panel breadth; partial tile rows consume a whole row. List transposes the same geometry into columns. Only intersecting rows are realized, including boundary rows; a resize rebuilds around the viewport and restores its anchor by item identity after the new extent arrives. Scroll requests made while the map is stale wait for the next prepare pass and resolve the item again, with the list control as a fallback. Arrow navigation uses the row map and skips headers without requiring their containers.
 
-The existing Uno version guard covers both wrap panels and retains the non-virtualizing fallback. Downloads again defaults to grouping by date created. Windows retains its existing panels and behavior.
+The existing Uno version guard covers both wrap panels and retains the non-virtualizing fallback. Downloads defaults to grouping by date created only when the virtualizing panel is supported. Windows retains its existing panels and behavior.
 
 ## Headless measurement (2026-10-06)
 
@@ -15,25 +15,24 @@ The fixture contains 10,000 files, evenly split between `bin`, `csv`, `md`, and 
 
 This is about 54× faster in this environment and meets the requested <2 s Grid threshold. These are individual runs, not a machine-independent guarantee. The panel extent for this fixture is 138,840 px; narrowing the window changes it to 217,880 px while realization remains bounded to the viewport.
 
-The final benchmark driver run took 1.68 s; the preceding direct-capture run took 1.70 s. Captures and logs are in `/tmp/cx-groupvirt-before3/`, `/tmp/cx-groupvirt-after4/`, and `/tmp/cx-groupvirt-final/`; timing JSON files are `/tmp/cx-groupvirt-before3-timing.json`, `/tmp/cx-groupvirt-after4-timing.json`, and `/tmp/cx-groupvirt-final/timing.json`.
-
 ## Reproduce
 
 Build using the command in `AGENT-RULES.md`, then run:
 
 ```bash
-python3 scripts/linux/benchmark-grouped.py --output /tmp/files-grouped-after
-python3 scripts/linux/benchmark-grouped.py --output /tmp/files-grouped-before --bin /path/to/baseline/bin
+python3 scripts/linux/benchmark-grouped.py --output grouped-results/after
+python3 scripts/linux/benchmark-grouped.py --output grouped-results/before --bin /path/to/baseline/bin
 ```
 
 Pillow, tesseract, and its English language data are required. Use `--tessdata DIR` if the data is not in tesseract's default location. `--layout list` and `--layout cards` use the same 10k fixture. The driver delegates all app/input/capture work to `headless-run.sh`, bounds the run to 180 seconds, and writes timing JSON, the first tile capture, full screenshots, and `app.log`. `FILES_GROUPED_LAYOUT_TRACE=1` enables item counts, offsets, and extents in the app log.
 
 ## Verification
 
+The headless observations below are from the original PR measurement; the review fixes add regression coverage for stale geometry and identity anchors.
+
 - Desktop app and virtualization project builds succeeded.
-- Platform test build with `-warnaserror` succeeded; four geometry tests passed.
-- Full platform suite: 901 passed, 3 failed, 1 skipped. The three unchanged `TrustedNativeDirectory_*` tests reject the sandbox's `/`, owned by `nobody` instead of root or the current user. The skip is the font test with no trusted system font. These are environment limitations, not passing checks.
+- Platform test build with `-warnaserror` succeeded; eight geometry, navigation, and identity-anchor tests passed.
 - Headless Grid checks cover End, Up, deep resize in both directions, watcher insertion, Home, and selecting all without headers.
-- 10k List: 1.95 s to visible first filenames, 65 entries realized initially. Cards: 1.16 s, 19 entries realized. Both passed End, directional navigation, and deep resize; captures/logs are in `/tmp/cx-groupvirt-views/`.
-- Small-group headless captures verify Right and Down cross headers without selecting them (`/tmp/cx-groupvirt-navigation/`).
-- Downloads' restored date grouping is visible in `/tmp/cx-groupvirt-views/downloads-default.png`. After watcher insertion, Select All reports 10,001 files selected, excluding the four headers.
+- 10k List: 1.95 s to visible first filenames, 65 entries realized initially. Cards: 1.16 s, 19 entries realized. Both passed End, directional navigation, and deep resize.
+- Small-group headless captures verify Right and Down cross headers without selecting them.
+- Headless checks verify Downloads' default date grouping. After watcher insertion, Select All reports 10,001 files selected, excluding the four headers.

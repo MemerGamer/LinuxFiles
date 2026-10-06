@@ -624,7 +624,11 @@ namespace Files.App.Helpers
 			if (string.IsNullOrEmpty(path))
 				return new();
 
-			if (path == Constants.UserEnvironmentPaths.DownloadsPath)
+			if (path == Constants.UserEnvironmentPaths.DownloadsPath
+#if !WINDOWS
+				&& Files.App.UnoVirtualization.VirtualizingWrapGrid.IsSupported(out _)
+#endif
+				)
 			{
 				// Default for downloads folder is to group by date created
 				return new()

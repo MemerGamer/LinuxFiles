@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Copyright (c) Files Community
 # Licensed under the MIT License.
 

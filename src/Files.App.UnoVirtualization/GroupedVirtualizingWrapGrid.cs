@@ -11,7 +11,7 @@ using Windows.Foundation;
 namespace Files.App.UnoVirtualization
 {
 	/// <summary>
-	/// Virtualizes flattened grouped tiles using exact row geometry, including full-width headers.
+	/// Virtualizes flattened grouped tiles with full-width headers and cached estimates for unrealized headers.
 	/// Uses the same publicized Uno 6.7 layout API as VirtualizingWrapGrid.
 	/// </summary>
 	public sealed class GroupedVirtualizingWrapGrid : Panel, IVirtualizingPanel
@@ -42,11 +42,12 @@ namespace Files.App.UnoVirtualization
 		public override Size ArrangeOverride(Size finalSize)
 		{
 			var result = layout.CorrectExtent(layout.ArrangeOverride(finalSize), finalSize);
+			layout.CaptureAnchor();
 			layout.Trace();
 			return result;
 		}
-		public void EnsureItemVisible(int index) => layout.EnsureItemVisible(index);
-		public int Navigate(int index, bool acrossLines, bool forward) => layout.Geometry.Navigate(index, acrossLines, forward);
+		public void EnsureItemVisible(object item, Action fallback) => layout.EnsureItemVisible(item, fallback);
+		public int Navigate(int index, bool acrossLines, bool forward) => layout.Navigate(index, acrossLines, forward);
 
 		private sealed class GroupedGridLayout : VirtualizingPanelLayout
 		{
@@ -56,20 +57,44 @@ namespace Files.App.UnoVirtualization
 			private bool cellMeasured;
 			private bool measurementQueued;
 			private bool dirty = true;
+			private bool geometryNeedsRefresh = true;
 			private int perRow = 1;
 			private object? source;
 			private INotifyCollectionChanged? notifications;
 			private ScrollViewer? scroller;
 			private int offsetRequest;
+			private bool restoringAnchor;
+			private double geometryBreadth;
+			private GroupedLayoutAnchor? anchor;
+			private (object Item, Action Fallback)? pendingScroll;
+			private readonly Dictionary<(Type Kind, object? Template, double Breadth, Orientation Orientation), double> headerEstimates = [];
+			private double? lastMeasuredHeaderExtent;
 			private static readonly bool traceEnabled = Environment.GetEnvironmentVariable("FILES_GROUPED_LAYOUT_TRACE") == "1";
 			private (int Count, int Realized, int First, double Offset, double Extent)? lastTrace;
 			private readonly Dictionary<int, double> headerSizes = [];
 			private readonly HashSet<int> measuredHeaders = [];
+			private readonly Dictionary<int, double> loadedHeaderSizes = [];
 			private readonly Dictionary<int, FrameworkElement> headers = [];
 
 			public GroupedWrapLayout Geometry { get; private set; } = new(0, 1, 140, _ => null);
 			public override Orientation ScrollOrientation => Orientation;
 			public override int GetItemsPerLine() => perRow;
+			private bool IsGeometryCurrent => !dirty && ReferenceEquals(source, ItemsControl?.ItemsSource) && Geometry.Count == (ItemsControl?.NumberOfItems ?? 0);
+
+			public int Navigate(int index, bool acrossLines, bool forward)
+			{
+				var target = Geometry.Navigate(index, acrossLines, forward, ItemsControl?.NumberOfItems ?? 0, !IsGeometryCurrent);
+				return target >= 0 && target < (ItemsControl?.NumberOfItems ?? 0) ? target : -1;
+			}
+
+			public void CaptureAnchor()
+			{
+				if (restoringAnchor || !IsGeometryCurrent || ItemsControl is not { } items || Geometry.FindRow(ScrollOffset) is not { } row)
+					return;
+				var index = row.IsHeader ? Geometry.Navigate(row.First, false, true) : row.First;
+				if (index >= 0 && index < items.NumberOfItems)
+					anchor = new GroupedLayoutAnchor(items.Items[index], ScrollOffset - Geometry.GetRow(index).Start);
+			}
 
 			public void Trace()
 			{
@@ -92,20 +117,27 @@ namespace Files.App.UnoVirtualization
 				scroller = null;
 				source = null;
 				headers.Clear();
+				anchor = null;
+				restoringAnchor = false;
+				pendingScroll = null;
 				dirty = true;
+				geometryNeedsRefresh = true;
 				offsetRequest++;
 			}
 
 			private void OnCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
 			{
 				dirty = true;
+				geometryNeedsRefresh = true;
+				restoringAnchor = false;
+				offsetRequest++;
 				OwnerPanel.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () => OwnerPanel.InvalidateMeasure());
 			}
 
 			public void Prepare(GroupedVirtualizingWrapGrid panel, Size available)
 			{
 				Orientation = panel.PanelScrollOrientation;
-				if (ItemsControl is null)
+				if (ItemsControl is not { } itemsControl)
 					return;
 				if (!ReferenceEquals(source, ItemsControl?.ItemsSource))
 				{
@@ -116,6 +148,9 @@ namespace Files.App.UnoVirtualization
 					if (notifications is not null)
 						notifications.CollectionChanged += OnCollectionChanged;
 					dirty = true;
+					geometryNeedsRefresh = true;
+					restoringAnchor = false;
+					offsetRequest++;
 				}
 
 				// Uno's large-scroll handler seeds by average item height, which cannot represent header rows.
@@ -129,9 +164,8 @@ namespace Files.App.UnoVirtualization
 				}
 
 				var breadth = GetBreadth(available);
-				var anchor = Geometry.FindRow(ScrollOffset);
-				var withinRow = anchor is { } old ? ScrollOffset - old.Start : 0;
-				var changed = dirty || Geometry.Count != (ItemsControl?.NumberOfItems ?? 0);
+				var viewportAnchor = anchor;
+				var changed = dirty || Geometry.Count != (ItemsControl?.NumberOfItems ?? 0) || breadth != geometryBreadth;
 				if (!cellMeasured)
 				{
 					cellBreadth = Math.Max(MinReliableSize, GetBreadth(panel.ProvisionalCellSize));
@@ -140,7 +174,7 @@ namespace Files.App.UnoVirtualization
 
 				foreach (var line in _materializedLines)
 				{
-					if (line.FirstItemFlat >= Geometry.Count || Geometry.GetRow(line.FirstItemFlat).IsHeader || !line.FirstView.IsLoaded)
+					if (!IsGeometryCurrent || !Geometry.TryGetRow(line.FirstItemFlat, out var row) || row.IsHeader || !line.FirstView.IsLoaded)
 						continue;
 
 					var view = line.FirstView;
@@ -161,40 +195,36 @@ namespace Files.App.UnoVirtualization
 				changed |= columns != perRow;
 				perRow = columns;
 
-				// Headers already exist in the flattened source; measuring them never realizes file tiles.
-				var sizes = new Dictionary<int, double>();
+				if (dirty || Geometry.Count != itemsControl.NumberOfItems)
+					CollectHeaders(panel);
+
+				// Only loaded headers have resolved templates and inherited resources.
 				measuredHeaders.Clear();
-				if (dirty || Geometry.Count != (ItemsControl?.NumberOfItems ?? 0))
+				loadedHeaderSizes.Clear();
+				foreach (var line in _materializedLines)
 				{
-					headers.Clear();
-					if (ItemsControl is { } items)
-					{
-						for (var i = 0; i < items.NumberOfItems; i++)
-							if (panel.IsHeader(items.Items[i]) && items.Items[i] is FrameworkElement header)
-								headers.Add(i, header);
-					}
-				}
-				foreach (var (i, header) in headers)
-				{
+					if (!headers.TryGetValue(line.FirstItemFlat, out var header) || !header.IsLoaded || !ReferenceEquals(header, line.FirstView))
+						continue;
 					header.Measure(ScrollOrientation == Orientation.Vertical
 						? new Size(breadth, double.PositiveInfinity)
 						: new Size(double.PositiveInfinity, breadth));
-					var extent = Math.Max(MinReliableSize, GetExtent(header.DesiredSize));
-					sizes[i] = extent;
-					if (header.IsLoaded)
-						measuredHeaders.Add(i);
-					changed |= !headerSizes.TryGetValue(i, out var previous) || Math.Abs(previous - extent) > .5;
+					var extent = GetExtent(header.DesiredSize);
+					if (!double.IsFinite(extent) || extent < MinReliableSize)
+						continue;
+					measuredHeaders.Add(line.FirstItemFlat);
+					loadedHeaderSizes[line.FirstItemFlat] = extent;
+					var key = HeaderKey(header, breadth);
+					changed |= !headerSizes.TryGetValue(line.FirstItemFlat, out var previous) || Math.Abs(previous - extent) > .5;
+					headerEstimates[key] = extent;
+					lastMeasuredHeaderExtent = extent;
 				}
 
+				QueuePendingScroll();
 				if (!changed)
 					return;
 
+				RebuildGeometry(breadth);
 				dirty = false;
-				headerSizes.Clear();
-				foreach (var pair in sizes)
-					headerSizes.Add(pair.Key, pair.Value);
-				Geometry = new GroupedWrapLayout(ItemsControl?.NumberOfItems ?? 0, perRow, cellExtent,
-					i => headerSizes.TryGetValue(i, out var height) ? height : null);
 
 				// Rebuild at the viewport, including after a Reset or a resize far down a large folder.
 				_availableSize = available;
@@ -202,19 +232,47 @@ namespace Files.App.UnoVirtualization
 				_pendingCollectionChanges.Clear();
 				_scrollAdjustmentForCollectionChanges = null;
 				SeedViewport(ScrollOffset, clearContainer: true);
-				if (anchor is { First: > 0 } a && a.First < Geometry.Count)
+				if (pendingScroll is null && viewportAnchor?.GetOffset(Geometry, item => itemsControl.Items.IndexOf(item)) is { } target)
 				{
-					var target = Geometry.GetRow(a.First).Start + Math.Min(withinRow, Geometry.GetRow(a.First).Extent);
 					var request = ++offsetRequest;
+					restoringAnchor = true;
 					ApplyAnchorOffset(target, request, 0);
 				}
+			}
+
+			private void CollectHeaders(GroupedVirtualizingWrapGrid panel)
+			{
+				geometryNeedsRefresh = false;
+				headers.Clear();
+				measuredHeaders.Clear();
+				loadedHeaderSizes.Clear();
+				if (ItemsControl is not { } items)
+					return;
+				for (var i = 0; i < items.NumberOfItems; i++)
+					if (panel.IsHeader(items.Items[i]) && items.Items[i] is FrameworkElement header)
+						headers.Add(i, header);
+			}
+
+			private (Type Kind, object? Template, double Breadth, Orientation Orientation) HeaderKey(FrameworkElement header, double breadth) =>
+				(header.GetType(), (header as ContentControl)?.ContentTemplate, breadth, ScrollOrientation);
+
+			private void RebuildGeometry(double breadth)
+			{
+				geometryBreadth = breadth;
+				headerSizes.Clear();
+				foreach (var (i, header) in headers)
+					headerSizes[i] = loadedHeaderSizes.TryGetValue(i, out var loadedExtent)
+						? loadedExtent : headerEstimates.TryGetValue(HeaderKey(header, breadth), out var extent)
+						? extent : lastMeasuredHeaderExtent ?? (ScrollOrientation == Orientation.Vertical ? 44 : cellExtent);
+				Geometry = new GroupedWrapLayout(ItemsControl?.NumberOfItems ?? 0, perRow, cellExtent,
+					i => headerSizes.TryGetValue(i, out var height) ? height : null);
 			}
 
 			private void ApplyAnchorOffset(double target, int request, int attempt)
 			{
 				OwnerPanel.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
 				{
-					if (request != offsetRequest || ScrollViewer is not { } viewer)
+					if (request != offsetRequest || !IsGeometryCurrent || ScrollViewer is not { } viewer)
 						return;
 					var extent = ScrollOrientation == Orientation.Vertical ? viewer.ExtentHeight : viewer.ExtentWidth;
 					if (Math.Abs(extent - Geometry.Extent) > 1 && attempt < 8)
@@ -222,7 +280,9 @@ namespace Files.App.UnoVirtualization
 						ApplyAnchorOffset(target, request, attempt + 1);
 						return;
 					}
+					restoringAnchor = false;
 					ChangeOffset(target);
+					CaptureAnchor();
 				});
 			}
 
@@ -238,7 +298,7 @@ namespace Files.App.UnoVirtualization
 
 			private void OnExactScrollChanged(object? sender, ScrollViewerViewChangedEventArgs e)
 			{
-				if (dirty)
+				if (!IsGeometryCurrent)
 				{
 					OwnerPanel.InvalidateMeasure();
 					return;
@@ -253,6 +313,7 @@ namespace Files.App.UnoVirtualization
 				_lastScrollOffset = ScrollOffset;
 				if (large)
 					OwnerPanel.InvalidateMeasure();
+				CaptureAnchor();
 				Trace();
 			}
 
@@ -267,13 +328,45 @@ namespace Files.App.UnoVirtualization
 				OnExactScrollChanged(viewer, new ScrollViewerViewChangedEventArgs());
 			}
 
-			public void EnsureItemVisible(int index)
+			public void EnsureItemVisible(object item, Action fallback)
 			{
-				if (index < 0 || index >= Geometry.Count || ScrollViewer is not { } viewer)
-					return;
 				offsetRequest++;
-				var row = Geometry.GetRow(index);
+				restoringAnchor = false;
+				pendingScroll = null;
+				if (IsGeometryCurrent && TryEnsureItemVisible(item))
+					return;
+				pendingScroll = (item, fallback);
+				OwnerPanel.InvalidateMeasure();
+			}
+
+			private void QueuePendingScroll()
+			{
+				if (pendingScroll is not { } pending)
+					return;
+				var request = offsetRequest;
+				OwnerPanel.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
+				{
+					if (request != offsetRequest || pendingScroll is null)
+						return;
+					if (!IsGeometryCurrent)
+					{
+						OwnerPanel.InvalidateMeasure();
+						return;
+					}
+					pendingScroll = null;
+					if (!TryEnsureItemVisible(pending.Item))
+						pending.Fallback();
+				});
+			}
+
+			private bool TryEnsureItemVisible(object item)
+			{
+				var index = ItemsControl?.Items.IndexOf(item) ?? -1;
+				if (!Geometry.TryGetRow(index, out var row) || ScrollViewer is not { } viewer)
+					return false;
 				var viewport = ScrollOrientation == Orientation.Vertical ? viewer.ViewportHeight : viewer.ViewportWidth;
+				if (viewport <= 0)
+					return false;
 				if (row.Start < ScrollOffset)
 				{
 					var start = row.First > 0 && Geometry.GetRow(row.First - 1) is { IsHeader: true } header ? header.Start : row.Start;
@@ -281,6 +374,7 @@ namespace Files.App.UnoVirtualization
 				}
 				else if (row.Start + row.Extent > ScrollOffset + viewport)
 					ChangeOffset(row.Start + row.Extent - viewport);
+				return true;
 			}
 
 			public Size CorrectExtent(Size size, Size available)
@@ -292,7 +386,25 @@ namespace Files.App.UnoVirtualization
 
 			public override Line CreateLine(GeneratorDirection fillDirection, double extentOffset, double availableBreadth, Uno.UI.IndexPath nextVisibleItem)
 			{
-				var row = Geometry.GetRow(GetFlatItemIndex(nextVisibleItem));
+				var flat = GetFlatItemIndex(nextVisibleItem);
+				if (geometryNeedsRefresh || Geometry.Count != (ItemsControl?.NumberOfItems ?? 0))
+				{
+					CollectHeaders((GroupedVirtualizingWrapGrid)OwnerPanel);
+					RebuildGeometry(availableBreadth);
+					OwnerPanel.InvalidateMeasure();
+				}
+				if (!Geometry.TryGetRow(flat, out var row))
+				{
+					// Uno may still supply a retired seed during collection-change processing.
+					var items = ItemsControl!;
+					var placeholder = (FrameworkElement)items.GetContainerForTemplate(items.ItemTemplate);
+					AddView(placeholder, fillDirection, extentOffset, 0);
+					SetBounds(placeholder, ScrollOrientation == Orientation.Vertical
+						? new Rect(0, extentOffset, availableBreadth, cellExtent)
+						: new Rect(extentOffset, 0, cellExtent, availableBreadth));
+					OwnerPanel.InvalidateMeasure();
+					return new Line(Math.Max(0, flat), (placeholder, nextVisibleItem));
+				}
 				var views = new (FrameworkElement container, Uno.UI.IndexPath index)[row.Count];
 				for (var column = 0; column < row.Count; column++)
 				{
@@ -316,7 +428,8 @@ namespace Files.App.UnoVirtualization
 
 			private Rect Bounds(int index, double availableBreadth)
 			{
-				var row = Geometry.GetRow(index);
+				if (!Geometry.TryGetRow(index, out var row))
+					return default;
 				var breadth = row.IsHeader ? availableBreadth : cellBreadth;
 				var column = row.IsHeader ? 0 : (index - row.First) * cellBreadth;
 				return ScrollOrientation == Orientation.Vertical

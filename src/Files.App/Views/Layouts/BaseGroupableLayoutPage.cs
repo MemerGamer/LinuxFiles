@@ -612,7 +612,7 @@ namespace Files.App.Views.Layouts
 					? e.Key is VirtualKey.Up or VirtualKey.Down
 					: e.Key is VirtualKey.Left or VirtualKey.Right;
 				var index = virtualized.Navigate(ListViewBase.SelectedIndex, acrossLines, e.Key is VirtualKey.Down or VirtualKey.Right);
-				if (index >= 0 && ListViewBase.Items[index] is ListedItem tile)
+				if (index >= 0 && index < ListViewBase.Items.Count && ListViewBase.Items[index] is ListedItem tile)
 				{
 					ItemManipulationModel.SetSelectedItem(tile);
 					ItemManipulationModel.ScrollIntoView(tile);

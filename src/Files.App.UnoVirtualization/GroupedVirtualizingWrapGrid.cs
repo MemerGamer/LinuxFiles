@@ -273,7 +273,11 @@ namespace Files.App.UnoVirtualization
 				OwnerPanel.DispatcherQueue.TryEnqueue(DispatcherQueuePriority.Low, () =>
 				{
 					if (request != offsetRequest || !IsGeometryCurrent || ScrollViewer is not { } viewer)
+					{
+						if (request == offsetRequest && ScrollViewer is null)
+							restoringAnchor = false;
 						return;
+					}
 					var extent = ScrollOrientation == Orientation.Vertical ? viewer.ExtentHeight : viewer.ExtentWidth;
 					if (Math.Abs(extent - Geometry.Extent) > 1 && attempt < 8)
 					{
@@ -403,7 +407,8 @@ namespace Files.App.UnoVirtualization
 						? new Rect(0, extentOffset, availableBreadth, cellExtent)
 						: new Rect(extentOffset, 0, cellExtent, availableBreadth));
 					OwnerPanel.InvalidateMeasure();
-					return new Line(Math.Max(0, flat), (placeholder, nextVisibleItem));
+					var clamped = Math.Clamp(flat, 0, Math.Max(0, Geometry.Count - 1));
+					return new Line(clamped, (placeholder, Uno.UI.IndexPath.FromRowSection(clamped, 0)));
 				}
 				var views = new (FrameworkElement container, Uno.UI.IndexPath index)[row.Count];
 				for (var column = 0; column < row.Count; column++)

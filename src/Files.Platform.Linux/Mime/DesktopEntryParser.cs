@@ -124,6 +124,12 @@ namespace Files.Platform.Linux.Mime
 				var line = rawLine.Trim();
 				if (desktopEntryOnly)
 				{
+					// Whitespace-padded group headers inside [Desktop Entry] must not hide control characters.
+					if (values is not null && line.StartsWith('[') && rawLine.TrimEnd('\r').Any(c => char.IsControl(c) && c != '\t'))
+					{
+						error = "control character";
+						return null;
+					}
 					if (line.StartsWith('[') && line != "[Desktop Entry]")
 					{
 						values = null;

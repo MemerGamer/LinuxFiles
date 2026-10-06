@@ -108,6 +108,53 @@ namespace Files.Platform.Linux.Launching
 			return result;
 		}
 
+		/// <summary>Service menus never invoke a shell. Target field codes must occupy complete argv elements.</summary>
+		public static IReadOnlyList<IReadOnlyList<string>> ExpandServiceMenu(DesktopApplication app, IReadOnlyList<string> targets)
+		{
+			// Refuse shell syntax conservatively, even if quoted. Substituted paths are not inspected as command text.
+			if (app.Exec.Any(c => c is '|' or '&' or ';' or '<' or '>' or '`' or '$' or '*' or '?' or '~' or '#' || char.IsControl(c))) return [];
+			var tokens = Tokenize(app.Exec);
+			if (tokens is null || tokens.Count == 0 || tokens[0].Contains('%') || tokens[0].Contains('=') ||
+				tokens.Any(t => Shells.Contains(System.IO.Path.GetFileName(t))) ||
+				(System.IO.Path.GetFileName(tokens[0]) == "env" && tokens.Any(t => t.StartsWith("-S", StringComparison.Ordinal) || t.StartsWith("--split-string", StringComparison.Ordinal)))) return [];
+			if (tokens.Count(t => t is "%f" or "%F" or "%u" or "%U") > 1 ||
+				(tokens.Any(t => t is "%f" or "%F") && targets.Any(t => !ToPathOrUri(t).StartsWith('/')))) return [];
+			var single = tokens.Any(t => t is "%f" or "%u");
+			var result = new List<IReadOnlyList<string>>();
+			foreach (var target in single ? targets : new string[] { string.Empty })
+			{
+				var argv = new List<string>();
+				foreach (var token in tokens)
+				{
+					switch (token)
+					{
+						case "%f": argv.Add(PathArgument(target)); break;
+						case "%u": argv.Add(ToUri(target)); break;
+						case "%F": argv.AddRange(targets.Select(PathArgument)); break;
+						case "%U": argv.AddRange(targets.Select(ToUri)); break;
+						case "%c": argv.Add(app.Name); break;
+						case "%k": argv.Add(app.DesktopFilePath); break;
+						case "%i":
+							if (!string.IsNullOrEmpty(app.IconName)) { argv.Add("--icon"); argv.Add(app.IconName); }
+							break;
+						default:
+							var literal = new StringBuilder();
+							for (var i = 0; i < token.Length; i++)
+							{
+								if (token[i] != '%') literal.Append(token[i]);
+								else if (i + 1 < token.Length && token[++i] == '%') literal.Append('%');
+								else return [];
+							}
+							argv.Add(literal.ToString());
+							break;
+					}
+				}
+				if (argv.Count == 0 || argv.Any(a => a.Contains('\0'))) return [];
+				result.Add(argv.ToArray());
+			}
+			return result;
+		}
+
 		/// <summary>
 		/// Quotes a value as a single shell word: wrapped in single quotes with embedded quotes escaped.
 		/// </summary>

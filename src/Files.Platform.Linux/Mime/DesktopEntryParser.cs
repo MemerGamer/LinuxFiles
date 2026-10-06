@@ -79,61 +79,11 @@ namespace Files.Platform.Linux.Mime
 		/// </summary>
 		public static Entry? ParseStrict(IReadOnlyList<string> lines, string path, string desktopId, CultureInfo culture, out string? error)
 		{
-			error = null;
-			var groups = 0;
-			var inGroup = false;
-			var keys = new HashSet<string>(StringComparer.Ordinal);
+			var groups = ReadStrictGroups(lines, out error);
+			if (groups is null)
+				return null;
 
-			foreach (var rawLine in lines)
-			{
-				if (rawLine.Contains('\0'))
-				{
-					error = "NUL character";
-					return null;
-				}
-
-				var line = rawLine.Trim();
-				if (line.Length == 0 || line[0] == '#')
-					continue;
-
-				if (line[0] == '[')
-				{
-					inGroup = line == "[Desktop Entry]";
-					if (inGroup && ++groups > 1)
-					{
-						error = "multiple [Desktop Entry] groups";
-						return null;
-					}
-
-					continue;
-				}
-
-				if (!inGroup)
-					continue;
-
-				var eq = line.IndexOf('=');
-				if (eq <= 0)
-					continue;
-
-				var key = line[..eq].TrimEnd();
-
-				// Localized Exec/Type/Terminal/Path/TryExec variants are not part of the spec; refuse so only one value can exist
-				if (key.StartsWith("Exec[", StringComparison.Ordinal) || key.StartsWith("Type[", StringComparison.Ordinal) ||
-					key.StartsWith("Terminal[", StringComparison.Ordinal) || key.StartsWith("Path[", StringComparison.Ordinal) ||
-					key.StartsWith("TryExec[", StringComparison.Ordinal))
-				{
-					error = "localized " + key;
-					return null;
-				}
-
-				if (!keys.Add(key))
-				{
-					error = "duplicate key " + line[..eq].TrimEnd();
-					return null;
-				}
-			}
-
-			if (!keys.Contains("Type") || !keys.Contains("Exec"))
+			if (!groups.TryGetValue("Desktop Entry", out var values) || !values.ContainsKey("Type") || !values.ContainsKey("Exec"))
 			{
 				error = "missing Type or Exec";
 				return null;
@@ -153,6 +103,50 @@ namespace Files.Platform.Linux.Mime
 			}
 
 			return entry;
+		}
+
+		/// <summary>Strictly reads all groups, sharing the same validation and unescaping for applications and service menus.</summary>
+		internal static Dictionary<string, Dictionary<string, string>>? ReadStrictGroups(IReadOnlyList<string> lines, out string? error)
+		{
+			error = null;
+			var groups = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+			Dictionary<string, string>? values = null;
+			foreach (var rawLine in lines)
+			{
+				if (rawLine.TrimEnd('\r').Any(c => char.IsControl(c) && c != '\t'))
+				{
+					error = "control character";
+					return null;
+				}
+
+				var line = rawLine.Trim();
+				if (line.Length == 0 || line[0] == '#')
+					continue;
+				if (line[0] == '[')
+				{
+					if (line[^1] != ']' || !groups.TryAdd(line[1..^1], values = new(StringComparer.Ordinal)))
+					{
+						error = "invalid or repeated group";
+						return null;
+					}
+					continue;
+				}
+
+				var eq = line.IndexOf('=');
+				if (values is null || eq <= 0)
+				{
+					error = "key outside a group or missing equals sign";
+					return null;
+				}
+				var key = line[..eq].TrimEnd();
+				if (new[] { "Exec[", "Type[", "Terminal[", "Path[", "TryExec[" }.Any(prefix => key.StartsWith(prefix, StringComparison.Ordinal)) ||
+					!values.TryAdd(key, Unescape(line[(eq + 1)..].TrimStart())))
+				{
+					error = "duplicate or localized execution key " + key;
+					return null;
+				}
+			}
+			return groups;
 		}
 
 		/// <summary>
@@ -191,7 +185,7 @@ namespace Files.Platform.Linux.Mime
 		private static bool IsTrue(Dictionary<string, string> values, string key) =>
 			values.TryGetValue(key, out var v) && v == "true";
 
-		private static string? GetLocalized(Dictionary<string, string> values, string key, CultureInfo culture)
+		internal static string? GetLocalized(Dictionary<string, string> values, string key, CultureInfo culture)
 		{
 			var tag = culture.Name.Replace('-', '_');
 			if (tag.Length > 0)

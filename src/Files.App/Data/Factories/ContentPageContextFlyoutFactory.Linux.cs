@@ -4,12 +4,61 @@
 #if !WINDOWS
 using Files.Platform.Abstractions;
 using Files.Platform.Abstractions.Launching;
+using Files.Platform.Abstractions.Mime;
+using Files.Platform.Linux.Launching;
 using Microsoft.Extensions.Logging;
 
 namespace Files.App.Data.Factories
 {
 	public static partial class ContentPageContextFlyoutFactory
 	{
+		private static async Task<List<ContextMenuFlyoutItemViewModel>> GetLinuxItemContextCommandsAsync(
+			string? workingDir, List<ListedItem> selectedItems, bool shiftPressed, bool showOpenMenu, CancellationToken cancellationToken)
+		{
+			var items = await ShellContextFlyoutFactory.GetShellContextmenuAsync(shiftPressed, showOpenMenu, workingDir, selectedItems, cancellationToken);
+			var targets = selectedItems.Select(i => i.ItemPath ?? string.Empty).ToArray();
+			if (targets.Length == 0 || targets.Any(p => string.IsNullOrEmpty(p) || !p.StartsWith('/')))
+				return items;
+
+			try
+			{
+				var actions = await Ioc.Default.GetRequiredService<IServiceMenuService>().GetActionsAsync(targets, cancellationToken);
+				var groups = new Dictionary<string, ContextMenuFlyoutItemViewModel>(StringComparer.Ordinal);
+				foreach (var action in actions)
+				{
+					var captured = action;
+					var item = new ContextMenuFlyoutItemViewModel
+					{
+						Text = DisplaySanitizer.Field(action.Application.Name),
+						Glyph = "\xE756",
+						ShowInSearchPage = true,
+						Command = new AsyncRelayCommand(() => NavigationHelpers.RunServiceMenuLinuxAsync(captured, targets)),
+					};
+					if (string.IsNullOrWhiteSpace(action.Submenu))
+						items.Add(item);
+					else
+					{
+						if (!groups.TryGetValue(action.Submenu, out var group))
+						{
+							group = new ContextMenuFlyoutItemViewModel { Text = DisplaySanitizer.Field(action.Submenu), Items = [], ShowInSearchPage = true };
+							groups.Add(action.Submenu, group);
+							items.Add(group);
+						}
+						group.Items!.Add(item);
+					}
+				}
+			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Failed to list service menus");
+			}
+			return items;
+		}
+
 		/// <summary>
 		/// Builds the "New" submenu from <see cref="ITemplatesService"/>: Folder, Text Document and the files in ~/Templates.
 		/// </summary>

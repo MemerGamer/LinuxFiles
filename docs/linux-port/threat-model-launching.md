@@ -1,6 +1,6 @@
 # Threat model: opening and launching files (Linux)
 
-Scope: double-click / Enter / "Open with" in `NavigationHelpers.Linux.cs`, `LinuxLauncherService`, `DesktopEntryParser`, `OpenDecision`.
+Scope: double-click / Enter / "Open with" in `NavigationHelpers.Linux.cs`, `LinuxLauncherService`, `DesktopEntryParser`, `OpenDecision`, and KDE service-menu actions discovered by `ContentPageContextFlyoutFactory` and prepared by `ServiceMenuLaunchPlan`.
 
 Attacker: controls a file's name, content, mode bits and symlinks (downloaded archive, shared folder, USB stick). Goal: get code to run without the user knowingly confirming exactly that code.
 
@@ -20,6 +20,20 @@ Attacker: controls a file's name, content, mode bits and symlinks (downloaded ar
 | 10 | More than 5 files opened at once asks first; files needing a gate are processed one by one, never in the bulk default-app launch | `OpenFilesLinuxAsync` | (UI path, covered by 1-9) |
 | 11 | Dry-run seam (`FILES_LAUNCH_DRYRUN`) so automated runs spawn nothing | `DryRunProcessStarter` | n/a |
 | 12 | Drop items onto an executable: same plan as gates 1-2 (only confirmable binaries/scripts); the dialog shows the full argv (target plus every dropped path, `DisplaySanitizer.FullArguments`, refused if too large) and exactly that argv is run after the identity re-check | `NavigationHelpers.RunWithItemsLinuxAsync` | `OnlyConfirmedActionsMayRunAFile`, `DisplaySanitizerTests` |
+| 13 | KDE service menus: every invocation (including system menus) uses `LaunchDesktopConfirm` and the existing launcher plan/dialog. User menus never gain trust from their directory or execute bit. Strict group/key validation is shared with the desktop parser; Type=Service and each declared action's Name/Exec are required | `ServiceMenuParser`, `RunServiceMenuLinuxAsync`, `ExecutePlanAsync` | `ServiceMenuTests` |
+| 14 | Service Exec: tokenize first, then substitute `%f/%F/%u/%U` only as complete argv elements; no shell or embedded target-code expansion. Explicit shells, shell syntax, unknown codes and oversized argv are refused. Every argv is shown through `DisplaySanitizer.FullArguments`, kept unchanged and identity-checked before its start; cancelling stops the remaining invocations | `DesktopExecExpander.ExpandServiceMenu`, `ServiceMenuLaunchPlan` | `Expansion_*`, `Plan_PinsCodeBeforeDialog_*` |
+| 15 | Service discovery: user entries override system entries by basename (hidden/invalid overrides included); every selected MIME/protocol and URL-count restriction must match. Scan at most 512 directory entries and return at most 256 actions for at most 256 selected targets; each file uses the existing pinned regular-file reader's 64 KiB/1000-line/4096-byte-line/200-key limits. Final symlinks, devices and FIFOs are refused | `LinuxServiceMenuService`, `DesktopEntryDisplay.ReadLinesBounded` | `Scan_*`, `Filter_*` |
+
+Service menus are read from XDG data directories' `kio/servicemenus` and legacy `kservices5/ServiceMenus`, including `~/.local/share`.
+Actions enter the existing Linux **Show more options** flow (or render inline when the user enables that existing menu setting).
+Localized `X-KDE-Submenu` groups are preserved. `X-KDE-Priority=TopLevel` entries sort first inside that flow, followed by `Important`, then normal entries.
+MIME filtering includes aliases, parent types, type globs, and KDE's `all/all` / `all/allfiles`; required URL counts and protocol lists accept KDE comma lists as well as semicolons.
+See [KDE's service-menu format](https://develop.kde.org/docs/apps/dolphin/service-menus/).
+
+Compatibility limits: commands needing a shell, inline scripts containing target field codes, and extra KDE field codes such as `%D` are refused rather than interpreted.
+For `%f`/`%u`, the existing dialog is shown separately for each selected target; `%F`/`%U` shows one command for the selection.
+The desktop-file identity is captured around the bounded read at invocation and checked after confirmation and before every start; edits to the selected action since menu discovery require reopening the menu.
+Selected files are arguments, not executable identities; as with Open with, an explicitly confirmed handler can itself interpret their contents.
 
 ## Review of default-open paths that could execute
 

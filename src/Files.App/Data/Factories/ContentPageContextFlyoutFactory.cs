@@ -33,7 +33,11 @@ namespace Files.App.Data.Factories
 
 		public static Task<List<ContextMenuFlyoutItemViewModel>> GetItemContextShellCommandsAsync(string? workingDir, List<ListedItem> selectedItems, bool shiftPressed, bool showOpenMenu, CancellationToken cancellationToken)
 		{
+#if !WINDOWS
+			return GetLinuxItemContextCommandsAsync(workingDir, selectedItems, shiftPressed, showOpenMenu, cancellationToken);
+#else
 			return ShellContextFlyoutFactory.GetShellContextmenuAsync(shiftPressed: shiftPressed, showOpenMenu: showOpenMenu, workingDirectory: workingDir, selectedItems: selectedItems, cancellationToken: cancellationToken);
+#endif
 		}
 
 		public static List<ContextMenuFlyoutItemViewModel> Filter(List<ContextMenuFlyoutItemViewModel> items, List<ListedItem> selectedItems, bool shiftPressed, CurrentInstanceViewModel currentInstanceViewModel, bool removeOverflowMenu = true)

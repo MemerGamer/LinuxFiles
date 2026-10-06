@@ -168,7 +168,7 @@ namespace Files.App.Helpers
 		/// Everything decided about a file before any dialog: the resolved target, its identity, the decision and the
 		/// parsed .desktop entry. The same entry object is shown in the dialog and launched.
 		/// </summary>
-		private sealed record LinuxOpenPlan(OpenAction Action, string Target, FileIdentity? Identity, DesktopEntryParser.Entry? Entry, IReadOnlyList<string>? Argv = null)
+		private sealed record LinuxOpenPlan(OpenAction Action, string Target, FileIdentity? Identity, DesktopEntryParser.Entry? Entry, IReadOnlyList<string>? Argv = null, IReadOnlyList<IReadOnlyList<string>>? Invocations = null)
 		{
 			public bool StillValid() => Identity is { } id && id.StillMatches(Target);
 		}
@@ -281,6 +281,24 @@ namespace Files.App.Helpers
 			return plan.StillValid() ? await LinuxLauncher.RunExecutableAsync(argv[0], argv.Skip(1).ToList(), Path.GetDirectoryName(argv[0])) : false;
 		}
 
+		internal static async Task<bool> RunServiceMenuLinuxAsync(ServiceMenuAction action, IReadOnlyList<string> targets)
+		{
+			var culture = CultureInfo.CurrentUICulture;
+			var tooManyInvocations = false;
+			var servicePlan = await Task.Run(() => ServiceMenuLaunchPlan.Create(action, targets, culture, out tooManyInvocations));
+			if (servicePlan is null)
+			{
+				var message = tooManyInvocations
+					? Strings.LinuxServiceMenuTooManyTargetsText.GetLocalizedFormatResource(ServiceMenuLaunchPlan.MaxPerTargetLaunches)
+					: Strings.LinuxServiceMenuRefusedText.GetLocalizedResource();
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxServiceMenuTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(action.Application.Name, 60)), message);
+				return false;
+			}
+			var plan = new LinuxOpenPlan(OpenAction.LaunchDesktopConfirm, action.Application.DesktopFilePath, servicePlan.Identity,
+				servicePlan.Entry, Invocations: servicePlan.Invocations);
+			return await ExecutePlanAsync(plan.Target, plan);
+		}
+
 		private static async Task<bool> ExecutePlanAsync(string path, LinuxOpenPlan plan)
 		{
 			var target = plan.Target;
@@ -349,17 +367,19 @@ namespace Files.App.Helpers
 				case OpenAction.LaunchDesktopConfirm:
 				{
 					var application = plan.Entry!.Application;
-					var argv = plan.Argv!;
-					if (plan.Action == OpenAction.LaunchDesktopConfirm)
+					var success = true;
+					foreach (var argv in plan.Invocations ?? [plan.Argv!])
 					{
-						// The real file is the identity; the .desktop Name is only a claim. Argv is shown one item per line.
-						var confirmed = await ShowLauncherConfirmationAsync(target, application.Name, argv, application.RunInTerminal);
-
-						if (OpenDecision.Resolve(plan.Action, confirmed ? ConfirmChoice.Run : ConfirmChoice.Cancel) != FollowUp.RunExact)
-							return true;
+						if (plan.Action == OpenAction.LaunchDesktopConfirm)
+						{
+							var confirmed = await ShowLauncherConfirmationAsync(target, application.Name, argv, application.RunInTerminal, plan.Invocations is not null);
+							if (OpenDecision.Resolve(plan.Action, confirmed ? ConfirmChoice.Run : ConfirmChoice.Cancel) != FollowUp.RunExact)
+								return true;
+						}
+						if (!plan.StillValid()) return await ChangedAsync();
+						success &= await LinuxLauncher.RunCommandAsync(argv, application.RunInTerminal);
 					}
-
-					return plan.StillValid() ? await LinuxLauncher.RunCommandAsync(argv, application.RunInTerminal) : await ChangedAsync();
+					return success;
 				}
 
 				default:
@@ -383,7 +403,7 @@ namespace Files.App.Helpers
 			return await LinuxLauncher.OpenWithAsync(editor, [target]);
 		}
 
-		private static async Task<bool> ShowLauncherConfirmationAsync(string target, string claimedName, IReadOnlyList<string> argv, bool inTerminal)
+		private static async Task<bool> ShowLauncherConfirmationAsync(string target, string claimedName, IReadOnlyList<string> argv, bool inTerminal, bool isServiceMenu = false)
 		{
 			// What will run must be shown in full; if it cannot be, it does not run
 			if (DisplaySanitizer.FullArguments(argv) is not { } lines)
@@ -411,8 +431,10 @@ namespace Files.App.Helpers
 
 			var dialog = new DynamicDialog(new DynamicDialogViewModel()
 			{
-				TitleText = Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
-				SubtitleText = Strings.LinuxUntrustedLauncherText.GetLocalizedResource(),
+				TitleText = isServiceMenu
+					? Strings.LinuxServiceMenuTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(claimedName, 60))
+					: Strings.LinuxUntrustedLauncherTitle.GetLocalizedFormatResource(DisplaySanitizer.Field(Path.GetFileName(target), 60)),
+				SubtitleText = (isServiceMenu ? Strings.LinuxServiceMenuConfirmationText : Strings.LinuxUntrustedLauncherText).GetLocalizedResource(),
 				DisplayControl = panel,
 				PrimaryButtonText = Strings.Run.GetLocalizedResource(),
 				CloseButtonText = Strings.Cancel.GetLocalizedResource(),

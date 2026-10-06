@@ -32,6 +32,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="../../src/Files.App.UnoVirtualization/GroupedWrapLayout.cs" Link="Listing/GroupedWrapLayout.cs" />
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewTextReader.cs" Link="Previews/PreviewTextReader.cs" />
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/CodeLanguageMap.cs" Link="Previews/CodeLanguageMap.cs" />
         <Compile Include="../../src/Files.App/ViewModels/UserControls/Previews/PreviewCodeTokenizer.cs" Link="Previews/PreviewCodeTokenizer.cs" />

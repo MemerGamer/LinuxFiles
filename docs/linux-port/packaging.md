@@ -1,4 +1,4 @@
-# Linux packaging (Phase 6 groundwork)
+# Linux packaging
 
 App id (used everywhere): `io.github.memergamer.LinuxFiles`. Binary/launcher: `files`. Assembly: `Files.dll`
 (apphost `Files`).
@@ -127,7 +127,7 @@ unbuilt.
 
 ### Publishing a release (exact procedure)
 
-The draft release `linux-vX.Y.Z[-pre]` already holds hand-uploaded assets; CI replaces them with its own build.
+First used for `linux-v0.1.0-alpha1` (prerelease; install instructions are in `.github/README.md`, the release body is kept in `docs/linux-port/release-notes/<version>.md`). Create a draft release `linux-vX.Y.Z[-pre]` with the notes, optionally with hand-uploaded assets; CI replaces them with its own build.
 
 1. Undraft the release (GitHub UI, or `gh release edit linux-vX.Y.Z-pre -R MemerGamer/LinuxFiles --draft=false`).
    Publishing creates the tag, which triggers `package-linux.yml`. The `release` job finds the existing release

@@ -1,5 +1,5 @@
-commit: 8d4ccd67b
-date: 2026-10-05
+commit: e1eaca8dc
+date: 2026-10-06
 captured: home
 captured: folder-details
 captured: folder-grid

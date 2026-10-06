@@ -606,6 +606,22 @@ namespace Files.App.Views.Layouts
 				InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(CoreVirtualKeyStates.Down))
 				return false;
 
+			if (ListViewBase.ItemsPanelRoot is Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid virtualized)
+			{
+				var acrossLines = virtualized.PanelScrollOrientation == Orientation.Vertical
+					? e.Key is VirtualKey.Up or VirtualKey.Down
+					: e.Key is VirtualKey.Left or VirtualKey.Right;
+				var index = virtualized.Navigate(ListViewBase.SelectedIndex, acrossLines, e.Key is VirtualKey.Down or VirtualKey.Right);
+				if (index >= 0 && ListViewBase.Items[index] is ListedItem tile)
+				{
+					ItemManipulationModel.SetSelectedItem(tile);
+					ItemManipulationModel.ScrollIntoView(tile);
+					ItemManipulationModel.FocusSelectedItems();
+				}
+				e.Handled = true;
+				return true;
+			}
+
 			var panel = ListViewBase.ItemsPanelRoot as LinuxGroupedWrapPanel;
 			if (panel is null && e.Key is VirtualKey.Left or VirtualKey.Right)
 				return false;

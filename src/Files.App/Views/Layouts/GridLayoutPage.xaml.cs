@@ -199,6 +199,13 @@ namespace Files.App.Views.Layouts
 
 		protected override void ItemManipulationModel_ScrollIntoViewInvoked(object? sender, ListedItem e)
 		{
+#if !WINDOWS
+			if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid grouped)
+			{
+				grouped.EnsureItemVisible(FileList.Items.IndexOf(e));
+				return;
+			}
+#endif
 			FileList.ScrollIntoView(e);
 #if !WINDOWS
 			// The virtualizing panel only knows a virtual strip per item; make sure the whole cell is in view
@@ -230,7 +237,12 @@ namespace Files.App.Views.Layouts
 		{
 			if (SelectedItems.Any())
 			{
-				FileList.ScrollIntoView(SelectedItems.Last());
+#if !WINDOWS
+				if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid grouped)
+					grouped.EnsureItemVisible(FileList.Items.IndexOf(SelectedItems.Last()));
+				else
+#endif
+					FileList.ScrollIntoView(SelectedItems.Last());
 				(FileList.ContainerFromItem(SelectedItems.Last()) as GridViewItem)?.Focus(FocusState.Keyboard);
 			}
 		}
@@ -379,7 +391,7 @@ namespace Files.App.Views.Layouts
 
 		/// <summary>
 		/// Uses the virtualizing wrap panel (Uno Skia has no ItemsWrapGrid, and the style's WrapPanel would realize every item) unless
-		/// the list is grouped (the panel has no group headers) or Uno's internals no longer match what the panel was built against.
+		/// Uno's internals no longer match what the panel was built against.
 		/// </summary>
 		protected override void OnCollectionViewSourceChanged() => UpdateItemsPanel();
 
@@ -390,10 +402,9 @@ namespace Files.App.Views.Layouts
 
 			// The folder setting decides, not the CollectionViewSource: that is still a placeholder when this first runs, and swapping the panel after
 			// the items are assigned would first realize every item in the style's non-virtualizing panel
-			var virtualize = folderSettings.DirectoryGroupOption == GroupOption.None;
-			if (virtualize && !Files.App.UnoVirtualization.VirtualizingWrapGrid.IsSupported(out var reason))
+			var virtualize = Files.App.UnoVirtualization.VirtualizingWrapGrid.IsSupported(out var reason);
+			if (!virtualize)
 			{
-				virtualize = false;
 				if (!s_loggedPanelFallback)
 				{
 					s_loggedPanelFallback = true;
@@ -421,18 +432,26 @@ namespace Files.App.Views.Layouts
 			}
 
 			var wrapOrientation = folderSettings.LayoutMode == FolderLayoutModes.ListView ? Orientation.Vertical : Orientation.Horizontal;
-			FileList.ItemsPanel = new ItemsPanelTemplate(() => new Files.App.UnoVirtualization.VirtualizingWrapGrid
+			var cellSize = folderSettings.LayoutMode switch
 			{
-				Orientation = wrapOrientation,
-				ProvisionalCellSize = folderSettings.LayoutMode switch
+				FolderLayoutModes.ListView => new Windows.Foundation.Size(260, RowHeightListView),
+				FolderLayoutModes.CardsView when CardsViewOrientation == Orientation.Horizontal =>
+					new Windows.Foundation.Size(CardsViewIconBoxWidth + CardsViewDetailsBoxWidth, Math.Max(CardsViewIconBoxHeight, CardsViewDetailsBoxHeight)),
+				FolderLayoutModes.CardsView => new Windows.Foundation.Size(CardsViewIconBoxWidth, CardsViewIconBoxHeight + CardsViewDetailsBoxHeight),
+				_ => new Windows.Foundation.Size(ItemWidthGridView, ItemWidthGridView + 68),
+			};
+			FileList.ItemsPanel = folderSettings.DirectoryGroupOption != GroupOption.None
+				? new ItemsPanelTemplate(() => new Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid
 				{
-					FolderLayoutModes.ListView => new Windows.Foundation.Size(260, RowHeightListView),
-					FolderLayoutModes.CardsView when CardsViewOrientation == Orientation.Horizontal =>
-						new Windows.Foundation.Size(CardsViewIconBoxWidth + CardsViewDetailsBoxWidth, Math.Max(CardsViewIconBoxHeight, CardsViewDetailsBoxHeight)),
-					FolderLayoutModes.CardsView => new Windows.Foundation.Size(CardsViewIconBoxWidth, CardsViewIconBoxHeight + CardsViewDetailsBoxHeight),
-					_ => new Windows.Foundation.Size(ItemWidthGridView, ItemWidthGridView + 68),
-				},
-			});
+					Orientation = wrapOrientation,
+					ProvisionalCellSize = cellSize,
+					IsHeader = item => item is ContentControl { Content: IGroupedCollectionHeader },
+				})
+				: new ItemsPanelTemplate(() => new Files.App.UnoVirtualization.VirtualizingWrapGrid
+				{
+					Orientation = wrapOrientation,
+					ProvisionalCellSize = cellSize,
+				});
 		}
 #endif
 

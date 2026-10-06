@@ -100,6 +100,7 @@ namespace Files.App.UnoVirtualization
 					{
 						// Instantiating exercises the internal types and members the layout subclasses
 						_ = ((IVirtualizingPanel)new VirtualizingWrapGrid()).GetLayouter();
+						_ = ((IVirtualizingPanel)new GroupedVirtualizingWrapGrid()).GetLayouter();
 					}
 				}
 				catch (Exception ex) when (ex is TypeLoadException or MissingMemberException or MethodAccessException or TypeInitializationException or BadImageFormatException or InvalidProgramException)

@@ -1,0 +1,118 @@
+# Copyright (c) Files Community
+# Licensed under the MIT License.
+
+# Abstract:
+#   Daily, merges new commits from upstream files-community/Files into a sync/upstream-* branch and opens a PR
+#   against main. Upstream is only fetched (read-only). Conflicts are reported in a single tracking issue instead
+#   of a PR. Pushes made with GITHUB_TOKEN do not trigger other workflows, so the PR build is dispatched here.
+
+name: Sync Upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * *'
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  UPSTREAM_URL: https://github.com/files-community/Files.git
+
+jobs:
+
+  sync:
+
+    if: github.repository != 'files-community/Files'
+    runs-on: ubuntu-24.04
+
+    steps:
+
+    - name: Checkout the repository
+      uses: actions/checkout@v6
+      with:
+        ref: main
+        fetch-depth: 0
+
+    - name: Fetch upstream
+      run: |
+        git remote add upstream "$UPSTREAM_URL"
+        git fetch --no-tags upstream main
+        behind=$(git rev-list --count HEAD..upstream/main)
+        echo "BEHIND=$behind" >> "$GITHUB_ENV"
+        echo "Behind upstream by $behind commit(s)"
+
+    - name: Skip when a sync PR is already open
+      if: env.BEHIND != '0'
+      run: |
+        open=$(gh pr list --state open --search "head:sync/upstream-" --json number --jq 'length')
+        if [ "$open" != "0" ]; then
+          echo "A sync PR is already open; skipping."
+          echo "BEHIND=0" >> "$GITHUB_ENV"
+        fi
+
+    - name: Merge upstream
+      if: env.BEHIND != '0'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        branch="sync/upstream-$(date -u +%F)"
+        echo "BRANCH=$branch" >> "$GITHUB_ENV"
+        git checkout -b "$branch"
+        if git merge upstream/main --no-edit; then
+          echo "CONFLICTS=false" >> "$GITHUB_ENV"
+        else
+          git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
+          git merge --abort
+          echo "CONFLICTS=true" >> "$GITHUB_ENV"
+        fi
+        git log --format='- %s' main..upstream/main | head -50 > "$RUNNER_TEMP/commits.txt"
+
+    - name: Open the sync PR
+      if: env.BEHIND != '0' && env.CONFLICTS == 'false'
+      run: |
+        git push origin "$BRANCH"
+        {
+          echo "Merges \`upstream/main\` (files-community/Files) into \`main\`: $BEHIND commit(s)."
+          echo
+          cat "$RUNNER_TEMP/commits.txt"
+          echo
+          echo "Merged without conflicts by the Sync Upstream workflow. The build was dispatched on this branch; check"
+          echo "that it passes before merging."
+        } > "$RUNNER_TEMP/body.md"
+        gh pr create --base main --head "$BRANCH" \
+          --title "Code Quality: Sync upstream Files ($(date -u +%F))" \
+          --body-file "$RUNNER_TEMP/body.md"
+        gh workflow run nightly-linux.yml --ref "$BRANCH"
+
+    - name: Report conflicts
+      if: env.BEHIND != '0' && env.CONFLICTS == 'true'
+      run: |
+        title="Upstream sync has merge conflicts"
+        {
+          echo "\`upstream/main\` is $BEHIND commit(s) ahead and does not merge cleanly into \`main\`."
+          echo
+          echo "Conflicting files:"
+          sed 's/^/- /' "$RUNNER_TEMP/conflicts.txt"
+          echo
+          echo "Upstream commits:"
+          cat "$RUNNER_TEMP/commits.txt"
+          echo
+          echo "Resolve locally: \`git fetch upstream && git merge upstream/main\`, then open a PR from a \`sync/upstream-*\` branch."
+          echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+        } > "$RUNNER_TEMP/issue.md"
+        number=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number // empty')
+        if [ -n "$number" ]; then
+          gh issue comment "$number" --body-file "$RUNNER_TEMP/issue.md"
+        else
+          gh issue create --title "$title" --body-file "$RUNNER_TEMP/issue.md"
+        fi

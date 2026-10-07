@@ -6,7 +6,7 @@
 
 **LinuxFiles, Files for Linux, based on Files by the Files Community, is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files) by the Files Community. It is not affiliated with or endorsed by the Files Community.**
 
-Files is created and maintained by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors). This fork builds on their work and keeps their MIT-licensed code, history and credit. The Linux port itself (Uno Platform, Skia, X11, and the Linux platform layer) is the work of the LinuxFiles contributors. See [Credits](#credits) and [NOTICE.md](../NOTICE.md).
+Files is created and maintained by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors). This fork builds on their work and keeps their MIT-licensed code, history and credit. The Linux port itself ([Uno Platform](https://platform.uno), Skia, X11, and the Linux platform layer) is the work of the LinuxFiles contributors. See [Credits](#credits) and [NOTICE.md](../NOTICE.md).
 
 > [!WARNING]
 > **Status: alpha.** Expect missing features and rough edges, and do not rely on it for data you cannot afford to lose. The official, supported Files for Windows is at [files.community](https://files.community/).

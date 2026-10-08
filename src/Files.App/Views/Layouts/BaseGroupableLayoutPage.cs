@@ -35,6 +35,11 @@ namespace Files.App.Views.Layouts
 		protected int NextRenameIndex = 0;
 #if !WINDOWS
 		private bool isSelectingAll;
+		private Microsoft.UI.Dispatching.DispatcherQueueTimer? listJumpTimer;
+		private ListedItem? pendingListJumpItem;
+		private ListedItem? lastListJumpItem;
+		private int pendingListJumpIndex;
+		private int listJumpPageSize = 1;
 #endif
 		protected TextBox? renameTextBox;
 
@@ -49,6 +54,9 @@ namespace Files.App.Views.Layouts
 
 		public BaseGroupableLayoutPage() : base()
 		{
+#if !WINDOWS
+			Unloaded += (_, _) => CancelListJump();
+#endif
 		}
 
 		// Abstract methods
@@ -113,6 +121,9 @@ namespace Files.App.Views.Layouts
 
 		protected override void UnhookEvents()
 		{
+#if !WINDOWS
+			CancelListJump();
+#endif
 			if (ItemManipulationModel is null)
 				return;
 
@@ -679,16 +690,22 @@ namespace Files.App.Views.Layouts
 			if (e.Key is not (VirtualKey.Home or VirtualKey.End or VirtualKey.PageUp or VirtualKey.PageDown) ||
 				ListViewBase.Items.Count == 0 ||
 				FocusManager.GetFocusedElement(MainWindow.Instance.Content.XamlRoot) is TextBox)
+			{
+				CancelListJump();
 				return false;
+			}
+
+			if (listJumpTimer?.IsRunning == true && !ReferenceEquals(ListViewBase.SelectedItem, lastListJumpItem))
+				CancelListJump();
 
 			var count = ListViewBase.Items.Count;
-			var current = Math.Max(ListViewBase.SelectedIndex, 0);
-			var pageSize = 1;
-			if (ListViewBase.FindDescendant<ScrollViewer>() is { } scrollViewer &&
+			var current = pendingListJumpItem is not null ? pendingListJumpIndex : Math.Max(ListViewBase.SelectedIndex, 0);
+			if (pendingListJumpItem is null &&
+				ListViewBase.FindDescendant<ScrollViewer>() is { } scrollViewer &&
 				ListViewBase.ContainerFromIndex(current) is FrameworkElement container &&
 				container.ActualHeight > 0 && container.ActualWidth > 0)
 			{
-				pageSize = Math.Max(1, (int)(scrollViewer.ViewportHeight / container.ActualHeight)) *
+				listJumpPageSize = Math.Max(1, (int)(scrollViewer.ViewportHeight / container.ActualHeight)) *
 					Math.Max(1, (int)(scrollViewer.ViewportWidth / container.ActualWidth));
 			}
 
@@ -696,8 +713,8 @@ namespace Files.App.Views.Layouts
 			{
 				VirtualKey.Home => 0,
 				VirtualKey.End => count - 1,
-				VirtualKey.PageUp => Math.Max(current - pageSize, 0),
-				_ => Math.Min(current + pageSize, count - 1),
+				VirtualKey.PageUp => Math.Max(current - listJumpPageSize, 0),
+				_ => Math.Min(current + listJumpPageSize, count - 1),
 			};
 
 			var direction = e.Key == VirtualKey.End || (e.Key == VirtualKey.PageUp && target > 0) ? -1 : 1;
@@ -706,13 +723,62 @@ namespace Files.App.Views.Layouts
 
 			if (target >= 0 && target < count && ListViewBase.Items[target] is ListedItem item)
 			{
-				ItemManipulationModel.SetSelectedItem(item);
-				ItemManipulationModel.ScrollIntoView(item);
-				ItemManipulationModel.FocusSelectedItems();
+				if (listJumpTimer is null)
+				{
+					listJumpTimer = DispatcherQueue.CreateTimer();
+					listJumpTimer.Interval = TimeSpan.FromMilliseconds(16);
+					listJumpTimer.Tick += ListJumpTimer_Tick;
+				}
+
+				if (listJumpTimer.IsRunning)
+				{
+					// Accumulate navigation from the latest target without realizing intermediate containers.
+					pendingListJumpItem = item;
+					pendingListJumpIndex = target;
+				}
+				else
+				{
+					ApplyListJump(item);
+					listJumpTimer.Start();
+				}
 			}
 
 			e.Handled = true;
 			return true;
+		}
+
+		private void ListJumpTimer_Tick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
+		{
+			if (pendingListJumpItem is not { } item ||
+				!IsLoaded || IsRenamingItem ||
+				!ReferenceEquals(ListViewBase.SelectedItem, lastListJumpItem) ||
+				pendingListJumpIndex >= ListViewBase.Items.Count ||
+				!ReferenceEquals(ListViewBase.Items[pendingListJumpIndex], item) ||
+				FocusManager.GetFocusedElement(MainWindow.Instance.Content.XamlRoot) is TextBox)
+			{
+				CancelListJump();
+				return;
+			}
+
+			pendingListJumpItem = null;
+			if (!ReferenceEquals(item, lastListJumpItem))
+				ApplyListJump(item);
+		}
+
+		private void ApplyListJump(ListedItem item)
+		{
+			lastListJumpItem = item;
+			ItemManipulationModel.SetSelectedItem(item);
+			ItemManipulationModel.ScrollIntoView(item);
+			ItemManipulationModel.FocusSelectedItems();
+		}
+
+		private void CancelListJump()
+		{
+			listJumpTimer?.Stop();
+			pendingListJumpItem = null;
+			lastListJumpItem = null;
+			listJumpPageSize = 1;
 		}
 
 #endif

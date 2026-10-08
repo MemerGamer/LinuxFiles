@@ -3,6 +3,42 @@
 LinuxFiles is an unofficial native Linux port of [Files](https://github.com/files-community/Files) by the Files
 Community. This changelog covers the fork only.
 
+## 0.1.0-alpha2 - 2026-10-08
+
+Second alpha, driven by feedback on the first. Expect rough edges and keep backups. Report issues at
+https://github.com/MemerGamer/LinuxFiles/issues.
+
+### Features
+
+- Optional Adwaita-style appearance (Settings > Appearance): libadwaita light and dark palettes, rounded controls
+  and more spacing, applied by overriding existing resources. Off by default.
+- Window opacity setting (Linux, needs a compositing window manager). The Backdrop material card is hidden on
+  Linux because it did nothing.
+- Nix flake (`nix run github:MemerGamer/LinuxFiles`) wrapping the release tarball. Root actions are off in the
+  Nix package.
+- `FILES_RENDERER=software|opengl|gles|vulkan` to override the rendering backend.
+
+### Fixes
+
+- The app background image setting now shows the image (the path was never decoded and the light file area
+  covered it). Images are loaded with size and pixel limits, special files are rejected and animations use their
+  first frame.
+- The glitching icon at the top left of the tab bar: two buttons were drawn on top of each other, and the hidden
+  one swallowed the clicks meant for the tab actions menu.
+- Systems without GPU acceleration use the software renderer, which roughly halves startup CPU use and
+  navigation cost.
+- Fractional `Xft.dpi` values such as `144.0` are honoured instead of falling back to 100 percent scale.
+- Holding Page Down in a large folder no longer freezes repainting (repeats are coalesced), and the Details column
+  header stays visible when the list is scrolled.
+- The root helper installer refuses to overwrite files owned by a distro package, and the AppImage and Flatpak
+  builds only strip the root-mode desktop action instead of everything after it.
+
+### Known limitations
+
+- Text can look soft at 100 percent scale: Uno's font hinting settings are not configurable. With fractional
+  scaling under XWayland, set `Xft.dpi` (KDE: apply scaling themselves) to avoid compositor upscaling.
+- Window opacity fades the whole window, and compositors that ignore the property show no change.
+
 ## 0.1.0-alpha1 - 2026-10-06
 
 First public alpha. Expect rough edges and do not rely on it for data you cannot afford to lose. Please report

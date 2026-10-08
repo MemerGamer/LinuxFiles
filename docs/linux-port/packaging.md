@@ -18,6 +18,7 @@ App id (used everywhere): `io.github.memergamer.LinuxFiles`. Binary/launcher: `f
 | `scripts/linux/publish.sh` | `dotnet publish` to `artifacts/linux-<rid>/`. |
 | `scripts/linux/install-local.sh`, `uninstall-local.sh` | User-local install into `~/.local`. |
 | `scripts/linux/gen-icons.sh` | Regenerates the icons. |
+| `flake.nix`, `scripts/linux/update-nix-flake.sh` | Nix flake (repackages the release tarball); the script bumps version and hashes. |
 | `.github/workflows/package-linux.yml` | Manual / `linux-v*` tag: publish, AppImage, Flatpak, AUR recipe; tags also create a GitHub release. |
 
 ## Icons
@@ -144,6 +145,21 @@ First used for `linux-v0.1.0-alpha1` (prerelease; install instructions are in `.
    git add PKGBUILD .SRCINFO && git commit -m "Update to X.Y.Z-pre"
    ```
 3. `git push aur` (from the same directory; the remote is the AUR `linuxfiles-bin` repo).
+
+## Nix flake
+
+`flake.nix` (with `flake.lock`, pinned to `nixos-unstable`) exposes `packages.x86_64-linux.{linuxfiles,default}`, `apps.x86_64-linux.default` and `overlays.default` (adds `pkgs.linuxfiles`). There is no NixOS module. The derivation `fetchurl`s the release's `files-linux-x64.tar.gz` and `files-packaging.tar.gz` (pinned version and SRI hashes), patches the ELF files with `autoPatchelfHook`, and installs like the AUR package: app in `$out/lib/linuxfiles`, a `makeWrapper` `bin/files`, desktop entry, metainfo, icons and licence. `LD_LIBRARY_PATH` carries the libraries that are loaded with dlopen (fontconfig, freetype, libGL, libX11/Xcursor/Xrandr/Xi/Xext, ICU, OpenSSL, zlib, krb5, glib). The LTTng tracing provider (`libcoreclrtraceptprovider.so`) is left unsatisfied on purpose. The polkit root helper and policy are not packaged, so only "Open in terminal as root" works; the Delete/Rename/Paste-as-root actions stay off.
+
+Per release (after CI has attached `SHA256SUMS`; the flake's tag is `linux-v<version>`):
+
+```
+gh release download linux-vX.Y.Z[-pre] -R MemerGamer/LinuxFiles -p SHA256SUMS --clobber
+scripts/linux/update-nix-flake.sh X.Y.Z[-pre] SHA256SUMS   # rewrites version + both hashes in flake.nix
+```
+
+Commit `flake.nix` in a PR. It is deliberately not a CI step: the hashes only exist after the release job has uploaded the assets, and `main` takes changes through PRs. Run `nix flake update` separately to bump nixpkgs.
+
+Verification so far: `nix flake check --no-build` and `nix build` succeeded on x86_64-linux with `nix-portable` (Nix 2.20, nixpkgs `e7439b6`), so evaluation, hashes and the autoPatchelf dependency check pass. The package has not been run (no GUI test on a Nix system), so a missing dlopen library would only show at runtime; report such cases as issues.
 
 ## Nightly builds
 

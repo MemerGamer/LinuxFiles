@@ -32,6 +32,15 @@ yay -S linuxfiles-bin    # or: paru -S linuxfiles-bin
 
 This is the only format that also installs the polkit helper for the optional [root actions](#root-actions).
 
+### Nix / NixOS
+
+```sh
+nix run github:MemerGamer/LinuxFiles          # try it
+nix profile install github:MemerGamer/LinuxFiles
+```
+
+The flake also exports `overlays.default` (adds `pkgs.linuxfiles`). It repackages the release tarball for x86_64-linux and does not include the polkit helper, so the [root actions](#root-actions) that need it stay off.
+
 ### AppImage
 
 ```sh

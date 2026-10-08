@@ -39,7 +39,7 @@ nix run github:MemerGamer/LinuxFiles          # try it
 nix profile install github:MemerGamer/LinuxFiles
 ```
 
-The flake also exports `overlays.default` (adds `pkgs.linuxfiles`). It repackages the release tarball for x86_64-linux and does not include the polkit helper, so the [root actions](#root-actions) that need it stay off.
+The flake also exports `overlays.default` (adds `pkgs.linuxfiles`). It repackages the release tarball for x86_64-linux and does not include the polkit helper, and all [root actions](#root-actions) are off in this package.
 
 ### AppImage
 

@@ -27,7 +27,7 @@
                 url = "${base}/files-packaging.tar.gz";
                 hash = "sha256-lzSW7ixRJLxW9ZgDM79t6I52BkuB9sPZrrkxTfMCSro=";
               };
-              # Opened with dlopen at runtime, so autoPatchelf cannot discover them.
+              # Opened with dlopen at runtime, so autoPatchelf cannot discover them; added to every ELF file's runpath.
               runtimeLibs = [
                 fontconfig freetype libGL libx11 libxcursor libxrandr libxi libxext
                 icu openssl zlib krb5 glib
@@ -48,6 +48,8 @@
               buildInputs = [ stdenv.cc.cc.lib fontconfig.lib zlib ];
               # The CoreCLR tracing provider needs LTTng, which the app never uses.
               autoPatchelfIgnoreMissingDeps = [ "liblttng-ust.so.0" ];
+              # Appended to every ELF file so dlopen from any of them resolves (not exported via the environment).
+              appendRunpaths = map (l: "${lib.getLib l}/lib") runtimeLibs;
 
               installPhase = ''
                 runHook preInstall
@@ -58,10 +60,11 @@
 
                 mkdir -p $out/lib/linuxfiles $out/bin
                 cp -a app/. $out/lib/linuxfiles/
-                # The polkit root helper is not packaged for Nix, so root-mode actions stay off.
+                # The polkit root helper is not packaged for Nix; the marker turns all root actions off.
                 rm -rf $out/lib/linuxfiles/elevation-helper
-                makeWrapper $out/lib/linuxfiles/Files $out/bin/files \
-                  --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath runtimeLibs}
+                touch $out/lib/linuxfiles/.root-actions-disabled
+                # No library environment: it would leak into programs the app starts.
+                makeWrapper $out/lib/linuxfiles/Files $out/bin/files
 
                 install -Dm644 packaging/linux/${id}.desktop $out/share/applications/${id}.desktop
                 install -Dm644 packaging/linux/${id}.metainfo.xml $out/share/metainfo/${id}.metainfo.xml

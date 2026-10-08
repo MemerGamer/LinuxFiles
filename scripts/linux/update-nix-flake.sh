@@ -19,7 +19,10 @@ hex_of = {}
 for line in open(sums):
     parts = line.split()
     if len(parts) == 2:
-        hex_of[parts[1].lstrip("*")] = parts[0]
+        name = parts[1].lstrip("*")
+        if name in hex_of:
+            sys.exit("duplicate entry for %s in %s" % (name, sums))
+        hex_of[name] = parts[0]
 text = open(flake).read()
 
 def sri(name):
@@ -27,12 +30,12 @@ def sri(name):
         sys.exit("no sha256 for %s in %s" % (name, sums))
     return "sha256-" + base64.b64encode(bytes.fromhex(hex_of[name])).decode()
 
-text, n = re.subn(r'(?m)^(\s*version = ")[^"]*(";)', lambda m: m.group(1) + ver + m.group(2), text, count=1)
+text, n = re.subn(r'(?m)^(\s*version = ")[^"]*(";)', lambda m: m.group(1) + ver + m.group(2), text)
 if n != 1:
     sys.exit("version line not found in flake.nix")
 for name in ("files-linux-x64.tar.gz", "files-packaging.tar.gz"):
     pat = r'(url = "\$\{base\}/%s";\s*hash = ")[^"]*(";)' % re.escape(name)
-    text, n = re.subn(pat, lambda m: m.group(1) + sri(name) + m.group(2), text, count=1)
+    text, n = re.subn(pat, lambda m: m.group(1) + sri(name) + m.group(2), text)
     if n != 1:
         sys.exit("hash for %s not found in flake.nix" % name)
 open(flake, "w").write(text)

@@ -4,6 +4,7 @@
 using Files.Platform.Linux.Windowing;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Generic;
+using System.IO;
 
 namespace Files.Platform.Tests.Windowing
 {
@@ -39,6 +40,45 @@ namespace Files.Platform.Tests.Windowing
 			Assert.AreEqual(RenderingBackendChoice.Software, Resolve(true, ("GALLIUM_DRIVER", "llvmpipe")));
 			Assert.AreEqual(RenderingBackendChoice.Default, Resolve(true, ("LIBGL_ALWAYS_SOFTWARE", "0")));
 			Assert.AreEqual(RenderingBackendChoice.Default, Resolve(true, ("GALLIUM_DRIVER", "radeonsi")));
+		}
+
+		[TestMethod]
+		public void LibGlAlwaysSoftware_FollowsMesaBooleanParsing()
+		{
+			foreach (var value in new[] { "", " ", "0", "n", "no", "NO", "f", "F", "false", "False", "off", "OFF" })
+				Assert.AreEqual(RenderingBackendChoice.Default, Resolve(true, ("LIBGL_ALWAYS_SOFTWARE", value)), $"'{value}'");
+
+			foreach (var value in new[] { "1", "y", "yes", "true", "on", "TRUE", "2", "anything" })
+				Assert.AreEqual(RenderingBackendChoice.Software, Resolve(true, ("LIBGL_ALWAYS_SOFTWARE", value)), $"'{value}'");
+		}
+
+		[TestMethod]
+		public void DeviceProbe_FindsNodesAndTreatsErrorsAsGpu()
+		{
+			var root = Directory.CreateTempSubdirectory("files-gpu-probe-").FullName;
+			try
+			{
+				Assert.IsFalse(RenderingBackendSelector.HasGpuDevice(root));
+
+				Directory.CreateDirectory(Path.Combine(root, "dri"));
+				File.WriteAllText(Path.Combine(root, "dri", "by-path"), string.Empty);
+				Assert.IsFalse(RenderingBackendSelector.HasGpuDevice(root));
+
+				File.WriteAllText(Path.Combine(root, "dri", "renderD128"), string.Empty);
+				Assert.IsTrue(RenderingBackendSelector.HasGpuDevice(root));
+
+				File.Delete(Path.Combine(root, "dri", "renderD128"));
+				File.WriteAllText(Path.Combine(root, "nvidia0"), string.Empty);
+				Assert.IsTrue(RenderingBackendSelector.HasGpuDevice(root));
+
+				// A probe that cannot enumerate the directory must not force software rendering
+				var notADirectory = Path.Combine(root, "nvidia0");
+				Assert.IsTrue(RenderingBackendSelector.HasGpuDevice(notADirectory));
+			}
+			finally
+			{
+				Directory.Delete(root, true);
+			}
 		}
 
 		[TestMethod]

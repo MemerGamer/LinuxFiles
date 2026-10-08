@@ -67,18 +67,24 @@ namespace Files.Platform.Linux.Windowing
 		/// Returns true when a DRM device (/dev/dri/card*, /dev/dri/renderD*) or an NVIDIA device node exists.
 		/// Errors count as present so an unreadable /dev never forces software rendering.
 		/// </summary>
-		public static bool HasGpuDevice()
+		public static bool HasGpuDevice() => HasGpuDevice("/dev");
+
+		/// <summary>
+		/// <see cref="HasGpuDevice()"/> against <paramref name="devDirectory"/> instead of /dev.
+		/// </summary>
+		public static bool HasGpuDevice(string devDirectory)
 		{
 			try
 			{
-				if (Directory.Exists("/dev/dri") && Directory.EnumerateFileSystemEntries("/dev/dri").Any(static p =>
+				var dri = Path.Combine(devDirectory, "dri");
+				if (Directory.Exists(dri) && Directory.EnumerateFileSystemEntries(dri).Any(static p =>
 				{
 					var name = Path.GetFileName(p);
 					return name.StartsWith("card", StringComparison.Ordinal) || name.StartsWith("renderD", StringComparison.Ordinal);
 				}))
 					return true;
 
-				return Directory.EnumerateFileSystemEntries("/dev", "nvidia*").Any();
+				return Directory.EnumerateFileSystemEntries(devDirectory, "nvidia*").Any();
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
@@ -86,10 +92,11 @@ namespace Files.Platform.Linux.Windowing
 			}
 		}
 
+		// Mesa's env_var_as_boolean: empty, 0, n, no, f, false and off are false; anything else is true
 		private static bool IsTruthy(string? value)
 		{
-			var trimmed = value?.Trim();
-			return !string.IsNullOrEmpty(trimmed) && trimmed != "0" && !trimmed.Equals("false", StringComparison.OrdinalIgnoreCase);
+			var trimmed = value?.Trim().ToLowerInvariant();
+			return !string.IsNullOrEmpty(trimmed) && trimmed is not ("0" or "n" or "no" or "f" or "false" or "off");
 		}
 	}
 }

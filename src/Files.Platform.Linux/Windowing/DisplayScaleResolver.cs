@@ -57,7 +57,7 @@ namespace Files.Platform.Linux.Windowing
 		/// </summary>
 		public static double? ParseXftDpi(string? xResources)
 		{
-			return double.TryParse(GetXftDpiText(xResources), NumberStyles.Float, CultureInfo.InvariantCulture, out var dpi) && dpi > 0 ? dpi : null;
+			return double.TryParse(GetXftDpiText(xResources), NumberStyles.Float, CultureInfo.InvariantCulture, out var dpi) && double.IsFinite(dpi) && dpi > 0 ? dpi : null;
 		}
 
 		private static string? GetXftDpiText(string? xResources)

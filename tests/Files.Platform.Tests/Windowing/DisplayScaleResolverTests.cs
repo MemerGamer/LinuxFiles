@@ -89,6 +89,19 @@ namespace Files.Platform.Tests.Windowing
 		}
 
 		[TestMethod]
+		public void NonFiniteXftDpi_IsIgnored()
+		{
+			foreach (var value in new[] { "Infinity", "-Infinity", "NaN" })
+			{
+				Assert.IsNull(Resolve($"Xft.dpi:\t{value}\n"), value);
+				Assert.IsNull(DisplayScaleResolver.ParseXftDpi($"Xft.dpi:\t{value}\n"), value);
+				Assert.AreEqual(1.0, DisplayScaleResolver.GetEffectiveScale(_ => null, $"Xft.dpi:\t{value}\n"), value);
+			}
+
+			Assert.AreEqual("2", Resolve("Xft.dpi:\tInfinity\n", ("GDK_SCALE", "2")));
+		}
+
+		[TestMethod]
 		public void XftDpi_ToleratesWhitespaceBeforeColon()
 		{
 			Assert.IsNull(Resolve("Xft.dpi : 144\n", ("GDK_SCALE", "2")));

@@ -17,15 +17,15 @@
            , icu, openssl, zlib, krb5, glib }:
             let
               # version and both hashes are rewritten by scripts/linux/update-nix-flake.sh
-              version = "0.1.0-alpha1";
+              version = "0.1.0-alpha2";
               base = "https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v${version}";
               app = fetchurl {
                 url = "${base}/files-linux-x64.tar.gz";
-                hash = "sha256-/mFEvG/q+gPRxMT8TORa/V7Cx4g2oDa9dGUz5iQK9q0=";
+                hash = "sha256-f6zBuMzd3mb0tDnMVtcBz9RXlNvQcjKlBVcRwMpIbbc=";
               };
               packaging = fetchurl {
                 url = "${base}/files-packaging.tar.gz";
-                hash = "sha256-lzSW7ixRJLxW9ZgDM79t6I52BkuB9sPZrrkxTfMCSro=";
+                hash = "sha256-QhBF4IhA4+y+6ZslPTYWt0xJGot/KjoZgKDoVVo5u60=";
               };
               # Opened with dlopen at runtime, so autoPatchelf cannot discover them; added to every ELF file's runpath.
               runtimeLibs = [

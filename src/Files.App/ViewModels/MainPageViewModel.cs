@@ -96,6 +96,8 @@ namespace Files.App.ViewModels
 		public ImageSource? AppThemeBackgroundImageSource
 			=> _AppThemeBackgroundImageSource;
 
+		private const long MaxBackgroundImageBytes = 64L * 1024 * 1024;
+
 		private CancellationTokenSource? backgroundImageLoadCts;
 
 		/// <summary>
@@ -113,15 +115,24 @@ namespace Files.App.ViewModels
 			{
 				try
 				{
+#if DESKTOP
 					if (Path.IsPathRooted(path))
 					{
-						var bytes = await File.ReadAllBytesAsync(path, cts.Token);
-						var bitmap = new BitmapImage();
-						using var stream = new MemoryStream(bytes);
-						await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
-						image = bitmap;
+						// Bounded, regular-file-only read and decode off the UI thread; failures just show no image
+						var bytes = await Files.Platform.Linux.Previews.BoundedFileReader.ReadAllBytesAsync(path, MaxBackgroundImageBytes, cts.Token);
+						var png = (await Task.Run(() => Files.App.ViewModels.Previews.PreviewImageDecoder.DecodeImage(bytes), cts.Token)).Png;
+						if (png is not null)
+						{
+							var bitmap = new BitmapImage();
+							using var stream = new MemoryStream(png);
+							await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
+							image = bitmap;
+						}
 					}
 					else if (Uri.TryCreate(path, UriKind.Absolute, out Uri? validUri))
+#else
+					if (Uri.TryCreate(path, UriKind.Absolute, out Uri? validUri))
+#endif
 					{
 						image = new BitmapImage(validUri);
 					}

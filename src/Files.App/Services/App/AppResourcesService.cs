@@ -25,12 +25,13 @@ namespace Files.App.Services
 			UserSettingsService.GeneralSettingsService.PropertyChanged += GeneralSettingsService_PropertyChanged;
 		}
 
-		private void UpdateAppearanceResources()
+		private bool UpdateAppearanceResources()
 		{
 			if (!OperatingSystem.IsLinux())
-				return;
+				return false;
 
 			var dictionaries = Application.Current.Resources.MergedDictionaries;
+			var changed = false;
 			if (UserSettingsService.AppearanceSettingsService.UseAdwaitaTheme)
 			{
 				adwaitaResources ??= new ResourceDictionary
@@ -39,11 +40,14 @@ namespace Files.App.Services
 				};
 
 				if (!dictionaries.Contains(adwaitaResources))
+				{
 					dictionaries.Add(adwaitaResources);
+					changed = true;
+				}
 			}
 			else if (adwaitaResources is not null)
 			{
-				dictionaries.Remove(adwaitaResources);
+				changed |= dictionaries.Remove(adwaitaResources);
 			}
 
 			var appearance = UserSettingsService.AppearanceSettingsService;
@@ -55,12 +59,17 @@ namespace Files.App.Services
 				};
 
 				if (!dictionaries.Contains(adwaitaBackgroundResources))
+				{
 					dictionaries.Add(adwaitaBackgroundResources);
+					changed = true;
+				}
 			}
 			else if (adwaitaBackgroundResources is not null)
 			{
-				dictionaries.Remove(adwaitaBackgroundResources);
+				changed |= dictionaries.Remove(adwaitaBackgroundResources);
 			}
+
+			return changed;
 		}
 
 		private void AppearanceSettingsService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -69,8 +78,8 @@ namespace Files.App.Services
 				nameof(IAppearanceSettingsService.AppThemeBackgroundImageSource) or
 				nameof(IAppearanceSettingsService.AppThemeBackgroundImageOpacity))
 			{
-				UpdateAppearanceResources();
-				ApplyResources();
+				if (UpdateAppearanceResources())
+					ApplyResources();
 			}
 		}
 

@@ -19,6 +19,21 @@ namespace Files.App.ViewModels.Settings
 		private readonly IUserSettingsService UserSettingsService;
 		private readonly IResourcesService ResourcesService;
 
+		public Visibility AdwaitaThemeVisibility => OperatingSystem.IsLinux() ? Visibility.Visible : Visibility.Collapsed;
+
+		public bool UseAdwaitaTheme
+		{
+			get => UserSettingsService.AppearanceSettingsService.UseAdwaitaTheme;
+			set
+			{
+				if (value != UseAdwaitaTheme)
+				{
+					UserSettingsService.AppearanceSettingsService.UseAdwaitaTheme = value;
+					OnPropertyChanged();
+				}
+			}
+		}
+
 		public List<string> Themes { get; private set; }
 		public Dictionary<BackdropMaterialType, string> BackdropMaterialTypes { get; private set; } = [];
 

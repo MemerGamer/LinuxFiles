@@ -28,6 +28,11 @@ namespace Files.App.Data.Contracts
 		string AppThemeMode { get; set; }
 
 		/// <summary>
+		/// Gets or sets whether Linux uses the Adwaita appearance resources.
+		/// </summary>
+		bool UseAdwaitaTheme { get; set; }
+
+		/// <summary>
 		/// Gets or sets a value for the app theme background color.
 		/// </summary>
 		String AppThemeBackgroundColor { get; set; }

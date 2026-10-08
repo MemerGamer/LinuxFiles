@@ -95,8 +95,7 @@ namespace Files.App
 
 			// Software GL (llvmpipe) is slower than Uno's software renderer; FILES_RENDERER=software|opengl|gles|vulkan overrides
 			var (renderingBackend, reason) = RenderingBackendSelector.Resolve(Environment.GetEnvironmentVariable, RenderingBackendSelector.HasGpuDevice);
-			if (reason is not null)
-				Console.Error.WriteLine($"[Files] Rendering backend: {renderingBackend} ({reason})");
+			Console.Error.WriteLine($"[Files] Rendering backend: {renderingBackend} ({reason ?? "default"})");
 
 			var host = UnoPlatformHostBuilder.Create()
 				.App(() => new App())

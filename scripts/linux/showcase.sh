@@ -140,14 +140,16 @@ shot recycle-bin
 mousemove 86 780 click 1
 sleep 4
 shot settings
-# Back in Documents: context menu of a file, then Properties (the wrench in its top row).
+# Back in Documents: context menu of a file, then Properties (Alt+Enter; the menu's placement depends on its length).
 # Properties is last: it is a separate window and the bare X server does not repaint what it covered.
 mousemove 113 253 click 1
 sleep 5
 mousemove 400 528 click 3
 sleep 2
 shot context-menu
-mousemove 624 552 click 1
+key Escape
+sleep 1
+key alt+Return
 sleep 5
 focus
 sleep 1

@@ -23,8 +23,14 @@ namespace Files.Platform.Linux.Windowing
 			if (!string.IsNullOrWhiteSpace(getEnv(OverrideVariable)))
 				return null;
 
-			if (ParseXftDpi(xResources) is not null)
-				return null;
+			if (ParseXftDpi(xResources) is { } dpi)
+			{
+				// Uno only accepts an integer Xft.dpi and uses scale 1.0 for values such as "120.5" or "144.0"
+				if (int.TryParse(GetXftDpiText(xResources), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+					return null;
+
+				return dpi > 96 ? Math.Min(dpi / 96.0, 4.0).ToString("0.###", CultureInfo.InvariantCulture) : null;
+			}
 
 			// Qt multiplies the global factor by the per-screen factor
 			var global = ParseScale(getEnv("QT_SCALE_FACTOR"));
@@ -51,6 +57,11 @@ namespace Files.Platform.Linux.Windowing
 		/// </summary>
 		public static double? ParseXftDpi(string? xResources)
 		{
+			return double.TryParse(GetXftDpiText(xResources), NumberStyles.Float, CultureInfo.InvariantCulture, out var dpi) && dpi > 0 ? dpi : null;
+		}
+
+		private static string? GetXftDpiText(string? xResources)
+		{
 			if (string.IsNullOrEmpty(xResources))
 				return null;
 
@@ -62,11 +73,8 @@ namespace Files.Platform.Linux.Windowing
 					continue;
 
 				var name = trimmed[..colon].TrimEnd();
-				if (!name.Equals("Xft.dpi", StringComparison.OrdinalIgnoreCase) && !name.Equals("Xft*dpi", StringComparison.OrdinalIgnoreCase))
-					continue;
-
-				if (double.TryParse(trimmed[(colon + 1)..].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var dpi) && dpi > 0)
-					return dpi;
+				if (name.Equals("Xft.dpi", StringComparison.OrdinalIgnoreCase) || name.Equals("Xft*dpi", StringComparison.OrdinalIgnoreCase))
+					return trimmed[(colon + 1)..].Trim();
 			}
 
 			return null;

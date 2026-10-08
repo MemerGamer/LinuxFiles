@@ -37,7 +37,6 @@ namespace Files.App.UserControls.TabBar
 			var window = MainWindow.Instance;
 			LinuxCaptionButtons.Visibility = window.HasClientSideDecorations ? Visibility.Visible : Visibility.Collapsed;
 			ClientSideDecorationsMenuItem.Visibility = Visibility.Visible;
-			LinuxTabActionsButton.Visibility = ShowTabActionsButton ? Visibility.Visible : Visibility.Collapsed;
 			ClientSideDecorationsMenuItem.IsChecked = window.UseClientSideDecorations;
 			var maximizeLabel = (window.IsLinuxWindowMaximized ? "LinuxRestoreWindow" : "LinuxMaximizeWindow").GetLocalizedResource();
 			AutomationProperties.SetName(LinuxMaximizeButton, maximizeLabel);
@@ -46,15 +45,6 @@ namespace Files.App.UserControls.TabBar
 			UpdateTitleBarInsets();
 		}
 #endif
-
-		private void LinuxTabActionsButton_Click(object sender, RoutedEventArgs e)
-		{
-			if (Resources.TryGetValue("TabFlyout", out var resource) && resource is MenuFlyout flyout)
-			{
-				LinuxTabActionsButton.DataContext = Items.ElementAtOrDefault(App.AppModel.TabStripSelectedIndex);
-				flyout.ShowAt(LinuxTabActionsButton);
-			}
-		}
 
 		private void ClientSideDecorationsMenuItem_Click(object sender, RoutedEventArgs e)
 		{

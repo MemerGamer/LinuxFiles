@@ -37,7 +37,8 @@ outdir="$(cd "$outdir" && pwd)"
 display=99
 while [[ -e "/tmp/.X11-unix/X$display" || -e "/tmp/.X$display-lock" ]]; do display=$((display + 1)); done
 
-Xvfb ":$display" -screen 0 "${size}x24" -nolisten tcp >"$outdir/xvfb.log" 2>&1 &
+# -noreset: otherwise the server resets when xrdb (the only client so far) disconnects and Xft.dpi is lost
+Xvfb ":$display" -screen 0 "${size}x24" -nolisten tcp -noreset >"$outdir/xvfb.log" 2>&1 &
 xvfb_pid=$!
 app_pid=""
 wm_pid=""

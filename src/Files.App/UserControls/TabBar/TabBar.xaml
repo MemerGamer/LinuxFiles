@@ -256,22 +256,6 @@
 			</TabView.TabStripFooter>
 
 		</TabView>
-		<Button
-			x:Name="LinuxTabActionsButton"
-			Width="34"
-			Height="40"
-			Margin="4,0,0,0"
-			Padding="0"
-			HorizontalAlignment="Left"
-			VerticalAlignment="Top"
-			AutomationProperties.Name="{helpers:ResourceString Key=TabActions}"
-			Background="Transparent"
-			BorderThickness="0"
-			Click="LinuxTabActionsButton_Click"
-			ToolTipService.ToolTip="{helpers:ResourceString Key=TabActions}"
-			Visibility="Collapsed">
-			<FontIcon FontSize="16" Glyph="&#xE8A7;" />
-		</Button>
 		<StackPanel x:Name="LinuxCaptionButtons" HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal" Visibility="Collapsed">
 			<Button Width="46" Height="40" Padding="0" Background="Transparent" BorderThickness="0" CornerRadius="0" Click="MinimizeWindow_Click" AutomationProperties.Name="{helpers:ResourceString Key=LinuxMinimizeWindow}" ToolTipService.ToolTip="{helpers:ResourceString Key=LinuxMinimizeWindow}">
 				<FontIcon FontSize="12" Glyph="&#xE921;" />

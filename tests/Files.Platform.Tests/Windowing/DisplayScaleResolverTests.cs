@@ -81,6 +81,27 @@ namespace Files.Platform.Tests.Windowing
 		}
 
 		[TestMethod]
+		public void FractionalXftDpi_IsPassedAsOverride()
+		{
+			Assert.AreEqual("1.25", Resolve("Xft.dpi:\t120.0\n", ("GDK_SCALE", "2")));
+			Assert.AreEqual("1.505", Resolve("Xft.dpi:\t144.5\n"));
+			Assert.IsNull(Resolve("Xft.dpi:\t96.0\n"));
+		}
+
+		[TestMethod]
+		public void NonFiniteXftDpi_IsIgnored()
+		{
+			foreach (var value in new[] { "Infinity", "-Infinity", "NaN" })
+			{
+				Assert.IsNull(Resolve($"Xft.dpi:\t{value}\n"), value);
+				Assert.IsNull(DisplayScaleResolver.ParseXftDpi($"Xft.dpi:\t{value}\n"), value);
+				Assert.AreEqual(1.0, DisplayScaleResolver.GetEffectiveScale(_ => null, $"Xft.dpi:\t{value}\n"), value);
+			}
+
+			Assert.AreEqual("2", Resolve("Xft.dpi:\tInfinity\n", ("GDK_SCALE", "2")));
+		}
+
+		[TestMethod]
 		public void XftDpi_ToleratesWhitespaceBeforeColon()
 		{
 			Assert.IsNull(Resolve("Xft.dpi : 144\n", ("GDK_SCALE", "2")));

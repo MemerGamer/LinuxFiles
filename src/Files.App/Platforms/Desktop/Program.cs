@@ -4,6 +4,7 @@
 using Files.Platform.Abstractions.Instance;
 using Files.Platform.Linux.Instance;
 using Files.Platform.Linux.Elevation;
+using Files.Platform.Linux.Windowing;
 using System.Text;
 using Uno.UI.Hosting;
 
@@ -92,9 +93,21 @@ namespace Files.App
 				SingleInstance = singleInstance;
 			}
 
+			// Software GL (llvmpipe) is slower than Uno's software renderer; FILES_RENDERER=software|opengl|gles|vulkan overrides
+			var (renderingBackend, reason) = RenderingBackendSelector.Resolve(Environment.GetEnvironmentVariable, RenderingBackendSelector.HasGpuDevice);
+			if (reason is not null)
+				Console.Error.WriteLine($"[Files] Rendering backend: {renderingBackend} ({reason})");
+
 			var host = UnoPlatformHostBuilder.Create()
 				.App(() => new App())
-				.UseX11()
+				.UseX11(x11 => x11.RenderingBackend(renderingBackend switch
+				{
+					RenderingBackendChoice.Software => X11RenderingBackend.Software,
+					RenderingBackendChoice.OpenGL => X11RenderingBackend.OpenGL,
+					RenderingBackendChoice.OpenGLES => X11RenderingBackend.OpenGLES,
+					RenderingBackendChoice.Vulkan => X11RenderingBackend.Vulkan,
+					_ => X11RenderingBackend.Default,
+				}))
 				.Build();
 
 			host.Run();

@@ -5060,6 +5060,12 @@
   <data name="LinuxRunningAsRootSuffix" xml:space="preserve">
     <value> (Running as root)</value>
   </data>
+  <data name="AdwaitaTheme" xml:space="preserve">
+    <value>Adwaita</value>
+  </data>
+  <data name="AdwaitaThemeDescription" xml:space="preserve">
+    <value>Use a GNOME-style appearance with rounded controls. Follows the selected light or dark theme.</value>
+  </data>
   <data name="WindowOpacity" xml:space="preserve">
     <value>Window opacity</value>
   </data>

@@ -102,6 +102,18 @@
 					SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
+			<wctcontrols:SettingsCard
+				Description="{helpers:ResourceString Key=AdwaitaThemeDescription}"
+				Header="{helpers:ResourceString Key=AdwaitaTheme}"
+				Visibility="{x:Bind ViewModel.AdwaitaThemeVisibility}">
+				<wctcontrols:SettingsCard.HeaderIcon>
+					<FontIcon Glyph="&#xE790;" />
+				</wctcontrols:SettingsCard.HeaderIcon>
+				<ToggleSwitch
+					AutomationProperties.Name="{helpers:ResourceString Key=AdwaitaTheme}"
+					IsOn="{x:Bind ViewModel.UseAdwaitaTheme, Mode=TwoWay}" />
+			</wctcontrols:SettingsCard>
+
 			<!--  Backdrop Material (no system backdrop on Linux)  -->
 			<wctcontrols:SettingsCard
 				x:Name="BackdropMaterialCard"

@@ -1,6 +1,8 @@
 # Copyright (c) Files Community. Licensed under the MIT License.
 """Non-root staging tests. Never invoke sudo, pkexec, or the installed helper."""
+from contextlib import redirect_stderr
 import hashlib
+import io
 import importlib.util
 import os
 from pathlib import Path
@@ -72,6 +74,43 @@ class InstallerTests(unittest.TestCase):
         self.assertIn("root file access", action.findtext("message"))
         self.assertEqual("auth_admin", action.findtext("defaults/allow_active"))
         self.assertEqual("/usr/lib/linuxfiles/files-elevation-helper", action.find("annotate").text)
+
+    def test_live_install_refuses_each_package_manager_before_snapshot_or_install(self):
+        paths = ("/usr/lib/linuxfiles", installer.HELPER_PATH, installer.POLICY_PATH)
+        for tool in ("/usr/bin/pacman", "/usr/bin/dpkg-query", "/usr/bin/rpm"):
+            for owned_path in paths:
+                with self.subTest(tool=tool, path=owned_path):
+                    def query(command, **kwargs):
+                        self.assertEqual(tool, command[0])
+                        return subprocess.CompletedProcess(command, 0 if command[-1] == owned_path else 1)
+
+                    arguments = self.arguments()
+                    arguments[-1] = "/"
+                    with mock.patch.object(installer.os, "geteuid", return_value=0), \
+                            mock.patch.object(installer.os, "access", side_effect=lambda path, mode: path == tool), \
+                            mock.patch.object(installer.subprocess, "run", side_effect=query), \
+                            mock.patch.object(installer, "snapshot_helper") as snapshot:
+                        diagnostic = io.StringIO()
+                        with redirect_stderr(diagnostic), self.assertRaises(SystemExit):
+                            installer.main(arguments)
+                        self.assertIn(f"{owned_path} is owned by a distro package", diagnostic.getvalue())
+                        self.assertIn("omit --install-root-helper", diagnostic.getvalue())
+                        snapshot.assert_not_called()
+
+    def test_unowned_paths_allow_tarball_helper_installation(self):
+        with mock.patch.object(installer.os, "access", return_value=True), \
+                mock.patch.object(installer.subprocess, "run", return_value=subprocess.CompletedProcess([], 1)) as run:
+            installer.refuse_package_owned_paths()
+        self.assertEqual(9, run.call_count)
+        for call in run.call_args_list:
+            self.assertNotIn("shell", call.kwargs)
+            self.assertEqual(subprocess.DEVNULL, call.kwargs["stdout"])
+
+    def test_package_query_errors_refuse_installation(self):
+        with mock.patch.object(installer.os, "access", return_value=True), \
+                mock.patch.object(installer.subprocess, "run", return_value=subprocess.CompletedProcess([], 2)):
+            with self.assertRaisesRegex(ValueError, "cannot check package ownership"):
+                installer.refuse_package_owned_paths()
 
     def test_aot_helper_uses_invariant_globalization_and_excludes_symlink_creation(self):
         repo = INSTALLER.parents[2]

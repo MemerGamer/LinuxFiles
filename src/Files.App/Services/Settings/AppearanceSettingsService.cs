@@ -101,6 +101,13 @@ namespace Files.App.Services.Settings
 		}
 
 		/// <inheritdoc/>
+		public float WindowOpacity
+		{
+			get => Math.Clamp(Get(1f), 0.2f, 1f);
+			set => Set(Math.Clamp(value, 0.2f, 1f));
+		}
+
+		/// <inheritdoc/>
 		public string AppThemeBackgroundImageSource
 		{
 			get => Get("");

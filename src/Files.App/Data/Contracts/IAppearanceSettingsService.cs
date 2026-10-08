@@ -73,6 +73,11 @@ namespace Files.App.Data.Contracts
 		BackdropMaterialType AppThemeBackdropMaterial { get; set; }
 
 		/// <summary>
+		/// Gets or sets the whole-window opacity (0.2 to 1). Only honored on Linux, and only visible under a compositing window manager.
+		/// </summary>
+		float WindowOpacity { get; set; }
+
+		/// <summary>
 		/// Gets or sets a value for the app background image source
 		/// </summary>
 		string AppThemeBackgroundImageSource { get; set; }

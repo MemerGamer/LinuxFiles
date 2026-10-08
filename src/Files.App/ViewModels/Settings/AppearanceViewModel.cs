@@ -311,6 +311,24 @@ namespace Files.App.ViewModels.Settings
 			}
 		}
 
+		public bool IsBackdropMaterialSupported => !OperatingSystem.IsLinux();
+
+		public bool IsWindowOpacitySupported => OperatingSystem.IsLinux();
+
+		public float WindowOpacity
+		{
+			get => UserSettingsService.AppearanceSettingsService.WindowOpacity;
+			set
+			{
+				if (value != UserSettingsService.AppearanceSettingsService.WindowOpacity)
+				{
+					UserSettingsService.AppearanceSettingsService.WindowOpacity = value;
+
+					OnPropertyChanged();
+				}
+			}
+		}
+
 		public float AppThemeBackgroundImageOpacity
 		{
 			get => UserSettingsService.AppearanceSettingsService.AppThemeBackgroundImageOpacity;

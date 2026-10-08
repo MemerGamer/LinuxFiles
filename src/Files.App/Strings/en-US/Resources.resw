@@ -5060,4 +5060,10 @@
   <data name="LinuxRunningAsRootSuffix" xml:space="preserve">
     <value> (Running as root)</value>
   </data>
+  <data name="WindowOpacity" xml:space="preserve">
+    <value>Window opacity</value>
+  </data>
+  <data name="WindowOpacityDescription" xml:space="preserve">
+    <value>Makes the whole window see-through. Requires a compositing window manager.</value>
+  </data>
 </root>

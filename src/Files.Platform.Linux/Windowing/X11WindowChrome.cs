@@ -115,6 +115,36 @@ namespace Files.Platform.Linux.Windowing
 					Send(_state, IsMaximized ? 0 : 1, (nint)_maximizedHorizontal, (nint)_maximizedVertical, 1, 0);
 		}
 
+		/// <summary>Converts an opacity in [0, 1] to the 32-bit _NET_WM_WINDOW_OPACITY cardinal; values are clamped.</summary>
+		public static uint ToOpacityCardinal(double opacity)
+			=> double.IsNaN(opacity) ? uint.MaxValue : (uint)Math.Round(Math.Clamp(opacity, 0d, 1d) * uint.MaxValue);
+
+		/// <summary>
+		/// Sets whole-window opacity through _NET_WM_WINDOW_OPACITY. It only has a visible effect under a compositing
+		/// window manager; fully opaque removes the property.
+		/// </summary>
+		public void SetWindowOpacity(double opacity)
+		{
+			lock (_sync)
+			{
+				if (_disposed)
+					return;
+
+				var property = Atom("_NET_WM_WINDOW_OPACITY");
+				var value = ToOpacityCardinal(opacity);
+				if (value == uint.MaxValue)
+					X11Native.XDeleteProperty(_display, _window, property);
+				else
+				{
+					// Format 32 properties are passed as C longs
+					nuint data = value;
+					X11Native.XChangeProperty(_display, _window, property, Atom("CARDINAL"), 32,
+						X11Native.PropModeReplace, (byte*)&data, 1);
+				}
+				X11Native.XFlush(_display);
+			}
+		}
+
 		private void CreateGrips()
 		{
 			uint[] cursors = [134, 138, 136, 96, 14, 16, 12, 70, 68];

@@ -116,11 +116,20 @@ namespace Files.App.ViewModels
 				try
 				{
 #if DESKTOP
-					if (Path.IsPathRooted(path))
+					// Only local files are accepted (plain paths or file:// URIs); every other scheme is dropped, never handed to Uno
+					var localPath = Path.IsPathRooted(path) ? path
+						: Uri.TryCreate(path, UriKind.Absolute, out Uri? fileUri) && fileUri.IsFile ? fileUri.LocalPath
+						: null;
+					if (localPath is null)
+					{
+						App.Logger.LogWarning("Ignoring the app background image because it is not a local file.");
+					}
+					else
 					{
 						// Bounded, regular-file-only read and decode off the UI thread; failures just show no image
-						var bytes = await Files.Platform.Linux.Previews.BoundedFileReader.ReadAllBytesAsync(path, MaxBackgroundImageBytes, cts.Token);
-						var png = (await Task.Run(() => Files.App.ViewModels.Previews.PreviewImageDecoder.DecodeImage(bytes), cts.Token)).Png;
+						var bytes = await Files.Platform.Linux.Previews.BoundedFileReader.ReadAllBytesAsync(localPath, MaxBackgroundImageBytes, cts.Token);
+						// A background needs one frame; animated images would otherwise keep every frame decoded
+						var png = (await Task.Run(() => Files.App.ViewModels.Previews.PreviewImageDecoder.DecodeImage(bytes, firstFrameOnly: true), cts.Token)).Png;
 						if (png is not null)
 						{
 							var bitmap = new BitmapImage();
@@ -129,13 +138,10 @@ namespace Files.App.ViewModels
 							image = bitmap;
 						}
 					}
-					else if (Uri.TryCreate(path, UriKind.Absolute, out Uri? validUri))
 #else
 					if (Uri.TryCreate(path, UriKind.Absolute, out Uri? validUri))
-#endif
-					{
 						image = new BitmapImage(validUri);
-					}
+#endif
 				}
 				catch (OperationCanceledException)
 				{

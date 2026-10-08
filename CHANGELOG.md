@@ -22,7 +22,8 @@ https://github.com/MemerGamer/LinuxFiles/issues.
 
 - The app background image setting now shows the image (the path was never decoded and the light file area
   covered it). Images are loaded with size and pixel limits, special files are rejected and animations use their
-  first frame.
+  first frame. Adwaita surfaces become translucent only while a background image is configured with nonzero opacity,
+  preserving the original opaque colours when no image is set.
 - The glitching icon at the top left of the tab bar: two buttons were drawn on top of each other, and the hidden
   one swallowed the clicks meant for the tab actions menu.
 - Systems without GPU acceleration use the software renderer, which roughly halves startup CPU use and

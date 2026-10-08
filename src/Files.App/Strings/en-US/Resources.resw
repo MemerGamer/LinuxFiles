@@ -5066,4 +5066,10 @@
   <data name="AdwaitaThemeDescription" xml:space="preserve">
     <value>Use a GNOME-style appearance with rounded controls. Follows the selected light or dark theme.</value>
   </data>
+  <data name="WindowOpacity" xml:space="preserve">
+    <value>Window opacity</value>
+  </data>
+  <data name="WindowOpacityDescription" xml:space="preserve">
+    <value>Makes the whole window see-through. Requires a compositing window manager.</value>
+  </data>
 </root>

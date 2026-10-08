@@ -138,7 +138,7 @@
 	<ResourceDictionary.ThemeDictionaries>
 		<!--  No Mica on Linux: the window backdrop is a solid fill equal to the Mica base colour, so the translucent Files layers on top keep their look  -->
 		<ResourceDictionary x:Key="Light">
-			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#FAFAFA" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#C0FCFCFC" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#0F000000" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="#0A000000" />
 			<SolidColorBrush x:Key="Files.Linux.FlyoutSurfaceBrush" Color="#F9F9F9" />

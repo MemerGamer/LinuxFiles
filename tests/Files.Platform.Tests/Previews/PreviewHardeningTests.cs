@@ -332,5 +332,38 @@ namespace Files.Platform.Tests.Previews
 			Assert.AreEqual(new string('a', 1021) + "😀…", PreviewEntryName.Sanitize(new string('a', 1021) + "😀suffix"));
 			Assert.AreEqual("a\\u{000A}b", PreviewEntryName.Sanitize("a\nb"));
 		}
+
+		[TestMethod]
+		public async Task BoundedFileReaderReadsRegularFilesAndRejectsOversizedAndSpecialFiles()
+		{
+			var directory = Path.Combine(Path.GetTempPath(), "files-bounded-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(directory);
+			try
+			{
+				var file = Path.Combine(directory, "a.png");
+				File.WriteAllBytes(file, new byte[100]);
+				var link = Path.Combine(directory, "link.png");
+				File.CreateSymbolicLink(link, file);
+
+				Assert.AreEqual(100, (await BoundedFileReader.ReadAllBytesAsync(file, 100).WaitAsync(TimeSpan.FromSeconds(5))).Length);
+				Assert.AreEqual(100, (await BoundedFileReader.ReadAllBytesAsync(link, 1000).WaitAsync(TimeSpan.FromSeconds(5))).Length);
+				await Assert.ThrowsAsync<IOException>(() => BoundedFileReader.ReadAllBytesAsync(file, 99).WaitAsync(TimeSpan.FromSeconds(5)));
+				await Assert.ThrowsAsync<IOException>(() => BoundedFileReader.ReadAllBytesAsync(directory, 1000).WaitAsync(TimeSpan.FromSeconds(5)));
+
+				var fifo = Path.Combine(directory, "fifo.png");
+				var start = new ProcessStartInfo("mkfifo") { UseShellExecute = false };
+				start.ArgumentList.Add(fifo);
+				using (var process = Process.Start(start)!)
+				{
+					await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+					Assert.AreEqual(0, process.ExitCode);
+				}
+				var fifoLink = Path.Combine(directory, "fifo-link.png");
+				File.CreateSymbolicLink(fifoLink, fifo);
+				await Assert.ThrowsAsync<IOException>(() => BoundedFileReader.ReadAllBytesAsync(fifo, 1000).WaitAsync(TimeSpan.FromSeconds(5)));
+				await Assert.ThrowsAsync<IOException>(() => BoundedFileReader.ReadAllBytesAsync(fifoLink, 1000).WaitAsync(TimeSpan.FromSeconds(5)));
+			}
+			finally { Directory.Delete(directory, recursive: true); }
+		}
 	}
 }

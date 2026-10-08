@@ -57,9 +57,20 @@ namespace Files.App
 					LinuxChromeChanged?.Invoke(this, EventArgs.Empty);
 				};
 				Closed += (_, _) => { _linuxChrome?.Dispose(); _linuxChrome = null; };
+
+				var appearance = Ioc.Default.GetRequiredService<IAppearanceSettingsService>();
+				appearance.PropertyChanged += (_, e) =>
+				{
+					if (e.PropertyName == nameof(IAppearanceSettingsService.WindowOpacity))
+						DispatcherQueue.TryEnqueue(ApplyLinuxWindowOpacity);
+				};
 			}
+			ApplyLinuxWindowOpacity();
 			LinuxChromeChanged?.Invoke(this, EventArgs.Empty);
 		}
+
+		private void ApplyLinuxWindowOpacity()
+			=> _linuxChrome?.SetWindowOpacity(Ioc.Default.GetRequiredService<IAppearanceSettingsService>().WindowOpacity);
 
 		public void SetClientSideDecorations(bool enabled)
 		{

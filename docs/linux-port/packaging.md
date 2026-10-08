@@ -18,6 +18,7 @@ App id (used everywhere): `io.github.memergamer.LinuxFiles`. Binary/launcher: `f
 | `scripts/linux/publish.sh` | `dotnet publish` to `artifacts/linux-<rid>/`. |
 | `scripts/linux/install-local.sh`, `uninstall-local.sh` | User-local install into `~/.local`. |
 | `scripts/linux/gen-icons.sh` | Regenerates the icons. |
+| `flake.nix`, `scripts/linux/update-nix-flake.sh` | Nix flake (repackages the release tarball); the script bumps version and hashes. |
 | `.github/workflows/package-linux.yml` | Manual / `linux-v*` tag: publish, AppImage, Flatpak, AUR recipe; tags also create a GitHub release. |
 
 ## Icons
@@ -145,6 +146,21 @@ First used for `linux-v0.1.0-alpha1` (prerelease; install instructions are in `.
    ```
 3. `git push aur` (from the same directory; the remote is the AUR `linuxfiles-bin` repo).
 
+## Nix flake
+
+`flake.nix` (with `flake.lock`, pinned to `nixos-unstable`) exposes `packages.x86_64-linux.{linuxfiles,default}`, `apps.x86_64-linux.default` and `overlays.default` (adds `pkgs.linuxfiles`). There is no NixOS module. The derivation `fetchurl`s the release's `files-linux-x64.tar.gz` and `files-packaging.tar.gz` (pinned version and SRI hashes), patches the ELF files with `autoPatchelfHook`, and installs like the AUR package: app in `$out/lib/linuxfiles`, a `makeWrapper` `bin/files`, desktop entry, metainfo, icons and licence. The libraries that are loaded with dlopen (fontconfig, freetype, libGL, libX11/Xcursor/Xrandr/Xi/Xext, ICU, OpenSSL, zlib, krb5, glib) are added to every ELF file's runpath through `appendRunpaths`; the wrapper sets no library environment variables, so programs the app starts do not inherit Nix libraries. The LTTng tracing provider (`libcoreclrtraceptprovider.so`) is left unsatisfied on purpose. The polkit root helper and policy are not packaged, and the package installs the `.root-actions-disabled` marker next to `Files` (the same gate the AppImage and Flatpak use), so all root actions, including "Open in terminal as root", are off. That item would not work on NixOS anyway: the trusted tool resolver only looks in `/usr/bin` and `/bin`, while NixOS keeps setuid wrappers (sudo, pkexec) in `/run/wrappers/bin`.
+
+Per release (after CI has attached `SHA256SUMS`; the flake's tag is `linux-v<version>`):
+
+```
+gh release download linux-vX.Y.Z[-pre] -R MemerGamer/LinuxFiles -p SHA256SUMS --clobber
+scripts/linux/update-nix-flake.sh X.Y.Z[-pre] SHA256SUMS   # rewrites version + both hashes in flake.nix
+```
+
+Commit `flake.nix` in a PR. It is deliberately not a CI step: the hashes only exist after the release job has uploaded the assets, and `main` takes changes through PRs. Run `nix flake update` separately to bump nixpkgs.
+
+Verification so far: `nix flake check --no-build` and `nix build` succeeded on x86_64-linux with `nix-portable` (Nix 2.20, nixpkgs `e7439b6`), so evaluation, hashes and the autoPatchelf dependency check pass. The package has not been run (no GUI test on a Nix system), so a missing dlopen library would only show at runtime; report such cases as issues.
+
 ## Nightly builds
 
 `.github/workflows/nightly-linux.yml` builds the tarball and AppImage on every push to `main` and replaces the
@@ -176,7 +192,7 @@ Try it: `curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nig
 
 Native AUR packages install a root-owned Native AOT helper at `/usr/lib/linuxfiles/files-elevation-helper` and `packaging/linux/io.github.memergamer.LinuxFiles.root-actions.policy` under `/usr/share/polkit-1/actions/`. Install polkit 0.105 or newer with distributor security fixes to enable helper actions in root mode. The helper is never setuid; the action uses `auth_admin` without retaining authorization. AOT publishing requires clang and zlib development files.
 
-For local installation, publish normally and opt in with `scripts/linux/install-local.sh --install-root-helper`. This separately runs `sudo python3 scripts/linux/install-root-helper.py --from artifacts/linux-x64/elevation-helper --sha256 <published-helper-sha256>`; the app stays in the user prefix. This is equivalent to `sudo make install`: trust the installer checkout and build output. The policy is embedded; a private root-owned helper snapshot is hashed and checked before installation. To inspect the package layout without privileges, run `python3 scripts/linux/install-root-helper.py --from <published-helper-dir> --sha256 <published-helper-sha256> --destdir <temporary-staging-dir>`. Remove the system helper and policy as administrator when uninstalling; the user-local uninstaller intentionally cannot remove system files.
+For local installation, publish normally and opt in with `scripts/linux/install-local.sh --install-root-helper`. This separately runs `sudo python3 scripts/linux/install-root-helper.py --from artifacts/linux-x64/elevation-helper --sha256 <published-helper-sha256>`; the app stays in the user prefix. This is equivalent to `sudo make install`: trust the installer checkout and build output. The policy is embedded; a private root-owned helper snapshot is hashed and checked before installation. Before writing system files, the installer queries available `/usr/bin/pacman -Qo`, `/usr/bin/dpkg-query -S`, and `/usr/bin/rpm -qf` tools for ownership of `/usr/lib/linuxfiles`, the helper, and the policy. It refuses to overwrite package-owned paths: omit `--install-root-helper` and use the distro package's helper instead. Tarball users without package-owned paths keep the same `/usr/lib/linuxfiles/files-elevation-helper` and `/usr/share/polkit-1/actions/` installation; the launcher and app's fixed helper/policy trust checks remain compatible. To inspect the package layout without privileges, run `python3 scripts/linux/install-root-helper.py --from <published-helper-dir> --sha256 <published-helper-sha256> --destdir <temporary-staging-dir>`. Remove the system helper and policy as administrator when uninstalling; the user-local uninstaller intentionally cannot remove system files.
 
 AppImage and Flatpak omit the helper and the **Open in Root Mode** desktop action, install no policy, and disable Root actions. They cannot supply host elevation, even when the native helper is installed separately. See [the elevation threat model](threat-model-elevation.md) for protocol, failure semantics and limitations.
 

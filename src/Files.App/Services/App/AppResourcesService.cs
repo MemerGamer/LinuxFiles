@@ -12,11 +12,47 @@ namespace Files.App.Services
 		private IAppThemeModeService AppThemeModeService { get; } = Ioc.Default.GetRequiredService<IAppThemeModeService>();
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
+		private ResourceDictionary? adwaitaResources;
+
 		public ResourcesService()
 		{
+			UpdateAppearanceResources();
+			UserSettingsService.AppearanceSettingsService.PropertyChanged += AppearanceSettingsService_PropertyChanged;
+
 			SetScrollInertiaEnabled(UserSettingsService.GeneralSettingsService.EnableSmoothScrolling);
 
 			UserSettingsService.GeneralSettingsService.PropertyChanged += GeneralSettingsService_PropertyChanged;
+		}
+
+		private void UpdateAppearanceResources()
+		{
+			if (!OperatingSystem.IsLinux())
+				return;
+
+			var dictionaries = Application.Current.Resources.MergedDictionaries;
+			if (UserSettingsService.AppearanceSettingsService.UseAdwaitaTheme)
+			{
+				adwaitaResources ??= new ResourceDictionary
+				{
+					Source = new Uri("ms-appx:///Styles/AdwaitaResources.xaml"),
+				};
+
+				if (!dictionaries.Contains(adwaitaResources))
+					dictionaries.Add(adwaitaResources);
+			}
+			else if (adwaitaResources is not null)
+			{
+				dictionaries.Remove(adwaitaResources);
+			}
+		}
+
+		private void AppearanceSettingsService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName == nameof(IAppearanceSettingsService.UseAdwaitaTheme))
+			{
+				UpdateAppearanceResources();
+				ApplyResources();
+			}
 		}
 
 		private void GeneralSettingsService_PropertyChanged(object? sender, PropertyChangedEventArgs e)

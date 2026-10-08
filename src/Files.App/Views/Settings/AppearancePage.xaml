@@ -102,8 +102,23 @@
 					SelectedIndex="{x:Bind ViewModel.SelectedThemeIndex, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
-			<!--  Backdrop Material  -->
-			<wctcontrols:SettingsCard Header="{helpers:ResourceString Key=BackdropMaterial}">
+			<wctcontrols:SettingsCard
+				Description="{helpers:ResourceString Key=AdwaitaThemeDescription}"
+				Header="{helpers:ResourceString Key=AdwaitaTheme}"
+				Visibility="{x:Bind ViewModel.AdwaitaThemeVisibility}">
+				<wctcontrols:SettingsCard.HeaderIcon>
+					<FontIcon Glyph="&#xE790;" />
+				</wctcontrols:SettingsCard.HeaderIcon>
+				<ToggleSwitch
+					AutomationProperties.Name="{helpers:ResourceString Key=AdwaitaTheme}"
+					IsOn="{x:Bind ViewModel.UseAdwaitaTheme, Mode=TwoWay}" />
+			</wctcontrols:SettingsCard>
+
+			<!--  Backdrop Material (no system backdrop on Linux)  -->
+			<wctcontrols:SettingsCard
+				x:Name="BackdropMaterialCard"
+				x:Load="{x:Bind ViewModel.IsBackdropMaterialSupported}"
+				Header="{helpers:ResourceString Key=BackdropMaterial}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xEF1F;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
@@ -111,6 +126,26 @@
 					AutomationProperties.Name="{helpers:ResourceString Key=BackdropMaterial}"
 					ItemsSource="{x:Bind ViewModel.BackdropMaterialTypes.Values}"
 					SelectedItem="{x:Bind ViewModel.SelectedBackdropMaterial, Mode=TwoWay}" />
+			</wctcontrols:SettingsCard>
+
+			<!--  Window Opacity (needs a compositing window manager)  -->
+			<wctcontrols:SettingsCard
+				x:Name="WindowOpacityCard"
+				x:Load="{x:Bind ViewModel.IsWindowOpacitySupported}"
+				Description="{helpers:ResourceString Key=WindowOpacityDescription}"
+				Header="{helpers:ResourceString Key=WindowOpacity}">
+				<wctcontrols:SettingsCard.HeaderIcon>
+					<FontIcon Glyph="&#xEF1F;" />
+				</wctcontrols:SettingsCard.HeaderIcon>
+				<Slider
+					Width="140"
+					HorizontalAlignment="Right"
+					AutomationProperties.Name="{helpers:ResourceString Key=WindowOpacity}"
+					IsThumbToolTipEnabled="False"
+					Maximum="1"
+					Minimum=".2"
+					StepFrequency=".05"
+					Value="{x:Bind ViewModel.WindowOpacity, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  App Background  -->

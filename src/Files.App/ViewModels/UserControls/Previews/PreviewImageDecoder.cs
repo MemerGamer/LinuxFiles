@@ -10,7 +10,8 @@ namespace Files.App.ViewModels.Previews
 	{
 		private const long MaxImagePixels = 16L * 1000 * 1000;
 		private const int MaxDisplayEdge = 2048;
-		public static (byte[]? Png, int Width, int Height) DecodeImage(byte[] bytes)
+		/// <param name="firstFrameOnly">Always re-encode the first frame as a still PNG, so animated images are never handed on with all their frames.</param>
+		public static (byte[]? Png, int Width, int Height) DecodeImage(byte[] bytes, bool firstFrameOnly = false)
 		{
 			using var data = SkiaSharp.SKData.CreateCopy(bytes);
 			using var codec = SkiaSharp.SKCodec.Create(data);
@@ -26,7 +27,7 @@ namespace Files.App.ViewModels.Previews
 				return (null, width, height);
 
 			// Formats the XAML decoder shows correctly (animated GIF, already upright images of a sane size) keep their original bytes.
-			var needsWork = (origin != SkiaSharp.SKEncodedOrigin.TopLeft && origin != SkiaSharp.SKEncodedOrigin.Default)
+			var needsWork = firstFrameOnly || (origin != SkiaSharp.SKEncodedOrigin.TopLeft && origin != SkiaSharp.SKEncodedOrigin.Default)
 				|| Math.Max(info.Width, info.Height) > MaxDisplayEdge * 2;
 			if (!needsWork)
 				return (bytes, width, height);

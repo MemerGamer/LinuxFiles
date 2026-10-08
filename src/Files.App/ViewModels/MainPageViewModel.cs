@@ -7,6 +7,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
+using Microsoft.Extensions.Logging;
+using System.IO;
 using System.Windows.Input;
 using Windows.Services.Store;
 using Windows.System;
@@ -90,26 +92,71 @@ namespace Files.App.ViewModels
 		public float AppThemeBackgroundImageOpacity
 			=> AppearanceSettingsService.AppThemeBackgroundImageOpacity;
 
+		private ImageSource? _AppThemeBackgroundImageSource;
 		public ImageSource? AppThemeBackgroundImageSource
+			=> _AppThemeBackgroundImageSource;
+
+		private const long MaxBackgroundImageBytes = 64L * 1024 * 1024;
+
+		private CancellationTokenSource? backgroundImageLoadCts;
+
+		/// <summary>
+		/// Loads the app background image from a local file. Uno does not resolve plain file paths
+		/// through <c>BitmapImage(Uri)</c>, so the bytes are decoded from a stream instead.
+		/// </summary>
+		private async Task LoadAppThemeBackgroundImageAsync()
 		{
-			get
+			backgroundImageLoadCts?.Cancel();
+			var cts = backgroundImageLoadCts = new CancellationTokenSource();
+			var path = AppearanceSettingsService.AppThemeBackgroundImageSource;
+
+			ImageSource? image = null;
+			if (!string.IsNullOrWhiteSpace(path))
 			{
-				if (string.IsNullOrWhiteSpace(AppearanceSettingsService.AppThemeBackgroundImageSource))
-					return null;
-
-				if (!Uri.TryCreate(AppearanceSettingsService.AppThemeBackgroundImageSource, UriKind.RelativeOrAbsolute, out Uri? validUri))
-					return null;
-
 				try
 				{
-					return new BitmapImage(validUri);
+#if DESKTOP
+					// Only local files are accepted (plain paths or file:// URIs); every other scheme is dropped, never handed to Uno
+					var localPath = Path.IsPathRooted(path) ? path
+						: Uri.TryCreate(path, UriKind.Absolute, out Uri? fileUri) && fileUri.IsFile ? fileUri.LocalPath
+						: null;
+					if (localPath is null)
+					{
+						App.Logger.LogWarning("Ignoring the app background image because it is not a local file.");
+					}
+					else
+					{
+						// Bounded, regular-file-only read and decode off the UI thread; failures just show no image
+						var bytes = await Files.Platform.Linux.Previews.BoundedFileReader.ReadAllBytesAsync(localPath, MaxBackgroundImageBytes, cts.Token);
+						// A background needs one frame; animated images would otherwise keep every frame decoded
+						var png = (await Task.Run(() => Files.App.ViewModels.Previews.PreviewImageDecoder.DecodeImage(bytes, firstFrameOnly: true), cts.Token)).Png;
+						if (png is not null)
+						{
+							var bitmap = new BitmapImage();
+							using var stream = new MemoryStream(png);
+							await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
+							image = bitmap;
+						}
+					}
+#else
+					if (Uri.TryCreate(path, UriKind.Absolute, out Uri? validUri))
+						image = new BitmapImage(validUri);
+#endif
 				}
-				catch (Exception)
+				catch (OperationCanceledException)
 				{
-					// Catch potential errors
-					return null;
+					return;
+				}
+				catch (Exception ex)
+				{
+					App.Logger.LogWarning(ex, "Failed to load the app background image.");
 				}
 			}
+
+			if (cts.IsCancellationRequested)
+				return;
+
+			SetProperty(ref _AppThemeBackgroundImageSource, image, nameof(AppThemeBackgroundImageSource));
 		}
 
 		public VerticalAlignment AppThemeBackgroundImageVerticalAlignment
@@ -189,12 +236,14 @@ namespace Files.App.ViewModels
 			SponsorCommand = new RelayCommand(ExecuteSponsorCommand);
 			OpenNetworkSharingSettingsCommand = new AsyncRelayCommand(ExecuteOpenNetworkSharingSettingsCommand);
 
+			_ = LoadAppThemeBackgroundImageAsync();
+
 			AppearanceSettingsService.PropertyChanged += (s, e) =>
 			{
 				switch (e.PropertyName)
 				{
 					case nameof(AppearanceSettingsService.AppThemeBackgroundImageSource):
-						OnPropertyChanged(nameof(AppThemeBackgroundImageSource));
+						_ = LoadAppThemeBackgroundImageAsync();
 						break;
 					case nameof(AppearanceSettingsService.AppThemeBackgroundImageOpacity):
 						OnPropertyChanged(nameof(AppThemeBackgroundImageOpacity));

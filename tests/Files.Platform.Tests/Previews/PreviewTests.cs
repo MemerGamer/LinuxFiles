@@ -116,6 +116,24 @@ namespace Files.Platform.Tests.Previews
 		}
 
 		[TestMethod]
+		public void FirstFrameOnlyAlwaysReencodesAsStillPng()
+		{
+			byte[] pngSignature = [0x89, 0x50, 0x4E, 0x47];
+			var gif = Convert.FromBase64String("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
+			var passthrough = PreviewImageDecoder.DecodeImage(gif);
+			Assert.AreSame(gif, passthrough.Png);
+
+			var still = PreviewImageDecoder.DecodeImage(gif, firstFrameOnly: true);
+			Assert.IsNotNull(still.Png);
+			CollectionAssert.AreEqual(pngSignature, still.Png.AsSpan(0, 4).ToArray());
+
+			var png = TestImages.CreatePng(4, 3);
+			var flattened = PreviewImageDecoder.DecodeImage(png, firstFrameOnly: true);
+			Assert.AreNotSame(png, flattened.Png);
+			Assert.IsNull(PreviewImageDecoder.DecodeImage([1, 2, 3], firstFrameOnly: true).Png);
+		}
+
+		[TestMethod]
 		public void LargeImageIsScaledForDisplay()
 		{
 			var image = PreviewImageDecoder.DecodeImage(TestImages.CreatePng(5000, 2));

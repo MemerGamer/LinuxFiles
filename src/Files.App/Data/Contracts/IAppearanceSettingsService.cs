@@ -28,6 +28,11 @@ namespace Files.App.Data.Contracts
 		string AppThemeMode { get; set; }
 
 		/// <summary>
+		/// Gets or sets whether Linux uses the Adwaita appearance resources.
+		/// </summary>
+		bool UseAdwaitaTheme { get; set; }
+
+		/// <summary>
 		/// Gets or sets a value for the app theme background color.
 		/// </summary>
 		String AppThemeBackgroundColor { get; set; }
@@ -71,6 +76,11 @@ namespace Files.App.Data.Contracts
 		/// Gets or sets a value for the theme system backdrop.
 		/// </summary>
 		BackdropMaterialType AppThemeBackdropMaterial { get; set; }
+
+		/// <summary>
+		/// Gets or sets the whole-window opacity (0.2 to 1). Only honored on Linux, and only visible under a compositing window manager.
+		/// </summary>
+		float WindowOpacity { get; set; }
 
 		/// <summary>
 		/// Gets or sets a value for the app background image source

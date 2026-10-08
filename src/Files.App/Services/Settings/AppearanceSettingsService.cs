@@ -34,6 +34,13 @@ namespace Files.App.Services.Settings
 		}
 
 		/// <inheritdoc/>
+		public bool UseAdwaitaTheme
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
+		/// <inheritdoc/>
 		public String AppThemeBackgroundColor
 		{
 			get => Get("#00000000");
@@ -98,6 +105,13 @@ namespace Files.App.Services.Settings
 				if (!OperatingSystem.IsLinux())
 					Set(value);
 			}
+		}
+
+		/// <inheritdoc/>
+		public float WindowOpacity
+		{
+			get => Math.Clamp(Get(1f), 0.2f, 1f);
+			set => Set(Math.Clamp(value, 0.2f, 1f));
 		}
 
 		/// <inheritdoc/>

@@ -11,6 +11,22 @@ import tempfile
 
 POLICY = '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">\n<policyconfig>\n  <vendor>LinuxFiles</vendor>\n  <vendor_url>https://github.com/MemerGamer/LinuxFiles</vendor_url>\n  <action id="io.github.memergamer.LinuxFiles.root-actions">\n    <description>Perform the confirmed Files root operation</description>\n    <message>Authentication grants root file access to the listed source and target paths (including their contents). Review the operation and request SHA-256: $(command_line). Program: $(program)</message>\n    <defaults>\n      <allow_any>no</allow_any>\n      <allow_inactive>no</allow_inactive>\n      <allow_active>auth_admin</allow_active>\n    </defaults>\n    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/linuxfiles/files-elevation-helper</annotate>\n  </action>\n</policyconfig>\n'
 MAX_HELPER_BYTES = 256 * 1024 * 1024
+HELPER_PATH = "/usr/lib/linuxfiles/files-elevation-helper"
+POLICY_PATH = "/usr/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy"
+
+
+def refuse_package_owned_paths():
+    # Query fixed system tools, never the caller's PATH or a shell.
+    for tool, option in (("/usr/bin/pacman", "-Qo"), ("/usr/bin/dpkg-query", "-S"), ("/usr/bin/rpm", "-qf")):
+        if not os.access(tool, os.X_OK):
+            continue
+        for path in ("/usr/lib/linuxfiles", HELPER_PATH, POLICY_PATH):
+            result = subprocess.run([tool, option, path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+            if result.returncode == 0:
+                raise ValueError(f"refusing root-helper installation: {path} is owned by a distro package; "
+                                 "use the packaged helper instead (omit --install-root-helper)")
+            if result.returncode != 1:
+                raise ValueError(f"cannot check package ownership of {path} with {tool}; no helper files installed")
 
 
 def snapshot_helper(source, destination, expected_hash):
@@ -50,6 +66,11 @@ def main(argv=None):
         parser.error("live installation requires root")
     if len(args.sha256) != 64 or any(c not in "0123456789abcdefABCDEF" for c in args.sha256):
         parser.error("expected a SHA-256 hex digest")
+    if live:
+        try:
+            refuse_package_owned_paths()
+        except (OSError, ValueError) as error:
+            parser.error(str(error))
     # Fixed /tmp, ignoring caller-controlled TMPDIR; mkdtemp is private and owned by the invoking installer.
     with tempfile.TemporaryDirectory(prefix="linuxfiles-helper-install-", dir="/tmp") as temporary:
         private = Path(temporary)
@@ -66,8 +87,8 @@ def main(argv=None):
         if live:
             os.chown(helper, 0, 0)
             os.chown(policy, 0, 0)
-        for source, relative, mode in ((helper, "usr/lib/linuxfiles/files-elevation-helper", "755"),
-                                      (policy, "usr/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy", "644")):
+        for source, relative, mode in ((helper, HELPER_PATH.lstrip("/"), "755"),
+                                      (policy, POLICY_PATH.lstrip("/"), "644")):
             destination = args.destdir / relative
             if live:
                 for parent in reversed(destination.parents):

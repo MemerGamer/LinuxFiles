@@ -1,0 +1,22 @@
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<!--  Image-only surface overrides; opaque Adwaita resources remain the no-image defaults.  -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+	<ResourceDictionary.ThemeDictionaries>
+		<ResourceDictionary x:Key="Light">
+			<SolidColorBrush x:Key="App.Theme.AddressBar.BackgroundBrush" Color="#D0FFFFFF" />
+			<SolidColorBrush x:Key="App.Theme.Toolbar.BackgroundBrush" Color="#D0FFFFFF" />
+			<SolidColorBrush x:Key="App.Theme.Sidebar.BackgroundBrush" Color="#D0E8E8EA" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#D0FFFFFF" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.SecondaryBackgroundBrush" Color="#D0FDFDFE" />
+			<SolidColorBrush x:Key="App.Theme.InfoPane.BackgroundBrush" Color="#D0EBEBED" />
+		</ResourceDictionary>
+		<ResourceDictionary x:Key="Dark">
+			<SolidColorBrush x:Key="App.Theme.AddressBar.BackgroundBrush" Color="#D0313135" />
+			<SolidColorBrush x:Key="App.Theme.Toolbar.BackgroundBrush" Color="#D02E2E32" />
+			<SolidColorBrush x:Key="App.Theme.Sidebar.BackgroundBrush" Color="#D0313135" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#D019191C" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.SecondaryBackgroundBrush" Color="#D01F1F23" />
+			<SolidColorBrush x:Key="App.Theme.InfoPane.BackgroundBrush" Color="#D02E2E32" />
+		</ResourceDictionary>
+	</ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>

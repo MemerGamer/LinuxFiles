@@ -13,6 +13,7 @@ namespace Files.App.Services
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
 		private ResourceDictionary? adwaitaResources;
+		private ResourceDictionary? adwaitaBackgroundResources;
 
 		public ResourcesService()
 		{
@@ -44,11 +45,29 @@ namespace Files.App.Services
 			{
 				dictionaries.Remove(adwaitaResources);
 			}
+
+			var appearance = UserSettingsService.AppearanceSettingsService;
+			if (appearance.UseAdwaitaTheme && !string.IsNullOrWhiteSpace(appearance.AppThemeBackgroundImageSource) && appearance.AppThemeBackgroundImageOpacity > 0)
+			{
+				adwaitaBackgroundResources ??= new ResourceDictionary
+				{
+					Source = new Uri("ms-appx:///Styles/AdwaitaBackgroundResources.xaml"),
+				};
+
+				if (!dictionaries.Contains(adwaitaBackgroundResources))
+					dictionaries.Add(adwaitaBackgroundResources);
+			}
+			else if (adwaitaBackgroundResources is not null)
+			{
+				dictionaries.Remove(adwaitaBackgroundResources);
+			}
 		}
 
 		private void AppearanceSettingsService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
-			if (e.PropertyName == nameof(IAppearanceSettingsService.UseAdwaitaTheme))
+			if (e.PropertyName is nameof(IAppearanceSettingsService.UseAdwaitaTheme) or
+				nameof(IAppearanceSettingsService.AppThemeBackgroundImageSource) or
+				nameof(IAppearanceSettingsService.AppThemeBackgroundImageOpacity))
 			{
 				UpdateAppearanceResources();
 				ApplyResources();

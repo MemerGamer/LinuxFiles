@@ -1,7 +1,5 @@
 <!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
 <!--  Optional Linux appearance. Reuses existing control templates; colors follow libadwaita CSS variables.  -->
-<!--  Large-surface brushes are 0xD0 alpha colours so a background image shows through. Each blends over what lies beneath it (window fill, or the sidebar layer under the content) to the libadwaita colour; pure white cannot be reached over grey, so those surfaces are 4 levels darker  -->
-<!--  Large-surface brushes are 0xC0 alpha colours that blend over the window fill to the libadwaita colour, so a background image shows through  -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 	<ResourceDictionary.ThemeDictionaries>
 		<ResourceDictionary x:Key="Light">
@@ -26,12 +24,12 @@
 			<x:Double x:Key="TabViewItemMinHeight">38</x:Double>
 
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#FAFAFB" />
-			<SolidColorBrush x:Key="App.Theme.AddressBar.BackgroundBrush" Color="#D0FFFFFF" />
-			<SolidColorBrush x:Key="App.Theme.Toolbar.BackgroundBrush" Color="#D0FFFFFF" />
-			<SolidColorBrush x:Key="App.Theme.Sidebar.BackgroundBrush" Color="#D0E8E8EA" />
-			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#D0FFFFFF" />
-			<SolidColorBrush x:Key="App.Theme.FileArea.SecondaryBackgroundBrush" Color="#D0FDFDFE" />
-			<SolidColorBrush x:Key="App.Theme.InfoPane.BackgroundBrush" Color="#D0EBEBED" />
+			<SolidColorBrush x:Key="App.Theme.AddressBar.BackgroundBrush" Color="#FFFFFF" />
+			<SolidColorBrush x:Key="App.Theme.Toolbar.BackgroundBrush" Color="#FFFFFF" />
+			<SolidColorBrush x:Key="App.Theme.Sidebar.BackgroundBrush" Color="#EBEBED" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#FFFFFF" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.SecondaryBackgroundBrush" Color="#FAFAFB" />
+			<SolidColorBrush x:Key="App.Theme.InfoPane.BackgroundBrush" Color="#EBEBED" />
 			<SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#FFFFFF" />
 			<SolidColorBrush x:Key="LayerOnMicaBaseAltFillColorDefaultBrush" Color="#FAFAFB" />
 			<SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#FFFFFF" />
@@ -183,12 +181,12 @@
 			<x:Double x:Key="TabViewItemMinHeight">38</x:Double>
 
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#222226" />
-			<SolidColorBrush x:Key="App.Theme.AddressBar.BackgroundBrush" Color="#D0313135" />
-			<SolidColorBrush x:Key="App.Theme.Toolbar.BackgroundBrush" Color="#D02E2E32" />
-			<SolidColorBrush x:Key="App.Theme.Sidebar.BackgroundBrush" Color="#D0313135" />
-			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#D019191C" />
-			<SolidColorBrush x:Key="App.Theme.FileArea.SecondaryBackgroundBrush" Color="#D01F1F23" />
-			<SolidColorBrush x:Key="App.Theme.InfoPane.BackgroundBrush" Color="#D02E2E32" />
+			<SolidColorBrush x:Key="App.Theme.AddressBar.BackgroundBrush" Color="#2E2E32" />
+			<SolidColorBrush x:Key="App.Theme.Toolbar.BackgroundBrush" Color="#2E2E32" />
+			<SolidColorBrush x:Key="App.Theme.Sidebar.BackgroundBrush" Color="#2E2E32" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#1D1D20" />
+			<SolidColorBrush x:Key="App.Theme.FileArea.SecondaryBackgroundBrush" Color="#222226" />
+			<SolidColorBrush x:Key="App.Theme.InfoPane.BackgroundBrush" Color="#2E2E32" />
 			<SolidColorBrush x:Key="LayerFillColorDefaultBrush" Color="#1D1D20" />
 			<SolidColorBrush x:Key="LayerOnMicaBaseAltFillColorDefaultBrush" Color="#222226" />
 			<SolidColorBrush x:Key="CardBackgroundFillColorDefaultBrush" Color="#36363A" />

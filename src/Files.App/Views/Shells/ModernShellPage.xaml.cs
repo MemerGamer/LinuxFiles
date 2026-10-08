@@ -60,9 +60,30 @@ namespace Files.App.Views.Shells
 			ItemDisplayFrame.NavigationFailed += (s, e) => Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, e.Exception, "Navigation to {T} failed", e.SourcePageType?.Name);
 			BackIcon.Visibility = Visibility.Collapsed;
 			ForwardIcon.Visibility = Visibility.Collapsed;
+
+			// The theme shadow shows through the translucent Adwaita file area and darkens it
+			Loaded += (_, _) =>
+			{
+				UpdateShellShadow();
+				userSettingsService.AppearanceSettingsService.PropertyChanged += AppearanceSettingsService_PropertyChanged;
+			};
+			Unloaded += (_, _) => userSettingsService.AppearanceSettingsService.PropertyChanged -= AppearanceSettingsService_PropertyChanged;
 #endif
 			// LINUX-TODO(overscroll): touchpad overscroll navigation needs InteractionTracker, which Uno does not implement
 		}
+
+#if !WINDOWS
+		private void AppearanceSettingsService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName == nameof(IAppearanceSettingsService.UseAdwaitaTheme))
+				UpdateShellShadow();
+		}
+
+		private void UpdateShellShadow()
+		{
+			RootGrid.Shadow = userSettingsService.AppearanceSettingsService.UseAdwaitaTheme ? null : ShellContentThemeShadow;
+		}
+#endif
 
 		private async void ShellViewModel_FocusFilterHeader(object? sender, EventArgs e)
 		{

@@ -46,6 +46,9 @@ namespace Files.App.Views.Layouts
 		private DetailsViewSizeKind? itemContainerSize;
 
 		private DispatcherQueueTimer? _autoFitColumnsTimer;
+#if !WINDOWS
+		private ScrollViewer? linuxHeaderScroller;
+#endif
 
 		// Properties
 
@@ -95,6 +98,8 @@ namespace Files.App.Views.Layouts
 			HeaderGrid.Padding = new Thickness(16, 0, 0, 0);
 			ActualThemeChanged += (_, _) => UpdateLinuxListTheme();
 			HoistSemanticZoomContent(RootGridZoom);
+			InitializeLinuxHeader();
+			Unloaded += (_, _) => DetachLinuxHeaderScroller();
 #endif
 			DataContext = this;
 			var selectionRectangle = RectangleSelection.Create(FileList, SelectionRectangle, FileList_SelectionChanged);
@@ -244,6 +249,9 @@ namespace Files.App.Views.Layouts
 
 		public override void Dispose()
 		{
+#if !WINDOWS
+			DetachLinuxHeaderScroller();
+#endif
 			Bindings.StopTracking();
 			if (FolderSettings is { } folderSettings)
 			{
@@ -801,6 +809,52 @@ namespace Files.App.Views.Layouts
 		}
 
 #if !WINDOWS
+		private void InitializeLinuxHeader()
+		{
+			// Uno cannot animate a scrolling header with GetScrollViewerManipulationPropertySet.
+			var behaviors = Microsoft.Xaml.Interactivity.Interaction.GetBehaviors(FileList);
+			foreach (var behavior in behaviors.OfType<StickyHeaderBehavior>().ToArray())
+				behaviors.Remove(behavior);
+
+			FileList.Header = null;
+			RootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+			RootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+			Grid.SetRow(FileList, 1);
+			Grid.SetRow(RootGridZoom, 1);
+			if (SelectionRectangle.Parent is FrameworkElement selectionCanvas)
+				Grid.SetRow(selectionCanvas, 1);
+
+			linuxHeaderScroller = new ScrollViewer
+			{
+				Content = HeaderGrid,
+				Margin = new Thickness(8, 0, 20, 0),
+				HorizontalScrollBarVisibility = ScrollBarVisibility.Hidden,
+				HorizontalScrollMode = ScrollMode.Enabled,
+				VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
+				VerticalScrollMode = ScrollMode.Disabled,
+				HorizontalContentAlignment = HorizontalAlignment.Stretch,
+				IsTabStop = false,
+			};
+			linuxHeaderScroller.PreviewKeyDown += FileList_PreviewKeyDown;
+			RootGrid.Children.Add(linuxHeaderScroller);
+		}
+
+		private void LinuxContentScroller_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
+			=> SynchronizeLinuxHeader();
+
+		private void SynchronizeLinuxHeader()
+		{
+			if (ContentScroller is { } scroller && linuxHeaderScroller is { } headerScroller &&
+				headerScroller.HorizontalOffset != scroller.HorizontalOffset)
+				headerScroller.ChangeView(scroller.HorizontalOffset, null, null, true);
+		}
+
+		private void DetachLinuxHeaderScroller()
+		{
+			if (ContentScroller is { } scroller)
+				scroller.ViewChanged -= LinuxContentScroller_ViewChanged;
+		}
+
 		private void UpdateLinuxListTheme()
 		{
 			FileList.RequestedTheme = ActualTheme;
@@ -1099,8 +1153,16 @@ namespace Files.App.Views.Layouts
 		{
 #if !WINDOWS
 			UpdateLinuxListTheme();
+			DetachLinuxHeaderScroller();
 #endif
 			ContentScroller = FileList.FindDescendant<ScrollViewer>(x => x.Name == "ScrollViewer");
+#if !WINDOWS
+			if (ContentScroller is { } linuxScroller)
+			{
+				linuxScroller.ViewChanged += LinuxContentScroller_ViewChanged;
+				SynchronizeLinuxHeader();
+			}
+#endif
 			const double OffsetCorrection = 88; // HeaderGrid (40) + ListViewHeaderItem (44 + 4 margin)
 
 			if (RootGridZoom is not null)

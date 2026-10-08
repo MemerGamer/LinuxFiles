@@ -13,6 +13,7 @@ namespace Files.App.Services
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
 		private ResourceDictionary? adwaitaResources;
+		private ResourceDictionary? adwaitaBackgroundResources;
 
 		public ResourcesService()
 		{
@@ -24,12 +25,13 @@ namespace Files.App.Services
 			UserSettingsService.GeneralSettingsService.PropertyChanged += GeneralSettingsService_PropertyChanged;
 		}
 
-		private void UpdateAppearanceResources()
+		private bool UpdateAppearanceResources()
 		{
 			if (!OperatingSystem.IsLinux())
-				return;
+				return false;
 
 			var dictionaries = Application.Current.Resources.MergedDictionaries;
+			var changed = false;
 			if (UserSettingsService.AppearanceSettingsService.UseAdwaitaTheme)
 			{
 				adwaitaResources ??= new ResourceDictionary
@@ -38,20 +40,46 @@ namespace Files.App.Services
 				};
 
 				if (!dictionaries.Contains(adwaitaResources))
+				{
 					dictionaries.Add(adwaitaResources);
+					changed = true;
+				}
 			}
 			else if (adwaitaResources is not null)
 			{
-				dictionaries.Remove(adwaitaResources);
+				changed |= dictionaries.Remove(adwaitaResources);
 			}
+
+			var appearance = UserSettingsService.AppearanceSettingsService;
+			if (appearance.UseAdwaitaTheme && !string.IsNullOrWhiteSpace(appearance.AppThemeBackgroundImageSource) && appearance.AppThemeBackgroundImageOpacity > 0)
+			{
+				adwaitaBackgroundResources ??= new ResourceDictionary
+				{
+					Source = new Uri("ms-appx:///Styles/AdwaitaBackgroundResources.xaml"),
+				};
+
+				if (!dictionaries.Contains(adwaitaBackgroundResources))
+				{
+					dictionaries.Add(adwaitaBackgroundResources);
+					changed = true;
+				}
+			}
+			else if (adwaitaBackgroundResources is not null)
+			{
+				changed |= dictionaries.Remove(adwaitaBackgroundResources);
+			}
+
+			return changed;
 		}
 
 		private void AppearanceSettingsService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
-			if (e.PropertyName == nameof(IAppearanceSettingsService.UseAdwaitaTheme))
+			if (e.PropertyName is nameof(IAppearanceSettingsService.UseAdwaitaTheme) or
+				nameof(IAppearanceSettingsService.AppThemeBackgroundImageSource) or
+				nameof(IAppearanceSettingsService.AppThemeBackgroundImageOpacity))
 			{
-				UpdateAppearanceResources();
-				ApplyResources();
+				if (UpdateAppearanceResources())
+					ApplyResources();
 			}
 		}
 

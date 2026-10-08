@@ -28,6 +28,12 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0-alpha2" date="2026-10-08" type="development">
+      <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha2</url>
+      <description>
+        <p>Optional Adwaita-style appearance, a working app background image and window opacity, a fix for the glitching tab bar icon, faster rendering on systems without GPU acceleration, a Nix flake and safer root helper installation.</p>
+      </description>
+    </release>
     <release version="0.1.0-alpha1" date="2026-10-06" type="development">
       <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha1</url>
       <description>

@@ -60,9 +60,41 @@ namespace Files.App.Views.Shells
 			ItemDisplayFrame.NavigationFailed += (s, e) => Microsoft.Extensions.Logging.LoggerExtensions.LogWarning(App.Logger, e.Exception, "Navigation to {T} failed", e.SourcePageType?.Name);
 			BackIcon.Visibility = Visibility.Collapsed;
 			ForwardIcon.Visibility = Visibility.Collapsed;
+
+			Loaded += ModernShellPage_Loaded;
+			Unloaded += ModernShellPage_Unloaded;
 #endif
 			// LINUX-TODO(overscroll): touchpad overscroll navigation needs InteractionTracker, which Uno does not implement
 		}
+
+#if !WINDOWS
+		private void ModernShellPage_Loaded(object sender, RoutedEventArgs e)
+		{
+			UpdateShellShadow();
+			userSettingsService.AppearanceSettingsService.PropertyChanged -= AppearanceSettingsService_PropertyChanged;
+			userSettingsService.AppearanceSettingsService.PropertyChanged += AppearanceSettingsService_PropertyChanged;
+		}
+
+		private void ModernShellPage_Unloaded(object sender, RoutedEventArgs e)
+		{
+			userSettingsService.AppearanceSettingsService.PropertyChanged -= AppearanceSettingsService_PropertyChanged;
+		}
+
+		private void AppearanceSettingsService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName is nameof(IAppearanceSettingsService.UseAdwaitaTheme) or
+				nameof(IAppearanceSettingsService.AppThemeBackgroundImageSource) or
+				nameof(IAppearanceSettingsService.AppThemeBackgroundImageOpacity))
+				UpdateShellShadow();
+		}
+
+		private void UpdateShellShadow()
+		{
+			var appearance = userSettingsService.AppearanceSettingsService;
+			var hasBackground = !string.IsNullOrWhiteSpace(appearance.AppThemeBackgroundImageSource) && appearance.AppThemeBackgroundImageOpacity > 0;
+			RootGrid.Shadow = appearance.UseAdwaitaTheme && hasBackground ? null : ShellContentThemeShadow;
+		}
+#endif
 
 		private async void ShellViewModel_FocusFilterHeader(object? sender, EventArgs e)
 		{
@@ -277,6 +309,11 @@ namespace Files.App.Views.Shells
 
 		public override void Dispose()
 		{
+#if !WINDOWS
+			Loaded -= ModernShellPage_Loaded;
+			Unloaded -= ModernShellPage_Unloaded;
+			userSettingsService.AppearanceSettingsService.PropertyChanged -= AppearanceSettingsService_PropertyChanged;
+#endif
 			Bindings.StopTracking();
 			ContentChanged -= ModernShellPage_ContentChanged;
 			ToolbarViewModel.RefreshWidgetsRequested -= ModernShellPage_RefreshWidgetsRequested;

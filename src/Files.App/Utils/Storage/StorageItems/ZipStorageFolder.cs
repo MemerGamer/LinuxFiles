@@ -26,7 +26,7 @@ namespace Files.App.Utils.Storage
 		public static Task<bool> CheckDefaultZipApp(string path) => Task.FromResult(true);
 		public static IAsyncOperation<BaseStorageFolder?> FromPathAsync(string path) => Task.FromResult<BaseStorageFolder?>(null).AsAsyncOperation();
 		public static IAsyncOperation<BaseStorageFolder?> FromStorageFileAsync(BaseStorageFile file) => Task.FromResult<BaseStorageFolder?>(null).AsAsyncOperation();
-		public static Task<bool> InitArchive(IStorageFile file, SevenZip.OutArchiveFormat format) => Task.FromException<bool>(new NotSupportedException());
+		public static Task<bool> InitArchive(IStorageFile file, ArchiveFormats format) => Task.FromException<bool>(new NotSupportedException());
 		public Task<long> GetUncompressedSize() => Task.FromException<long>(new NotSupportedException());
 		public Task<bool> ValidateCredentialsAsync() => Task.FromResult(false);
 		public IAsyncOperation<BaseStorageFile?> CreateFileAsync(Stream contents, string name, CreationCollisionOption options) => Task.FromException<BaseStorageFile?>(new NotSupportedException()).AsAsyncOperation();

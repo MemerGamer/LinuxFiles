@@ -19,12 +19,16 @@
         <PackageReference Include="ColorCode.Core" />
         <PackageReference Include="TagLibSharp" />
         <PackageReference Include="FluentFTP" />
+        <PackageReference Include="SharpZipLib" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
         <PackageReference Include="MSTest.TestAdapter" />
         <PackageReference Include="MSTest.TestFramework" />
         <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="../../src/Files.Core.SourceGenerator/Files.Core.SourceGenerator.csproj" />
         <ProjectReference Include="..\..\src\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
         <ProjectReference Include="..\..\src\Files.Platform.Linux\Files.Platform.Linux.csproj" />
         <ProjectReference Include="../../src/Files.Platform.Linux.ElevationHelper/Files.Platform.Linux.ElevationHelper.csproj" Aliases="ElevationHelper" />
@@ -45,6 +49,8 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="../../src/Files.App/Utils/Storage/StorageBaseItems/IPasswordProtectedItem.cs" Link="Archives/IPasswordProtectedItem.cs" />
+        <Compile Include="../../src/Files.App/Utils/Storage/StorageBaseItems/StorageCredential.cs" Link="Archives/StorageCredential.cs" />
         <Compile Include="../../src/Files.App.Storage/Archives/*.cs" LinkBase="Archives/Storables" />
         <Compile Include="../../src/Files.Shared/Helpers/FileExtensionHelpers.cs" Link="Archives/FileExtensionHelpers.cs" />
     </ItemGroup>

@@ -410,3 +410,6 @@ FodyWeavers.xsd
 .idea/
 src/Files.App/Assets/FilesOpenDialog/Files.App.Launcher.exe.sha256
 .cache/
+
+# Shared opt-in Linux publish analysis profile
+!src/Files.App/Properties/PublishProfiles/linux-analysis.pubxml

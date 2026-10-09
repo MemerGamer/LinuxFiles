@@ -22,7 +22,9 @@ using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Storage;
 using Windows.System;
+#if WINDOWS
 using Windows.Win32;
+#endif
 using WinRT;
 using static Files.App.Helpers.PathNormalization;
 using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;

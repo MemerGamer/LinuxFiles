@@ -27,6 +27,7 @@ namespace Files.App.Services
 		{
 			if (!OperatingSystem.IsLinux()) return;
 			SystemAppearance.Changed += (_, _) => MainWindow.Instance.DispatcherQueue.TryEnqueue(ApplyResources);
+			X11AppearanceSupport.Changed += (_, _) => MainWindow.Instance.DispatcherQueue.TryEnqueue(ApplyResources);
 			AppThemeModeService.AppThemeModeChanged += (_, _) =>
 			{
 				if (!_refreshing) UpdateLinuxAppearanceResources();
@@ -88,8 +89,7 @@ namespace Files.App.Services
 				{
 					colors.Clear();
 					foreach (var key in SurfaceKeys) colors[key] = Colors.Black;
-					foreach (var key in new[] { "TextFillColorPrimaryBrush", "TextFillColorSecondaryBrush", "TextFillColorTertiaryBrush", "TextFillColorDisabledBrush", "ButtonForeground", "ComboBoxForeground", "ToolbarButtonForeground", "ToolbarToggleButtonForeground" }) colors[key] = Colors.White;
-					foreach (var key in new[] { "Files.Linux.FlyoutSurfaceBrush", "MenuFlyoutPresenterBackground", "FlyoutBackgroundThemeBrush", "ContentDialogBackground", "CardBackgroundFillColorDefaultBrush", "CardBackgroundFillColorSecondaryBrush", "App.Theme.CardBackgroundFillColorTertiaryBrush", "LayerFillColorDefaultBrush", "LayerOnMicaBaseAltFillColorDefaultBrush", "ButtonBackground", "ComboBoxBackground", "ControlFillColorDefaultBrush" }) colors[key] = Colors.Black;
+					foreach (var (key, color) in SystemAppearancePalette.MapHighContrast()) colors[key] = ToColor(color);
 				}
 				else if (mode != BackdropMode.Solid)
 				{

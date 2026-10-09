@@ -27,6 +27,18 @@ namespace Files.Platform.Tests.Theme
 		}
 
 		[TestMethod]
+		public void Support_RecognizesIndependentPicomWithoutGrantingBlur()
+		{
+			foreach (var manager in new[] { "i3", "Openbox", null })
+			{
+				var support = X11AppearanceSupport.Detect(manager, "", true, true, "picom");
+				Assert.AreEqual(OpacitySupport.Supported, support.WindowOpacity);
+				Assert.AreEqual(BackdropMode.Transparent, support.Resolve(BackdropMode.Transparent, false));
+				Assert.IsFalse(support.Blur);
+			}
+		}
+
+		[TestMethod]
 		public void Backdrop_RetainsRequestedModeWhileResolvingReadableFallback()
 		{
 			var kwin = X11AppearanceSupport.Detect("KWin", "KDE", true, true);
@@ -92,6 +104,44 @@ namespace Files.Platform.Tests.Theme
 				Assert.IsNull(await GtkNamedColors.ReadAsync(path));
 			}
 			finally { File.Delete(path); }
+		}
+
+		[TestMethod]
+		public void HighContrast_OverridesEveryControlStateIncludingCheckedAndDisabled()
+		{
+			var map = SystemAppearancePalette.MapHighContrast();
+			foreach (var control in new[] { "Button", "ComboBox", "ToolbarButton", "ToggleButton", "ToolbarToggleButton" })
+				foreach (var state in new[] { "", "PointerOver", "Pressed", "Disabled", "Checked", "CheckedPointerOver", "CheckedPressed", "CheckedDisabled", "Indeterminate", "IndeterminatePointerOver", "IndeterminatePressed", "IndeterminateDisabled" })
+				{
+					if (state.StartsWith("Checked") || state.StartsWith("Indeterminate"))
+						if (control is not ("ToggleButton" or "ToolbarToggleButton")) continue;
+					var foreground = map[control + "Foreground" + state];
+					var background = map[control + "Background" + state];
+					Assert.AreEqual((byte)255, foreground.A);
+					Assert.AreEqual((byte)255, background.A);
+					Assert.AreEqual(21d, SystemAppearancePalette.ContrastRatio(foreground, background), 0.001, control + state);
+				}
+			Assert.AreNotEqual(map["ToolbarToggleButtonBackground"], map["ToolbarToggleButtonBackgroundChecked"]);
+		}
+
+		[TestMethod]
+		[DataRow(false, 255, 240, 0)]
+		[DataRow(true, 10, 20, 80)]
+		public void Palette_DerivesAccentTextAgainstInfoPaneAndViewSeparatelyFromFills(bool dark, int red, int green, int blue)
+		{
+			var accent = new AppearanceColor((byte)red, (byte)green, (byte)blue);
+			var background = dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(250, 240, 230);
+			var view = dark ? new AppearanceColor(48, 48, 48) : new AppearanceColor(255, 255, 255);
+			var named = new Dictionary<string, AppearanceColor> { ["theme_bg_color"] = background, ["view_bg_color"] = view };
+			var map = SystemAppearancePalette.Map(new(dark, false, accent, named, dark), dark);
+			Assert.AreEqual(accent, map["AccentFillColorDefaultBrush"]);
+			Assert.AreEqual(accent, map["SystemAccentColor"]);
+			foreach (var key in new[] { "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush" })
+				foreach (var surface in new[] { "App.Theme.InfoPane.BackgroundBrush", "App.Theme.FileArea.BackgroundBrush" })
+					Assert.IsTrue(SystemAppearancePalette.ContrastRatio(map[key], map[surface]) >= 4.5, key + " on " + surface);
+			var explicitTheme = SystemAppearancePalette.Map(new(dark, false, accent, named, dark), !dark);
+			var fallback = !dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(243, 243, 243);
+			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(explicitTheme["AccentTextFillColorPrimaryBrush"], fallback) >= 4.5);
 		}
 
 		[TestMethod]

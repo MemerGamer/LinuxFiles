@@ -98,7 +98,7 @@ namespace Files.App.ViewModels.Settings
 			ResourcesService = resourcesService;
 #if HAS_UNO
 			var weak = new WeakReference<AppearanceViewModel>(this);
-			Ioc.Default.GetRequiredService<ISystemAppearanceService>().Changed += (_, _) =>
+			EventHandler appearanceChanged = (_, _) =>
 			{
 				if (weak.TryGetTarget(out var model)) MainWindow.Instance.DispatcherQueue.TryEnqueue(() =>
 				{
@@ -108,6 +108,8 @@ namespace Files.App.ViewModels.Settings
 					model.OnPropertyChanged(nameof(BackdropDescription));
 				});
 			};
+			Ioc.Default.GetRequiredService<ISystemAppearanceService>().Changed += appearanceChanged;
+			X11AppearanceSupport.Changed += appearanceChanged;
 #endif
 			selectedThemeIndex = (int)Enum.Parse<ElementTheme>(AppThemeModeService.AppThemeMode.ToString());
 

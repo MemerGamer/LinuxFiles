@@ -41,7 +41,16 @@ namespace Files.Platform.Linux.Theme
 			if (accent is null && appearance.NamedColors.TryGetValue("theme_selected_bg_color", out bg)) accent = bg;
 			if (accent is { } a)
 			{
-				foreach (var key in new[] { "SystemAccentColor", "SystemAccentColorDark1", "SystemAccentColorDark2", "SystemAccentColorDark3", "SystemAccentColorLight1", "SystemAccentColorLight2", "SystemAccentColorLight3", "App.Theme.FillColorAttention", "AccentFillColorDefaultBrush", "AccentFillColorSecondaryBrush", "AccentFillColorTertiaryBrush", "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush", "App.Theme.FillColorAttentionBrush", "Files.Item.AccentBrush", "ToolbarToggleButtonBackgroundChecked", "ToolbarToggleButtonBackgroundCheckedPointerOver", "ToolbarToggleButtonBackgroundCheckedPressed" }) result[key] = a;
+				foreach (var key in new[] { "SystemAccentColor", "SystemAccentColorDark1", "SystemAccentColorDark2", "SystemAccentColorDark3", "SystemAccentColorLight1", "SystemAccentColorLight2", "SystemAccentColorLight3", "App.Theme.FillColorAttention", "AccentFillColorDefaultBrush", "AccentFillColorSecondaryBrush", "AccentFillColorTertiaryBrush", "App.Theme.FillColorAttentionBrush", "Files.Item.AccentBrush", "ToolbarToggleButtonBackgroundChecked", "ToolbarToggleButtonBackgroundCheckedPointerOver", "ToolbarToggleButtonBackgroundCheckedPressed" }) result[key] = a;
+				var fallback = dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(243, 243, 243);
+				var surfaces = new[] { "App.Theme.InfoPane.BackgroundBrush", "App.Theme.FileArea.BackgroundBrush",
+					"App.Theme.BackgroundBrush", "CardBackgroundFillColorDefaultBrush" };
+				var backgrounds = new AppearanceColor[surfaces.Length];
+				for (var i = 0; i < surfaces.Length; i++)
+					backgrounds[i] = result.TryGetValue(surfaces[i], out var surface) ? surface : fallback;
+				var accentText = ReadableAccentText(a, backgrounds);
+				result["AccentTextFillColorPrimaryBrush"] = accentText;
+				result["AccentTextFillColorSecondaryBrush"] = accentText;
 				var foreground = ContrastForeground(a);
 				foreach (var role in new[] { "accent_fg_color", "theme_selected_fg_color" })
 					if (appearance.NamedColors.TryGetValue(role, out var f) && ContrastRatio(a, f) >= 4.5) { foreground = f; break; }
@@ -55,6 +64,53 @@ namespace Files.Platform.Linux.Theme
 				}
 			}
 			return result;
+		}
+
+		public static IReadOnlyDictionary<string, AppearanceColor> MapHighContrast()
+		{
+			var result = new Dictionary<string, AppearanceColor>(StringComparer.Ordinal);
+			var white = new AppearanceColor(255, 255, 255);
+			var black = new AppearanceColor(0, 0, 0);
+			foreach (var key in new[] { "TextFillColorPrimaryBrush", "TextFillColorSecondaryBrush", "TextFillColorTertiaryBrush", "TextFillColorDisabledBrush", "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush" }) result[key] = white;
+			foreach (var key in new[] { "Files.Linux.FlyoutSurfaceBrush", "MenuFlyoutPresenterBackground", "FlyoutBackgroundThemeBrush", "ContentDialogBackground", "CardBackgroundFillColorDefaultBrush", "CardBackgroundFillColorSecondaryBrush", "App.Theme.CardBackgroundFillColorTertiaryBrush", "LayerFillColorDefaultBrush", "LayerOnMicaBaseAltFillColorDefaultBrush", "ControlFillColorDefaultBrush" }) result[key] = black;
+			foreach (var control in new[] { "Button", "ComboBox", "ToolbarButton", "ToggleButton", "ToolbarToggleButton" })
+			{
+				foreach (var state in new[] { "", "PointerOver", "Pressed", "Disabled" })
+				{
+					result[control + "Foreground" + state] = white;
+					result[control + "Background" + state] = black;
+				}
+				if (control is "ToggleButton" or "ToolbarToggleButton")
+					foreach (var state in new[] { "Checked", "CheckedPointerOver", "CheckedPressed", "CheckedDisabled", "Indeterminate", "IndeterminatePointerOver", "IndeterminatePressed", "IndeterminateDisabled" })
+					{
+						result[control + "Foreground" + state] = black;
+						result[control + "Background" + state] = white;
+					}
+			}
+			return result;
+		}
+
+		private static AppearanceColor ReadableAccentText(AppearanceColor accent, AppearanceColor[] backgrounds)
+		{
+			double MinimumContrast(AppearanceColor color)
+			{
+				var contrast = double.MaxValue;
+				foreach (var background in backgrounds) contrast = Math.Min(contrast, ContrastRatio(color, background));
+				return contrast;
+			}
+			accent = accent with { A = 255 };
+			if (MinimumContrast(accent) >= 4.5) return accent;
+			var black = new AppearanceColor(0, 0, 0);
+			var white = new AppearanceColor(255, 255, 255);
+			var target = MinimumContrast(black) >= MinimumContrast(white) ? black : white;
+			// Keep the accent hue while finding a shade readable on the mapped text surfaces.
+			for (var step = 1; step <= 255; step++)
+			{
+				byte Mix(byte channel, byte end) => (byte)Math.Round(channel + (end - channel) * step / 255d);
+				var shade = new AppearanceColor(Mix(accent.R, target.R), Mix(accent.G, target.G), Mix(accent.B, target.B));
+				if (MinimumContrast(shade) >= 4.5) return shade;
+			}
+			return target;
 		}
 
 		public static AppearanceColor ContrastForeground(AppearanceColor color)

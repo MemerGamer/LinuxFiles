@@ -65,6 +65,7 @@ namespace Files.App
 				{
 					Ioc.Default.GetRequiredService<IAppearanceSettingsService>().PropertyChanged -= _appearanceChanged;
 					Ioc.Default.GetRequiredService<ISystemAppearanceService>().Changed -= _systemAppearanceChanged;
+					X11AppearanceSupport.Changed -= _systemAppearanceChanged;
 					_linuxChrome?.Dispose(); _linuxChrome = null;
 				};
 
@@ -77,6 +78,7 @@ namespace Files.App
 				appearance.PropertyChanged += _appearanceChanged;
 				_systemAppearanceChanged = (_, _) => DispatcherQueue.TryEnqueue(ApplyLinuxWindowOpacity);
 				Ioc.Default.GetRequiredService<ISystemAppearanceService>().Changed += _systemAppearanceChanged;
+				X11AppearanceSupport.Changed += _systemAppearanceChanged;
 			}
 			ApplyLinuxWindowOpacity();
 			Ioc.Default.GetRequiredService<IResourcesService>().ApplyResources();

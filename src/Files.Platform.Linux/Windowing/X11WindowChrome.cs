@@ -21,6 +21,8 @@ namespace Files.Platform.Linux.Windowing
 		private nuint _lastClick;
 		private readonly nuint _window;
 		private readonly nuint _root;
+		private readonly nuint _compositorSelection;
+		private nuint _compositorOwner;
 		private readonly nuint _moveResize;
 		private readonly nuint _state;
 		private readonly nuint _maximizedHorizontal;
@@ -31,6 +33,7 @@ namespace Files.Platform.Linux.Windowing
 			_display = display;
 			_window = window;
 			_root = X11Native.XDefaultRootWindow(display);
+			_compositorSelection = Atom($"_NET_WM_CM_S{X11WindowChromeNative.XDefaultScreen(display)}");
 			_moveResize = Atom("_NET_WM_MOVERESIZE");
 			_state = Atom("_NET_WM_STATE");
 			_maximizedHorizontal = Atom("_NET_WM_STATE_MAXIMIZED_HORZ");
@@ -48,15 +51,13 @@ namespace Files.Platform.Linux.Windowing
 				return null;
 
 			var chrome = new X11WindowChrome(display, window);
-			var managerWindow = chrome.ReadWindowProperty(chrome._root, "_NET_SUPPORTING_WM_CHECK");
-			var manager = managerWindow == 0 ? null : chrome.ReadName(managerWindow);
-			var compositor = X11Native.XGetSelectionOwner(display, chrome.Atom("_NET_WM_CM_S0")) != 0;
-			X11AppearanceSupport.Current = X11AppearanceSupport.Detect(manager,
-				Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP"), compositor,
-				chrome.ContainsAtom(chrome._root, chrome.Atom("_NET_SUPPORTED"), chrome.Atom("_KDE_NET_WM_BLUR_BEHIND_REGION")));
+			X11AppearanceSupport.Current = chrome.ReadAppearanceSupport();
+			X11Native.XSelectInput(display, chrome._root, X11Native.PropertyChangeMask);
 			chrome.SupportsClientSideDecorations = chrome.ContainsAtom(chrome._root, chrome.Atom("_NET_SUPPORTED"), chrome._moveResize);
 			if (chrome.SupportsClientSideDecorations)
 				chrome.CreateGrips();
+			chrome._eventThread = new Thread(chrome.ReadPointerEvents) { IsBackground = true, Name = "X11 window chrome" };
+			chrome._eventThread.Start();
 			return chrome;
 		}
 
@@ -168,6 +169,27 @@ namespace Files.Platform.Linux.Windowing
 			}
 		}
 
+		private X11AppearanceSupport ReadAppearanceSupport()
+		{
+			// Keep the manager and compositor owner alive while reading their properties.
+			X11WindowChromeNative.XGrabServer(_display);
+			try
+			{
+				var managerWindow = ReadWindowProperty(_root, "_NET_SUPPORTING_WM_CHECK");
+				var manager = managerWindow == 0 ? null : ReadName(managerWindow);
+				_compositorOwner = X11Native.XGetSelectionOwner(_display, _compositorSelection);
+				if (_compositorOwner != 0) X11Native.XSelectInput(_display, _compositorOwner, X11Native.PropertyChangeMask);
+				var compositorName = _compositorOwner == 0 ? null : ReadName(_compositorOwner);
+				return X11AppearanceSupport.Detect(manager, Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP"),
+					_compositorOwner != 0, ContainsAtom(_root, Atom("_NET_SUPPORTED"), Atom("_KDE_NET_WM_BLUR_BEHIND_REGION")), compositorName);
+			}
+			finally
+			{
+				X11WindowChromeNative.XUngrabServer(_display);
+				X11Native.XFlush(_display);
+			}
+		}
+
 		private nuint ReadWindowProperty(nuint window, string property)
 		{
 			nuint type, count, remaining;
@@ -181,13 +203,22 @@ namespace Files.Platform.Linux.Windowing
 
 		private string? ReadName(nuint window)
 		{
-			nuint type, count, remaining;
-			int format;
-			byte* data;
-			var status = X11Native.XGetWindowProperty(_display, window, Atom("_NET_WM_NAME"), 0, 256, false,
-				Atom("UTF8_STRING"), &type, &format, &count, &remaining, &data);
-			try { return status == 0 && format == 8 && count <= 1024 && data != null ? Encoding.UTF8.GetString(data, (int)count) : null; }
-			finally { if (data != null) X11Native.XFree(data); }
+			foreach (var property in new[] { "_NET_WM_NAME", "WM_NAME" })
+			{
+				nuint type, count, remaining;
+				int format;
+				byte* data;
+				var utf8 = property == "_NET_WM_NAME";
+				var status = X11Native.XGetWindowProperty(_display, window, Atom(property), 0, 256, false,
+					Atom(utf8 ? "UTF8_STRING" : "STRING"), &type, &format, &count, &remaining, &data);
+				try
+				{
+					if (status == 0 && format == 8 && count > 0 && count <= 1024 && data != null)
+						return (utf8 ? Encoding.UTF8 : Encoding.Latin1).GetString(data, (int)count);
+				}
+				finally { if (data != null) X11Native.XFree(data); }
+			}
+			return null;
 		}
 
 		private void CreateGrips()
@@ -202,8 +233,6 @@ namespace Files.Platform.Linux.Windowing
 				X11WindowChromeNative.XDefineCursor(_display, _grips[i], cursor);
 				X11WindowChromeNative.XFreeCursor(_display, cursor);
 			}
-			_eventThread = new Thread(ReadPointerEvents) { IsBackground = true, Name = "X11 window chrome" };
-			_eventThread.Start();
 		}
 
 		public void SetRegions(int width, int height, int dragX, int dragWidth, int titleHeight, int border)
@@ -241,19 +270,35 @@ namespace Files.Platform.Linux.Windowing
 		private void ReadPointerEvents()
 		{
 			var fd = new PollFd { Fd = X11Native.XConnectionNumber(_display), Events = 1 };
+			var nextCompositorCheck = Environment.TickCount64 + 500;
 			while (true)
 			{
+				X11AppearanceSupport? support = null;
 				lock (_sync)
 				{
 					if (_disposed)
 						return;
+					var refresh = false;
 					while (X11Native.XPending(_display) > 0)
 					{
 						XEvent ev;
 						X11Native.XNextEvent(_display, &ev);
-						HandlePointer(*(XChromePointerEvent*)&ev);
+						if (ev.Type == X11Native.PropertyNotify &&
+							(ev.Property.Window == _root && (ev.Property.Atom == Atom("_NET_SUPPORTED") || ev.Property.Atom == Atom("_NET_SUPPORTING_WM_CHECK")) ||
+							 ev.Property.Window == _compositorOwner && (ev.Property.Atom == Atom("_NET_WM_NAME") || ev.Property.Atom == Atom("WM_NAME"))))
+							refresh = true;
+						else
+							HandlePointer(*(XChromePointerEvent*)&ev);
 					}
+					// Selection ownership has no core X11 change event; also watch when CSD is unavailable.
+					if (Environment.TickCount64 >= nextCompositorCheck)
+					{
+						refresh |= X11Native.XGetSelectionOwner(_display, _compositorSelection) != _compositorOwner;
+						nextCompositorCheck = Environment.TickCount64 + 500;
+					}
+					if (refresh) support = ReadAppearanceSupport();
 				}
+				if (support is not null) X11AppearanceSupport.Current = support;
 				X11Native.Poll(&fd, 1, 50);
 			}
 		}

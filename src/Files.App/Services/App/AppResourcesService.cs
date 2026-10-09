@@ -7,7 +7,7 @@ using Windows.UI;
 namespace Files.App.Services
 {
 	/// <inheritdoc cref="IResourcesService"/>
-	public sealed class ResourcesService : IResourcesService
+	public sealed partial class ResourcesService : IResourcesService
 	{
 		private IAppThemeModeService AppThemeModeService { get; } = Ioc.Default.GetRequiredService<IAppThemeModeService>();
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
@@ -18,6 +18,9 @@ namespace Files.App.Services
 		public ResourcesService()
 		{
 			UpdateAppearanceResources();
+#if HAS_UNO
+			InitializeLinuxAppearance();
+#endif
 			UserSettingsService.AppearanceSettingsService.PropertyChanged += AppearanceSettingsService_PropertyChanged;
 
 			SetScrollInertiaEnabled(UserSettingsService.GeneralSettingsService.EnableSmoothScrolling);
@@ -74,12 +77,13 @@ namespace Files.App.Services
 
 		private void AppearanceSettingsService_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{
-			if (e.PropertyName is nameof(IAppearanceSettingsService.UseAdwaitaTheme) or
+			if (e.PropertyName is nameof(IAppearanceSettingsService.ColourSource) or nameof(IAppearanceSettingsService.BackdropMode) or
+				nameof(IAppearanceSettingsService.BackgroundOpacity) or nameof(IAppearanceSettingsService.UseAdwaitaTheme) or
 				nameof(IAppearanceSettingsService.AppThemeBackgroundImageSource) or
 				nameof(IAppearanceSettingsService.AppThemeBackgroundImageOpacity))
 			{
-				if (UpdateAppearanceResources())
-					ApplyResources();
+				UpdateAppearanceResources();
+				ApplyResources();
 			}
 		}
 
@@ -95,12 +99,26 @@ namespace Files.App.Services
 		/// <inheritdoc/>
 		public void SetAppThemeBackgroundColor(Color appThemeBackgroundColor)
 		{
+#if HAS_UNO
+			if (OperatingSystem.IsLinux())
+			{
+				SetLinuxManualColor("App.Theme.BackgroundBrush", appThemeBackgroundColor);
+				return;
+			}
+#endif
 			Application.Current.Resources["App.Theme.BackgroundBrush"] = appThemeBackgroundColor;
 		}
 
 		/// <inheritdoc/>
 		public void SetAppThemeAddressBarBackgroundColor(Color appThemeAddressBarBackgroundColor)
 		{
+#if HAS_UNO
+			if (OperatingSystem.IsLinux())
+			{
+				SetLinuxManualColor("App.Theme.AddressBar.BackgroundBrush", appThemeAddressBarBackgroundColor);
+				return;
+			}
+#endif
 			Application.Current.Resources["App.Theme.AddressBar.BackgroundBrush"] = appThemeAddressBarBackgroundColor;
 
 			// Overrides the selected tab background to match the address bar
@@ -110,30 +128,65 @@ namespace Files.App.Services
 		/// <inheritdoc/>
 		public void SetAppThemeToolbarBackgroundColor(Color appThemeToolbarBackgroundColor)
 		{
+#if HAS_UNO
+			if (OperatingSystem.IsLinux())
+			{
+				SetLinuxManualColor("App.Theme.Toolbar.BackgroundBrush", appThemeToolbarBackgroundColor);
+				return;
+			}
+#endif
 			Application.Current.Resources["App.Theme.Toolbar.BackgroundBrush"] = appThemeToolbarBackgroundColor;
 		}
 
 		/// <inheritdoc/>
 		public void SetAppThemeSidebarBackgroundColor(Color appThemeSidebarBackgroundColor)
 		{
+#if HAS_UNO
+			if (OperatingSystem.IsLinux())
+			{
+				SetLinuxManualColor("App.Theme.Sidebar.BackgroundBrush", appThemeSidebarBackgroundColor);
+				return;
+			}
+#endif
 			Application.Current.Resources["App.Theme.Sidebar.BackgroundBrush"] = appThemeSidebarBackgroundColor;
 		}
 
 		/// <inheritdoc/>
 		public void SetAppThemeFileAreaBackgroundColor(Color appThemeFileAreaBackgroundColor)
 		{
+#if HAS_UNO
+			if (OperatingSystem.IsLinux())
+			{
+				SetLinuxManualColor("App.Theme.FileArea.BackgroundBrush", appThemeFileAreaBackgroundColor);
+				return;
+			}
+#endif
 			Application.Current.Resources["App.Theme.FileArea.BackgroundBrush"] = appThemeFileAreaBackgroundColor;
 		}
 
 		/// <inheritdoc/>
 		public void SetAppThemeFileAreaSecondaryBackgroundColor(Color appThemeFileAreaSecondaryBackgroundColor)
 		{
+#if HAS_UNO
+			if (OperatingSystem.IsLinux())
+			{
+				SetLinuxManualColor("App.Theme.FileArea.SecondaryBackgroundBrush", appThemeFileAreaSecondaryBackgroundColor);
+				return;
+			}
+#endif
 			Application.Current.Resources["App.Theme.FileArea.SecondaryBackgroundBrush"] = appThemeFileAreaSecondaryBackgroundColor;
 		}
 
 		/// <inheritdoc/>
 		public void SetAppThemeInfoPaneBackgroundColor(Color appThemeInfoPaneBackgroundColor)
 		{
+#if HAS_UNO
+			if (OperatingSystem.IsLinux())
+			{
+				SetLinuxManualColor("App.Theme.InfoPane.BackgroundBrush", appThemeInfoPaneBackgroundColor);
+				return;
+			}
+#endif
 			Application.Current.Resources["App.Theme.InfoPane.BackgroundBrush"] = appThemeInfoPaneBackgroundColor;
 		}
 
@@ -152,6 +205,9 @@ namespace Files.App.Services
 		/// <inheritdoc/>
 		public void ApplyResources()
 		{
+#if HAS_UNO
+			UpdateLinuxAppearanceResources();
+#endif
 			AppThemeModeService.ApplyResources();
 		}
 	}

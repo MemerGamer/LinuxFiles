@@ -103,15 +103,16 @@
 			</wctcontrols:SettingsCard>
 
 			<wctcontrols:SettingsCard
-				Description="{helpers:ResourceString Key=AdwaitaThemeDescription}"
-				Header="{helpers:ResourceString Key=AdwaitaTheme}"
-				Visibility="{x:Bind ViewModel.AdwaitaThemeVisibility}">
+				Description="{helpers:ResourceString Key=LinuxColourSourceDescription}"
+				Header="{helpers:ResourceString Key=LinuxColourSource}"
+				Visibility="{x:Bind ViewModel.LinuxAppearanceVisibility}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xE790;" />
 				</wctcontrols:SettingsCard.HeaderIcon>
-				<ToggleSwitch
-					AutomationProperties.Name="{helpers:ResourceString Key=AdwaitaTheme}"
-					IsOn="{x:Bind ViewModel.UseAdwaitaTheme, Mode=TwoWay}" />
+				<uc:ComboBoxEx
+					AutomationProperties.Name="{helpers:ResourceString Key=LinuxColourSource}"
+					ItemsSource="{x:Bind ViewModel.ColourSources}"
+					SelectedIndex="{x:Bind ViewModel.SelectedColourSource, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
 			<!--  Backdrop Material (no system backdrop on Linux)  -->
@@ -128,11 +129,30 @@
 					SelectedItem="{x:Bind ViewModel.SelectedBackdropMaterial, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
-			<!--  Window Opacity (needs a compositing window manager)  -->
+			<wctcontrols:SettingsCard
+				Visibility="{x:Bind ViewModel.LinuxAppearanceVisibility}"
+				Header="{helpers:ResourceString Key=LinuxBackdropMode}"
+				Description="{x:Bind ViewModel.BackdropDescription, Mode=OneWay}">
+				<uc:ComboBoxEx
+					AutomationProperties.Name="{helpers:ResourceString Key=LinuxBackdropMode}"
+					ItemsSource="{x:Bind ViewModel.BackdropModes}"
+					SelectedIndex="{x:Bind ViewModel.SelectedBackdropMode, Mode=TwoWay}" />
+			</wctcontrols:SettingsCard>
+			<wctcontrols:SettingsCard
+				Visibility="{x:Bind ViewModel.LinuxAppearanceVisibility}"
+				Header="{helpers:ResourceString Key=LinuxBackgroundOpacity}"
+				Description="{helpers:ResourceString Key=LinuxBackgroundOpacityDescription}">
+				<Slider Width="140" Minimum="0" Maximum="1" StepFrequency=".05"
+					AutomationProperties.Name="{helpers:ResourceString Key=LinuxBackgroundOpacity}"
+					IsEnabled="{x:Bind ViewModel.IsBackgroundOpacityEnabled, Mode=OneWay}"
+					Value="{x:Bind ViewModel.BackgroundOpacity, Mode=TwoWay}" />
+			</wctcontrols:SettingsCard>
+
+			<!--  Whole-window opacity  -->
 			<wctcontrols:SettingsCard
 				x:Name="WindowOpacityCard"
 				x:Load="{x:Bind ViewModel.IsWindowOpacitySupported}"
-				Description="{helpers:ResourceString Key=WindowOpacityDescription}"
+				Description="{x:Bind ViewModel.WindowOpacityDescription, Mode=OneWay}"
 				Header="{helpers:ResourceString Key=WindowOpacity}">
 				<wctcontrols:SettingsCard.HeaderIcon>
 					<FontIcon Glyph="&#xEF1F;" />
@@ -141,6 +161,7 @@
 					Width="140"
 					HorizontalAlignment="Right"
 					AutomationProperties.Name="{helpers:ResourceString Key=WindowOpacity}"
+					IsEnabled="{x:Bind ViewModel.IsWindowOpacityEnabled, Mode=OneWay}"
 					IsThumbToolTipEnabled="False"
 					Maximum="1"
 					Minimum=".2"

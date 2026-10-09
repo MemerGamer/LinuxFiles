@@ -1,6 +1,7 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Appearance;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 
@@ -31,6 +32,10 @@ namespace Files.App.Data.Contracts
 		/// Gets or sets whether Linux uses the Adwaita appearance resources.
 		/// </summary>
 		bool UseAdwaitaTheme { get; set; }
+
+		ColourSource ColourSource { get; set; }
+		BackdropMode BackdropMode { get; set; }
+		float BackgroundOpacity { get; set; }
 
 		/// <summary>
 		/// Gets or sets a value for the app theme background color.

@@ -5072,4 +5072,58 @@
   <data name="WindowOpacityDescription" xml:space="preserve">
     <value>Makes the whole window see-through. Requires a compositing window manager.</value>
   </data>
+  <data name="LinuxColourFiles" xml:space="preserve">
+    <value>Files</value>
+  </data>
+  <data name="LinuxColourSystem" xml:space="preserve">
+    <value>System (GTK/portal)</value>
+  </data>
+  <data name="LinuxColourSource" xml:space="preserve">
+    <value>Colour source</value>
+  </data>
+  <data name="LinuxColourSourceDescription" xml:space="preserve">
+    <value>Use Files colours, Adwaita, or available system colours. Missing GTK colours use the app palette. Your light/dark and custom colour choices are preserved.</value>
+  </data>
+  <data name="LinuxBackdropMode" xml:space="preserve">
+    <value>Window background</value>
+  </data>
+  <data name="LinuxBackdropSolid" xml:space="preserve">
+    <value>Solid</value>
+  </data>
+  <data name="LinuxBackdropTransparent" xml:space="preserve">
+    <value>Transparent</value>
+  </data>
+  <data name="LinuxBackdropBlur" xml:space="preserve">
+    <value>Blur</value>
+  </data>
+  <data name="LinuxBackdropDescription" xml:space="preserve">
+    <value>A translucent background keeps text and icons opaque. Blur requires the KWin X11 blur effect. Renderer support may vary.</value>
+  </data>
+  <data name="LinuxBackdropSolidDescription" xml:space="preserve">
+    <value>Use an opaque background. Background transparency and KWin blur depend on the compositor.</value>
+  </data>
+  <data name="LinuxBackdropFallback" xml:space="preserve">
+    <value>This compositor or bridge does not advertise the requested effect, or high contrast is enabled. Using a solid background.</value>
+  </data>
+  <data name="LinuxBackgroundOpacity" xml:space="preserve">
+    <value>Background opacity</value>
+  </data>
+  <data name="LinuxBackgroundOpacityDescription" xml:space="preserve">
+    <value>Opacity of the background tint in Transparent or Blur mode. Text, icons and popups stay opaque.</value>
+  </data>
+  <data name="LinuxOpacitySatellite" xml:space="preserve">
+    <value>xwayland-satellite does not forward whole-window opacity. This control is unavailable.</value>
+  </data>
+  <data name="LinuxOpacityUnknown" xml:space="preserve">
+    <value>Whole-window opacity support is unknown for this compositor or bridge. This control is unavailable.</value>
+  </data>
+  <data name="LinuxOpacityNoCompositor" xml:space="preserve">
+    <value>No X11 compositing manager was detected. Whole-window opacity is unavailable.</value>
+  </data>
+  <data name="LinuxOpacitySupported" xml:space="preserve">
+    <value>Fades the entire window, including text and icons. Requires compositor support.</value>
+  </data>
+  <data name="LinuxOpacityHighContrast" xml:space="preserve">
+    <value>High contrast keeps the window opaque. Your opacity choice is retained.</value>
+  </data>
 </root>

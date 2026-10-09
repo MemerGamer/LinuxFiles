@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Appearance;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 
@@ -36,8 +37,30 @@ namespace Files.App.Services.Settings
 		/// <inheritdoc/>
 		public bool UseAdwaitaTheme
 		{
-			get => Get(false);
-			set => Set(value);
+			get => ColourSource == ColourSource.Adwaita;
+			set => ColourSource = value ? ColourSource.Adwaita : ColourSource.Files;
+		}
+
+		public ColourSource ColourSource
+		{
+			get => AppearancePreferences.MigrateColourSource(Get("", nameof(ColourSource)), Get(false, nameof(UseAdwaitaTheme)));
+			set
+			{
+				if (Set(value.ToString()))
+					OnPropertyChanged(nameof(UseAdwaitaTheme));
+			}
+		}
+
+		public BackdropMode BackdropMode
+		{
+			get => Enum.TryParse<BackdropMode>(Get("", nameof(BackdropMode)), out var mode) && Enum.IsDefined(mode) ? mode : BackdropMode.Solid;
+			set => Set(value.ToString());
+		}
+
+		public float BackgroundOpacity
+		{
+			get => AppearancePreferences.ClampOpacity(Get(0.85f), 0);
+			set => Set(AppearancePreferences.ClampOpacity(value, 0));
 		}
 
 		/// <inheritdoc/>
@@ -110,8 +133,8 @@ namespace Files.App.Services.Settings
 		/// <inheritdoc/>
 		public float WindowOpacity
 		{
-			get => Math.Clamp(Get(1f), 0.2f, 1f);
-			set => Set(Math.Clamp(value, 0.2f, 1f));
+			get => AppearancePreferences.ClampOpacity(Get(1f), 0.2f);
+			set => Set(AppearancePreferences.ClampOpacity(value, 0.2f));
 		}
 
 		/// <inheritdoc/>

@@ -48,6 +48,12 @@ namespace Files.Platform.Linux.Windowing
 				return null;
 
 			var chrome = new X11WindowChrome(display, window);
+			var managerWindow = chrome.ReadWindowProperty(chrome._root, "_NET_SUPPORTING_WM_CHECK");
+			var manager = managerWindow == 0 ? null : chrome.ReadName(managerWindow);
+			var compositor = X11Native.XGetSelectionOwner(display, chrome.Atom("_NET_WM_CM_S0")) != 0;
+			X11AppearanceSupport.Current = X11AppearanceSupport.Detect(manager,
+				Environment.GetEnvironmentVariable("XDG_CURRENT_DESKTOP"), compositor,
+				chrome.ContainsAtom(chrome._root, chrome.Atom("_NET_SUPPORTED"), chrome.Atom("_KDE_NET_WM_BLUR_BEHIND_REGION")));
 			chrome.SupportsClientSideDecorations = chrome.ContainsAtom(chrome._root, chrome.Atom("_NET_SUPPORTED"), chrome._moveResize);
 			if (chrome.SupportsClientSideDecorations)
 				chrome.CreateGrips();
@@ -143,6 +149,45 @@ namespace Files.Platform.Linux.Windowing
 				}
 				X11Native.XFlush(_display);
 			}
+		}
+
+		/// <summary>KWin's empty CARDINAL region requests blur behind the whole window.</summary>
+		public void SetBlur(bool enabled)
+		{
+			lock (_sync)
+			{
+				if (_disposed)
+					return;
+				var property = Atom("_KDE_NET_WM_BLUR_BEHIND_REGION");
+				if (enabled && X11AppearanceSupport.Current.Blur)
+					X11Native.XChangeProperty(_display, _window, property, Atom("CARDINAL"), 32,
+						X11Native.PropModeReplace, null, 0);
+				else
+					X11Native.XDeleteProperty(_display, _window, property);
+				X11Native.XFlush(_display);
+			}
+		}
+
+		private nuint ReadWindowProperty(nuint window, string property)
+		{
+			nuint type, count, remaining;
+			int format;
+			byte* data;
+			var status = X11Native.XGetWindowProperty(_display, window, Atom(property), 0, 1, false,
+				Atom("WINDOW"), &type, &format, &count, &remaining, &data);
+			try { return status == 0 && type == Atom("WINDOW") && format == 32 && count == 1 && data != null ? *(nuint*)data : 0; }
+			finally { if (data != null) X11Native.XFree(data); }
+		}
+
+		private string? ReadName(nuint window)
+		{
+			nuint type, count, remaining;
+			int format;
+			byte* data;
+			var status = X11Native.XGetWindowProperty(_display, window, Atom("_NET_WM_NAME"), 0, 256, false,
+				Atom("UTF8_STRING"), &type, &format, &count, &remaining, &data);
+			try { return status == 0 && format == 8 && count <= 1024 && data != null ? Encoding.UTF8.GetString(data, (int)count) : null; }
+			finally { if (data != null) X11Native.XFree(data); }
 		}
 
 		private void CreateGrips()

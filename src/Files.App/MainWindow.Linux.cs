@@ -3,6 +3,9 @@
 
 #if !WINDOWS
 using Files.Platform.Abstractions;
+using Files.Platform.Abstractions.Appearance;
+using Microsoft.UI;
+using Microsoft.UI.Xaml.Media;
 using Files.Platform.Linux.Windowing;
 using Files.Platform.Linux.Elevation;
 using Microsoft.UI.Windowing;
@@ -14,6 +17,8 @@ namespace Files.App
 	public sealed partial class MainWindow
 	{
 		private X11WindowChrome? _linuxChrome;
+		private PropertyChangedEventHandler? _appearanceChanged;
+		private EventHandler? _systemAppearanceChanged;
 		private bool _chromeEventsAttached;
 		private int _dragStart;
 		private int _titleHeight;
@@ -56,21 +61,39 @@ namespace Files.App
 					UpdateLinuxChromeRegions(_dragStart, _titleHeight);
 					LinuxChromeChanged?.Invoke(this, EventArgs.Empty);
 				};
-				Closed += (_, _) => { _linuxChrome?.Dispose(); _linuxChrome = null; };
+				Closed += (_, _) =>
+				{
+					Ioc.Default.GetRequiredService<IAppearanceSettingsService>().PropertyChanged -= _appearanceChanged;
+					Ioc.Default.GetRequiredService<ISystemAppearanceService>().Changed -= _systemAppearanceChanged;
+					_linuxChrome?.Dispose(); _linuxChrome = null;
+				};
 
 				var appearance = Ioc.Default.GetRequiredService<IAppearanceSettingsService>();
-				appearance.PropertyChanged += (_, e) =>
+				_appearanceChanged = (_, e) =>
 				{
-					if (e.PropertyName == nameof(IAppearanceSettingsService.WindowOpacity))
+					if (e.PropertyName is nameof(IAppearanceSettingsService.WindowOpacity) or nameof(IAppearanceSettingsService.BackdropMode) or nameof(IAppearanceSettingsService.BackgroundOpacity))
 						DispatcherQueue.TryEnqueue(ApplyLinuxWindowOpacity);
 				};
+				appearance.PropertyChanged += _appearanceChanged;
+				_systemAppearanceChanged = (_, _) => DispatcherQueue.TryEnqueue(ApplyLinuxWindowOpacity);
+				Ioc.Default.GetRequiredService<ISystemAppearanceService>().Changed += _systemAppearanceChanged;
 			}
 			ApplyLinuxWindowOpacity();
+			Ioc.Default.GetRequiredService<IResourcesService>().ApplyResources();
 			LinuxChromeChanged?.Invoke(this, EventArgs.Empty);
 		}
 
 		private void ApplyLinuxWindowOpacity()
-			=> _linuxChrome?.SetWindowOpacity(Ioc.Default.GetRequiredService<IAppearanceSettingsService>().WindowOpacity);
+		{
+			var appearance = Ioc.Default.GetRequiredService<IAppearanceSettingsService>();
+			var highContrast = Ioc.Default.GetRequiredService<ISystemAppearanceService>().Current.HighContrast == true;
+			var support = X11AppearanceSupport.Current;
+			_linuxChrome?.SetWindowOpacity(!highContrast && support.WindowOpacity == OpacitySupport.Supported ? appearance.WindowOpacity : 1);
+			var mode = support.Resolve(appearance.BackdropMode, highContrast);
+			Uno.UI.Xaml.WindowHelper.SetBackground(this, new SolidColorBrush(mode == BackdropMode.Solid ?
+				(appearance.AppThemeMode == "Dark" || appearance.AppThemeMode == "Default" && Files.Platform.Linux.Theme.LinuxColorScheme.IsDark ? Colors.Black : Colors.White) : Colors.Transparent));
+			_linuxChrome?.SetBlur(mode == BackdropMode.Blur);
+		}
 
 		public void SetClientSideDecorations(bool enabled)
 		{

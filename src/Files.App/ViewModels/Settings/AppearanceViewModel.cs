@@ -1,7 +1,11 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.Platform.Abstractions.Appearance;
 using CommunityToolkit.WinUI.Helpers;
+#if HAS_UNO
+using Files.Platform.Linux.Windowing;
+#endif
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using System.Windows.Input;
@@ -19,20 +23,55 @@ namespace Files.App.ViewModels.Settings
 		private readonly IUserSettingsService UserSettingsService;
 		private readonly IResourcesService ResourcesService;
 
-		public Visibility AdwaitaThemeVisibility => OperatingSystem.IsLinux() ? Visibility.Visible : Visibility.Collapsed;
-
-		public bool UseAdwaitaTheme
+		public Visibility LinuxAppearanceVisibility => OperatingSystem.IsLinux() ? Visibility.Visible : Visibility.Collapsed;
+		public List<string> ColourSources { get; } = [Strings.LinuxColourFiles.GetLocalizedResource(), Strings.AdwaitaTheme.GetLocalizedResource(), Strings.LinuxColourSystem.GetLocalizedResource()];
+		public List<string> BackdropModes { get; } = [Strings.LinuxBackdropSolid.GetLocalizedResource(), Strings.LinuxBackdropTransparent.GetLocalizedResource(), Strings.LinuxBackdropBlur.GetLocalizedResource()];
+		public int SelectedColourSource
 		{
-			get => UserSettingsService.AppearanceSettingsService.UseAdwaitaTheme;
+			get => (int)UserSettingsService.AppearanceSettingsService.ColourSource;
 			set
 			{
-				if (value != UseAdwaitaTheme)
-				{
-					UserSettingsService.AppearanceSettingsService.UseAdwaitaTheme = value;
-					OnPropertyChanged();
-				}
+				if (value < 0 || value >= ColourSources.Count) return;
+				UserSettingsService.AppearanceSettingsService.ColourSource = (ColourSource)value;
+				OnPropertyChanged();
 			}
 		}
+		public int SelectedBackdropMode
+		{
+			get => (int)UserSettingsService.AppearanceSettingsService.BackdropMode;
+			set
+			{
+				if (value < 0 || value >= BackdropModes.Count) return;
+				UserSettingsService.AppearanceSettingsService.BackdropMode = (BackdropMode)value;
+				OnPropertyChanged();
+				OnPropertyChanged(nameof(BackdropDescription));
+				OnPropertyChanged(nameof(IsBackgroundOpacityEnabled));
+			}
+		}
+		public float BackgroundOpacity
+		{
+			get => UserSettingsService.AppearanceSettingsService.BackgroundOpacity;
+			set
+			{
+				UserSettingsService.AppearanceSettingsService.BackgroundOpacity = value;
+				OnPropertyChanged();
+			}
+		}
+		public bool IsBackgroundOpacityEnabled
+		{
+			get
+			{
+#if HAS_UNO
+				var appearance = UserSettingsService.AppearanceSettingsService;
+				return X11AppearanceSupport.Current.Resolve(appearance.BackdropMode,
+					Ioc.Default.GetRequiredService<ISystemAppearanceService>().Current.HighContrast == true) != BackdropMode.Solid;
+#else
+				return false;
+#endif
+			}
+		}
+		public string BackdropDescription => (IsBackgroundOpacityEnabled ? Strings.LinuxBackdropDescription :
+			UserSettingsService.AppearanceSettingsService.BackdropMode == BackdropMode.Solid ? Strings.LinuxBackdropSolidDescription : Strings.LinuxBackdropFallback).GetLocalizedResource();
 
 		public List<string> Themes { get; private set; }
 		public Dictionary<BackdropMaterialType, string> BackdropMaterialTypes { get; private set; } = [];
@@ -57,6 +96,19 @@ namespace Files.App.ViewModels.Settings
 		{
 			UserSettingsService = userSettingsService;
 			ResourcesService = resourcesService;
+#if HAS_UNO
+			var weak = new WeakReference<AppearanceViewModel>(this);
+			Ioc.Default.GetRequiredService<ISystemAppearanceService>().Changed += (_, _) =>
+			{
+				if (weak.TryGetTarget(out var model)) MainWindow.Instance.DispatcherQueue.TryEnqueue(() =>
+				{
+					model.OnPropertyChanged(nameof(IsWindowOpacityEnabled));
+					model.OnPropertyChanged(nameof(WindowOpacityDescription));
+					model.OnPropertyChanged(nameof(IsBackgroundOpacityEnabled));
+					model.OnPropertyChanged(nameof(BackdropDescription));
+				});
+			};
+#endif
 			selectedThemeIndex = (int)Enum.Parse<ElementTheme>(AppThemeModeService.AppThemeMode.ToString());
 
 			Themes =
@@ -329,6 +381,37 @@ namespace Files.App.ViewModels.Settings
 		public bool IsBackdropMaterialSupported => !OperatingSystem.IsLinux();
 
 		public bool IsWindowOpacitySupported => OperatingSystem.IsLinux();
+		public bool IsWindowOpacityEnabled
+		{
+			get
+			{
+#if HAS_UNO
+				return X11AppearanceSupport.Current.WindowOpacity == OpacitySupport.Supported &&
+					Ioc.Default.GetRequiredService<ISystemAppearanceService>().Current.HighContrast != true;
+#else
+				return false;
+#endif
+			}
+		}
+		public string WindowOpacityDescription
+		{
+			get
+			{
+#if HAS_UNO
+				if (Ioc.Default.GetRequiredService<ISystemAppearanceService>().Current.HighContrast == true)
+					return Strings.LinuxOpacityHighContrast.GetLocalizedResource();
+				return (X11AppearanceSupport.Current.WindowOpacity switch
+				{
+					OpacitySupport.Satellite => Strings.LinuxOpacitySatellite,
+					OpacitySupport.NoCompositor => Strings.LinuxOpacityNoCompositor,
+					OpacitySupport.Unknown => Strings.LinuxOpacityUnknown,
+					_ => Strings.LinuxOpacitySupported,
+				}).GetLocalizedResource();
+#else
+				return Strings.WindowOpacityDescription.GetLocalizedResource();
+#endif
+			}
+		}
 
 		public float WindowOpacity
 		{

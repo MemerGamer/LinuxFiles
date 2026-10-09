@@ -30,7 +30,7 @@ Grab the assets from the [0.1.0-alpha2 release page](https://github.com/MemerGam
 yay -S linuxfiles-bin    # or: paru -S linuxfiles-bin
 ```
 
-This is the only format that also installs the polkit helper for the optional [root actions](#root-actions).
+This installs the polkit helper for optional [root actions](#root-actions); polkit and a session authentication agent are required.
 
 ### Nix / NixOS
 
@@ -39,7 +39,17 @@ nix run github:MemerGamer/LinuxFiles          # try it
 nix profile install github:MemerGamer/LinuxFiles
 ```
 
-The flake also exports `overlays.default` (adds `pkgs.linuxfiles`). It repackages the release tarball for x86_64-linux and does not include the polkit helper, and all [root actions](#root-actions) are off in this package.
+The flake exports `overlays.default` (adds `pkgs.linuxfiles`) and `nixosModules.default`. Plain `nix run`/profile installs keep all [root actions](#root-actions) disabled. NixOS administrators can import the module and opt in:
+
+```nix
+# Add inputs.linuxfiles.nixosModules.default to your NixOS modules.
+programs.linuxfiles = {
+  enable = true;
+  rootActions = true; # default: false
+};
+```
+
+This installs a patched helper, a matching polkit action and trusted deployment manifest, and enables the pkexec wrapper. A session authentication agent is required. The current alpha2 release pin predates this runtime support: root file operations need the next release containing it and updated flake hashes. See [Nix packaging details](../docs/linux-port/packaging.md#nix-flake).
 
 ### AppImage
 
@@ -49,6 +59,8 @@ chmod +x Files-x86_64.AppImage
 ./Files-x86_64.AppImage
 ```
 
+Root actions remain disabled in the AppImage. Administrators can separately [provision a matching native host helper](../docs/linux-port/packaging.md#companion-host-helper-opt-in-appimage--flatpak), but this alone does not enable AppImage elevation.
+
 ### Flatpak bundle
 
 ```sh
@@ -56,7 +68,7 @@ flatpak install --user Files-x86_64.flatpak
 flatpak run io.github.memergamer.LinuxFiles
 ```
 
-The bundle needs the `org.freedesktop.Platform//25.08` runtime; Flatpak offers to install it from Flathub.
+The bundle needs the `org.freedesktop.Platform//25.08` runtime; Flatpak offers to install it from Flathub. Root actions remain disabled. An optional [companion host-helper installer](../docs/linux-port/packaging.md#companion-host-helper-opt-in-appimage--flatpak) provisions the native host only; this bundle has no host-spawn bridge and keeps its sandbox permissions unchanged.
 
 ### Tarball
 
@@ -77,7 +89,7 @@ scripts/linux/install-local.sh --from /path/to/linux-x64
 
 ### Root actions
 
-Optional. **Open in terminal as root** works everywhere (it asks your terminal elevation tool: run0, sudo or pkexec). The polkit-authenticated Delete/Rename/Paste-as-root actions need the root helper, which only the AUR package installs; they are off in the AppImage and Flatpak. Start a root-mode window with:
+Optional. **Open in terminal as root** uses a trusted run0, sudo or pkexec in native packages that allow elevation. Polkit-authenticated Delete/Rename/Paste-as-root requires the installed trusted helper: AUR, an opted-in local tarball install, or the NixOS module with a release containing its runtime support. AppImage, Flatpak and plain `nix run` keep all root actions disabled. In a supported native installation, start a root-mode window with:
 
 ```sh
 files --root

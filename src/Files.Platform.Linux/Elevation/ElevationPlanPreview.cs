@@ -77,7 +77,7 @@ namespace Files.Platform.Linux.Elevation
 			foreach (var command in plan.Commands)
 			{
 				IReadOnlyList<string> arguments = command.Arguments;
-				if (command.Program == ElevationHelperProtocol.HelperPath && arguments.Count == 1)
+				if (System.IO.Path.GetFileName(command.Program) == "files-elevation-helper" && arguments.Count == 1)
 				{
 					try
 					{

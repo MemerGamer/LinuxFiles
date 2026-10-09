@@ -465,7 +465,7 @@
 						Style="{StaticResource App.ThemedIcons.StatusCenter}"
 						Visibility="{x:Bind OngoingTasksViewModel.ShowProgressRing, Converter={StaticResource VisibilityInvertConverter}, Mode=OneWay}" />
 
-					<!--  Uno renders ProgressRing as a red unsupported-control placeholder; the badge marks running work instead  -->
+					<!--  On Linux, Uno renders ProgressRing as an unsupported-control placeholder; use the badge instead  -->
 					<ProgressRing
 						x:Name="MedianOperationProgressRing"
 						Width="24"
@@ -474,7 +474,7 @@
 						VerticalAlignment="Center"
 						AutomationProperties.Name="{helpers:ResourceString Key=StatusCenterProgressRing}"
 						IsIndeterminate="False"
-						Visibility="Collapsed"
+						Visibility="{x:Bind GetProgressRingVisibility(OngoingTasksViewModel.ShowProgressRing), Mode=OneWay}"
 						Value="{x:Bind OngoingTasksViewModel.AverageOperationProgressValue, Mode=OneWay}" />
 
 					<InfoBadge

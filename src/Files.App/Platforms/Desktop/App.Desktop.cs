@@ -47,6 +47,7 @@ namespace Files.App
 
 				MainWindow.Instance.RestorePlacement(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.ILocalSettingsStore>());
 				MainWindow.Instance.Activate();
+				UiResponsivenessProbe.Start(UiDispatcher!);
 
 				MainWindow.Instance.Closed += Window_Closed;
 				MainWindow.Instance.Activated += Window_Activated;

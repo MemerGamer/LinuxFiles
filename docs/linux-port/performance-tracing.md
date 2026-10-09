@@ -37,6 +37,9 @@ message bodies, credentials, or process output are included.
 | `folder-enumeration` | Batch enumerator lifetime, including consumer time between batches. |
 | `folder-enumeration-batch` | Directory entries/metadata read on a worker, excluding consumer/UI rendering time. |
 
+With tracing enabled, a 10 ms dispatcher timer also writes `[files-ui] t=<unix ms> stall-ms=<n>` to stderr whenever the UI
+thread was blocked for more than 50 ms (see `investigations/ui-slowness.md`). It records timing only.
+
 `completed-or-unwound` means the scope ended, including exception/cancellation paths; it does not claim success.
 D-Bus records explicitly report `reply`/`fault`. Correlate caller logs to distinguish cancellations/timeouts.
 

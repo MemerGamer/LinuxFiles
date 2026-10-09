@@ -247,6 +247,7 @@
 
 					<CheckBox
 						x:Name="SelectionCheckbox"
+						Style="{StaticResource Files.SelectionCheckBoxStyle}"
 						Grid.RowSpan="2"
 						Grid.ColumnSpan="2"
 						Width="32"
@@ -373,6 +374,7 @@
 						<!--  Selection Check Box  -->
 						<CheckBox
 							x:Name="SelectionCheckbox"
+							Style="{StaticResource Files.SelectionCheckBoxStyle}"
 							Width="20"
 							MinWidth="0"
 							HorizontalAlignment="Center"
@@ -533,6 +535,7 @@
 
 							<CheckBox
 								x:Name="SelectionCheckbox"
+								Style="{StaticResource Files.SelectionCheckBoxStyle}"
 								Width="32"
 								MinWidth="0"
 								MinHeight="0"

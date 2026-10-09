@@ -135,6 +135,59 @@
 		</Grid>
 	</ControlTemplate>
 
+	<!--
+		Selection CheckBox of file items. Uno's default CheckBox template builds an AnimatedIcon (Lottie visual) per instance,
+		which was about a third of the time spent realizing item containers in software rendering; this one is a plain box and glyph.
+	-->
+	<ControlTemplate x:Key="Files.SelectionCheckBoxTemplate" TargetType="CheckBox">
+		<Grid x:Name="RootGrid" Background="Transparent">
+			<Border
+				x:Name="CheckBoxBorder"
+				Width="20"
+				Height="20"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				Background="{ThemeResource CheckBoxCheckBackgroundFillUnchecked}"
+				BorderBrush="{ThemeResource CheckBoxCheckBackgroundStrokeUnchecked}"
+				BorderThickness="1"
+				CornerRadius="4" />
+			<Path
+				x:Name="CheckGlyph"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				Data="M0,5 L4,9 L12,0"
+				IsHitTestVisible="False"
+				Opacity="0"
+				Stroke="{ThemeResource CheckBoxCheckGlyphForegroundChecked}"
+				StrokeEndLineCap="Round"
+				StrokeLineJoin="Round"
+				StrokeStartLineCap="Round"
+				StrokeThickness="1.5" />
+			<VisualStateManager.VisualStateGroups>
+				<VisualStateGroup x:Name="CheckStates">
+					<VisualState x:Name="Unchecked" />
+					<VisualState x:Name="Checked">
+						<VisualState.Setters>
+							<Setter Target="CheckBoxBorder.Background" Value="{ThemeResource CheckBoxCheckBackgroundFillChecked}" />
+							<Setter Target="CheckBoxBorder.BorderBrush" Value="{ThemeResource CheckBoxCheckBackgroundStrokeChecked}" />
+							<Setter Target="CheckGlyph.Opacity" Value="1" />
+						</VisualState.Setters>
+					</VisualState>
+					<VisualState x:Name="Indeterminate">
+						<VisualState.Setters>
+							<Setter Target="CheckBoxBorder.Background" Value="{ThemeResource CheckBoxCheckBackgroundFillChecked}" />
+							<Setter Target="CheckBoxBorder.BorderBrush" Value="{ThemeResource CheckBoxCheckBackgroundStrokeChecked}" />
+						</VisualState.Setters>
+					</VisualState>
+				</VisualStateGroup>
+			</VisualStateManager.VisualStateGroups>
+		</Grid>
+	</ControlTemplate>
+
+	<Style x:Key="Files.SelectionCheckBoxStyle" TargetType="CheckBox">
+		<Setter Property="Template" Value="{StaticResource Files.SelectionCheckBoxTemplate}" />
+	</Style>
+
 	<ResourceDictionary.ThemeDictionaries>
 		<!--  No Mica on Linux: the window backdrop is a solid fill equal to the Mica base colour, so the translucent Files layers on top keep their look  -->
 		<ResourceDictionary x:Key="Light">

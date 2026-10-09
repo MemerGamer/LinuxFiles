@@ -990,6 +990,7 @@
 										<!--  Selection Check Box  -->
 										<CheckBox
 											x:Name="SelectionCheckbox"
+											Style="{StaticResource Files.SelectionCheckBoxStyle}"
 											Width="20"
 											MinWidth="0"
 											HorizontalAlignment="Center"

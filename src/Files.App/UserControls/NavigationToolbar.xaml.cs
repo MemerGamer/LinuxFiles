@@ -51,6 +51,9 @@ namespace Files.App.UserControls
 
 		// Methods
 
+		private Visibility GetProgressRingVisibility(bool showProgressRing)
+			=> !OperatingSystem.IsLinux() && showProgressRing ? Visibility.Visible : Visibility.Collapsed;
+
 		private void SidebarPaneToggleButton_Click(object sender, RoutedEventArgs e)
 		{
 			var sidebarViewModel = Ioc.Default.GetRequiredService<SidebarViewModel>();

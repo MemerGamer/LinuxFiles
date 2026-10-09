@@ -97,6 +97,8 @@ namespace Files.App
 			var (renderingBackend, reason) = RenderingBackendSelector.Resolve(Environment.GetEnvironmentVariable, RenderingBackendSelector.HasGpuDevice);
 			Console.Error.WriteLine($"[Files] Rendering backend: {renderingBackend} ({reason ?? "default"})");
 
+			CursorSettingsResolver.ApplyToProcess();
+
 			var host = UnoPlatformHostBuilder.Create()
 				.App(() => new App())
 				.UseX11(x11 => x11.RenderingBackend(renderingBackend switch

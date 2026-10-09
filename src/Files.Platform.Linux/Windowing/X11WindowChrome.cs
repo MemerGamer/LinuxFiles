@@ -147,15 +147,23 @@ namespace Files.Platform.Linux.Windowing
 
 		private void CreateGrips()
 		{
-			uint[] cursors = [134, 138, 136, 96, 14, 16, 12, 70, 68];
+			(uint Shape, string Name)[] cursors =
+			[
+				(134, "top_left_corner"), (138, "top_side"), (136, "top_right_corner"), (96, "right_side"),
+				(14, "bottom_right_corner"), (16, "bottom_side"), (12, "bottom_left_corner"), (70, "left_side"),
+				(68, "left_ptr"),
+			];
 			for (var i = 0; i < _grips.Length; i++)
 			{
 				// InputOnly siblings above Uno's rendering window own the implicit pointer grab.
 				_grips[i] = X11WindowChromeNative.XCreateWindow(_display, _window, 0, 0, 1, 1, 0, 0, 2, 0, 0, 0);
 				X11Native.XSelectInput(_display, _grips[i], (1 << 2) | (1 << 3) | (1 << 6));
-				var cursor = X11WindowChromeNative.XCreateFontCursor(_display, cursors[i]);
-				X11WindowChromeNative.XDefineCursor(_display, _grips[i], cursor);
-				X11WindowChromeNative.XFreeCursor(_display, cursor);
+				var cursor = XCursorNative.LoadCursor(_display, cursors[i].Name, cursors[i].Shape);
+				if (cursor != 0)
+				{
+					X11WindowChromeNative.XDefineCursor(_display, _grips[i], cursor);
+					X11WindowChromeNative.XFreeCursor(_display, cursor);
+				}
 			}
 			_eventThread = new Thread(ReadPointerEvents) { IsBackground = true, Name = "X11 window chrome" };
 			_eventThread.Start();

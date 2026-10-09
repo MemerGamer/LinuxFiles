@@ -137,11 +137,32 @@ namespace Files.Platform.Tests.Theme
 			Assert.AreEqual(accent, map["AccentFillColorDefaultBrush"]);
 			Assert.AreEqual(accent, map["SystemAccentColor"]);
 			foreach (var key in new[] { "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush" })
-				foreach (var surface in new[] { "App.Theme.InfoPane.BackgroundBrush", "App.Theme.FileArea.BackgroundBrush" })
-					Assert.IsTrue(SystemAppearancePalette.ContrastRatio(map[key], map[surface]) >= 4.5, key + " on " + surface);
+				Assert.IsTrue(SystemAppearancePalette.ContrastRatio(map[key], map["App.Theme.FileArea.BackgroundBrush"]) >= 4.5, key);
+			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(map["App.Theme.InfoPane.AccentTextBrush"], map["App.Theme.InfoPane.BackgroundBrush"]) >= 4.5);
 			var explicitTheme = SystemAppearancePalette.Map(new(dark, false, accent, named, dark), !dark);
 			var fallback = !dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(243, 243, 243);
 			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(explicitTheme["AccentTextFillColorPrimaryBrush"], fallback) >= 4.5);
+		}
+
+		[TestMethod]
+		[DataRow(false, 255, 240, 0, 48, 243)]
+		[DataRow(true, 10, 20, 80, 243, 32)]
+		public void Palette_UsesFinalCustomBackgroundsAndSeparateInfoPaneAccent(bool dark, int red, int green, int blue, int info, int view)
+		{
+			var accent = new AppearanceColor((byte)red, (byte)green, (byte)blue);
+			var infoBackground = new AppearanceColor((byte)info, (byte)info, (byte)info);
+			var viewBackground = new AppearanceColor((byte)view, (byte)view, (byte)view);
+			var colors = new Dictionary<string, AppearanceColor>(SystemAppearancePalette.Map(new(dark, false, accent, new Dictionary<string, AppearanceColor>()), dark));
+			colors["App.Theme.InfoPane.BackgroundBrush"] = infoBackground;
+			colors["App.Theme.FileArea.BackgroundBrush"] = viewBackground;
+			foreach (var (key, color) in SystemAppearancePalette.MapAccentText(accent, dark, colors)) colors[key] = color;
+
+			Assert.AreEqual(accent, colors["App.Theme.InfoPane.AccentTextBrush"]);
+			Assert.AreEqual(accent, colors["AccentFillColorDefaultBrush"]);
+			Assert.AreNotEqual(colors["App.Theme.InfoPane.AccentTextBrush"], colors["AccentTextFillColorPrimaryBrush"]);
+			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(colors["App.Theme.InfoPane.AccentTextBrush"], infoBackground) >= 4.5);
+			foreach (var key in new[] { "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush" })
+				Assert.IsTrue(SystemAppearancePalette.ContrastRatio(colors[key], viewBackground) >= 4.5, key);
 		}
 
 		[TestMethod]

@@ -75,6 +75,7 @@
 			<SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#1A5FB4" />
 			<SolidColorBrush x:Key="AccentFillColorDisabledBrush" Color="#66000006" />
 			<SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#0461BE" />
+			<StaticResource x:Key="App.Theme.InfoPane.AccentTextBrush" ResourceKey="AccentTextFillColorPrimaryBrush" />
 			<SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#0461BE" />
 			<SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFF" />
 			<SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#E6FFFFFF" />
@@ -232,6 +233,7 @@
 			<SolidColorBrush x:Key="AccentFillColorTertiaryBrush" Color="#1A5FB4" />
 			<SolidColorBrush x:Key="AccentFillColorDisabledBrush" Color="#66FFFFFF" />
 			<SolidColorBrush x:Key="AccentTextFillColorPrimaryBrush" Color="#81D0FF" />
+			<StaticResource x:Key="App.Theme.InfoPane.AccentTextBrush" ResourceKey="AccentTextFillColorPrimaryBrush" />
 			<SolidColorBrush x:Key="AccentTextFillColorSecondaryBrush" Color="#81D0FF" />
 			<SolidColorBrush x:Key="TextOnAccentFillColorPrimaryBrush" Color="#FFFFFF" />
 			<SolidColorBrush x:Key="TextOnAccentFillColorSecondaryBrush" Color="#E6FFFFFF" />

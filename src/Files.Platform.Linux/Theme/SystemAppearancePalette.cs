@@ -42,15 +42,7 @@ namespace Files.Platform.Linux.Theme
 			if (accent is { } a)
 			{
 				foreach (var key in new[] { "SystemAccentColor", "SystemAccentColorDark1", "SystemAccentColorDark2", "SystemAccentColorDark3", "SystemAccentColorLight1", "SystemAccentColorLight2", "SystemAccentColorLight3", "App.Theme.FillColorAttention", "AccentFillColorDefaultBrush", "AccentFillColorSecondaryBrush", "AccentFillColorTertiaryBrush", "App.Theme.FillColorAttentionBrush", "Files.Item.AccentBrush", "ToolbarToggleButtonBackgroundChecked", "ToolbarToggleButtonBackgroundCheckedPointerOver", "ToolbarToggleButtonBackgroundCheckedPressed" }) result[key] = a;
-				var fallback = dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(243, 243, 243);
-				var surfaces = new[] { "App.Theme.InfoPane.BackgroundBrush", "App.Theme.FileArea.BackgroundBrush",
-					"App.Theme.BackgroundBrush", "CardBackgroundFillColorDefaultBrush" };
-				var backgrounds = new AppearanceColor[surfaces.Length];
-				for (var i = 0; i < surfaces.Length; i++)
-					backgrounds[i] = result.TryGetValue(surfaces[i], out var surface) ? surface : fallback;
-				var accentText = ReadableAccentText(a, backgrounds);
-				result["AccentTextFillColorPrimaryBrush"] = accentText;
-				result["AccentTextFillColorSecondaryBrush"] = accentText;
+				foreach (var (key, color) in MapAccentText(a, dark, result)) result[key] = color;
 				var foreground = ContrastForeground(a);
 				foreach (var role in new[] { "accent_fg_color", "theme_selected_fg_color" })
 					if (appearance.NamedColors.TryGetValue(role, out var f) && ContrastRatio(a, f) >= 4.5) { foreground = f; break; }
@@ -66,12 +58,31 @@ namespace Files.Platform.Linux.Theme
 			return result;
 		}
 
+		public static IReadOnlyDictionary<string, AppearanceColor> MapAccentText(AppearanceColor accent, bool dark, IReadOnlyDictionary<string, AppearanceColor> backgrounds)
+		{
+			var fallback = dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(243, 243, 243);
+			static AppearanceColor Composite(AppearanceColor color, AppearanceColor background)
+			{
+				byte Blend(byte channel, byte under) => (byte)Math.Round((channel * color.A + under * (255 - color.A)) / 255d);
+				return new(Blend(color.R, background.R), Blend(color.G, background.G), Blend(color.B, background.B));
+			}
+			var window = backgrounds.TryGetValue("App.Theme.BackgroundBrush", out var color) ? Composite(color, fallback) : fallback;
+			AppearanceColor Surface(string key) => backgrounds.TryGetValue(key, out var surface) ? Composite(surface, window) : window;
+			var accentText = ReadableAccentText(accent, [window, Surface("App.Theme.FileArea.BackgroundBrush"), Surface("CardBackgroundFillColorDefaultBrush")]);
+			return new Dictionary<string, AppearanceColor>(StringComparer.Ordinal)
+			{
+				["AccentTextFillColorPrimaryBrush"] = accentText,
+				["AccentTextFillColorSecondaryBrush"] = accentText,
+				["App.Theme.InfoPane.AccentTextBrush"] = ReadableAccentText(accent, [Surface("App.Theme.InfoPane.BackgroundBrush")]),
+			};
+		}
+
 		public static IReadOnlyDictionary<string, AppearanceColor> MapHighContrast()
 		{
 			var result = new Dictionary<string, AppearanceColor>(StringComparer.Ordinal);
 			var white = new AppearanceColor(255, 255, 255);
 			var black = new AppearanceColor(0, 0, 0);
-			foreach (var key in new[] { "TextFillColorPrimaryBrush", "TextFillColorSecondaryBrush", "TextFillColorTertiaryBrush", "TextFillColorDisabledBrush", "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush" }) result[key] = white;
+			foreach (var key in new[] { "TextFillColorPrimaryBrush", "TextFillColorSecondaryBrush", "TextFillColorTertiaryBrush", "TextFillColorDisabledBrush", "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush", "App.Theme.InfoPane.AccentTextBrush" }) result[key] = white;
 			foreach (var key in new[] { "Files.Linux.FlyoutSurfaceBrush", "MenuFlyoutPresenterBackground", "FlyoutBackgroundThemeBrush", "ContentDialogBackground", "CardBackgroundFillColorDefaultBrush", "CardBackgroundFillColorSecondaryBrush", "App.Theme.CardBackgroundFillColorTertiaryBrush", "LayerFillColorDefaultBrush", "LayerOnMicaBaseAltFillColorDefaultBrush", "ControlFillColorDefaultBrush" }) result[key] = black;
 			foreach (var control in new[] { "Button", "ComboBox", "ToolbarButton", "ToggleButton", "ToolbarToggleButton" })
 			{
@@ -103,7 +114,7 @@ namespace Files.Platform.Linux.Theme
 			var black = new AppearanceColor(0, 0, 0);
 			var white = new AppearanceColor(255, 255, 255);
 			var target = MinimumContrast(black) >= MinimumContrast(white) ? black : white;
-			// Keep the accent hue while finding a shade readable on the mapped text surfaces.
+			// Keep the accent hue while finding a shade readable on the resolved text surfaces.
 			for (var step = 1; step <= 255; step++)
 			{
 				byte Mix(byte channel, byte end) => (byte)Math.Round(channel + (end - channel) * step / 255d);

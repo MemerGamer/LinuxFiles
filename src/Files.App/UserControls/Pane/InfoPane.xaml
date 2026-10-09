@@ -256,7 +256,7 @@
 				<TextBlock
 					x:Name="UsedSpaceTextBlock"
 					HorizontalAlignment="Center"
-					Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+					Foreground="{ThemeResource App.Theme.InfoPane.AccentTextBrush}"
 					IsTextSelectionEnabled="True"
 					Style="{ThemeResource SubtitleTextBlockStyle}"
 					Text="{x:Bind ViewModel.SelectedDriveItem.UsedSpaceText, Mode=OneWay}"

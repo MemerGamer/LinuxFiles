@@ -104,6 +104,23 @@ namespace Files.App.Services
 					// MainPage supplies the single alpha plane; overlapping region fills must not compound it.
 					foreach (var key in SurfaceKeys.Skip(1)) colors[key] = Colors.Transparent;
 				}
+				if (!highContrast && settings.ColourSource == ColourSource.System && colors.TryGetValue("SystemAccentColor", out var accent))
+				{
+					var backgrounds = new Dictionary<string, AppearanceColor>();
+					foreach (var key in new[] { "App.Theme.BackgroundBrush", "App.Theme.FileArea.BackgroundBrush", "App.Theme.InfoPane.BackgroundBrush", "CardBackgroundFillColorDefaultBrush" })
+					{
+						if (!colors.TryGetValue(key, out var background))
+						{
+							var original = FindResource(resources, dark ? "Dark" : "Light", key);
+							if (original is SolidColorBrush brush) background = brush.Color;
+							else if (original is Color c) background = c;
+							else continue;
+						}
+						backgrounds[key] = new(background.R, background.G, background.B, background.A);
+					}
+					foreach (var (key, color) in SystemAppearancePalette.MapAccentText(new(accent.R, accent.G, accent.B, accent.A), dark, backgrounds))
+						colors[key] = ToColor(color);
+				}
 				foreach (var (key, color) in colors)
 				{
 					resources[key] = key.StartsWith("SystemAccentColor", StringComparison.Ordinal) || key == "App.Theme.FillColorAttention"

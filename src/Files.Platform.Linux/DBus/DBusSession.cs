@@ -17,6 +17,7 @@ namespace Files.Platform.Linux.DBus
 		/// </summary>
 		public static async Task<DBusConnection?> TryConnectAsync(string? address, TimeSpan timeout)
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("dbus-connect");
 			address ??= DBusAddress.Session;
 			if (string.IsNullOrEmpty(address))
 				return null;

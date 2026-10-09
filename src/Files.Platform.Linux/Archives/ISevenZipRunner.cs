@@ -80,7 +80,7 @@ namespace Files.Platform.Linux.Archives
 			foreach (var argument in arguments)
 				startInfo.ArgumentList.Add(argument);
 
-			using var process = Process.Start(startInfo) ?? throw new InvalidOperationException("The 7-Zip process could not be started.");
+			using var process = Files.Platform.Linux.Launching.TracedProcess.Start(startInfo) ?? throw new InvalidOperationException("The 7-Zip process could not be started.");
 			process.StandardInput.Close();
 
 			var output = new StringBuilder();

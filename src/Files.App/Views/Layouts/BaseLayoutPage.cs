@@ -718,6 +718,9 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyout))]
 		private async void ItemContextFlyout_Opening(object? sender, object e)
 		{
+#if !WINDOWS
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
+#endif
 			try
 			{
 				var parentShellPage = await EnsurePageIsCurrentAsync();
@@ -994,6 +997,9 @@ namespace Files.App.Views.Layouts
 
 		private async void BaseContextFlyout_Opening(object? sender, object e)
 		{
+#if !WINDOWS
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
+#endif
 			try
 			{
 				var parentShellPage = await EnsurePageIsCurrentAsync();

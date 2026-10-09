@@ -199,7 +199,7 @@ namespace Files.Platform.Linux.Instance
 				// Somebody else owns the name: hand over the command line
 				var message = BuildLaunch(bus, path, launchRequest);
 
-				await bus.CallMethodAsync(message).WaitAsync(ForwardTimeout, cancellationToken).ConfigureAwait(false);
+				await bus.CallTracedAsync("dbus.instance", message).WaitAsync(ForwardTimeout, cancellationToken).ConfigureAwait(false);
 				bus.Dispose();
 				return false;
 			}

@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using Files.Platform.Abstractions.Watching;
 using Files.Platform.Linux.Watching;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Collections.Concurrent;
 
@@ -57,6 +58,30 @@ namespace Files.Platform.Tests.Watching
 					await Task.Delay(20);
 				}
 			}
+		}
+
+		private sealed class PollingLogger : ILogger<LinuxFolderWatcherFactory>
+		{
+			public List<string> Messages { get; } = [];
+			public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+			public bool IsEnabled(LogLevel level) => true;
+			public void Log<TState>(LogLevel level, EventId id, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+				=> Messages.Add(formatter(state, exception));
+		}
+
+		[TestMethod]
+		public void Polling_LogsOnceAcrossRestartsWithoutExposingFolderPath()
+		{
+			var logger = new PollingLogger();
+			using var watcher = new LinuxFolderWatcherFactory(logger).Create(_root, new FolderWatcherOptions { ForcePolling = true });
+			watcher.Start();
+			Assert.IsTrue(watcher.IsPolling);
+			watcher.Stop();
+			watcher.Start();
+			Assert.AreEqual(1, logger.Messages.Count);
+			StringAssert.Contains(logger.Messages[0], "fallback polling");
+			StringAssert.Contains(logger.Messages[0], "2000");
+			Assert.IsFalse(logger.Messages[0].Contains(_root, StringComparison.Ordinal));
 		}
 
 		[TestMethod]

@@ -42,9 +42,14 @@ namespace Files.App.Helpers
 			var registry = Ioc.Default.GetRequiredService<IApplicationRegistry>();
 			var launcher = Ioc.Default.GetRequiredService<ILauncherService>();
 
-			var mime = await mimeTypes.GetMimeTypeAsync(path, cancellationToken);
-			var apps = await registry.GetApplicationsForMimeTypeAsync(mime, cancellationToken);
-			var defaultApp = await registry.GetDefaultApplicationAsync(mime, cancellationToken);
+			var (apps, defaultApp) = await Task.Run(async () =>
+			{
+				using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("open-with-load", false);
+				var mime = await mimeTypes.GetMimeTypeAsync(path, cancellationToken).ConfigureAwait(false);
+				var applications = await registry.GetApplicationsForMimeTypeAsync(mime, cancellationToken).ConfigureAwait(false);
+				var preferred = await registry.GetDefaultApplicationAsync(mime, cancellationToken).ConfigureAwait(false);
+				return (applications, preferred);
+			}, cancellationToken);
 			var items = model.Items ??= [];
 
 			foreach (var app in apps)

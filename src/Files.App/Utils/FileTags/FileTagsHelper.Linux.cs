@@ -35,29 +35,38 @@ namespace Files.App.Utils.FileTags
 			return GetDbInstance().GetTags(filePath, null);
 		}
 
+		private static readonly object writeGate = new();
+		private static Task pendingWrite = Task.CompletedTask;
+
 		public static Task<bool> WriteFileTagAsync(string filePath, string[] tag, CancellationToken cancellationToken = default)
 		{
-			try
+			if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
+			var tags = (string[])tag.Clone();
+			var store = Ioc.Default.GetService<IFileTagsStore>();
+			var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
+			var names = settings.GetTagsByIds(tags)?.Select(x => x.Name).ToArray() ?? [];
+			lock (writeGate)
 			{
-				cancellationToken.ThrowIfCancellationRequested();
-
-				GetDbInstance().SetTags(filePath, null, tag);
-
-				// Best effort: the database already holds the tags, so a file system without xattr support is not an error
-				var store = Ioc.Default.GetService<IFileTagsStore>();
-				if (store is not null)
+				var previous = pendingWrite;
+				var write = Task.Run(async () =>
 				{
-					var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
-					var names = settings.GetTagsByIds(tag)?.Select(x => x.Name).ToArray() ?? [];
-					if (!store.WriteTags(filePath, names))
-						App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
-				}
-
-				return Task.FromResult(true);
-			}
-			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-			{
-				return Task.FromResult(false);
+					await previous.ConfigureAwait(false);
+					if (cancellationToken.IsCancellationRequested) return false;
+					try
+					{
+						GetDbInstance().SetTags(filePath, null, tags);
+						if (store is not null && !store.WriteTags(filePath, names))
+							App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
+						return true;
+					}
+					catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+					{
+						App.Logger?.LogWarning(ex, "Could not write file tags.");
+						return false;
+					}
+				});
+				pendingWrite = write;
+				return write;
 			}
 		}
 

@@ -37,6 +37,7 @@ namespace Files.Platform.Linux.Enumeration
 			FileSystemEnumerationOptions? options = null,
 			[EnumeratorCancellation] CancellationToken cancellationToken = default)
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("folder-enumeration");
 			ArgumentException.ThrowIfNullOrEmpty(folderPath);
 			options ??= new();
 			var batchSize = Math.Max(1, options.BatchSize);
@@ -65,6 +66,7 @@ namespace Files.Platform.Linux.Enumeration
 
 		private static List<FileSystemEntryInfo> ReadBatch(IEnumerator<FileSystemEntryInfo> enumerator, int batchSize, CancellationToken cancellationToken)
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("folder-enumeration-batch", false);
 			var batch = new List<FileSystemEntryInfo>(batchSize);
 			while (batch.Count < batchSize && enumerator.MoveNext())
 			{

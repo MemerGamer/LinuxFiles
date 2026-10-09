@@ -576,7 +576,11 @@ namespace Files.App.Views.Shells
 		public async Task RefreshIfNoWatcherExistsAsync()
 		{
 			var shellViewModel = this.GetRequiredShellViewModel();
-			if (shellViewModel.HasNoWatcher)
+			if (shellViewModel.HasNoWatcher
+#if !WINDOWS
+				|| shellViewModel.IsLinuxWatcherPolling
+#endif
+				)
 				await Refresh_Click();
 		}
 

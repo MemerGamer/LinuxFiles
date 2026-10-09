@@ -3,6 +3,9 @@
 
 #if !WINDOWS
 using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
@@ -17,19 +20,28 @@ namespace Files.App.Utils.FileTags
 	{
 		private readonly object _gate = new();
 		private Dictionary<string, TaggedFile>? _entries;
+		private bool _dirty;
+		private readonly string? _databasePath;
 
-		private static string DatabasePath
-			=> Path.Combine(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IAppDataPaths>().DataDirectory, "filetags.json");
+		public FileTagsDatabase() { }
+
+		internal FileTagsDatabase(string databasePath) => _databasePath = databasePath;
+
+		private string DatabasePath
+			=> _databasePath ?? Path.Combine(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IAppDataPaths>().DataDirectory, "filetags.json");
 
 		public void SetTags(string filePath, ulong? frn, string[] tags)
 		{
 			lock (_gate)
 			{
 				var entries = Load();
-				if (tags is [])
-					entries.Remove(filePath);
-				else
-					entries[filePath] = new TaggedFile { FilePath = filePath, Tags = tags };
+				var changed = tags.Length == 0
+					? entries.Remove(filePath)
+					: !entries.TryGetValue(filePath, out var current) || !current.Tags.SequenceEqual(tags, StringComparer.Ordinal);
+				if (!changed && !_dirty)
+					return;
+				if (tags.Length > 0 && changed)
+					entries[filePath] = new TaggedFile { FilePath = filePath, Tags = (string[])tags.Clone() };
 
 				Save(entries);
 			}
@@ -37,7 +49,7 @@ namespace Files.App.Utils.FileTags
 
 		public void UpdateTag(string oldFilePath, ulong? frn, string? newFilePath)
 		{
-			if (newFilePath is null)
+			if (newFilePath is null || string.Equals(oldFilePath, newFilePath, StringComparison.Ordinal))
 				return;
 
 			lock (_gate)
@@ -63,7 +75,7 @@ namespace Files.App.Utils.FileTags
 				return [];
 
 			lock (_gate)
-				return Load().TryGetValue(filePath, out var tagged) ? tagged.Tags : [];
+				return Load().TryGetValue(filePath, out var tagged) ? (string[])tagged.Tags.Clone() : [];
 		}
 
 		public IEnumerable<TaggedFile> GetAll()
@@ -91,6 +103,12 @@ namespace Files.App.Utils.FileTags
 					if (!string.IsNullOrEmpty(tag.FilePath) && tag.Tags.Length > 0)
 						entries[tag.FilePath] = tag;
 				}
+
+				var current = Load();
+				if (!_dirty && current.Count == entries.Count && entries.All(pair =>
+					current.TryGetValue(pair.Key, out var existing) && existing.Frn == pair.Value.Frn &&
+					existing.Tags.SequenceEqual(pair.Value.Tags, StringComparer.Ordinal)))
+					return;
 
 				Save(entries);
 			}
@@ -131,7 +149,9 @@ namespace Files.App.Utils.FileTags
 
 		private void Save(Dictionary<string, TaggedFile> entries)
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("tag-db-save");
 			_entries = entries;
+			_dirty = true;
 
 			string? temp = null;
 			try
@@ -142,6 +162,7 @@ namespace Files.App.Utils.FileTags
 				File.WriteAllText(temp, JsonSerializer.Serialize(entries.Values.ToList(), AppJsonSerializerContext.Default.ListTaggedFile));
 				File.Move(temp, path, overwrite: true);
 				temp = null;
+				_dirty = false;
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{

@@ -56,6 +56,11 @@
         <Compile Include="../../src/Files.App/Utils/Serialization/Implementation/*.cs" LinkBase="Settings/Implementation" />
     </ItemGroup>
     <ItemGroup>
+        <Compile Include="../../src/Files.App/Utils/FileTags/FileTagsDatabase.Linux.cs" Link="Tags/FileTagsDatabase.Linux.cs" />
+        <Compile Include="../../src/Files.App/Utils/FileTags/TaggedFile.cs" Link="Tags/TaggedFile.cs" />
+    </ItemGroup>
+
+    <ItemGroup>
         <None Update="Mime/Fixtures/ServiceMenus/*.desktop" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 </Project>

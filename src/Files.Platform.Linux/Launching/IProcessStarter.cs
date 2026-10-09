@@ -93,13 +93,14 @@ namespace Files.Platform.Linux.Launching
 			foreach (var argument in launch.Arguments)
 				startInfo.ArgumentList.Add(argument);
 
-			using var process = Process.Start(startInfo)
+			using var process = Files.Platform.Linux.Launching.TracedProcess.Start(startInfo)
 				?? throw new InvalidOperationException("The process could not be started.");
 
 			process.StandardInput.Close();
 			process.StandardOutput.Close();
 			process.StandardError.Close();
 
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("process-wrapper-exit");
 			await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
 		}
 	}

@@ -116,6 +116,10 @@ namespace Files.App.Utils
 			get => fileTags;
 			set
 			{
+#if !WINDOWS
+				if (fileTags is not null && fileTags.SequenceEqual(value, StringComparer.Ordinal))
+					return;
+#endif
 				// fileTags is null when the item is first created
 				var fileTagsInitialized = fileTags is not null;
 				if (SetProperty(ref fileTags, value))
@@ -124,8 +128,10 @@ namespace Files.App.Utils
 					if (fileTagsInitialized)
 					{
 						var path = this.GetRequiredPath();
+#if WINDOWS
 						var dbInstance = FileTagsHelper.GetDbInstance();
 						dbInstance.SetTags(path, FileFRN, value);
+#endif
 						_ = FileTagsHelper.WriteFileTagAsync(path, value);
 					}
 

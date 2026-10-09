@@ -76,7 +76,7 @@ namespace Files.Platform.Linux.FileChooser
 						writer.Dispose();
 					}
 
-					handlePath = await bus.CallMethodAsync(message, static (Message m, object? _) => m.GetBodyReader().ReadObjectPathAsString(), null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
+					handlePath = await bus.CallTracedAsync("dbus.filechooser", message, static (Message m, object? _) => m.GetBodyReader().ReadObjectPathAsString(), null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
 
 					// Older portals may not honor handle_token; the returned handle is authoritative
 					var returnedToken = handlePath[(handlePath.LastIndexOf('/') + 1)..];

@@ -59,7 +59,7 @@ namespace Files.Platform.Linux.Wallpaper
 					message = writer.CreateMessage();
 				}
 
-				await bus.CallMethodAsync(message, static (Message _, object? _) => true, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
+				await bus.CallTracedAsync("dbus.wallpaper", message, static (Message _, object? _) => true, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
 				return true;
 			}
 			catch (Exception ex) when (IsBackendFailure(ex))
@@ -103,7 +103,7 @@ namespace Files.Platform.Linux.Wallpaper
 						message = writer.CreateMessage();
 					}
 
-					await bus.CallMethodAsync(message, static (Message _, object? _) => true, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
+					await bus.CallTracedAsync("dbus.wallpaper", message, static (Message _, object? _) => true, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
 
 					uint code;
 					try

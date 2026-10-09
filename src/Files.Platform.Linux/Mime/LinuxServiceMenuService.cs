@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Mime;
+using Files.Platform.Abstractions.Diagnostics;
 using Files.Platform.Linux.Launching;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -25,6 +26,7 @@ namespace Files.Platform.Linux.Mime
 		private readonly IMimeTypeService mimeTypes;
 		private readonly CultureInfo culture;
 		private readonly MimeHierarchy hierarchy;
+		private readonly ParsedFileCache<ServiceMenuEntry> menus = new(followLinks: false);
 		private readonly ILogger<LinuxServiceMenuService> logger;
 
 		public LinuxServiceMenuService(XdgDirectories directories, IMimeTypeService mimeTypes, CultureInfo culture, ILogger<LinuxServiceMenuService>? logger = null)
@@ -53,6 +55,7 @@ namespace Files.Platform.Linux.Mime
 
 		private IReadOnlyList<ServiceMenuAction> Scan(IReadOnlyList<string> targets, IReadOnlyList<string> types, CancellationToken cancellationToken)
 		{
+			using var trace = PerformanceTrace.Begin("service-menu-scan", false);
 			var result = new List<ServiceMenuAction>();
 			var seen = new HashSet<string>(StringComparer.Ordinal);
 			var scanned = 0;
@@ -73,7 +76,7 @@ namespace Files.Platform.Linux.Mime
 							if (!path.EndsWith(".desktop", StringComparison.Ordinal) || !seen.Add(Path.GetFileName(path))) continue;
 							try
 							{
-								var menu = Read(path, culture, out _, logger);
+								var menu = menus.Get(path, p => Read(p, culture, out _, logger));
 								if (menu is null || !menu.Matches(targets, types, hierarchy)) continue;
 								result.AddRange(menu.Actions.Where(a => DesktopExecExpander.ExpandServiceMenu(a.Application, targets).Count > 0)
 									.Take(MaxActions - result.Count));

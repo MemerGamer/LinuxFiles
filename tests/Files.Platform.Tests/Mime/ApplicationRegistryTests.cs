@@ -17,6 +17,110 @@ namespace Files.Platform.Tests.Mime
 			new(fx.Directories, CultureInfo.GetCultureInfo(culture), new FakeLocator(executables));
 
 		[TestMethod]
+		public async Task Cache_ReusesDesktopParsingAndInvalidatesReplacementAndDeletion()
+		{
+			using var fx = new XdgFixture();
+			fx.WriteDesktop("usr-share", "edit.desktop", "Before", "edit %f");
+			var path = Path.Combine(fx.SystemData, "applications", "edit.desktop");
+			var registry = Create(fx);
+			var before = await registry.GetApplicationAsync("edit.desktop");
+			Assert.AreSame(before, await registry.GetApplicationAsync("edit.desktop"));
+			var timestamp = File.GetLastWriteTimeUtc(path);
+			var replacement = path + ".new";
+			File.WriteAllText(replacement, File.ReadAllText(path).Replace("Before", "After!"));
+			File.SetLastWriteTimeUtc(replacement, timestamp);
+			File.Move(replacement, path, true);
+			Assert.AreEqual("After!", (await registry.GetApplicationAsync("edit.desktop"))!.Name);
+			File.Delete(path);
+			Assert.IsNull(await registry.GetApplicationAsync("edit.desktop"));
+		}
+
+		[TestMethod]
+		public async Task Cache_InvalidatesInPlaceEditsWithRestoredMtime()
+		{
+			using var fx = new XdgFixture();
+			var desktop = fx.WriteDesktop("usr-share", "a.desktop", "Before", "a %f");
+			fx.WriteDesktop("usr-share", "b.desktop", "B", "b %f");
+			var associations = fx.Write("config/mimeapps.list", "[Default Applications]\ntext/plain=a.desktop;\n");
+			var timestamp = System.DateTime.UtcNow.AddDays(-1);
+			File.SetLastWriteTimeUtc(desktop, timestamp);
+			File.SetLastWriteTimeUtc(associations, timestamp);
+			var registry = Create(fx);
+			Assert.AreEqual("Before", (await registry.GetDefaultApplicationAsync("text/plain"))!.Name);
+			await Task.Delay(20);
+			RewritePreservingMtime(desktop, "Before", "After!");
+			Assert.AreEqual("After!", (await registry.GetApplicationAsync("a.desktop"))!.Name);
+			await Task.Delay(20);
+			RewritePreservingMtime(associations, "a.desktop", "b.desktop");
+			Assert.AreEqual("b.desktop", (await registry.GetDefaultApplicationAsync("text/plain"))!.Id);
+		}
+
+		private static void RewritePreservingMtime(string path, string before, string after)
+		{
+			var timestamp = File.GetLastWriteTimeUtc(path);
+			var length = new FileInfo(path).Length;
+			File.WriteAllText(path, File.ReadAllText(path).Replace(before, after));
+			File.SetLastWriteTimeUtc(path, timestamp);
+			Assert.AreEqual(length, new FileInfo(path).Length);
+			Assert.AreEqual(timestamp, File.GetLastWriteTimeUtc(path));
+		}
+
+		[TestMethod]
+		public async Task Cache_RetriesTransientReadFailureWithoutFileChanges()
+		{
+			using var fx = new XdgFixture();
+			var path = fx.WriteDesktop("usr-share", "a.desktop", "A", "a %f");
+			var registry = Create(fx);
+			var timestamp = File.GetLastWriteTimeUtc(path);
+			using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+				Assert.IsNull(await registry.GetApplicationAsync("a.desktop"));
+			Assert.AreEqual(timestamp, File.GetLastWriteTimeUtc(path));
+			Assert.AreEqual("A", (await registry.GetApplicationAsync("a.desktop"))!.Name);
+		}
+
+		[TestMethod]
+		public async Task Cache_InvalidatesMimeInfoAndAssociationsAndUserOverride()
+		{
+			using var fx = new XdgFixture();
+			fx.WriteDesktop("usr-share", "a.desktop", "A", "a %f");
+			fx.WriteDesktop("usr-share", "b.desktop", "B", "b %f");
+			fx.Write("usr-share/applications/mimeinfo.cache", "[MIME Cache]\ntext/plain=a.desktop;\n");
+			var registry = Create(fx);
+			Assert.AreEqual("a.desktop", (await registry.GetApplicationsForMimeTypeAsync("text/plain")).Single().Id);
+			fx.Write("usr-share/applications/mimeinfo.cache", "[MIME Cache]\ntext/plain=b.desktop;a.desktop;\n");
+			CollectionAssert.AreEqual(new[] { "b.desktop", "a.desktop" }, (await registry.GetApplicationsForMimeTypeAsync("text/plain")).Select(a => a.Id).ToArray());
+			fx.Write("config/mimeapps.list", "[Removed Associations]\ntext/plain=b.desktop;\n");
+			Assert.AreEqual("a.desktop", (await registry.GetApplicationsForMimeTypeAsync("text/plain")).Single().Id);
+			await registry.SetDefaultApplicationAsync("text/plain", "b.desktop");
+			Assert.AreEqual("b.desktop", (await registry.GetDefaultApplicationAsync("text/plain"))!.Id);
+			fx.WriteDesktop("data", "b.desktop", "User B", "b %f");
+			Assert.AreEqual("User B", (await registry.GetDefaultApplicationAsync("text/plain"))!.Name);
+		}
+
+		[TestMethod]
+		public async Task Cache_FallbackScanSeesNewAndChangedNestedEntries()
+		{
+			using var fx = new XdgFixture();
+			fx.WriteDesktop("usr-share", "vendor/a.desktop", "A", "a %f", "MimeType=text/plain;\n");
+			var registry = Create(fx);
+			Assert.AreEqual(1, (await registry.GetApplicationsForMimeTypeAsync("text/plain")).Count);
+			fx.WriteDesktop("usr-share", "vendor/b.desktop", "B", "b %f", "MimeType=text/plain;\n");
+			Assert.AreEqual(2, (await registry.GetApplicationsForMimeTypeAsync("text/plain")).Count);
+			fx.WriteDesktop("usr-share", "vendor/a.desktop", "A", "a %f", "MimeType=image/png;\n");
+			Assert.AreEqual("vendor-b.desktop", (await registry.GetApplicationsForMimeTypeAsync("text/plain")).Single().Id);
+		}
+
+		[TestMethod]
+		public async Task Cache_ConcurrentQueriesShareParsedEntry()
+		{
+			using var fx = new XdgFixture();
+			fx.WriteDesktop("usr-share", "a.desktop", "A", "a %f");
+			var registry = Create(fx);
+			var results = await Task.WhenAll(Enumerable.Range(0, 12).Select(_ => registry.GetApplicationAsync("a.desktop")));
+			foreach (var result in results) Assert.AreSame(results[0], result);
+		}
+
+		[TestMethod]
 		public async Task Parse_LocalizedNameAndFlags()
 		{
 			using var fx = new XdgFixture();

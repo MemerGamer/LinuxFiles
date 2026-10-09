@@ -151,7 +151,7 @@ namespace Files.Platform.Linux.Secrets
 			writer.WriteMethodCallHeader(Service, ServicePath, ServiceInterface, "OpenSession", "sv");
 			writer.WriteString("plain");
 			writer.WriteVariantString(string.Empty);
-			return bus.CallMethodAsync(writer.CreateMessage(), static (Message m, object? _) =>
+			return bus.CallTracedAsync("dbus.secrets", writer.CreateMessage(), static (Message m, object? _) =>
 			{
 				var reader = m.GetBodyReader();
 				reader.ReadVariantValue();
@@ -188,7 +188,7 @@ namespace Files.Platform.Linux.Secrets
 				}
 			}
 
-			var (unlocked, locked) = await bus.CallMethodAsync(message, static (Message m, object? _) =>
+			var (unlocked, locked) = await bus.CallTracedAsync("dbus.secrets", message, static (Message m, object? _) =>
 			{
 				var reader = m.GetBodyReader();
 				var unlockedItems = reader.ReadArrayOfObjectPath().Select(p => p.ToString()).ToArray();
@@ -215,7 +215,7 @@ namespace Files.Platform.Linux.Secrets
 				message = writer.CreateMessage();
 			}
 
-			var bytes = await bus.CallMethodAsync(message, static (Message m, object? _) =>
+			var bytes = await bus.CallTracedAsync("dbus.secrets", message, static (Message m, object? _) =>
 			{
 				var reader = m.GetBodyReader();
 				reader.AlignStruct();
@@ -265,7 +265,7 @@ namespace Files.Platform.Linux.Secrets
 				}
 			}
 
-			var prompt = await bus.CallMethodAsync(message, static (Message m, object? _) =>
+			var prompt = await bus.CallTracedAsync("dbus.secrets", message, static (Message m, object? _) =>
 			{
 				var reader = m.GetBodyReader();
 				reader.ReadObjectPath();
@@ -298,7 +298,7 @@ namespace Files.Platform.Linux.Secrets
 				message = writer.CreateMessage();
 			}
 
-			var prompt = await bus.CallMethodAsync(message, static (Message m, object? _) => m.GetBodyReader().ReadObjectPathAsString(), null).ConfigureAwait(false);
+			var prompt = await bus.CallTracedAsync("dbus.secrets", message, static (Message m, object? _) => m.GetBodyReader().ReadObjectPathAsString(), null).ConfigureAwait(false);
 			return prompt == "/" ? "deleted" : "failed";
 		}
 	}

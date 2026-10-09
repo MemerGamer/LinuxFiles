@@ -29,6 +29,43 @@ namespace Files.Platform.Tests.Mime
 			new(fx.Directories, new LinuxMimeTypeService(fx.Directories, CultureInfo.InvariantCulture), CultureInfo.GetCultureInfo("fr-FR"));
 
 		[TestMethod]
+		public async Task Cache_ReusesParsingButRefiltersAndInvalidatesChanges()
+		{
+			using var fx = new XdgFixture();
+			fx.Write("usr-share/mime/globs2", "50:image/png:*.png\n50:text/plain:*.txt\n");
+			var path = fx.Write("data/kio/servicemenus/a.desktop", Text());
+			var service = Service(fx);
+			var first = (await service.GetActionsAsync(["/a.png"])).Single();
+			Assert.AreSame(first, (await service.GetActionsAsync(["/b.png"])).Single());
+			Assert.AreEqual(0, (await service.GetActionsAsync(["/b.txt"])).Count);
+			File.WriteAllText(path, Text().Replace("Name[fr]=Exécuter", "Name[fr]=Updated"));
+			Assert.AreEqual("Updated", (await service.GetActionsAsync(["/a.png"])).Single().Application.Name);
+			File.WriteAllText(path, Text("Hidden=true\n"));
+			Assert.AreEqual(0, (await service.GetActionsAsync(["/a.png"])).Count);
+			File.Delete(path);
+			fx.Write("usr-share/kio/servicemenus/a.desktop", Text());
+			Assert.AreEqual(1, (await service.GetActionsAsync(["/a.png"])).Count);
+		}
+
+		[TestMethod]
+		public async Task Cache_InvalidatesAtomicReplacementAndRejectsSymlinkReplacement()
+		{
+			using var fx = new XdgFixture();
+			fx.Write("usr-share/mime/globs2", "50:image/png:*.png\n");
+			var path = fx.Write("data/kio/servicemenus/a.desktop", Text(exec: "tool %F"));
+			var service = Service(fx);
+			await service.GetActionsAsync(["/a.png"]);
+			var timestamp = File.GetLastWriteTimeUtc(path);
+			var replacement = fx.Write("home/replacement.desktop", Text(exec: "next %F"));
+			File.SetLastWriteTimeUtc(replacement, timestamp);
+			File.Move(replacement, path, true);
+			Assert.AreEqual("next %F", (await service.GetActionsAsync(["/a.png"])).Single().Application.Exec);
+			File.Move(path, replacement);
+			File.CreateSymbolicLink(path, replacement);
+			Assert.AreEqual(0, (await service.GetActionsAsync(["/a.png"])).Count);
+		}
+
+		[TestMethod]
 		public void Parse_LocalizesActionsAndSubmenu_AndPreservesActionOrder()
 		{
 			var menu = Parse(Text("X-KDE-Submenu=Images\nX-KDE-Submenu[fr]=Photos\nX-KDE-Priority=TopLevel\nTerminal=true\n")

@@ -111,7 +111,14 @@ namespace Files.App
 				}))
 				.Build();
 
-			host.Run();
+			try
+			{
+				host.Run();
+			}
+			finally
+			{
+				FileTagsHelper.DrainPendingWritesAsync().GetAwaiter().GetResult();
+			}
 
 			SingleInstance?.DisposeAsync().AsTask().GetAwaiter().GetResult();
 

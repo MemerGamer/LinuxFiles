@@ -28,6 +28,7 @@ namespace Files.App.ViewModels
 	public sealed partial class ShellViewModel
 	{
 		private Files.Platform.Abstractions.Watching.IFolderWatcher? _linuxWatcher;
+		public bool IsLinuxWatcherPolling => _linuxWatcher?.IsPolling == true;
 		private CancellationTokenSource? _linuxRefreshDebounce;
 		private readonly List<Files.Platform.Abstractions.Watching.IFolderWatcher> _linuxRepositoryWatchers = [];
 		private Action? _linuxTrashUnsubscribe;

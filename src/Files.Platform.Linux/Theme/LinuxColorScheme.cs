@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System;
+using Files.Platform.Linux.DBus;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -90,7 +91,7 @@ namespace Files.Platform.Linux.Theme
 			if (connection is null)
 				return;
 
-			_lastRead = await connection.CallMethodAsync(BuildReadMessage(connection), static (Message message, object? _) =>
+			_lastRead = await connection.CallTracedAsync("dbus.theme", BuildReadMessage(connection), static (Message message, object? _) =>
 			{
 				var reader = message.GetBodyReader();
 				var outer = reader.ReadVariantValue();
@@ -241,7 +242,7 @@ namespace Files.Platform.Linux.Theme
 					UseShellExecute = false,
 				};
 
-				using var process = Process.Start(info);
+				using var process = Files.Platform.Linux.Launching.TracedProcess.Start(info);
 				if (process is null)
 					return null;
 

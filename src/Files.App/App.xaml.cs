@@ -81,6 +81,7 @@ namespace Files.App
 			AppDomain.CurrentDomain.ProcessExit += static (_, _) =>
 				SafetyExtensions.IgnoreExceptions(() => Ioc.Default.GetService<FileLoggerProvider>()?.TryCompleteAndFlush(TimeSpan.FromSeconds(2)));
 #if !WINDOWS
+			AppDomain.CurrentDomain.ProcessExit += static (_, _) => FileTagsHelper.DrainPendingWritesAsync().GetAwaiter().GetResult();
 			AppDomain.CurrentDomain.ProcessExit += static (_, _) => SafetyExtensions.IgnoreExceptions(ArchiveOpenTempStore.CleanupCurrentProcess);
 			_ = Task.Run(ArchiveOpenTempStore.CleanupStale);
 #endif

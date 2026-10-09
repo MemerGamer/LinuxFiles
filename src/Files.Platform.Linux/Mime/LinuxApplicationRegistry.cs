@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Mime;
+using Files.Platform.Abstractions.Diagnostics;
 using Files.Platform.Linux.Launching;
 using System;
 using System.Collections.Generic;
@@ -22,6 +23,9 @@ namespace Files.Platform.Linux.Mime
 		private readonly CultureInfo culture;
 		private readonly IExecutableLocator locator;
 		private readonly MimeHierarchy hierarchy;
+		private readonly ParsedFileCache<DesktopEntryParser.Entry> desktopEntries = new();
+		private readonly ParsedFileCache<MimeAppsList> associations = new();
+		private readonly ParsedFileCache<Dictionary<string, string[]>> mimeInfo = new();
 
 		/// <summary>
 		/// Creates the registry for the process environment.
@@ -44,86 +48,102 @@ namespace Files.Platform.Linux.Mime
 		/// <inheritdoc/>
 		public Task<IReadOnlyList<DesktopApplication>> GetApplicationsForMimeTypeAsync(string mimeType, CancellationToken cancellationToken = default)
 		{
-			cancellationToken.ThrowIfCancellationRequested();
-
-			var apps = new List<DesktopApplication>();
-			var seen = new HashSet<string>(StringComparer.Ordinal);
-			foreach (var type in hierarchy.GetChain(mimeType))
+			return Task.Run<IReadOnlyList<DesktopApplication>>(() =>
 			{
-				var (_, all) = BuildCandidates(type);
-				foreach (var id in all)
+				using var trace = PerformanceTrace.Begin("open-with-query", false);
+				cancellationToken.ThrowIfCancellationRequested();
+
+				var apps = new List<DesktopApplication>();
+				var seen = new HashSet<string>(StringComparer.Ordinal);
+				foreach (var type in hierarchy.GetChain(mimeType))
 				{
-					if (!seen.Add(id))
-						continue;
+					var (_, all) = BuildCandidates(type);
+					foreach (var id in all)
+					{
+						if (!seen.Add(id))
+							continue;
 
-					var app = Load(id);
-					if (app is not null && !app.NoDisplay)
-						apps.Add(app);
+						var app = Load(id);
+						if (app is not null && !app.NoDisplay)
+							apps.Add(app);
+					}
 				}
-			}
 
-			return Task.FromResult<IReadOnlyList<DesktopApplication>>(apps);
+				return (IReadOnlyList<DesktopApplication>)apps;
+			}, cancellationToken);
 		}
 
 		/// <inheritdoc/>
 		public Task<IReadOnlyList<DesktopApplication>> GetAllApplicationsAsync(CancellationToken cancellationToken = default)
 		{
-			var apps = new List<DesktopApplication>();
-			var seen = new HashSet<string>(StringComparer.Ordinal);
-			foreach (var dir in xdg.AllDataDirs)
+			return Task.Run<IReadOnlyList<DesktopApplication>>(() =>
 			{
-				cancellationToken.ThrowIfCancellationRequested();
-				var applications = Path.Combine(dir, "applications");
-				if (!Directory.Exists(applications))
-					continue;
-
-				foreach (var (id, _) in EnumerateDesktopFiles(applications))
+				using var trace = PerformanceTrace.Begin("open-with-query", false);
+				var apps = new List<DesktopApplication>();
+				var seen = new HashSet<string>(StringComparer.Ordinal);
+				foreach (var dir in xdg.AllDataDirs)
 				{
-					if (!seen.Add(id))
+					cancellationToken.ThrowIfCancellationRequested();
+					var applications = Path.Combine(dir, "applications");
+					if (!Directory.Exists(applications))
 						continue;
 
-					var app = Load(id);
-					if (app is not null && !app.NoDisplay)
-						apps.Add(app);
-				}
-			}
+					foreach (var (id, _) in EnumerateDesktopFiles(applications))
+					{
+						if (!seen.Add(id))
+							continue;
 
-			apps.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
-			return Task.FromResult<IReadOnlyList<DesktopApplication>>(apps);
+						var app = Load(id);
+						if (app is not null && !app.NoDisplay)
+							apps.Add(app);
+					}
+				}
+
+				apps.Sort((a, b) => string.Compare(a.Name, b.Name, StringComparison.CurrentCultureIgnoreCase));
+				return (IReadOnlyList<DesktopApplication>)apps;
+			}, cancellationToken);
 		}
 
 		/// <inheritdoc/>
 		public Task<DesktopApplication?> GetDefaultApplicationAsync(string mimeType, CancellationToken cancellationToken = default)
 		{
-			cancellationToken.ThrowIfCancellationRequested();
-
-			// Per type, nearest first: the explicit default, else the first visible association (like xdg-open)
-			foreach (var type in hierarchy.GetChain(mimeType))
+			return Task.Run<DesktopApplication?>(() =>
 			{
-				var (defaults, all) = BuildCandidates(type);
-				foreach (var id in defaults)
+				using var trace = PerformanceTrace.Begin("open-with-query", false);
+				cancellationToken.ThrowIfCancellationRequested();
+
+				// Per type, nearest first: the explicit default, else the first visible association (like xdg-open)
+				foreach (var type in hierarchy.GetChain(mimeType))
 				{
-					var app = Load(id);
-					if (app is not null)
-						return Task.FromResult<DesktopApplication?>(app);
+					var (defaults, all) = BuildCandidates(type);
+					foreach (var id in defaults)
+					{
+						var app = Load(id);
+						if (app is not null)
+							return app;
+					}
+
+					foreach (var id in all)
+					{
+						var app = Load(id);
+						if (app is not null && !app.NoDisplay)
+							return app;
+					}
 				}
 
-				foreach (var id in all)
-				{
-					var app = Load(id);
-					if (app is not null && !app.NoDisplay)
-						return Task.FromResult<DesktopApplication?>(app);
-				}
-			}
-
-			return Task.FromResult<DesktopApplication?>(null);
+				return (DesktopApplication?)null;
+			}, cancellationToken);
 		}
 
 		/// <inheritdoc/>
 		public Task<DesktopApplication?> GetApplicationAsync(string desktopId, CancellationToken cancellationToken = default)
 		{
-			cancellationToken.ThrowIfCancellationRequested();
-			return Task.FromResult(Load(desktopId));
+			return Task.Run<DesktopApplication?>(() =>
+			{
+				using var trace = PerformanceTrace.Begin("open-with-query", false);
+				cancellationToken.ThrowIfCancellationRequested();
+				return Load(desktopId);
+			}, cancellationToken);
 		}
 
 		/// <inheritdoc/>
@@ -189,7 +209,7 @@ namespace Files.Platform.Linux.Mime
 
 			foreach (var file in MimeAppsListFiles())
 			{
-				var list = MimeAppsList.Load(file);
+				var list = associations.Get(file, MimeAppsList.Load);
 				if (list is null)
 					continue;
 
@@ -223,41 +243,44 @@ namespace Files.Platform.Linux.Mime
 
 		private IEnumerable<string> ReadMimeInfoCache(string mimeType)
 		{
-			var prefix = mimeType + "=";
 			foreach (var dir in xdg.AllDataDirs)
 			{
 				var applications = Path.Combine(dir, "applications");
 				var cache = Path.Combine(applications, "mimeinfo.cache");
-
 				if (File.Exists(cache))
 				{
-					string[] lines;
-					try
-					{
-						lines = File.ReadAllLines(cache);
-					}
-					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-					{
-						continue;
-					}
-
-					var line = lines.FirstOrDefault(l => l.StartsWith(prefix, StringComparison.Ordinal));
-					if (line is not null)
-					{
-						foreach (var id in DesktopEntryParser.SplitList(line[prefix.Length..]))
-							yield return id;
-					}
+					var mapping = mimeInfo.Get(cache, ReadMimeInfo);
+					if (mapping?.TryGetValue(mimeType, out var ids) == true)
+						foreach (var id in ids) yield return id;
 				}
 				else if (Directory.Exists(applications))
 				{
-					// Cache not generated: scan the desktop files directly
 					foreach (var (id, file) in EnumerateDesktopFiles(applications))
 					{
-						var entry = DesktopEntryParser.ParseFile(file, id, culture);
+						var entry = desktopEntries.Get(file, p => DesktopEntryParser.ParseFile(p, id, culture));
 						if (entry?.Application.MimeTypes?.Contains(mimeType) == true)
 							yield return id;
 					}
 				}
+			}
+		}
+
+		private static Dictionary<string, string[]>? ReadMimeInfo(string path)
+		{
+			try
+			{
+				var result = new Dictionary<string, string[]>(StringComparer.Ordinal);
+				foreach (var line in File.ReadLines(path))
+				{
+					var eq = line.IndexOf('=');
+					if (eq > 0)
+						result.TryAdd(line[..eq], DesktopEntryParser.SplitList(line[(eq + 1)..]));
+				}
+				return result;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+			{
+				return null;
 			}
 		}
 
@@ -287,7 +310,7 @@ namespace Files.Platform.Linux.Mime
 					if (!File.Exists(candidate))
 						continue;
 
-					var entry = DesktopEntryParser.ParseFile(candidate, desktopId, culture);
+					var entry = desktopEntries.Get(candidate, p => DesktopEntryParser.ParseFile(p, desktopId, culture));
 					if (entry is null || entry.Hidden)
 						return null;
 

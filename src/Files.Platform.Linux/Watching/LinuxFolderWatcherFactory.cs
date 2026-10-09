@@ -8,6 +8,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.Watching;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Files.Platform.Linux.Watching
 {
@@ -16,11 +18,18 @@ namespace Files.Platform.Linux.Watching
 	/// </summary>
 	public sealed class LinuxFolderWatcherFactory : IFolderWatcherFactory
 	{
+		private readonly ILogger<LinuxFolderWatcherFactory> logger;
+
+		public LinuxFolderWatcherFactory(ILogger<LinuxFolderWatcherFactory>? logger = null)
+		{
+			this.logger = logger ?? NullLogger<LinuxFolderWatcherFactory>.Instance;
+		}
+
 		/// <inheritdoc/>
 		public IFolderWatcher Create(string folderPath, FolderWatcherOptions? options = null)
 		{
 			ArgumentException.ThrowIfNullOrEmpty(folderPath);
-			return new LinuxFolderWatcher(Path.GetFullPath(folderPath), options ?? new());
+			return new LinuxFolderWatcher(Path.GetFullPath(folderPath), options ?? new(), logger);
 		}
 	}
 }

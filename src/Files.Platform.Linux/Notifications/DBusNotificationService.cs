@@ -44,7 +44,7 @@ namespace Files.Platform.Linux.Notifications
 
 				var message = BuildNotify(bus, title, body);
 
-				await bus.CallMethodAsync(message, static (Message m, object? _) => m.GetBodyReader().ReadUInt32(), null)
+				await bus.CallTracedAsync("dbus.notifications", message, static (Message m, object? _) => m.GetBodyReader().ReadUInt32(), null)
 					.WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
 				return true;
 			}

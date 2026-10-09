@@ -273,7 +273,7 @@ namespace Files.Platform.Linux.Volumes
 
 			try
 			{
-				var result = await bus.CallMethodAsync(message, reader, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
+				var result = await bus.CallTracedAsync("dbus.volumes", message, reader, null).WaitAsync(CallTimeout, cancellationToken).ConfigureAwait(false);
 				await Task.Yield();
 				return result;
 			}
@@ -294,7 +294,7 @@ namespace Files.Platform.Linux.Volumes
 				message = writer.CreateMessage();
 			}
 
-			var objects = await bus.CallMethodAsync(message, static (Message m, object? _) =>
+			var objects = await bus.CallTracedAsync("dbus.volumes", message, static (Message m, object? _) =>
 			{
 				var reader = m.GetBodyReader();
 				return UDisks2Objects.Read(ref reader);

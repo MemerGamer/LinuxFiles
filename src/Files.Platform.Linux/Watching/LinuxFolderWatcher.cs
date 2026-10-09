@@ -8,6 +8,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Files.Platform.Abstractions.Watching;
+using Microsoft.Extensions.Logging;
 
 namespace Files.Platform.Linux.Watching
 {
@@ -31,6 +32,8 @@ namespace Files.Platform.Linux.Watching
 		private Timer? _debounceTimer;
 		private bool _started;
 		private bool _disposed;
+		private bool _pollingLogged;
+		private readonly ILogger logger;
 
 		public event EventHandler<FolderChangeEventArgs>? Created;
 		public event EventHandler<FolderChangeEventArgs>? Deleted;
@@ -43,10 +46,11 @@ namespace Files.Platform.Linux.Watching
 
 		public bool IsPolling => _pollCts is not null;
 
-		public LinuxFolderWatcher(string folderPath, FolderWatcherOptions options)
+		public LinuxFolderWatcher(string folderPath, FolderWatcherOptions options, ILogger logger)
 		{
 			FolderPath = folderPath;
 			_options = options;
+			this.logger = logger;
 		}
 
 		public void Start()
@@ -65,7 +69,10 @@ namespace Files.Platform.Linux.Watching
 				try
 				{
 					if (_options.ForcePolling)
+					{
 						StartPolling();
+						LogPolling(null);
+					}
 					else
 						StartNative();
 				}
@@ -81,7 +88,10 @@ namespace Files.Platform.Linux.Watching
 			}
 
 			if (nativeFailure is not null)
+			{
+				LogPolling(nativeFailure);
 				Error?.Invoke(this, new FolderWatcherErrorEventArgs(nativeFailure, fellBackToPolling: true));
+			}
 		}
 
 		public void Stop()
@@ -163,7 +173,20 @@ namespace Files.Platform.Linux.Watching
 				}
 			}
 
+			if (fellBack) LogPolling(ex);
 			Error?.Invoke(this, new FolderWatcherErrorEventArgs(ex, fellBack));
+		}
+
+		private void LogPolling(Exception? failure)
+		{
+			lock (_gate)
+			{
+				if (_pollingLogged) return;
+				_pollingLogged = true;
+			}
+			logger.LogWarning("Folder watcher is using fallback polling (interval {IntervalMs} ms, reason {Reason}); native failures can indicate inotify limits.",
+				(_options.PollInterval > TimeSpan.Zero ? _options.PollInterval : TimeSpan.FromSeconds(2)).TotalMilliseconds,
+				failure?.GetType().Name ?? "forced polling");
 		}
 
 		private void StartPolling()

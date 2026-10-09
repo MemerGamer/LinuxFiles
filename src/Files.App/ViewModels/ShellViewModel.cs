@@ -1575,11 +1575,22 @@ namespace Files.App.ViewModels
 		// Types whose icon is embedded in the file itself rather than shared by the extension
 		private static readonly string[] _perFileIconExtensions = [".ico", ".cur", ".ani", ".scr", ".msc", ".appref-ms", ".desktop"];
 
+		private static Task<string[]> ReadFileTagAsync(string filePath)
+		{
+#if WINDOWS
+			return Task.Run(() => FileTagsHelper.ReadFileTag(filePath));
+#else
+			return FileTagsHelper.ReadAndUpdateFileTagsAsync(filePath);
+#endif
+		}
+
+#if WINDOWS
 		private static void SetFileTag(ListedItem item)
 		{
 			var dbInstance = FileTagsHelper.GetDbInstance();
 			dbInstance.SetTags(item.GetRequiredPath(), item.FileFRN, item.FileTags ?? []);
 		}
+#endif
 
 		// Loads extended file properties off the critical path so a slow per-file read never blocks the row's essentials.
 		private async Task LoadExtendedFilePropertiesInBackgroundAsync(ListedItem item, BaseStorageFile file, CancellationToken token)
@@ -1691,7 +1702,7 @@ namespace Files.App.ViewModels
 								// A network share is never a cloud placeholder root, so skip that round-trip
 								var syncStatus = isItemNetwork ? CloudDriveSyncStatus.Unknown : await CheckCloudDriveSyncStatusAsync(matchingStorageFile);
 								var fileFRN = await FileTagsHelper.GetFileFRN(matchingStorageFile);
-								var fileTag = await Task.Run(() => FileTagsHelper.ReadFileTag(item.GetRequiredPath()));
+								var fileTag = await ReadFileTagAsync(item.GetRequiredPath());
 
 								// Extended properties open each file; load them in the background on a share
 								var extraProperties = isItemNetwork ? null : await GetExtraProperties(matchingStorageFile);
@@ -1736,7 +1747,9 @@ namespace Files.App.ViewModels
 								},
 								Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 
+#if WINDOWS
 								await Task.Run(() => SetFileTag(item));
+#endif
 
 								if (isItemNetwork)
 									_ = LoadExtendedFilePropertiesInBackgroundAsync(item, matchingStorageFile, token);
@@ -1771,7 +1784,7 @@ namespace Files.App.ViewModels
 								// A network share is never a cloud placeholder root, so skip that round-trip
 								var syncStatus = isItemNetwork ? CloudDriveSyncStatus.Unknown : await CheckCloudDriveSyncStatusAsync(matchingStorageFolder);
 								var fileFRN = await FileTagsHelper.GetFileFRN(matchingStorageFolder);
-								var fileTag = await Task.Run(() => FileTagsHelper.ReadFileTag(item.GetRequiredPath()));
+								var fileTag = await ReadFileTagAsync(item.GetRequiredPath());
 
 								// Folder extended properties only carry drive storage details, irrelevant on a network subfolder
 								var extraProperties = isItemNetwork ? null : await GetExtraProperties(matchingStorageFolder);
@@ -1800,7 +1813,9 @@ namespace Files.App.ViewModels
 								},
 								Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 
+#if WINDOWS
 								await Task.Run(() => SetFileTag(item));
+#endif
 								wasSyncStatusLoaded = true;
 							}
 						}
@@ -1819,7 +1834,7 @@ namespace Files.App.ViewModels
 						token.ThrowIfCancellationRequested();
 						await FilesystemTasks.Wrap(async () =>
 						{
-							var fileTag = await Task.Run(() => FileTagsHelper.ReadFileTag(item.GetRequiredPath()));
+							var fileTag = await ReadFileTagAsync(item.GetRequiredPath());
 
 							await dispatcherQueue.EnqueueOrInvokeAsync(() =>
 							{
@@ -1830,7 +1845,9 @@ namespace Files.App.ViewModels
 							},
 							Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 
+#if WINDOWS
 							await Task.Run(() => SetFileTag(item));
+#endif
 						});
 					}
 					else

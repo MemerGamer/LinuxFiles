@@ -4,7 +4,10 @@
 #if !WINDOWS
 using Files.Platform.Abstractions.Tags;
 using Microsoft.Extensions.Logging;
-using Windows.Storage;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Files.App.Utils.FileTags
 {
@@ -35,29 +38,96 @@ namespace Files.App.Utils.FileTags
 			return GetDbInstance().GetTags(filePath, null);
 		}
 
+		public static Task<string[]> ReadAndUpdateFileTagsAsync(string filePath)
+		{
+			return EnqueueWrite(() =>
+			{
+				var tags = ReadFileTag(filePath);
+				GetDbInstance().SetTags(filePath, null, tags);
+				return tags;
+			}, Array.Empty<string>());
+		}
+
+		private static readonly object writeGate = new();
+		private static Task pendingWrite = Task.CompletedTask;
+
 		public static Task<bool> WriteFileTagAsync(string filePath, string[] tag, CancellationToken cancellationToken = default)
+		{
+			if (cancellationToken.IsCancellationRequested) return Task.FromResult(false);
+			var tags = (string[])tag.Clone();
+			var store = Ioc.Default.GetService<IFileTagsStore>();
+			var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
+			var names = settings.GetTagsByIds(tags)?.Select(x => x.Name).ToArray() ?? [];
+			return EnqueueWrite(() => !cancellationToken.IsCancellationRequested && WriteTags(filePath, tags, names, store), false);
+		}
+
+		public static Task<bool> UntagAllFilesAsync(string uid)
+		{
+			var store = Ioc.Default.GetService<IFileTagsStore>();
+			var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
+			var namesById = settings.FileTagList.ToDictionary(tag => tag.Uid, tag => tag.Name);
+			return EnqueueWrite(() =>
+			{
+				var succeeded = true;
+				foreach (var item in GetDbInstance().GetAll())
+				{
+					if (!item.Tags.Contains(uid)) continue;
+					var tags = item.Tags.Where(tag => tag != uid).ToArray();
+					var names = tags.Where(namesById.ContainsKey).Select(tag => namesById[tag]).ToArray();
+					succeeded &= WriteTags(item.FilePath, tags, names, store);
+				}
+				return succeeded;
+			}, false);
+		}
+
+		public static async Task DrainPendingWritesAsync()
+		{
+			while (true)
+			{
+				Task write;
+				lock (writeGate) write = pendingWrite;
+				await write.ConfigureAwait(false);
+				lock (writeGate)
+					if (ReferenceEquals(write, pendingWrite)) return;
+			}
+		}
+
+		private static bool WriteTags(string filePath, string[] tags, string[] names, IFileTagsStore? store)
 		{
 			try
 			{
-				cancellationToken.ThrowIfCancellationRequested();
-
-				GetDbInstance().SetTags(filePath, null, tag);
-
-				// Best effort: the database already holds the tags, so a file system without xattr support is not an error
-				var store = Ioc.Default.GetService<IFileTagsStore>();
-				if (store is not null)
-				{
-					var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
-					var names = settings.GetTagsByIds(tag)?.Select(x => x.Name).ToArray() ?? [];
-					if (!store.WriteTags(filePath, names))
-						App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
-				}
-
-				return Task.FromResult(true);
+				GetDbInstance().SetTags(filePath, null, tags);
+				if (store is not null && !store.WriteTags(filePath, names))
+					App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
+				return true;
 			}
-			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+			catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
 			{
-				return Task.FromResult(false);
+				App.Logger?.LogWarning(ex, "Could not write file tags.");
+				return false;
+			}
+		}
+
+		private static Task<T> EnqueueWrite<T>(Func<T> action, T failureResult)
+		{
+			lock (writeGate)
+			{
+				var previous = pendingWrite;
+				var write = Task.Run(async () =>
+				{
+					await previous.ConfigureAwait(false);
+					try
+					{
+						return action();
+					}
+					catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+					{
+						App.Logger?.LogWarning(ex, "Could not write file tags.");
+						return failureResult;
+					}
+				});
+				pendingWrite = write;
+				return write;
 			}
 		}
 

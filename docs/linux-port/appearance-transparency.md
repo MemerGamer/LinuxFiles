@@ -7,12 +7,22 @@ Settings > Appearance > Background image works on Linux. Two things used to hide
 
 Opacity, fit and alignment settings apply as before. Per-folder `desktop.ini` backgrounds are Windows-only.
 
-## Window opacity (new)
-Settings > Appearance > Window opacity (20% to 100%) sets the `_NET_WM_WINDOW_OPACITY` property on the top-level X11 window (`X11WindowChrome.SetWindowOpacity`); 100% removes the property.
+## Window opacity
+Settings > Appearance > Window opacity (20% to 100%) sets `_NET_WM_WINDOW_OPACITY` on the top-level X11 window (`X11WindowChrome.SetWindowOpacity`); 100% removes the property.
 - It fades the whole window, text and icons included. It is not a translucent background.
-- It needs a compositing window manager (KWin, Mutter, picom, ...). Without one the property is ignored. On Wayland sessions it goes through XWayland, and compositors that do not honour the property ignore it.
-- Checked structurally under Xvfb (no compositor): the property is set to the expected cardinal. The visual effect is not verified there.
+- Support is reported honestly (`X11AppearanceSupport`): the slider is enabled only on a compositor known to honour the property (KWin, Mutter, Xfwm, picom, compiz). Under xwayland-satellite (niri) the property is not forwarded, so the slider is disabled with an explanation; with no compositor or an unrecognised one the slider is disabled and says so ("unknown"). A successful property write is never treated as proof.
+- High contrast forces opaque surfaces.
+
+## Backdrop: Solid / Transparent / Blur
+Settings > Appearance > Backdrop (`BackdropMode`) with Background opacity (`BackgroundOpacity`), separate from window opacity.
+- Uno 6.7.135's Skia X11 host does request a 32-bit TrueColor visual (24-bit fallback) and a premultiplied BGRA surface. `Uno.UI.Xaml.WindowHelper.SetBackground(window, Transparent)` clears to transparent, so per-pixel alpha is possible without an Uno patch. This supersedes the earlier claim that no alpha visual was available.
+- Transparent: the window clear colour is transparent and `App.Theme.BackgroundBrush` carries the single alpha plane; the other region fills become transparent so they do not compound.
+- Blur: on KWin (X11) the empty `_KDE_NET_WM_BLUR_BEHIND_REGION` hint is set; the hint blurs behind the alpha pixels only. If unsupported (other compositors, xwayland-satellite, no compositor) the mode falls back to Solid and the UI says why. niri 26.04+ blur needs compositor window rules or `ext-background-effect`, not reachable from this X11 host.
+- Requires an alpha-capable compositor; only recognised compositors are enabled, others fall back to Solid.
+
+## Colour source
+`ColourSource` = Files | Adwaita | System (migrated from the old `UseAdwaitaTheme`; existing choices are preserved). System reads the XDG portal (`color-scheme`, `accent-color`, `contrast`) and a bounded GTK named-colour reader (`ISystemAppearanceService`), and maps roles onto the app resources. Manual custom colours still win.
 
 ## Not offered
-- **Per-pixel transparency (ARGB visual).** Uno's Skia X11 host creates the window with the default visual and its own GL/software surface; there is no hook to request a 32-bit visual or an alpha-capable surface. Making panels see-through to the desktop would need an Uno change.
-- **Backdrop material (Mica/Acrylic).** Not implemented on Linux, so the Backdrop card is hidden there. The window uses a solid fill equal to the Mica base colour.
+- **Native Wayland / org_kde_kwin_blur.** The Skia host is X11 only.
+- **Backdrop material (Mica/Acrylic).** Not implemented on Linux; the Backdrop material card is hidden.

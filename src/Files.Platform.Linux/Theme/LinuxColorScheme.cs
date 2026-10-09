@@ -65,7 +65,7 @@ namespace Files.Platform.Linux.Theme
 			if (OverrideValue() is { } forced)
 				return forced;
 
-			return PortalValue() is { } portal ? portal == 1
+			return PortalValue() is { } portal && portal is 1 or 2 ? portal == 1
 				: FromGtkThemeEnv() ?? FromKdeGlobals() ?? FromGSettings() ?? false;
 		}
 
@@ -175,7 +175,7 @@ namespace Files.Platform.Linux.Theme
 						if (ex is not null || value is null)
 							return;
 
-						var dark = value == 1;
+						var dark = value is 1 or 2 ? value == 1 : FromGtkThemeEnv() ?? FromKdeGlobals() ?? FromGSettings() ?? false;
 						if (_isDark != dark)
 						{
 							_isDark = dark;

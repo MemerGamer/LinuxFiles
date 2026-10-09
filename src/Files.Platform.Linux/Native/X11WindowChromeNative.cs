@@ -7,6 +7,15 @@ namespace Files.Platform.Linux.Native
 {
 	internal static partial class X11WindowChromeNative
 	{
+		[LibraryImport("libX11.so.6")]
+		public static partial int XGrabServer(nint display);
+
+		[LibraryImport("libX11.so.6")]
+		public static partial int XUngrabServer(nint display);
+
+		[LibraryImport("libX11.so.6")]
+		public static partial int XDefaultScreen(nint display);
+
 		[LibraryImport("libX11.so.6", StringMarshalling = StringMarshalling.Utf8)]
 		public static partial int XStoreName(nint display, nuint window, string title);
 

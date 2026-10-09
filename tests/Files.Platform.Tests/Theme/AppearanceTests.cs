@@ -1,0 +1,183 @@
+// Copyright (c) Files Community
+// Licensed under the MIT License.
+
+using Files.Platform.Abstractions.Appearance;
+using Files.Platform.Linux.Theme;
+using Files.Platform.Linux.Windowing;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
+using Tmds.DBus.Protocol;
+
+namespace Files.Platform.Tests.Theme
+{
+	[TestClass]
+	public sealed class AppearanceTests
+	{
+		[TestMethod]
+		public void Support_DoesNotMistakeAtomsOrCompositorPresenceForProtocolSupport()
+		{
+			Assert.AreEqual(OpacitySupport.Unknown, X11AppearanceSupport.Detect("unknown", "", true, true).WindowOpacity);
+			Assert.AreEqual(OpacitySupport.NoCompositor, X11AppearanceSupport.Detect("KWin", "KDE", false, true).WindowOpacity);
+			Assert.AreEqual(OpacitySupport.Satellite, X11AppearanceSupport.Detect("KWin", "niri", true, true).WindowOpacity);
+			Assert.AreEqual(OpacitySupport.Satellite, X11AppearanceSupport.Detect("xwayland-satellite", "", true, true).WindowOpacity);
+			Assert.IsFalse(X11AppearanceSupport.Detect("Mutter", "GNOME", true, true).Blur);
+		}
+
+		[TestMethod]
+		public void Support_RecognizesIndependentPicomWithoutGrantingBlur()
+		{
+			foreach (var manager in new[] { "i3", "Openbox", null })
+			{
+				var support = X11AppearanceSupport.Detect(manager, "", true, true, "picom");
+				Assert.AreEqual(OpacitySupport.Supported, support.WindowOpacity);
+				Assert.AreEqual(BackdropMode.Transparent, support.Resolve(BackdropMode.Transparent, false));
+				Assert.IsFalse(support.Blur);
+			}
+		}
+
+		[TestMethod]
+		public void Backdrop_RetainsRequestedModeWhileResolvingReadableFallback()
+		{
+			var kwin = X11AppearanceSupport.Detect("KWin", "KDE", true, true);
+			Assert.AreEqual(BackdropMode.Blur, kwin.Resolve(BackdropMode.Blur, false));
+			Assert.AreEqual(BackdropMode.Solid, kwin.Resolve(BackdropMode.Blur, true));
+			var noBlur = X11AppearanceSupport.Detect("KWin", "KDE", true, false);
+			Assert.AreEqual(BackdropMode.Transparent, noBlur.Resolve(BackdropMode.Transparent, false));
+			Assert.AreEqual(BackdropMode.Solid, noBlur.Resolve(BackdropMode.Blur, false));
+			Assert.AreEqual(BackdropMode.Solid, X11AppearanceSupport.Detect("unknown", "", true, false).Resolve(BackdropMode.Transparent, false));
+		}
+
+		[TestMethod]
+		public void Migration_PreservesBothOldChoicesAndExplicitNewChoice()
+		{
+			Assert.AreEqual(ColourSource.Files, AppearancePreferences.MigrateColourSource(null, false));
+			Assert.AreEqual(ColourSource.Adwaita, AppearancePreferences.MigrateColourSource("", true));
+			Assert.AreEqual(ColourSource.System, AppearancePreferences.MigrateColourSource("System", true));
+			Assert.AreEqual(ColourSource.Files, AppearancePreferences.MigrateColourSource("Files", true));
+			Assert.AreEqual(ColourSource.Adwaita, AppearancePreferences.MigrateColourSource("999", true));
+			Assert.AreEqual(1f, AppearancePreferences.ClampOpacity(float.NaN));
+			Assert.AreEqual(1f, AppearancePreferences.ClampOpacity(float.PositiveInfinity));
+			Assert.AreEqual(0.2f, AppearancePreferences.ClampOpacity(-1, 0.2f));
+		}
+
+		[TestMethod]
+		public void Portal_LeavesUnknownAndInvalidPreferencesUnset()
+		{
+			Assert.IsNull(LinuxSystemAppearanceService.ReadScheme((VariantValue)0u));
+			Assert.AreEqual(true, LinuxSystemAppearanceService.ReadScheme((VariantValue)1u));
+			Assert.AreEqual(false, LinuxSystemAppearanceService.ReadScheme((VariantValue)2u));
+			Assert.IsNull(LinuxSystemAppearanceService.ReadScheme((VariantValue)"dark"));
+			Assert.IsNull(LinuxSystemAppearanceService.ReadContrast((VariantValue)2u));
+			Assert.AreEqual(true, LinuxSystemAppearanceService.ReadContrast((VariantValue)1u));
+			Assert.AreEqual(new AppearanceColor(255, 128, 0), LinuxSystemAppearanceService.ReadAccent(Struct.Create(1d, 0.5d, 0d)));
+			Assert.IsNull(LinuxSystemAppearanceService.ReadAccent(Struct.Create(double.NaN, 0d, 0d)));
+			Assert.IsNull(LinuxSystemAppearanceService.ReadAccent(Struct.Create(2d, 0d, 0d)));
+			Assert.IsNull(LinuxSystemAppearanceService.ReadAccent(Struct.Create(1u, 0u, 0u)));
+		}
+
+		[TestMethod]
+		public void Css_ResolvesLiteralAliasesAndLastDefinitionWithoutEvaluatingCode()
+		{
+			var colors = GtkNamedColors.Parse("/* @define-color base #000; */ @import url('evil'); @define-color base #123; @define-color alias @base; @define-color base rgba(255, 0, 128, .5); @define-color expr shade(@base, 0.5); @define-color loop @loop; @define-color bad url(file:///etc/passwd);");
+			Assert.AreEqual(new AppearanceColor(255, 0, 128, 128), colors["alias"]);
+			Assert.IsFalse(colors.ContainsKey("expr"));
+			Assert.IsFalse(colors.ContainsKey("loop"));
+			Assert.IsFalse(colors.ContainsKey("bad"));
+			Assert.AreEqual(new AppearanceColor(17, 34, 51, 68), GtkNamedColors.ParseLiteral("#1234"));
+			Assert.AreEqual(new AppearanceColor(255, 0, 0), GtkNamedColors.ParseLiteral("rgb(100%, 0%, 0%)"));
+			Assert.IsNull(GtkNamedColors.ParseLiteral("rgba(0,0,0,NaN)"));
+			Assert.AreEqual(0, GtkNamedColors.Parse(new string('x', GtkNamedColors.MaxCssBytes + 1)).Count);
+			Assert.IsFalse(GtkNamedColors.IsSafeThemeName("../theme"));
+			Assert.IsFalse(GtkNamedColors.IsSafeThemeName(".."));
+		}
+
+		[TestMethod]
+		public async Task Css_RejectsOversizeFiles()
+		{
+			var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".css");
+			try
+			{
+				await File.WriteAllTextAsync(path, new string('x', GtkNamedColors.MaxCssBytes + 1));
+				Assert.IsNull(await GtkNamedColors.ReadAsync(path));
+			}
+			finally { File.Delete(path); }
+		}
+
+		[TestMethod]
+		public void HighContrast_OverridesEveryControlStateIncludingCheckedAndDisabled()
+		{
+			var map = SystemAppearancePalette.MapHighContrast();
+			foreach (var control in new[] { "Button", "ComboBox", "ToolbarButton", "ToggleButton", "ToolbarToggleButton" })
+				foreach (var state in new[] { "", "PointerOver", "Pressed", "Disabled", "Checked", "CheckedPointerOver", "CheckedPressed", "CheckedDisabled", "Indeterminate", "IndeterminatePointerOver", "IndeterminatePressed", "IndeterminateDisabled" })
+				{
+					if (state.StartsWith("Checked") || state.StartsWith("Indeterminate"))
+						if (control is not ("ToggleButton" or "ToolbarToggleButton")) continue;
+					var foreground = map[control + "Foreground" + state];
+					var background = map[control + "Background" + state];
+					Assert.AreEqual((byte)255, foreground.A);
+					Assert.AreEqual((byte)255, background.A);
+					Assert.AreEqual(21d, SystemAppearancePalette.ContrastRatio(foreground, background), 0.001, control + state);
+				}
+			Assert.AreNotEqual(map["ToolbarToggleButtonBackground"], map["ToolbarToggleButtonBackgroundChecked"]);
+		}
+
+		[TestMethod]
+		[DataRow(false, 255, 240, 0)]
+		[DataRow(true, 10, 20, 80)]
+		public void Palette_DerivesAccentTextAgainstInfoPaneAndViewSeparatelyFromFills(bool dark, int red, int green, int blue)
+		{
+			var accent = new AppearanceColor((byte)red, (byte)green, (byte)blue);
+			var background = dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(250, 240, 230);
+			var view = dark ? new AppearanceColor(48, 48, 48) : new AppearanceColor(255, 255, 255);
+			var named = new Dictionary<string, AppearanceColor> { ["theme_bg_color"] = background, ["view_bg_color"] = view };
+			var map = SystemAppearancePalette.Map(new(dark, false, accent, named, dark), dark);
+			Assert.AreEqual(accent, map["AccentFillColorDefaultBrush"]);
+			Assert.AreEqual(accent, map["SystemAccentColor"]);
+			foreach (var key in new[] { "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush" })
+				Assert.IsTrue(SystemAppearancePalette.ContrastRatio(map[key], map["App.Theme.FileArea.BackgroundBrush"]) >= 4.5, key);
+			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(map["App.Theme.InfoPane.AccentTextBrush"], map["App.Theme.InfoPane.BackgroundBrush"]) >= 4.5);
+			var explicitTheme = SystemAppearancePalette.Map(new(dark, false, accent, named, dark), !dark);
+			var fallback = !dark ? new AppearanceColor(32, 32, 32) : new AppearanceColor(243, 243, 243);
+			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(explicitTheme["AccentTextFillColorPrimaryBrush"], fallback) >= 4.5);
+		}
+
+		[TestMethod]
+		[DataRow(false, 255, 240, 0, 48, 243)]
+		[DataRow(true, 10, 20, 80, 243, 32)]
+		public void Palette_UsesFinalCustomBackgroundsAndSeparateInfoPaneAccent(bool dark, int red, int green, int blue, int info, int view)
+		{
+			var accent = new AppearanceColor((byte)red, (byte)green, (byte)blue);
+			var infoBackground = new AppearanceColor((byte)info, (byte)info, (byte)info);
+			var viewBackground = new AppearanceColor((byte)view, (byte)view, (byte)view);
+			var colors = new Dictionary<string, AppearanceColor>(SystemAppearancePalette.Map(new(dark, false, accent, new Dictionary<string, AppearanceColor>()), dark));
+			colors["App.Theme.InfoPane.BackgroundBrush"] = infoBackground;
+			colors["App.Theme.FileArea.BackgroundBrush"] = viewBackground;
+			foreach (var (key, color) in SystemAppearancePalette.MapAccentText(accent, dark, colors)) colors[key] = color;
+
+			Assert.AreEqual(accent, colors["App.Theme.InfoPane.AccentTextBrush"]);
+			Assert.AreEqual(accent, colors["AccentFillColorDefaultBrush"]);
+			Assert.AreNotEqual(colors["App.Theme.InfoPane.AccentTextBrush"], colors["AccentTextFillColorPrimaryBrush"]);
+			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(colors["App.Theme.InfoPane.AccentTextBrush"], infoBackground) >= 4.5);
+			foreach (var key in new[] { "AccentTextFillColorPrimaryBrush", "AccentTextFillColorSecondaryBrush" })
+				Assert.IsTrue(SystemAppearancePalette.ContrastRatio(colors[key], viewBackground) >= 4.5, key);
+		}
+
+		[TestMethod]
+		public void Palette_MapsControlStatesPreservesExplicitThemeAndReadableAccentText()
+		{
+			var bg = new AppearanceColor(250, 240, 230);
+			var named = new Dictionary<string, AppearanceColor> { ["theme_bg_color"] = bg, ["theme_fg_color"] = new(12, 23, 34), ["theme_selected_fg_color"] = new(255, 255, 255) };
+			var system = new SystemAppearance(false, false, new(255, 240, 0), named);
+			var map = SystemAppearancePalette.Map(system, false);
+			Assert.AreEqual(bg, map["App.Theme.BackgroundBrush"]);
+			Assert.AreEqual(named["theme_fg_color"], map["ToolbarButtonForegroundPointerOver"]);
+			Assert.AreEqual(new AppearanceColor(0, 0, 0), map["TextOnAccentFillColorPrimaryBrush"]);
+			Assert.IsFalse(SystemAppearancePalette.Map(system, true).ContainsKey("App.Theme.BackgroundBrush"));
+			Assert.IsTrue(SystemAppearancePalette.Map(system, true).ContainsKey("SystemAccentColor"));
+			Assert.IsTrue(SystemAppearancePalette.ContrastRatio(map["SystemAccentColor"], map["TextOnAccentFillColorPrimaryBrush"]) >= 4.5);
+		}
+	}
+}

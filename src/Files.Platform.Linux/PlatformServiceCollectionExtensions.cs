@@ -33,6 +33,7 @@ namespace Files.Platform.Linux
 		{
 			return services
 				.AddSingleton<IPlatformCapabilities, LinuxPlatformCapabilities>()
+				.AddSingleton<Files.Platform.Abstractions.Appearance.ISystemAppearanceService, Theme.LinuxSystemAppearanceService>()
 				.AddLinuxAppData()
 				.AddLinuxEnumeration()
 				.AddLinuxFileStat()

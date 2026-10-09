@@ -37,6 +37,8 @@
             stdenv.mkDerivation {
               pname = "linuxfiles";
               inherit version;
+              # Set true only after pinning a release with NixOS helper/tool discovery.
+              passthru.supportsNixRootActions = false;
 
               dontUnpack = true;
               dontConfigure = true;
@@ -116,7 +118,13 @@
             rootActions = lib.mkEnableOption "polkit-authenticated LinuxFiles root operations";
           };
           config = lib.mkIf cfg.enable (lib.mkMerge [
-            { environment.systemPackages = [ package ]; }
+            {
+              environment.systemPackages = [ package ];
+              assertions = [{
+                assertion = !cfg.rootActions || (package.passthru.supportsNixRootActions or false);
+                message = "programs.linuxfiles.rootActions requires a runtime with NixOS deployment-manifest and elevation-wrapper discovery (passthru.supportsNixRootActions = true). Disable rootActions or select a compatible package; the pinned alpha2 release is incompatible.";
+              }];
+            }
             (lib.mkIf cfg.rootActions (lib.mkMerge [
               {
                 security.polkit.enable = true;
@@ -139,11 +147,37 @@
 
       checks.${system}.root-actions-module =
         let
+          # This fixture checks module/layout wiring, not the pinned runtime's capabilities.
+          compatible = self.packages.${system}.linuxfiles.overrideAttrs (old: {
+            passthru = (old.passthru or { }) // { supportsNixRootActions = true; };
+          });
+          unsupported = nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = [ self.nixosModules.default {
+              programs.linuxfiles.enable = true;
+              programs.linuxfiles.rootActions = true;
+            } ];
+          };
+          unmarked = nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = [ self.nixosModules.default {
+              programs.linuxfiles.enable = true;
+              programs.linuxfiles.rootActions = true;
+              programs.linuxfiles.package = compatible.overrideAttrs (old: {
+                passthru = builtins.removeAttrs old.passthru [ "supportsNixRootActions" ];
+              });
+            } ];
+          };
+          capabilityAssertion = evaluated:
+            nixpkgs.lib.findFirst
+              (entry: nixpkgs.lib.hasPrefix "programs.linuxfiles.rootActions requires" entry.message)
+              (throw "Missing root-actions runtime assertion") evaluated.config.assertions;
           enabled = nixpkgs.lib.nixosSystem {
             inherit system;
             modules = [ self.nixosModules.default {
               programs.linuxfiles.enable = true;
               programs.linuxfiles.rootActions = true;
+              programs.linuxfiles.package = compatible;
             } ];
           };
           disabled = nixpkgs.lib.nixosSystem {
@@ -151,8 +185,12 @@
             modules = [ self.nixosModules.default { programs.linuxfiles.enable = true; } ];
           };
           # Pick our package explicitly; other modules also add system packages.
-          package = self.packages.${system}.linuxfiles.override { enableRootActions = true; };
+          package = compatible.override { enableRootActions = true; };
         in
+        assert !(capabilityAssertion unsupported).assertion;
+        assert !(capabilityAssertion unmarked).assertion;
+        assert (capabilityAssertion enabled).assertion;
+        assert (capabilityAssertion disabled).assertion;
         assert enabled.config.security.polkit.enable;
         assert enabled.config.security.wrappers.pkexec.setuid;
         assert enabled.config.environment.etc."linuxfiles/root-actions".text ==

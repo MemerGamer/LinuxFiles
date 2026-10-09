@@ -202,6 +202,28 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		public async Task TbzActivationUsesArchiveServiceRecognitionForRootsAndMembers()
+		{
+			var source = Path.Combine(root, "readme.txt");
+			File.WriteAllText(source, "readme");
+			var path = Path.Combine(root, "backup.tbz");
+			var created = await service.CreateAsync([source], path, new ArchiveCreateOptions { Format = ArchiveFormat.TarBz2 });
+			Assert.IsTrue(created.Succeeded, created.Error);
+			Assert.IsTrue(service.IsArchiveFileName(path));
+			Assert.IsTrue(FileExtensionHelpers.IsZipPath(path, isArchiveFileName: service.IsArchiveFileName));
+			Assert.IsFalse(FileExtensionHelpers.IsZipPath(path, includeRoot: false, isArchiveFileName: service.IsArchiveFileName));
+			var memberPath = path + "/readme.txt";
+			Assert.IsTrue(FileExtensionHelpers.IsZipPath(memberPath, includeRoot: false, isArchiveFileName: service.IsArchiveFileName));
+			Assert.AreEqual(path, FileExtensionHelpers.GetArchiveContainerPath(memberPath, service.IsArchiveFileName));
+			var resolver = new StorableResolver([new ArchiveStorableRoute(service), new LocalStorableRoute()]);
+			Assert.IsInstanceOfType<ArchiveFolder>((await resolver.TryGetAsync(path)).Item);
+			var member = (ArchiveEntryFile)(await resolver.TryGetAsync(memberPath)).Item!;
+			using var stream = await member.OpenReadAsync();
+			using var reader = new StreamReader(stream);
+			Assert.AreEqual("readme", await reader.ReadToEndAsync());
+		}
+
+		[TestMethod]
 		public async Task TraversalAndAmbiguousArchiveTreesAreRejected()
 		{
 			var path = Zip(("../outside", "no"));

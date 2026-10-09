@@ -35,19 +35,19 @@ namespace Files.App.Helpers
 					return true;
 				}
 
-				var isArchiveRoot = !openViaApplicationPicker && File.Exists(path) &&
-					Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName(path);
+				var archiveService = Ioc.Default.GetRequiredService<IArchiveService>();
+				var isArchiveRoot = !openViaApplicationPicker && File.Exists(path) && archiveService.IsArchiveFileName(path);
 				if (isArchiveRoot)
 				{
-					// A supported extension must not bypass executable or desktop-entry confirmation.
+					// Archive navigation must not launch executables, desktop entries, or editors.
 					var plan = await PlanAsync(path);
 					if (plan.Action != OpenAction.OpenDefault)
-						return await ExecutePlanAsync(path, plan);
+						return false;
 					if (!plan.StillValid())
 						return false;
 				}
 
-				if (isArchiveRoot || FileExtensionHelpers.IsZipPath(path, includeRoot: false))
+				if (isArchiveRoot || FileExtensionHelpers.IsZipPath(path, includeRoot: false, isArchiveFileName: archiveService.IsArchiveFileName))
 				{
 					var resolved = await Ioc.Default.GetRequiredService<Files.Core.Storage.Contracts.IStorableResolver>().TryGetAsync(path);
 					if (resolved.Item is OwlCore.Storage.IFolder)

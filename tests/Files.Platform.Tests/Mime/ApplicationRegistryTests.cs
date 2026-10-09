@@ -36,6 +36,49 @@ namespace Files.Platform.Tests.Mime
 		}
 
 		[TestMethod]
+		public async Task Cache_InvalidatesInPlaceEditsWithRestoredMtime()
+		{
+			using var fx = new XdgFixture();
+			var desktop = fx.WriteDesktop("usr-share", "a.desktop", "Before", "a %f");
+			fx.WriteDesktop("usr-share", "b.desktop", "B", "b %f");
+			var associations = fx.Write("config/mimeapps.list", "[Default Applications]\ntext/plain=a.desktop;\n");
+			var timestamp = System.DateTime.UtcNow.AddDays(-1);
+			File.SetLastWriteTimeUtc(desktop, timestamp);
+			File.SetLastWriteTimeUtc(associations, timestamp);
+			var registry = Create(fx);
+			Assert.AreEqual("Before", (await registry.GetDefaultApplicationAsync("text/plain"))!.Name);
+			await Task.Delay(20);
+			RewritePreservingMtime(desktop, "Before", "After!");
+			Assert.AreEqual("After!", (await registry.GetApplicationAsync("a.desktop"))!.Name);
+			await Task.Delay(20);
+			RewritePreservingMtime(associations, "a.desktop", "b.desktop");
+			Assert.AreEqual("b.desktop", (await registry.GetDefaultApplicationAsync("text/plain"))!.Id);
+		}
+
+		private static void RewritePreservingMtime(string path, string before, string after)
+		{
+			var timestamp = File.GetLastWriteTimeUtc(path);
+			var length = new FileInfo(path).Length;
+			File.WriteAllText(path, File.ReadAllText(path).Replace(before, after));
+			File.SetLastWriteTimeUtc(path, timestamp);
+			Assert.AreEqual(length, new FileInfo(path).Length);
+			Assert.AreEqual(timestamp, File.GetLastWriteTimeUtc(path));
+		}
+
+		[TestMethod]
+		public async Task Cache_RetriesTransientReadFailureWithoutFileChanges()
+		{
+			using var fx = new XdgFixture();
+			var path = fx.WriteDesktop("usr-share", "a.desktop", "A", "a %f");
+			var registry = Create(fx);
+			var timestamp = File.GetLastWriteTimeUtc(path);
+			using (var locked = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+				Assert.IsNull(await registry.GetApplicationAsync("a.desktop"));
+			Assert.AreEqual(timestamp, File.GetLastWriteTimeUtc(path));
+			Assert.AreEqual("A", (await registry.GetApplicationAsync("a.desktop"))!.Name);
+		}
+
+		[TestMethod]
 		public async Task Cache_InvalidatesMimeInfoAndAssociationsAndUserOverride()
 		{
 			using var fx = new XdgFixture();

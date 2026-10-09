@@ -187,6 +187,9 @@ namespace Files.App.Services.Settings
 
 		private void UntagAllFiles(string uid)
 		{
+#if !WINDOWS
+			_ = FileTagsHelper.UntagAllFilesAsync(uid);
+#else
 			var tagDoDelete = new string[] { uid };
 
 			foreach (var item in FileTagsHelper.GetDbInstance().GetAll())
@@ -198,6 +201,7 @@ namespace Files.App.Services.Settings
 						item.Tags.Except(tagDoDelete).ToArray());
 				}
 			}
+#endif
 		}
 
 		private IJsonSettingsSerializer GetJsonSettingsSerializer()

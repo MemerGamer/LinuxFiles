@@ -79,7 +79,10 @@ namespace Files.App.Utils.FileTags
 	internal sealed class Ioc
 	{
 		public static Ioc Default { get; } = new();
-		public T GetRequiredService<T>() => throw new InvalidOperationException("Tests must use an explicit database path.");
+		public IServiceProvider? Services { get; set; }
+		public T? GetService<T>() where T : class => Services?.GetService(typeof(T)) as T;
+		public T GetRequiredService<T>() => Services?.GetService(typeof(T)) is T service
+			? service : throw new InvalidOperationException("Tests must use an explicit database path or register services.");
 	}
 
 	internal static class App

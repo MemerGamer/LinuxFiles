@@ -8,11 +8,11 @@ using System.Collections.Generic;
 
 namespace Files.Platform.Linux.Mime
 {
-	/// <summary>Reuses parsing until a file's device, inode, mode, size or nanosecond mtime changes.</summary>
+	/// <summary>Reuses parsing until a file's device, inode, mode, size or nanosecond mtime or ctime changes.</summary>
 	internal sealed class ParsedFileCache<T> where T : class
 	{
 		private readonly object gate = new();
-		private readonly Dictionary<string, (PosixStat Stamp, T? Value)> entries = new(StringComparer.Ordinal);
+		private readonly Dictionary<string, (PosixStat Stamp, T Value)> entries = new(StringComparer.Ordinal);
 		private readonly bool followLinks;
 
 		public ParsedFileCache(bool followLinks = true) => this.followLinks = followLinks;
@@ -37,8 +37,13 @@ namespace Files.Platform.Linux.Mime
 				var value = read(path);
 				if (PosixNative.TryStat(PosixNative.AtFdCwd, path, flags, out var after) && after == stamp)
 				{
-					if (entries.Count >= 4096) entries.Clear();
-					entries[path] = (stamp, value);
+					if (value is not null)
+					{
+						if (entries.Count >= 4096) entries.Clear();
+						entries[path] = (stamp, value);
+					}
+					else
+						entries.Remove(path);
 				}
 				else
 					value = null;

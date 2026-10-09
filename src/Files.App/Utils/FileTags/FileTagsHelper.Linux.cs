@@ -4,7 +4,10 @@
 #if !WINDOWS
 using Files.Platform.Abstractions.Tags;
 using Microsoft.Extensions.Logging;
-using Windows.Storage;
+using System;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Files.App.Utils.FileTags
 {
@@ -45,19 +48,67 @@ namespace Files.App.Utils.FileTags
 			var store = Ioc.Default.GetService<IFileTagsStore>();
 			var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
 			var names = settings.GetTagsByIds(tags)?.Select(x => x.Name).ToArray() ?? [];
+			return EnqueueWrite(() => !cancellationToken.IsCancellationRequested && WriteTags(filePath, tags, names, store));
+		}
+
+		public static Task<bool> UntagAllFilesAsync(string uid)
+		{
+			var store = Ioc.Default.GetService<IFileTagsStore>();
+			var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
+			var namesById = settings.FileTagList.ToDictionary(tag => tag.Uid, tag => tag.Name);
+			return EnqueueWrite(() =>
+			{
+				var succeeded = true;
+				foreach (var item in GetDbInstance().GetAll())
+				{
+					if (!item.Tags.Contains(uid)) continue;
+					var tags = item.Tags.Where(tag => tag != uid).ToArray();
+					var names = tags.Where(namesById.ContainsKey).Select(tag => namesById[tag]).ToArray();
+					succeeded &= WriteTags(item.FilePath, tags, names, store);
+				}
+				return succeeded;
+			});
+		}
+
+		public static async Task DrainPendingWritesAsync()
+		{
+			while (true)
+			{
+				Task write;
+				lock (writeGate) write = pendingWrite;
+				await write.ConfigureAwait(false);
+				lock (writeGate)
+					if (ReferenceEquals(write, pendingWrite)) return;
+			}
+		}
+
+		private static bool WriteTags(string filePath, string[] tags, string[] names, IFileTagsStore? store)
+		{
+			try
+			{
+				GetDbInstance().SetTags(filePath, null, tags);
+				if (store is not null && !store.WriteTags(filePath, names))
+					App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
+				return true;
+			}
+			catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+			{
+				App.Logger?.LogWarning(ex, "Could not write file tags.");
+				return false;
+			}
+		}
+
+		private static Task<bool> EnqueueWrite(Func<bool> action)
+		{
 			lock (writeGate)
 			{
 				var previous = pendingWrite;
 				var write = Task.Run(async () =>
 				{
 					await previous.ConfigureAwait(false);
-					if (cancellationToken.IsCancellationRequested) return false;
 					try
 					{
-						GetDbInstance().SetTags(filePath, null, tags);
-						if (store is not null && !store.WriteTags(filePath, names))
-							App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
-						return true;
+						return action();
 					}
 					catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
 					{

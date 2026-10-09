@@ -224,6 +224,37 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		public async Task TbzNavigationRoutesRootsAndInternalFoldersToArchiveEnumeration()
+		{
+			// Guard the UI routing too: resolver-only tests bypass the filesystem fallback.
+			var repository = new DirectoryInfo(AppContext.BaseDirectory);
+			while (repository is not null && !File.Exists(Path.Combine(repository.FullName, "Files.slnx")))
+				repository = repository.Parent;
+			Assert.IsNotNull(repository, "Repository root not found");
+			var shell = File.ReadAllText(Path.Combine(repository.FullName, "src/Files.App/Platforms/Desktop/ViewModels/ShellViewModel.Linux.cs"));
+			Assert.IsTrue(shell.Contains("FileExtensionHelpers.IsZipPath(path, isArchiveFileName: Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName)", StringComparison.Ordinal), "Linux enumeration must use archive service recognition.");
+			var pagePaths = File.ReadAllText(Path.Combine(repository.FullName, "src/Files.App/Utils/Storage/StorageItems/ZipStorageFolder.cs"));
+			Assert.IsTrue(pagePaths.Contains("FileExtensionHelpers.IsZipPath(path, includeRoot, Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName)", StringComparison.Ordinal), "Archive page classification must use archive service recognition.");
+
+			var directory = Directory.CreateDirectory(Path.Combine(root, "dir"));
+			File.WriteAllText(Path.Combine(directory.FullName, "readme.txt"), "readme");
+			var path = Path.Combine(root, "backup.tbz");
+			var created = await service.CreateAsync([directory.FullName], path, new ArchiveCreateOptions { Format = ArchiveFormat.TarBz2 });
+			Assert.IsTrue(created.Succeeded, created.Error);
+			var resolver = new StorableResolver([new ArchiveStorableRoute(service), new LocalStorableRoute()]);
+			foreach (var (location, expectedChild) in new[] { (path, "dir"), (path + "/dir", "readme.txt") })
+			{
+				Assert.IsFalse(Directory.Exists(location));
+				Assert.IsTrue(FileExtensionHelpers.IsZipPath(location, isArchiveFileName: service.IsArchiveFileName));
+				Assert.AreEqual(path, FileExtensionHelpers.GetArchiveContainerPath(location, service.IsArchiveFileName));
+				var folder = (ArchiveFolder)(await resolver.TryGetAsync(location)).Item!;
+				var children = new List<IStorableChild>();
+				await foreach (var child in folder.GetItemsAsync()) children.Add(child);
+				CollectionAssert.AreEqual(new[] { expectedChild }, children.Select(child => child.Name).ToArray());
+			}
+		}
+
+		[TestMethod]
 		public async Task TraversalAndAmbiguousArchiveTreesAreRejected()
 		{
 			var path = Zip(("../outside", "no"));

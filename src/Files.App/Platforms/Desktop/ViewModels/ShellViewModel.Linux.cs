@@ -4,6 +4,7 @@
 using Files.App.Storage.Archives;
 using Files.Core.Storage.Contracts;
 using Files.Core.Storage.Enums;
+using Files.Platform.Abstractions.Archives;
 using Files.Platform.Abstractions.Enumeration;
 using Files.Platform.Abstractions.Trash;
 using Files.Platform.Abstractions.Watching;
@@ -47,7 +48,7 @@ namespace Files.App.ViewModels
 				return await EnumerateLinuxTrashAsync(path, cancellationToken);
 
 			currentStorable = null;
-			if (FileExtensionHelpers.IsZipPath(path))
+			if (FileExtensionHelpers.IsZipPath(path, isArchiveFileName: Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName))
 				return await EnumerateLinuxArchiveAsync(path, cancellationToken, library);
 
 			if (!Directory.Exists(path))
@@ -192,7 +193,7 @@ namespace Files.App.ViewModels
 
 			currentStorable = StorableWithPath.FromStorable(path, folder);
 
-			var containerPath = FileExtensionHelpers.GetArchiveContainerPath(path) ?? path;
+			var containerPath = FileExtensionHelpers.GetArchiveContainerPath(path, Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName) ?? path;
 			var containerModified = File.GetLastWriteTime(containerPath);
 			CurrentFolder = library ?? new ListedItem(null)
 			{

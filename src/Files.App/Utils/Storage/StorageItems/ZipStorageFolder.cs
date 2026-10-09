@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 #if !WINDOWS
+using Files.Platform.Abstractions.Archives;
 using Files.Shared.Helpers;
 using System.Collections.Concurrent;
 using System.Diagnostics.CodeAnalysis;
@@ -19,8 +20,8 @@ namespace Files.App.Utils.Storage
 		private static readonly ConcurrentDictionary<string, Encoding?> Encodings = new(StringComparer.Ordinal);
 		public StorageCredential? Credentials { get; set; }
 		public Func<IPasswordProtectedItem, Task<StorageCredential>>? PasswordRequestedCallback { get; set; }
-		public static string? GetContainerPath(string path) => FileExtensionHelpers.GetArchiveContainerPath(path);
-		public static bool IsZipPath([NotNullWhen(true)] string? path, bool includeRoot = true) => FileExtensionHelpers.IsZipPath(path, includeRoot);
+		public static string? GetContainerPath(string path) => FileExtensionHelpers.GetArchiveContainerPath(path, Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName);
+		public static bool IsZipPath([NotNullWhen(true)] string? path, bool includeRoot = true) => FileExtensionHelpers.IsZipPath(path, includeRoot, Ioc.Default.GetRequiredService<IArchiveService>().IsArchiveFileName);
 		internal static bool TryGetEncodingForContainerPath(string path, out Encoding? encoding) => Encodings.TryGetValue(path, out encoding);
 		internal static void SetEncodingForContainerPath(string path, Encoding? encoding) => Encodings[path] = encoding;
 		public static Task<bool> CheckDefaultZipApp(string path) => Task.FromResult(true);

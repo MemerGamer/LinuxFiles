@@ -165,7 +165,7 @@ namespace Files.Shared.Helpers
 		}
 
 		/// <summary>Finds a browsable archive component, skipping real directories with archive extensions.</summary>
-		public static string? GetArchiveContainerPath(string path)
+		public static string? GetArchiveContainerPath(string path, Func<string, bool>? isArchiveFileName = null)
 		{
 			for (var end = 1; end <= path.Length; end++)
 			{
@@ -173,16 +173,16 @@ namespace Files.Shared.Helpers
 					continue;
 				var candidate = path[..end];
 				var name = candidate[(Math.Max(candidate.LastIndexOf('/'), candidate.LastIndexOf('\\')) + 1)..];
-				if (IsBrowsableZipFile(name, out _) && !Directory.Exists(candidate))
+				if ((isArchiveFileName?.Invoke(candidate) ?? IsBrowsableZipFile(name, out _)) && !Directory.Exists(candidate))
 					return candidate;
 			}
 			return null;
 		}
 
 		/// <summary>Checks for an archive root or a member path using either separator.</summary>
-		public static bool IsZipPath([NotNullWhen(true)] string? path, bool includeRoot = true)
+		public static bool IsZipPath([NotNullWhen(true)] string? path, bool includeRoot = true, Func<string, bool>? isArchiveFileName = null)
 		{
-			if (string.IsNullOrEmpty(path) || GetArchiveContainerPath(path) is not { } container)
+			if (string.IsNullOrEmpty(path) || GetArchiveContainerPath(path, isArchiveFileName) is not { } container)
 				return false;
 			return container.Length == path.TrimEnd('/', '\\').Length ? includeRoot : !Path.Exists(path);
 		}

@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -82,6 +83,19 @@ namespace Files.Platform.Linux.Archives
 				// Pass 2: stream the entries
 				var buffer = new byte[81920];
 				long bytesDone = 0, streamedEntries = 0;
+				long? lastProgress = null;
+				void ReportProgress(string? currentEntry, bool force = false)
+				{
+					if (options.Progress is null)
+						return;
+
+					var now = Stopwatch.GetTimestamp();
+					if (!force && lastProgress is { } last && Stopwatch.GetElapsedTime(last, now) < TimeSpan.FromMilliseconds(100))
+						return;
+
+					lastProgress = now;
+					options.Progress.Report(new ArchiveProgress(processed, entryCount, bytesDone, declaredBytes, currentEntry));
+				}
 				{
 					foreach (var (entry, openEntry) in archive.Entries())
 					{
@@ -92,7 +106,8 @@ namespace Files.Platform.Linux.Archives
 						if (entry.IsEncrypted && string.IsNullOrEmpty(options.Password))
 							throw new ArchivePasswordException("The archive is encrypted and the password is missing.");
 
-						options.Progress?.Report(new ArchiveProgress(processed, entryCount, bytesDone, declaredBytes, ArchivePathValidator.Printable(relative)));
+						var currentEntry = ArchivePathValidator.Printable(relative);
+						ReportProgress(currentEntry);
 
 						if (!extract)
 						{
@@ -108,6 +123,7 @@ namespace Files.Platform.Linux.Archives
 								guard.AddBytes(read);
 								testCrc = Crc32.Update(testCrc, buffer, read);
 								bytesDone += read;
+								ReportProgress(currentEntry);
 							}
 
 							VerifyCrc(entry, testCrc);
@@ -161,6 +177,7 @@ namespace Files.Platform.Linux.Archives
 								output.Write(buffer, 0, read);
 								crc = Crc32.Update(crc, buffer, read);
 								bytesDone += read;
+								ReportProgress(currentEntry);
 							}
 						}
 
@@ -184,7 +201,7 @@ namespace Files.Platform.Linux.Archives
 				Merge(staging!, destination!, string.Empty, state);
 				skipped += state.Skipped;
 
-				options.Progress?.Report(new ArchiveProgress(processed, entryCount, bytesDone, declaredBytes, null));
+				ReportProgress(null, force: true);
 				return new ArchiveResult(true, false, processed, skipped, null, destination);
 			}
 			catch (OperationCanceledException)

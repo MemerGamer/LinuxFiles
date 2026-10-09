@@ -7,7 +7,7 @@ using Windows.Storage;
 namespace Files.App.Actions
 {
 	/// <summary>
-	/// Browses an archive like a folder (Linux), while double-click keeps opening it in the default application.
+	/// Browses an archive like a folder (Linux).
 	/// </summary>
 	[GeneratedRichCommand]
 	internal sealed partial class OpenArchiveAsFolderAction : ObservableObject, IAction

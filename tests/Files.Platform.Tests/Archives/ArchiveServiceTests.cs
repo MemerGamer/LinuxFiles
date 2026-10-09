@@ -144,6 +144,80 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		public async Task ExtractionReportsThrottledBytesWithinSingleEntryAndFinalTotals()
+		{
+			var data = new byte[2 * 1024 * 1024];
+			Random.Shared.NextBytes(data);
+			var archive = ZipWith(Path.Combine(Work, "progress.zip"), ("large.bin", data));
+			var reports = new List<ArchiveProgress>();
+			var elapsed = Stopwatch.StartNew();
+			var result = await service.ExtractAsync(archive, Out, new ArchiveExtractOptions
+			{
+				Progress = new SynchronousProgress(p =>
+				{
+					reports.Add(p);
+					// Ensure even a fast disk crosses the throttle interval during this single entry.
+					if (reports.Count == 1)
+						Thread.Sleep(150);
+				}),
+			});
+
+			Assert.IsTrue(result.Succeeded, result.Error);
+			Assert.IsTrue(reports.Any(p => p.BytesProcessed > 0 && p.BytesProcessed < data.Length && p.EntriesProcessed == 0 && p.CurrentEntry == "large.bin"));
+			Assert.IsTrue(reports.Count <= elapsed.ElapsedMilliseconds / 100 + 2, "progress must be throttled, except for initial and final reports");
+			for (var i = 1; i < reports.Count; i++)
+				Assert.IsTrue(reports[i].BytesProcessed >= reports[i - 1].BytesProcessed);
+			Assert.AreEqual(new ArchiveProgress(1, 1, data.Length, data.Length, null), reports[^1]);
+			CollectionAssert.AreEqual(data, File.ReadAllBytes(Path.Combine(Out, "large.bin")));
+		}
+
+		[TestMethod]
+		public async Task CancellationFromByteProgressRemovesStagingWithoutCompletion()
+		{
+			var archive = ZipWith(Path.Combine(Work, "cancel.zip"), ("large.bin", new byte[2 * 1024 * 1024]));
+			using var cts = new CancellationTokenSource();
+			var reports = new List<ArchiveProgress>();
+			var result = await service.ExtractAsync(archive, Out, new ArchiveExtractOptions
+			{
+				Progress = new SynchronousProgress(p =>
+				{
+					reports.Add(p);
+					if (p.BytesProcessed == 0)
+						Thread.Sleep(150);
+					else
+						cts.Cancel();
+				}),
+			}, cts.Token);
+
+			Assert.IsFalse(result.Succeeded);
+			Assert.IsTrue(result.Cancelled);
+			Assert.AreEqual(0L, result.ItemsProcessed);
+			Assert.IsTrue(reports.Any(p => p.BytesProcessed > 0));
+			Assert.IsFalse(reports.Any(p => p.CurrentEntry is null));
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(Out).Length);
+		}
+
+		[TestMethod]
+		public async Task EmptyExtractionReportsCompletion()
+		{
+			var archive = ZipWith(Path.Combine(Work, "empty.zip"));
+			var reports = new List<ArchiveProgress>();
+			var result = await service.ExtractAsync(archive, Out, new ArchiveExtractOptions
+			{
+				Progress = new SynchronousProgress(reports.Add),
+			});
+
+			Assert.IsTrue(result.Succeeded, result.Error);
+			Assert.AreEqual(new ArchiveProgress(0, 0, 0, 0, null), reports.Single());
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(Out).Length);
+		}
+
+		private sealed class SynchronousProgress(Action<ArchiveProgress> report) : IProgress<ArchiveProgress>
+		{
+			public void Report(ArchiveProgress value) => report(value);
+		}
+
+		[TestMethod]
 		public async Task CompressionLevelsAffectSize()
 		{
 			var tree = MakeTree();

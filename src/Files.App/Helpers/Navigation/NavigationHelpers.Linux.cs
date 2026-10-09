@@ -3,6 +3,7 @@
 
 #if !WINDOWS
 using Files.App.Dialogs;
+using Files.Platform.Abstractions.Archives;
 using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
@@ -34,8 +35,19 @@ namespace Files.App.Helpers
 					return true;
 				}
 
-				// Members of an archive being browsed; the archive file itself still opens with its default application
-				if (FileExtensionHelpers.IsZipPath(path, includeRoot: false))
+				var archiveService = Ioc.Default.GetRequiredService<IArchiveService>();
+				var isArchiveRoot = !openViaApplicationPicker && File.Exists(path) && archiveService.IsArchiveFileName(path);
+				if (isArchiveRoot)
+				{
+					// Archive navigation must not launch executables, desktop entries, or editors.
+					var plan = await PlanAsync(path);
+					if (plan.Action != OpenAction.OpenDefault)
+						return false;
+					if (!plan.StillValid())
+						return false;
+				}
+
+				if (isArchiveRoot || FileExtensionHelpers.IsZipPath(path, includeRoot: false, isArchiveFileName: archiveService.IsArchiveFileName))
 				{
 					var resolved = await Ioc.Default.GetRequiredService<Files.Core.Storage.Contracts.IStorableResolver>().TryGetAsync(path);
 					if (resolved.Item is OwlCore.Storage.IFolder)
@@ -45,7 +57,7 @@ namespace Files.App.Helpers
 						return true;
 					}
 
-					if (resolved.Item is not OwlCore.Storage.IFile member)
+					if (isArchiveRoot || resolved.Item is not OwlCore.Storage.IFile member)
 					{
 						await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
 						return false;

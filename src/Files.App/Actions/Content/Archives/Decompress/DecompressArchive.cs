@@ -90,7 +90,7 @@ namespace Files.App.Actions
 			var result = await FilesystemTasks.Wrap(() =>
 				StorageArchiveService.DecompressAsync(archivePath, destinationFolderPath, password, encoding));
 
-			if (decompressArchiveViewModel.OpenDestinationFolderOnCompletion)
+			if (result && decompressArchiveViewModel.OpenDestinationFolderOnCompletion)
 				await NavigationHelpers.OpenPath(destinationFolderPath, context.ShellPage, FilesystemItemType.Directory);
 		}
 

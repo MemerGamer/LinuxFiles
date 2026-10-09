@@ -18,10 +18,11 @@ namespace Files.Platform.Tests.SystemIntegration
 	public sealed class ElevationProcessRunnerTests
 	{
 		[TestMethod]
-		[DataRow(0, false)]
-		[DataRow(1, true)]
-		[DataRow(2, false)]
-		public async Task CancellationWithEpermWaitsAndReturnsActualExitAndOutput(int exitCode, bool processTree)
+		[DataRow(0, false, ElevationHelperProtocol.HelperPath)]
+		[DataRow(0, false, "/nix/store/00000000000000000000000000000000-linuxfiles/lib/linuxfiles/elevation-helper/files-elevation-helper")]
+		[DataRow(1, true, ElevationHelperProtocol.HelperPath)]
+		[DataRow(2, false, ElevationHelperProtocol.HelperPath)]
+		public async Task CancellationWithEpermWaitsAndReturnsActualExitAndOutput(int exitCode, bool processTree, string helper)
 		{
 			var directory = Path.Combine(Path.GetTempPath(), "files-auth-process-" + Guid.NewGuid().ToString("N"));
 			Directory.CreateDirectory(directory);
@@ -32,6 +33,7 @@ namespace Files.Platform.Tests.SystemIntegration
 			var script = "#!/usr/bin/python3\nimport sys, json, hashlib, pathlib, time\n"
 				+ "directory = pathlib.Path(__file__).resolve().parent\n"
 				+ "data = sys.stdin.buffer.read()\nassert len(sys.argv) == 4\n"
+				+ $"assert sys.argv[1] == '{helper}'\n"
 				+ "assert hashlib.sha256(data).hexdigest().upper() == sys.argv[3]\n"
 				+ "request = json.loads(data)\n"
 				+ "(directory / 'started').touch()\n"
@@ -51,7 +53,7 @@ namespace Files.Platform.Tests.SystemIntegration
 				throw processTree ? new AggregateException(denied) : denied;
 			});
 			using var cancellation = new CancellationTokenSource();
-			var execution = runner.RunHelperAsync(executable, json, cancellation.Token);
+			var execution = runner.RunHelperAsync(executable, helper, json, cancellation.Token);
 			try
 			{
 				var deadline = DateTime.UtcNow.AddSeconds(5);

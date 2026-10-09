@@ -17,6 +17,7 @@ App id (used everywhere): `io.github.memergamer.LinuxFiles`. Binary/launcher: `f
 | `scripts/linux/build-flatpak.sh`, `gen-aur.sh` | Build the Flatpak bundle; render PKGBUILD + `.SRCINFO` with real checksums. |
 | `scripts/linux/publish.sh` | `dotnet publish` to `artifacts/linux-<rid>/`. |
 | `scripts/linux/install-local.sh`, `uninstall-local.sh` | User-local install into `~/.local`. |
+| `scripts/linux/install-host-root-helper.py` | Explicit companion host-helper install from a matching native release; does not alter sandbox permissions. |
 | `scripts/linux/gen-icons.sh` | Regenerates the icons. |
 | `flake.nix`, `scripts/linux/update-nix-flake.sh` | Nix flake (repackages the release tarball); the script bumps version and hashes. |
 | `.github/workflows/package-linux.yml` | Manual / `linux-v*` tag: publish, AppImage, Flatpak, AUR recipe; tags also create a GitHub release. |
@@ -148,7 +149,24 @@ First used for `linux-v0.1.0-alpha1` (prerelease; install instructions are in `.
 
 ## Nix flake
 
-`flake.nix` (with `flake.lock`, pinned to `nixos-unstable`) exposes `packages.x86_64-linux.{linuxfiles,default}`, `apps.x86_64-linux.default` and `overlays.default` (adds `pkgs.linuxfiles`). There is no NixOS module. The derivation `fetchurl`s the release's `files-linux-x64.tar.gz` and `files-packaging.tar.gz` (pinned version and SRI hashes), patches the ELF files with `autoPatchelfHook`, and installs like the AUR package: app in `$out/lib/linuxfiles`, a `makeWrapper` `bin/files`, desktop entry, metainfo, icons and licence. The libraries that are loaded with dlopen (fontconfig, freetype, libGL, libX11/Xcursor/Xrandr/Xi/Xext, ICU, OpenSSL, zlib, krb5, glib) are added to every ELF file's runpath through `appendRunpaths`; the wrapper sets no library environment variables, so programs the app starts do not inherit Nix libraries. The LTTng tracing provider (`libcoreclrtraceptprovider.so`) is left unsatisfied on purpose. The polkit root helper and policy are not packaged, and the package installs the `.root-actions-disabled` marker next to `Files` (the same gate the AppImage and Flatpak use), so all root actions, including "Open in terminal as root", are off. That item would not work on NixOS anyway: the trusted tool resolver only looks in `/usr/bin` and `/bin`, while NixOS keeps setuid wrappers (sudo, pkexec) in `/run/wrappers/bin`.
+`flake.nix` (with `flake.lock`, pinned to `nixos-unstable`) exposes `packages.x86_64-linux.{linuxfiles,default}`, `apps.x86_64-linux.default`, `overlays.default` (adds `pkgs.linuxfiles`), and `nixosModules.default`. The package repackages the pinned release tarballs, patches all ELF files with `autoPatchelfHook` (including the retained Native AOT helper), and installs the app under `$out/lib/linuxfiles`. Runtime dlopen libraries are added to ELF runpaths rather than the launch environment, so child programs do not inherit Nix libraries. The unused CoreCLR LTTng tracing provider remains exempt from dependency checking.
+
+Plain `nix run` and `nix profile install` retain `.root-actions-disabled`: all root actions remain off. Installing a profile cannot activate host polkit. NixOS administrators may opt in through their configuration flake:
+
+```nix
+# inputs.linuxfiles.url = "github:MemerGamer/LinuxFiles";
+# Add inputs.linuxfiles.nixosModules.default to nixosSystem.modules, then:
+programs.linuxfiles = {
+  enable = true;
+  rootActions = true; # default: false
+};
+```
+
+The module selects the package's `enableRootActions` variant, removes its disable marker, enables `security.polkit`, and installs a generated action in `share/polkit-1/actions`. Its `exec.path` names exactly the invoked store helper, never a mutable profile alias. `/etc/linuxfiles/root-actions` is a root-controlled two-line deployment manifest (helper path, policy path, final newline). Discovery checks every manifest symlink traversal, immutable root-owned store entries, executable permissions, and the action's path and fresh `auth_admin` defaults. No user environment variable selects a helper or manifest. A changed helper path between preview and execution rejects the old confirmation; a malformed deployment never falls back to a native helper or a generic prompt.
+
+`pkexec` uses `/run/wrappers/bin` before the system profile and `/usr/bin`/`/bin`. The module enables `security.polkit.enablePkexecWrapper` when present; older nixpkgs uses `security.wrappers.pkexec`. Only pkexec is setuid, never the LinuxFiles helper. A session authentication agent and an administrator identity are still required. The narrow store exception accepts a root-owned sticky `/nix/store` with group write (1775), but rejects other write there, non-root ownership, and any writable entries beneath it. Native `/usr` helper/policy checks retain their existing restrictions.
+
+**Release integration:** the current pin is still `0.1.0-alpha2`, whose app predates deployment-manifest discovery. The module installs the new layout, but root file operations require a newly published native release containing these runtime changes, followed by the version/hash update below. Do not treat alpha2 as a verified working root-actions package.
 
 Per release (after CI has attached `SHA256SUMS`; the flake's tag is `linux-v<version>`):
 
@@ -159,7 +177,7 @@ scripts/linux/update-nix-flake.sh X.Y.Z[-pre] SHA256SUMS   # rewrites version + 
 
 Commit `flake.nix` in a PR. It is deliberately not a CI step: the hashes only exist after the release job has uploaded the assets, and `main` takes changes through PRs. Run `nix flake update` separately to bump nixpkgs.
 
-Verification so far: `nix flake check --no-build` and `nix build` succeeded on x86_64-linux with `nix-portable` (Nix 2.20, nixpkgs `e7439b6`), so evaluation, hashes and the autoPatchelf dependency check pass. The package has not been run (no GUI test on a Nix system), so a missing dlopen library would only show at runtime; report such cases as issues.
+The earlier plain package passed `nix flake check --no-build` and `nix build` with nix-portable. The new `checks.x86_64-linux.root-actions-module` checks module opt-in/defaults and, when built, helper presence, marker state, and the generated policy path. Re-run `nix flake check` against the locked revision after the release bump; sandboxed DNS failures cannot establish NixOS evaluation or packaged loader startup. See the headless checklist below.
 
 ## Nightly builds
 
@@ -194,8 +212,31 @@ Native AUR packages install a root-owned Native AOT helper at `/usr/lib/linuxfil
 
 For local installation, publish normally and opt in with `scripts/linux/install-local.sh --install-root-helper`. This separately runs `sudo python3 scripts/linux/install-root-helper.py --from artifacts/linux-x64/elevation-helper --sha256 <published-helper-sha256>`; the app stays in the user prefix. This is equivalent to `sudo make install`: trust the installer checkout and build output. The policy is embedded; a private root-owned helper snapshot is hashed and checked before installation. Before writing system files, the installer queries available `/usr/bin/pacman -Qo`, `/usr/bin/dpkg-query -S`, and `/usr/bin/rpm -qf` tools for ownership of `/usr/lib/linuxfiles`, the helper, and the policy. It refuses to overwrite package-owned paths: omit `--install-root-helper` and use the distro package's helper instead. Tarball users without package-owned paths keep the same `/usr/lib/linuxfiles/files-elevation-helper` and `/usr/share/polkit-1/actions/` installation; the launcher and app's fixed helper/policy trust checks remain compatible. To inspect the package layout without privileges, run `python3 scripts/linux/install-root-helper.py --from <published-helper-dir> --sha256 <published-helper-sha256> --destdir <temporary-staging-dir>`. Remove the system helper and policy as administrator when uninstalling; the user-local uninstaller intentionally cannot remove system files.
 
-AppImage and Flatpak omit the helper and the **Open in Root Mode** desktop action, install no policy, and disable Root actions. They cannot supply host elevation, even when the native helper is installed separately. See [the elevation threat model](threat-model-elevation.md) for protocol, failure semantics and limitations.
+### Companion host-helper opt-in (AppImage / Flatpak)
+
+AppImage and Flatpak omit the helper and **Open in Root Mode** desktop action, and retain their full elevation disable gates. A separately installed host helper is an administrator opt-in for native host integration; installing it does **not** enable root actions in either current format. No sandbox permission or runtime gate is changed here. Flatpak still has no `org.freedesktop.Flatpak` permission and no `flatpak-spawn --host` bridge. AppImage still refuses its user-controlled extraction directory for privileged helpers.
+
+To provision only the host helper, verify and unpack the **matching native tarball** from the same release (the helper is not in the AppImage or Flatpak). Verify the tarball against the release `SHA256SUMS`, inspect the trusted installer checkout, and record the approved helper digest:
+
+```sh
+sha256sum -- /path/to/linux-x64/elevation-helper/files-elevation-helper
+python3 scripts/linux/install-host-root-helper.py --from /path/to/linux-x64 --sha256 <approved-helper-sha256>
+```
+
+The companion script invokes the existing hardened installer through literal argv and sudo. It installs only `/usr/lib/linuxfiles/files-elevation-helper` (0755, never setuid) and the fixed-path policy (0644), verifies a private snapshot and digest, and refuses package-owned destinations. NixOS users must use the module instead of this `/usr` layout. For inspection without privileges, add `--destdir /tmp/linuxfiles-helper-stage`. Re-run explicitly for each matching release update; remove those two system files as administrator when retiring a manually installed helper. No installer grants persistent polkit authorization or changes the user's desktop settings.
+
+For root file operations today, run the matching native tarball/local install or enabled NixOS package. A future AppImage host discovery path or Flatpak transport needs separate implementation and review; a host helper alone is insufficient. See [the elevation threat model](threat-model-elevation.md) for protocol, failure semantics and limitations.
 
 Normal launches show only **Root actions → Open in terminal as root**, independently of helper installation; authentication happens through the terminal elevation tool. Launch `files --root` or choose **Open in Root Mode** from the desktop entry to additionally show Delete/Rename/Paste as root when the trusted helper is installed. Each action requests polkit authentication; the GUI remains unprivileged. Tabs and the title show **(Root mode)** only when helper actions are allowed by the package/disable gates. Each `--root` invocation opens its own process/window and bypasses normal single-instance forwarding, so an existing ordinary window never acquires root mode. **New Window** preserves `--root`. These separate processes never claim FileManager1.
 
 For an actual uid-0 launch (`sudo files`), tabs/title show **(Running as root)**, ordinary operations already run as root, and all helper/root-terminal actions are hidden. The normal terminal command remains available. Before app initialization, HOME and XDG config/data/cache/state are reset to root's account home/defaults; XDG_DATA_DIRS and XDG_CONFIG_DIRS are reset to `/usr/local/share:/usr/share` and `/etc/xdg`, and PATH to `/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`. Inherited TERMINAL, EDITOR, VISUAL, BROWSER, SHELL, XDG_CURRENT_DESKTOP, user runtime/session-bus, GVfs and TMPDIR overrides are cleared. Unsafe root-owned directory configuration aborts startup before settings writes. This also protects the invoking user's settings when sudo preserves HOME or XDG variables. AppImage/Flatpak retain their full elevation disable gate, including the root-terminal item, even with `--root`, and show no root-mode indicator when helper actions are disabled.
+
+### Pending headless verification for Nix root actions
+
+Run app checks only with `FILES_SANDBOX_DRIVES=scripts/linux/showcase-drives.txt scripts/linux/headless-run.sh` (private Xvfb and throwaway HOME); never use the real display. The harness blocks the system bus, so authentication and privileged operations additionally require a disposable NixOS VM with private Xvfb, a controlled polkit agent, and disposable test files.
+
+- Plain Nix launch and `--root`: marker keeps all root actions and the root-mode indicator hidden. Enabled NixOS `files --root`: root-mode title/tabs, Delete/Rename/Paste menus and independent root-terminal action appear while GUI uid remains unprivileged; ordinary launch stays outside helper mode.
+- Packaged helper starts with the runner's cleared environment: its patched loader and dependencies work, and polkit selects the action whose `exec.path` exactly matches the displayed/invoked store helper. Root-terminal elevation selects the trusted Nix wrapper.
+- Confirmation shows the exact helper, sanitized paths/operation, stdin JSON summary and request SHA-256. Cancel/dismiss leaves files unchanged; approved delete, rename, copy and move on disposable protected files report complete/partial results correctly.
+- Switch NixOS generations while a dialog is open: the old helper confirmation refuses execution; a fresh plan shows and uses the new helper/action. Disabling the module or breaking helper/policy/manifest trust keeps helper actions unavailable without fallback.
+- AppImage and Flatpak with the companion installed still hide all root actions and root-mode indicators, including `--root`; ordinary browsing and existing portals continue working with unchanged sandbox permissions.

@@ -14,7 +14,7 @@
         linuxfiles = final.callPackage
           ({ lib, stdenv, fetchurl, autoPatchelfHook, makeWrapper
            , fontconfig, freetype, libGL, libx11, libxcursor, libxrandr, libxi, libxext
-           , icu, openssl, zlib, krb5, glib }:
+           , icu, openssl, zlib, krb5, glib, enableRootActions ? false }:
             let
               # version and both hashes are rewritten by scripts/linux/update-nix-flake.sh
               version = "0.1.0-alpha2";
@@ -60,9 +60,18 @@
 
                 mkdir -p $out/lib/linuxfiles $out/bin
                 cp -a app/. $out/lib/linuxfiles/
-                # The polkit root helper is not packaged for Nix; the marker turns all root actions off.
-                rm -rf $out/lib/linuxfiles/elevation-helper
-                touch $out/lib/linuxfiles/.root-actions-disabled
+                # Keep the AOT helper so autoPatchelf patches its loader and dependencies too.
+                test -x $out/lib/linuxfiles/elevation-helper/files-elevation-helper
+                ${if enableRootActions then ''
+                  rm -f $out/lib/linuxfiles/.root-actions-disabled
+                  install -Dm644 ${./packaging/linux/io.github.memergamer.LinuxFiles.root-actions.policy} \
+                    $out/share/polkit-1/actions/${id}.root-actions.policy
+                  substituteInPlace $out/share/polkit-1/actions/${id}.root-actions.policy \
+                    --replace-fail /usr/lib/linuxfiles/files-elevation-helper \
+                    $out/lib/linuxfiles/elevation-helper/files-elevation-helper
+                '' else ''
+                  touch $out/lib/linuxfiles/.root-actions-disabled
+                ''}
                 # No library environment: it would leak into programs the app starts.
                 makeWrapper $out/lib/linuxfiles/Files $out/bin/files
 
@@ -88,6 +97,76 @@
             })
           { };
       };
+
+      nixosModules.default = { config, lib, pkgs, options, ... }:
+        let
+          cfg = config.programs.linuxfiles;
+          package = cfg.package.override { enableRootActions = cfg.rootActions; };
+          helper = "${package}/lib/linuxfiles/elevation-helper/files-elevation-helper";
+          policy = "${package}/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy";
+        in
+        {
+          options.programs.linuxfiles = {
+            enable = lib.mkEnableOption "LinuxFiles";
+            package = lib.mkOption {
+              type = lib.types.package;
+              default = self.packages.${pkgs.stdenv.hostPlatform.system}.linuxfiles;
+              description = "LinuxFiles package accepting the enableRootActions override.";
+            };
+            rootActions = lib.mkEnableOption "polkit-authenticated LinuxFiles root operations";
+          };
+          config = lib.mkIf cfg.enable (lib.mkMerge [
+            { environment.systemPackages = [ package ]; }
+            (lib.mkIf cfg.rootActions (lib.mkMerge [
+              {
+                security.polkit.enable = true;
+                environment.etc."linuxfiles/root-actions".text = "${helper}\n${policy}\n";
+              }
+              # Older nixpkgs creates pkexec with polkit.enable; newer revisions gate it separately.
+              (if options.security.polkit ? enablePkexecWrapper then {
+                security.polkit.enablePkexecWrapper = true;
+              } else {
+                security.wrappers.pkexec = {
+                  source = "${pkgs.polkit.bin}/bin/pkexec";
+                  owner = "root";
+                  group = "root";
+                  setuid = true;
+                };
+              })
+            ]))
+          ]);
+        };
+
+      checks.${system}.root-actions-module =
+        let
+          enabled = nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = [ self.nixosModules.default {
+              programs.linuxfiles.enable = true;
+              programs.linuxfiles.rootActions = true;
+            } ];
+          };
+          disabled = nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = [ self.nixosModules.default { programs.linuxfiles.enable = true; } ];
+          };
+          # Pick our package explicitly; other modules also add system packages.
+          package = self.packages.${system}.linuxfiles.override { enableRootActions = true; };
+        in
+        assert enabled.config.security.polkit.enable;
+        assert enabled.config.security.wrappers.pkexec.setuid;
+        assert enabled.config.environment.etc."linuxfiles/root-actions".text ==
+          "${package}/lib/linuxfiles/elevation-helper/files-elevation-helper\n${package}/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy\n";
+        assert !(disabled.config.environment.etc ? "linuxfiles/root-actions");
+        assert !disabled.config.security.polkit.enable;
+        pkgs.runCommand "linuxfiles-root-actions-layout" { } ''
+          test -x ${package}/lib/linuxfiles/elevation-helper/files-elevation-helper
+          test ! -e ${package}/lib/linuxfiles/.root-actions-disabled
+          grep -F '<annotate key="org.freedesktop.policykit.exec.path">${package}/lib/linuxfiles/elevation-helper/files-elevation-helper</annotate>' \
+            ${package}/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy
+          test -e ${self.packages.${system}.linuxfiles}/lib/linuxfiles/.root-actions-disabled
+          touch $out
+        '';
 
       packages.${system} = {
         linuxfiles = pkgs.linuxfiles;

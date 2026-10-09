@@ -6,6 +6,7 @@ using Files.Platform.Abstractions.Elevation;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Files.Platform.Linux.Elevation
 {
@@ -29,12 +30,14 @@ namespace Files.Platform.Linux.Elevation
 		private const int MaxLinkHops = 40;
 		private readonly IFileOwnershipInspector inspector;
 		private readonly uint userId;
+		private readonly Func<string, string?> readLink;
 
 		/// <summary>Creates the checker.</summary>
-		public ElevationPathChecker(IFileOwnershipInspector inspector, uint userId)
+		public ElevationPathChecker(IFileOwnershipInspector inspector, uint userId, Func<string, string?>? readLink = null)
 		{
 			this.inspector = inspector;
 			this.userId = userId;
+			this.readLink = readLink ?? (path => new FileInfo(path).LinkTarget);
 		}
 
 		/// <summary>Gets the inspector used for all lookups.</summary>
@@ -45,8 +48,12 @@ namespace Files.Platform.Linux.Elevation
 		/// <summary>
 		/// Resolves every symbolic link in <paramref name="absolutePath"/>, including the last component. Returns null for broken links or loops.
 		/// </summary>
-		public string? Canonicalize(string absolutePath)
+		public string? Canonicalize(string absolutePath) => Canonicalize(absolutePath, null);
+
+		internal string? Canonicalize(string absolutePath, Func<string, FileEntryInfo, bool, bool>? trust)
 		{
+			if (!absolutePath.StartsWith('/')) return null;
+			if (trust is not null && (!inspector.TryGetInfo("/", out var root) || !trust("/", root, false))) return null;
 			var pending = new Stack<string>();
 			foreach (var segment in absolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries))
 				pending.Push(segment);
@@ -69,7 +76,9 @@ namespace Files.Platform.Linux.Elevation
 
 				current.Add(segment);
 				var path = "/" + string.Join('/', current);
-				if (!inspector.TryGetInfo(path, out var info) || !info.IsSymbolicLink)
+				var found = inspector.TryGetInfo(path, out var info);
+				if (trust is not null && (!found || !trust(path, info, ordered.Count == 0))) return null;
+				if (!found || !info.IsSymbolicLink)
 					continue;
 
 				if (++hops > MaxLinkHops)
@@ -78,9 +87,9 @@ namespace Files.Platform.Linux.Elevation
 				string? target;
 				try
 				{
-					target = new FileInfo(path).LinkTarget;
+					target = readLink(path);
 				}
-				catch (IOException)
+				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 				{
 					return null;
 				}
@@ -129,62 +138,112 @@ namespace Files.Platform.Linux.Elevation
 		}
 	}
 
-	/// <summary>
-	/// Resolves tools from <c>/usr/bin</c> then <c>/bin</c> and accepts them only if the file is owned by root and not writable by group or others.
-	/// </summary>
+	/// <summary>Resolves privileged tools only through root-controlled system paths, never PATH.</summary>
 	public sealed class SystemToolResolver : ITrustedToolResolver
 	{
+		public const string DeploymentPath = "/etc/linuxfiles/root-actions";
 		private static readonly HashSet<string> Allowed = new(StringComparer.Ordinal) { "run0", "sudo", "pkexec" };
-		private static readonly string[] Directories = ["/usr/bin", "/bin"];
+		private static readonly string[] Directories = ["/run/wrappers/bin", "/run/current-system/sw/bin", "/usr/bin", "/bin"];
 		private readonly ElevationPathChecker checker;
+		private readonly Func<string, string> readDeploymentFile;
 
-		/// <summary>Creates the resolver.</summary>
-		public SystemToolResolver(ElevationPathChecker checker)
+		/// <summary>Creates the resolver. The optional reader is a test seam; path trust is always checked first.</summary>
+		public SystemToolResolver(ElevationPathChecker checker, Func<string, string>? readDeploymentFile = null)
 		{
 			this.checker = checker;
+			this.readDeploymentFile = readDeploymentFile ?? ReadBoundedFile;
 		}
 
 		/// <inheritdoc/>
 		public string? Resolve(string name)
 		{
 			if (name == "files-elevation-helper")
+			{
+				// An installed deployment is authoritative: never fall back after a broken generation switch.
+				if (checker.Inspector.TryGetInfo(DeploymentPath, out _)) return ResolveDeployment();
 				return IsRootOwnedChain(ElevationHelperProtocol.HelperPath) && IsRootOwnedChain(ElevationHelperProtocol.PolicyPath)
 					&& checker.Inspector.TryGetInfo(ElevationHelperProtocol.HelperPath, out var helper)
 					&& (helper.Mode & UnixFileMode.UserExecute) != 0
 					? ElevationHelperProtocol.HelperPath : null;
+			}
 
-			if (!Allowed.Contains(name))
-				return null;
-
+			if (!Allowed.Contains(name)) return null;
 			foreach (var directory in Directories)
 			{
 				var candidate = directory + "/" + name;
-				var real = checker.Canonicalize(candidate);
-				if (real is null || !checker.Inspector.TryGetInfo(real, out var info) || info.IsDirectory || info.IsSymbolicLink)
-					continue;
-
-				if (IsRootOwnedChain(real, allowSetIdFile: true) && (info.Mode & UnixFileMode.UserExecute) != 0)
+				var real = ResolveRootOwned(candidate, allowSetIdFile: true);
+				if (real is not null && checker.Inspector.TryGetInfo(real, out var info) && (info.Mode & UnixFileMode.UserExecute) != 0)
 					return candidate;
 			}
-
 			return null;
 		}
 
-		private bool IsRootOwnedChain(string path, bool allowSetIdFile = false)
+		private string? ResolveDeployment()
+		{
+			try
+			{
+				var manifest = ResolveRootOwned(DeploymentPath);
+				if (manifest is null) return null;
+				var text = readDeploymentFile(manifest);
+				if (text.Length > 8192) return null;
+				var lines = text.Split('\n');
+				if (lines.Length != 3 || lines[2].Length != 0) return null;
+				var helper = lines[0];
+				var policy = lines[1];
+				if (!IsStorePath(helper) || !IsStorePath(policy)
+					|| !helper.EndsWith("/lib/linuxfiles/elevation-helper/files-elevation-helper", StringComparison.Ordinal)
+					|| !policy.EndsWith("/share/polkit-1/actions/io.github.memergamer.LinuxFiles.root-actions.policy", StringComparison.Ordinal)
+					|| ResolveRootOwned(helper) != helper || ResolveRootOwned(policy) != policy
+					|| !checker.Inspector.TryGetInfo(helper, out var info) || (info.Mode & UnixFileMode.UserExecute) == 0)
+					return null;
+				return ElevationDeploymentPolicy.Matches(readDeploymentFile(policy), helper) ? helper : null;
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or System.Xml.XmlException)
+			{
+				return null;
+			}
+		}
+
+		private static bool IsStorePath(string path) => path.StartsWith("/nix/store/", StringComparison.Ordinal)
+			&& !path.Contains("//", StringComparison.Ordinal) && !path.Split('/').Any(part => part is "." or "..");
+
+		private static string ReadBoundedFile(string path)
+		{
+			using var reader = new StreamReader(path);
+			var buffer = new char[8193];
+			var count = reader.ReadBlock(buffer, 0, buffer.Length);
+			if (count == buffer.Length) throw new IOException("Deployment file exceeds size limit.");
+			return new string(buffer, 0, count);
+		}
+
+		private string? ResolveRootOwned(string path, bool allowSetIdFile = false)
+			=> checker.Canonicalize(path, (component, info, last) => IsTrustedComponent(component, info, last, allowSetIdFile, allowLinks: true));
+
+		private bool IsRootOwnedChain(string path)
 		{
 			var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 			var current = "/";
 			for (var index = -1; index < parts.Length; index++)
 			{
 				if (index >= 0) current = Path.Combine(current, parts[index]);
-				if (!checker.Inspector.TryGetInfo(current, out var info) || info.IsSymbolicLink || info.OwnerUserId != 0
-					|| (info.Mode & (UnixFileMode.GroupWrite | UnixFileMode.OtherWrite)) != 0
-					|| ((info.Mode & (UnixFileMode.SetUser | UnixFileMode.SetGroup)) != 0 && !(allowSetIdFile && index == parts.Length - 1))
-					|| (index < parts.Length - 1 && !info.IsDirectory) || (index == parts.Length - 1 && info.IsDirectory))
-					return false;
+				if (!checker.Inspector.TryGetInfo(current, out var info)
+					|| !IsTrustedComponent(current, info, index == parts.Length - 1, false, allowLinks: false)) return false;
 			}
 			return true;
 		}
 
+		private static bool IsTrustedComponent(string path, FileEntryInfo info, bool last, bool allowSetIdFile, bool allowLinks)
+		{
+			if (info.OwnerUserId != 0) return false;
+			if (info.IsSymbolicLink) return allowLinks;
+			if (info.IsDirectory == last) return false;
+			if ((info.Mode & (UnixFileMode.SetUser | UnixFileMode.SetGroup)) != 0 && !(allowSetIdFile && last)) return false;
+			// Nix's root-owned sticky store may be 1775. Every entry below it must be immutable and root-owned.
+			if (path == "/nix/store" && info.IsDirectory && (info.Mode & UnixFileMode.StickyBit) != 0
+				&& (info.Mode & UnixFileMode.OtherWrite) == 0) return true;
+			var forbidden = UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
+			if (path.StartsWith("/nix/store/", StringComparison.Ordinal)) forbidden |= UnixFileMode.UserWrite;
+			return (info.Mode & forbidden) == 0;
+		}
 	}
 }

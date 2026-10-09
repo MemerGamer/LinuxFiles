@@ -69,9 +69,10 @@ namespace Files.Platform.Tests.SystemIntegration
 			public int ExitCode;
 			public string? OverrideOutput;
 			public string? Payload;
-			public Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string json, CancellationToken cancellationToken)
+			public Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string helper, string json, CancellationToken cancellationToken)
 			{
 				Assert.AreEqual("/usr/bin/pkexec", pkexec);
+				Assert.AreEqual(ElevationHelperProtocol.HelperPath, helper);
 				Calls++; Payload = json;
 				var request = ElevationHelperProtocol.ParseRequest(json);
 				return Task.FromResult((ExitCode, OverrideOutput ?? ElevationHelperProtocol.Serialize(new HelperResponse(1, request.Sources.Select(source => new HelperItemResult(source, true, "")).ToArray(), "")), "auth error"));

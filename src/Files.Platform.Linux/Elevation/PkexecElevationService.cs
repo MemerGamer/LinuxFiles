@@ -79,7 +79,7 @@ namespace Files.Platform.Linux.Elevation
 			catch (AggregateException ex) when (ex.InnerExceptions.All(inner => inner is System.ComponentModel.Win32Exception or InvalidOperationException)) { }
 		}
 
-		public async Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string json, CancellationToken cancellationToken)
+		public async Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string helper, string json, CancellationToken cancellationToken)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			var info = new ProcessStartInfo(pkexec)
@@ -89,7 +89,7 @@ namespace Files.Platform.Linux.Elevation
 			};
 			info.Environment.Clear();
 			info.Environment["LANG"] = "C";
-			info.ArgumentList.Add(ElevationHelperProtocol.HelperPath);
+			info.ArgumentList.Add(helper);
 			foreach (var argument in HelperAuthorization.Arguments(json)) info.ArgumentList.Add(argument);
 			using var process = Process.Start(info) ?? throw new IOException("Unable to start authorization.");
 			var output = ReadBoundedAsync(process.StandardOutput, CancellationToken.None, Stop);
@@ -146,7 +146,7 @@ namespace Files.Platform.Linux.Elevation
 
 	public interface IRootHelperProcessRunner
 	{
-		Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string json, CancellationToken cancellationToken);
+		Task<(int ExitCode, string Output, string Error)> RunHelperAsync(string pkexec, string helper, string json, CancellationToken cancellationToken);
 	}
 
 	/// <summary>Plans root actions and sends the frozen plan to the installed fd-relative helper through pkexec.</summary>
@@ -168,7 +168,7 @@ namespace Files.Platform.Linux.Elevation
 			this.packagedWithoutHelper = packagedWithoutHelper ?? (() => RootActionsAvailability.IsDisabled);
 		}
 
-		public bool IsAvailable => checker.CurrentUserId != 0 && !packagedWithoutHelper() && tools.Resolve("pkexec") is not null && tools.Resolve("files-elevation-helper") == ElevationHelperProtocol.HelperPath;
+		public bool IsAvailable => checker.CurrentUserId != 0 && !packagedWithoutHelper() && tools.Resolve("pkexec") is not null && tools.Resolve("files-elevation-helper") is not null;
 
 		public ElevatedPlanResult PlanDelete(IReadOnlyList<string> paths) => Plan(ElevatedOperation.Delete, paths, null);
 		public ElevatedPlanResult PlanCopy(IReadOnlyList<string> sources, string destinationFolder) => Plan(ElevatedOperation.Copy, sources, destinationFolder);
@@ -185,7 +185,7 @@ namespace Files.Platform.Linux.Elevation
 		{
 			try
 			{
-				if (!IsAvailable) return ElevatedPlanResult.Refuse("The privileged helper is not installed in a trusted location.");
+				if (!IsAvailable || tools.Resolve("files-elevation-helper") is not { } helper) return ElevatedPlanResult.Refuse("The privileged helper is not installed in a trusted location.");
 				var paths = sources.Select(path =>
 				{
 					ElevationHelperProtocol.ValidatePath(path);
@@ -207,7 +207,7 @@ namespace Files.Platform.Linux.Elevation
 				// Parsing here also enforces the wire size bound before offering confirmation.
 				ElevationHelperProtocol.ParseRequest(json);
 				return ElevatedPlanResult.Ok(new ElevatedPlan(operation, Array.AsReadOnly(paths), operation == ElevatedOperation.Rename ? target : absoluteTarget,
-					Array.AsReadOnly(new[] { new ElevatedCommand(ElevationHelperProtocol.HelperPath, Array.AsReadOnly(new[] { json })) })));
+					Array.AsReadOnly(new[] { new ElevatedCommand(helper, Array.AsReadOnly(new[] { json })) })));
 			}
 			catch (Exception ex) when (ex is InvalidDataException or IOException or ArgumentException or InvalidOperationException or JsonException)
 			{
@@ -217,7 +217,7 @@ namespace Files.Platform.Linux.Elevation
 
 		public async Task<ElevatedResult> RunAsync(ElevatedPlan plan, CancellationToken cancellationToken = default)
 		{
-			if (!IsAvailable || tools.Resolve("pkexec") is not { } pkexec) return Failure("The privileged helper is unavailable.");
+			if (!IsAvailable || tools.Resolve("pkexec") is not { } pkexec || tools.Resolve("files-elevation-helper") is not { } helper) return Failure("The privileged helper is unavailable.");
 			try
 			{
 				// Rebuild only the serialized data: filesystem authority and post-verification belong to the helper.
@@ -226,9 +226,9 @@ namespace Files.Platform.Linux.Elevation
 				ElevationHelperProtocol.Validate(request);
 				var json = ElevationHelperProtocol.Serialize(request);
 				ElevationHelperProtocol.ParseRequest(json);
-				if (plan.Commands.Count != 1 || plan.Commands[0].Program != ElevationHelperProtocol.HelperPath || !plan.Commands[0].Arguments.SequenceEqual(new[] { json }))
+				if (plan.Commands.Count != 1 || plan.Commands[0].Program != helper || !plan.Commands[0].Arguments.SequenceEqual(new[] { json }))
 					return Failure("The operation no longer matches what was confirmed.");
-				var (exitCode, output, error) = await runner.RunHelperAsync(pkexec, json, cancellationToken).ConfigureAwait(false);
+				var (exitCode, output, error) = await runner.RunHelperAsync(pkexec, helper, json, cancellationToken).ConfigureAwait(false);
 				if (exitCode is 126 or 127) return new(false, true, exitCode, error);
 				if (exitCode is not (0 or 1)) return new(false, false, exitCode, error);
 				var response = ElevationHelperProtocol.ParseResponse(output);

@@ -500,7 +500,12 @@ namespace Files.App.Helpers
 			// If multiple files are selected, open them together
 			if (!openViaApplicationPicker &&
 				selectedItems.Count > 1 &&
-				selectedItems.All(x => x.PrimaryItemAttribute == StorageItemTypes.File && !x.IsExecutable && !x.IsShortcut))
+				selectedItems.All(x => x.PrimaryItemAttribute == StorageItemTypes.File && !x.IsExecutable && !x.IsShortcut)
+#if !WINDOWS
+				&& selectedItems.All(x => !FileExtensionHelpers.IsZipPath(x.GetRequiredPath()) &&
+					!Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().IsArchiveFileName(x.GetRequiredPath()))
+#endif
+				)
 			{
 #if !WINDOWS
 				opened = await OpenFilesLinuxAsync(selectedItems.Select(x => x.GetRequiredPath()));
@@ -521,7 +526,11 @@ namespace Files.App.Helpers
 				var itemPath = item.GetRequiredPath();
 				await OpenPath(itemPath, associatedInstance, type, false, openViaApplicationPicker, forceOpenInNewTab: forceOpenInNewTab);
 
-				if (type == FilesystemItemType.Directory)
+				if (type == FilesystemItemType.Directory
+#if !WINDOWS
+					|| (!openViaApplicationPicker && Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().IsArchiveFileName(itemPath))
+#endif
+					)
 					forceOpenInNewTab = true;
 			}
 		}

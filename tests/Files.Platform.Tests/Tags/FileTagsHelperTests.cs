@@ -61,6 +61,33 @@ namespace Files.Platform.Tests.Tags
 			Assert.AreEqual(0, fixture.Store.Tags["/blocked"].Length);
 		}
 
+		[TestMethod]
+		[DataRow(true)]
+		[DataRow(false)]
+		public async Task BulkDeletion_SerializesPropertyLoadingReadAndDatabaseUpdate(bool supportsXattrs)
+		{
+			using var fixture = new TagFixture();
+			fixture.Store.SupportsXattrs = supportsXattrs;
+			fixture.Store.BlockReads = true;
+			fixture.Store.Tags["/existing"] = ["A", "B"];
+			if (!supportsXattrs)
+				FileTagsHelper.GetDbInstance().SetTags("/existing", null, ["a", "b"]);
+
+			var loading = FileTagsHelper.ReadAndUpdateFileTagsAsync("/existing");
+			await fixture.Store.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+			var deletion = FileTagsHelper.UntagAllFilesAsync("a");
+			var reloading = FileTagsHelper.ReadAndUpdateFileTagsAsync("/existing");
+			Assert.IsFalse(deletion.IsCompleted);
+			Assert.IsFalse(reloading.IsCompleted);
+			fixture.Store.ReadRelease.Set();
+			CollectionAssert.AreEqual(new[] { "a", "b" }, await loading.WaitAsync(TimeSpan.FromSeconds(10)));
+			Assert.IsTrue(await deletion.WaitAsync(TimeSpan.FromSeconds(10)));
+
+			CollectionAssert.AreEqual(new[] { "b" }, await reloading.WaitAsync(TimeSpan.FromSeconds(10)));
+			var reloaded = new FileTagsDatabase(fixture.DatabasePath);
+			CollectionAssert.AreEqual(new[] { "b" }, reloaded.GetTags("/existing", null));
+		}
+
 		private sealed class TagFixture : IDisposable
 		{
 			private readonly string root = Path.Combine(Path.GetTempPath(), "files-tags-queue-" + Guid.NewGuid().ToString("N"));
@@ -81,10 +108,12 @@ namespace Files.Platform.Tests.Tags
 			public void Dispose()
 			{
 				Store.Release.Set();
+				Store.ReadRelease.Set();
 				FileTagsHelper.DrainPendingWritesAsync().GetAwaiter().GetResult();
 				Ioc.Default.Services = null;
 				services.Dispose();
 				Store.Release.Dispose();
+				Store.ReadRelease.Dispose();
 				Directory.Delete(root, true);
 			}
 		}
@@ -94,7 +123,19 @@ namespace Files.Platform.Tests.Tags
 			public TaskCompletionSource Entered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 			public ManualResetEventSlim Release { get; } = new();
 			public Dictionary<string, string[]> Tags { get; } = new();
-			public IReadOnlyList<string> ReadTags(string path) => Tags.GetValueOrDefault(path) ?? [];
+			public bool SupportsXattrs { get; set; } = true;
+			public bool BlockReads { get; set; }
+			public TaskCompletionSource ReadEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+			public ManualResetEventSlim ReadRelease { get; } = new();
+			public IReadOnlyList<string> ReadTags(string path)
+			{
+				if (BlockReads && !ReadEntered.Task.IsCompleted)
+				{
+					ReadEntered.SetResult();
+					if (!ReadRelease.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException();
+				}
+				return SupportsXattrs ? Tags.GetValueOrDefault(path) ?? [] : [];
+			}
 			public bool WriteTags(string path, IReadOnlyList<string> tags)
 			{
 				if (path == "/blocked" && !Entered.Task.IsCompleted)
@@ -102,6 +143,7 @@ namespace Files.Platform.Tests.Tags
 					Entered.SetResult();
 					if (!Release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException();
 				}
+				if (!SupportsXattrs) return false;
 				Tags[path] = tags.ToArray();
 				return true;
 			}

@@ -38,6 +38,16 @@ namespace Files.App.Utils.FileTags
 			return GetDbInstance().GetTags(filePath, null);
 		}
 
+		public static Task<string[]> ReadAndUpdateFileTagsAsync(string filePath)
+		{
+			return EnqueueWrite(() =>
+			{
+				var tags = ReadFileTag(filePath);
+				GetDbInstance().SetTags(filePath, null, tags);
+				return tags;
+			}, Array.Empty<string>());
+		}
+
 		private static readonly object writeGate = new();
 		private static Task pendingWrite = Task.CompletedTask;
 
@@ -48,7 +58,7 @@ namespace Files.App.Utils.FileTags
 			var store = Ioc.Default.GetService<IFileTagsStore>();
 			var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
 			var names = settings.GetTagsByIds(tags)?.Select(x => x.Name).ToArray() ?? [];
-			return EnqueueWrite(() => !cancellationToken.IsCancellationRequested && WriteTags(filePath, tags, names, store));
+			return EnqueueWrite(() => !cancellationToken.IsCancellationRequested && WriteTags(filePath, tags, names, store), false);
 		}
 
 		public static Task<bool> UntagAllFilesAsync(string uid)
@@ -67,7 +77,7 @@ namespace Files.App.Utils.FileTags
 					succeeded &= WriteTags(item.FilePath, tags, names, store);
 				}
 				return succeeded;
-			});
+			}, false);
 		}
 
 		public static async Task DrainPendingWritesAsync()
@@ -98,7 +108,7 @@ namespace Files.App.Utils.FileTags
 			}
 		}
 
-		private static Task<bool> EnqueueWrite(Func<bool> action)
+		private static Task<T> EnqueueWrite<T>(Func<T> action, T failureResult)
 		{
 			lock (writeGate)
 			{
@@ -113,7 +123,7 @@ namespace Files.App.Utils.FileTags
 					catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
 					{
 						App.Logger?.LogWarning(ex, "Could not write file tags.");
-						return false;
+						return failureResult;
 					}
 				});
 				pendingWrite = write;

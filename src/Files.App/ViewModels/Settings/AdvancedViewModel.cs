@@ -4,7 +4,9 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.Win32;
+#if WINDOWS
 using SevenZip;
+#endif
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -247,7 +249,12 @@ namespace Files.App.ViewModels.Settings
 				if (file is null)
 					throw new IOException($"The settings export file '{filePath}' could not be opened.");
 
+#if WINDOWS
 				await ZipStorageFolder.InitArchive(file, OutArchiveFormat.Zip);
+#else
+				// LINUX-TODO(settings): migrate legacy settings import/export to IArchiveService.
+				await ZipStorageFolder.InitArchive(file, ArchiveFormats.Zip);
+#endif
 
 				if (await ZipStorageFolder.FromStorageFileAsync(file) is not ZipStorageFolder zipFolder)
 					return;

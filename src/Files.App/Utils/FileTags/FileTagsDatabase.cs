@@ -7,8 +7,8 @@ using System.Runtime.CompilerServices;
 using System.Security;
 using Windows.ApplicationModel;
 using static Files.App.Helpers.RegistryHelpers;
-#endif
 using static Files.App.Utils.FileTags.TaggedFileRegistry;
+#endif
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace Files.App.Utils.FileTags

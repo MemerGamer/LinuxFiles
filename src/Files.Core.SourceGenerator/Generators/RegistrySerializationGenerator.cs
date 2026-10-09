@@ -17,7 +17,8 @@ namespace Files.Core.SourceGenerator.Generators
 		{
 			var valueProvider = context.SyntaxProvider.ForAttributeWithMetadataName(
 				"Files.Shared.Attributes.RegistrySerializableAttribute",
-				(node, _) => node.IsKind(SyntaxKind.ClassDeclaration),
+				(node, _) => node.IsKind(SyntaxKind.ClassDeclaration) &&
+					((CSharpParseOptions)node.SyntaxTree.Options).PreprocessorSymbolNames.Contains("WINDOWS"),
 				(ctx, _) => (ITypeSymbol)ctx.TargetSymbol);
 
 			context.RegisterSourceOutput(valueProvider, (ctx, symbol) =>

@@ -4,7 +4,9 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Specialized;
 using System.IO;
+#if WINDOWS
 using Windows.Win32.UI.Shell;
+#endif
 
 namespace Files.App.Data.Models
 {

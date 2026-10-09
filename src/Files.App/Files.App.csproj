@@ -153,16 +153,16 @@
         <PackageReference Include="Microsoft.Extensions.Logging" />
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
         <PackageReference Include="Sentry" />
-        <PackageReference Include="SevenZipSharp" />
         <PackageReference Include="SharpZipLib" />
         <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" />
-        <PackageReference Include="System.Drawing.Common" />
         <PackageReference Include="TagLibSharp" />
         <PackageReference Include="UTF.Unknown" />
     </ItemGroup>
 
     <!--  Windows UI packages; desktop previews use ColorCode.Core and Markdig  -->
     <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
+        <PackageReference Include="SevenZipSharp" />
+        <PackageReference Include="System.Drawing.Common" />
         <PackageReference Include="ColorCode.WinUI" />
         <PackageReference Include="Microsoft.Xaml.Behaviors.WinUI.Managed" />
         <PackageReference Include="CommunityToolkit.Labs.WinUI.Controls.MarkdownTextBlock" />
@@ -253,6 +253,14 @@
         <Compile Remove="Services\SizeProvider\CachedSizeProvider.Linux.cs" />
         <Compile Remove="Utils\Storage\Operations\FileSizeCalculator.Linux.cs" />
         <Compile Remove="Utils\Storage\Helpers\SyncRootHelpers.Linux.cs" />
+    </ItemGroup>
+
+    <!--  Uno's late asset globs also honor DefaultItemExcludes; keep packaging inputs on disk.  -->
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <DefaultItemExcludes>$(DefaultItemExcludes);Assets/Libraries/**;Assets/FilesOpenDialog/**;Assets/WSL/**;Assets/tile-0-*.png;Assets/AppTiles/**/*.png</DefaultItemExcludes>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
+        <Content Include="Assets/AppTiles/Dev/SplashScreen.scale-*.png" />
     </ItemGroup>
 
     <!--  XAML pages are matched by SDK default globs that run after this file, so Page Remove has no effect; use DefaultItemExcludes  -->

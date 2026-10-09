@@ -1,13 +1,15 @@
 ﻿// Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
+#if WINDOWS
 using SevenZip;
+#endif
 using System.Text;
 
 namespace Files.App.Data.Contracts
 {
 	/// <summary>
-	/// Represents a service to manage storage archives, powered by 7zip and its C# wrapper SevenZipSharp.
+	/// Represents the app commands and progress UI for storage archives.
 	/// </summary>
 	public interface IStorageArchiveService
 	{
@@ -90,6 +92,7 @@ namespace Files.App.Data.Contracts
 		/// <returns>Null if the archive file doesn't need to detect encoding or its encoding can't be detected; otherwise, the encoding detected.</returns>
 		Task<Encoding?> DetectEncodingAsync(string archiveFilePath);
 
+#if WINDOWS
 		/// <summary>
 		/// Gets the <see cref="SevenZipExtractor"/> instance from the archive file path.
 		/// </summary>
@@ -97,5 +100,6 @@ namespace Files.App.Data.Contracts
 		/// <param name="password">The password to decrypt the archive file if applicable.</param>
 		/// <returns>An instance of <see cref="SevenZipExtractor"/> if the specified item is archive; otherwise null.</returns>
 		Task<SevenZipExtractor?> GetSevenZipExtractorAsync(string archiveFilePath, string password = "");
+#endif
 	}
 }

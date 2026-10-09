@@ -6,7 +6,6 @@ using Files.Platform.Abstractions.FileOperations;
 using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
-using SevenZip;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text;
@@ -244,13 +243,6 @@ namespace Files.App.Services
 		/// <inheritdoc/>
 		public Task<Encoding?> DetectEncodingAsync(string archiveFilePath)
 			=> Task.FromResult<Encoding?>(null);
-
-		/// <inheritdoc/>
-		public Task<SevenZipExtractor?> GetSevenZipExtractorAsync(string archiveFilePath, string password = "")
-		{
-			// 7z.dll does not exist on this platform; use IArchiveService
-			return Task.FromResult<SevenZipExtractor?>(null);
-		}
 
 		private static ArchiveFormat ToPlatformFormat(ArchiveFormats format) => format switch
 		{

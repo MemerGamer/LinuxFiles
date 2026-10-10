@@ -1,0 +1,22 @@
+<!-- Copyright (c) Files Community. Licensed under the MIT License. -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableMSTestRunner>false</EnableMSTestRunner>
+    <DefineConstants>$(DefineConstants);ELEVATION_HELPER;LINUX_DIRECTORY_BENCHMARK</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Link the current implementations, without changing production visibility or dependencies. -->
+    <Compile Include="../../src/Files.Platform.Linux/Native/PosixNative.cs" Link="Native/PosixNative.cs" />
+    <Compile Include="../../src/Files.Platform.Linux/Native/DirectoryBenchmarkNative.cs" Link="Native/DirectoryBenchmarkNative.cs" />
+    <Compile Include="../../src/Files.Platform.Linux/Enumeration/LinuxFileSystemEnumerator.cs" Link="Enumeration/LinuxFileSystemEnumerator.cs" />
+    <Compile Include="../../src/Files.Platform.Abstractions/Enumeration/*.cs" LinkBase="Enumeration" />
+  </ItemGroup>
+  <Target Name="RequireLinux" BeforeTargets="Build" Condition="!$([MSBuild]::IsOSPlatform('Linux'))">
+    <Error Text="This benchmark requires Linux." />
+  </Target>
+</Project>

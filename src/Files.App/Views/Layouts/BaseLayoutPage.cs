@@ -720,6 +720,7 @@ namespace Files.App.Views.Layouts
 		private CancellationToken RenewShellMenuToken()
 		{
 			shellContextMenuItemCancellationToken?.Cancel();
+			shellContextMenuItemCancellationToken?.Dispose();
 			shellContextMenuItemCancellationToken = new CancellationTokenSource();
 			return shellContextMenuItemCancellationToken.Token;
 		}
@@ -730,9 +731,11 @@ namespace Files.App.Views.Layouts
 #if !WINDOWS
 			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
 #endif
+			var token = RenewShellMenuToken();
 			try
 			{
 				var parentShellPage = await EnsurePageIsCurrentAsync();
+				token.ThrowIfCancellationRequested();
 				var shellViewModel = parentShellPage.GetRequiredShellViewModel();
 				var commandsViewModel = CommandsViewModel
 					?? throw new InvalidOperationException("The layout commands are not initialized.");
@@ -745,16 +748,26 @@ namespace Files.App.Views.Layouts
 				if (!IsItemSelected)
 					return;
 
-				var selectedItems = SelectedItems;
+				var selectedItems = SelectedItems?.ToList();
 				if (selectedItems is null or { Count: 0 })
 					return;
 
 				shiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 				SelectedItemsPropertiesViewModel.CheckAllFileExtensions(selectedItems.Select(x => x.FileExtension).ToList());
 
+#if WINDOWS
 				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: selectedItems, selectedItemsPropertiesViewModel: SelectedItemsPropertiesViewModel, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: null);
+#else
+				ItemContextFlyoutHost.Reset();
+				ItemContextFlyoutHost.Items.Add(new MenuFlyoutItem { Text = Strings.Loading.GetLocalizedResource(), IsEnabled = false });
+				var items = await ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItemsAsync(currentInstanceViewModel: instanceViewModel, selectedItems: selectedItems, selectedItemsPropertiesViewModel: SelectedItemsPropertiesViewModel, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: null, cancellationToken: token);
+				token.ThrowIfCancellationRequested();
+#endif
 				var host = ItemContextFlyoutHost;
-				host.Build(items);
+#if !WINDOWS
+				using (Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-flyout", true))
+#endif
+					host.Build(items);
 
 				// Edit tags: a submenu of the available tags (FileTagsContextMenu is a standalone MenuFlyout that
 				// can't be nested, so build the tag toggles directly).
@@ -768,8 +781,6 @@ namespace Files.App.Views.Layouts
 				// the rest go under a single "Show more options" submenu (Win11) or inline (Win10) per the setting.
 				if (!instanceViewModel.IsPageTypeZipFolder && !instanceViewModel.IsPageTypeFtp)
 				{
-					var token = RenewShellMenuToken();
-
 					// Pre-add "Show more options" (with the synchronously-known built-in overflow items) BEFORE the
 					// async shell fetch so its placeholder shows while the extensions load.
 					var (moreOptions, moreSeparator) = host.AddShowMoreOptionsIfEnabled(items);
@@ -813,6 +824,9 @@ namespace Files.App.Views.Layouts
 				}
 
 				host.FinalizePrimaryRowPosition();
+			}
+			catch (OperationCanceledException) when (token.IsCancellationRequested)
+			{
 			}
 			catch (Exception error)
 			{
@@ -970,6 +984,7 @@ namespace Files.App.Views.Layouts
 		protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
 		{
 			base.OnNavigatingFrom(e);
+			shellContextMenuItemCancellationToken?.Cancel();
 			navigationArguments = null;
 
 			// Remove item jumping handler
@@ -1007,9 +1022,11 @@ namespace Files.App.Views.Layouts
 #if !WINDOWS
 			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
 #endif
+			var token = RenewShellMenuToken();
 			try
 			{
 				var parentShellPage = await EnsurePageIsCurrentAsync();
+				token.ThrowIfCancellationRequested();
 				var shellViewModel = parentShellPage.GetRequiredShellViewModel();
 				var commandsViewModel = CommandsViewModel
 					?? throw new InvalidOperationException("The layout commands are not initialized.");
@@ -1020,14 +1037,22 @@ namespace Files.App.Views.Layouts
 				var currentFolder = shellViewModel.CurrentFolder
 					?? throw new InvalidOperationException("The current folder is not available.");
 				List<ListedItem> contextItems = [currentFolder];
+#if WINDOWS
 				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: contextItems, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: shellViewModel, selectedItemsPropertiesViewModel: null);
+#else
+				BaseContextFlyoutHost.Reset();
+				BaseContextFlyoutHost.Items.Add(new MenuFlyoutItem { Text = Strings.Loading.GetLocalizedResource(), IsEnabled = false });
+				var items = await ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItemsAsync(currentInstanceViewModel: instanceViewModel, selectedItems: contextItems, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: shellViewModel, selectedItemsPropertiesViewModel: null, cancellationToken: token);
+				token.ThrowIfCancellationRequested();
+#endif
 				var host = BaseContextFlyoutHost;
-				host.Build(items);
+#if !WINDOWS
+				using (Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-flyout", true))
+#endif
+					host.Build(items);
 
 				if (!instanceViewModel.IsPageTypeSearchResults && !instanceViewModel.IsPageTypeZipFolder && !instanceViewModel.IsPageTypeFtp)
 				{
-					var token = RenewShellMenuToken();
-
 					// Pre-add "Show more options" (with the synchronously-known built-in overflow items) BEFORE the
 					// async shell fetch so its placeholder shows while the extensions load.
 					var (moreOptions, moreSeparator) = host.AddShowMoreOptionsIfEnabled(items);
@@ -1053,6 +1078,9 @@ namespace Files.App.Views.Layouts
 				}
 
 				host.FinalizePrimaryRowPosition();
+			}
+			catch (OperationCanceledException) when (token.IsCancellationRequested)
+			{
 			}
 			catch (Exception error)
 			{

@@ -804,14 +804,10 @@ namespace Files.App.Helpers.ContextFlyouts
 					AccessKey = model.AccessKey ?? string.Empty,
 				};
 
-				if (model.KeyboardAccelerator is { } accelerator)
+				if (model.CreateKeyboardAccelerator() is { } accelerator)
 				{
 					// Fresh instance: the row is rebuilt on placement flips and an accelerator can have only one owner.
-					button.KeyboardAccelerators.Add(new Microsoft.UI.Xaml.Input.KeyboardAccelerator
-					{
-						Key = accelerator.Key,
-						Modifiers = accelerator.Modifiers,
-					});
+					button.KeyboardAccelerators.Add(accelerator);
 					button.KeyboardAcceleratorPlacementMode = Microsoft.UI.Xaml.Input.KeyboardAcceleratorPlacementMode.Hidden;
 				}
 

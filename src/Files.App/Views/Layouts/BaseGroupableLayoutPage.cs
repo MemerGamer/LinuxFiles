@@ -249,6 +249,7 @@ namespace Files.App.Views.Layouts
 #if WINDOWS
 			ListViewBase.SelectAll();
 #else
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("select-all", DispatcherQueue.HasThreadAccess);
 			// Uno doesn't implement SelectAll. Each Add raises SelectionChanged, so update the page once at the end instead of per item.
 			var selected = ListViewBase.SelectedItems.ToHashSet(ReferenceEqualityComparer.Instance);
 			var added = GetAllItems().Where(item => !selected.Contains(item)).Cast<object>().ToList();
@@ -323,8 +324,17 @@ namespace Files.App.Views.Layouts
 #if !WINDOWS
 			if (e is not null)
 			{
-				foreach (var added in e.AddedItems)
-					ApplyPageThemeToContainer(ListViewBase.ContainerFromItem(added) as FrameworkElement);
+				if (e.AddedItems.Count > 1 && ListViewBase.ItemsPanelRoot is { } panel)
+				{
+					// Only realized containers need a theme; Uno's per-item lookup scans the entire items source.
+					foreach (var child in panel.Children)
+						ApplyPageThemeToContainer(child as FrameworkElement);
+				}
+				else
+				{
+					foreach (var added in e.AddedItems)
+						ApplyPageThemeToContainer(ListViewBase.ContainerFromItem(added) as FrameworkElement);
+				}
 			}
 #endif
 

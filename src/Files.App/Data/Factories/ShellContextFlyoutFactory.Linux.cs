@@ -17,23 +17,26 @@ namespace Files.App.Helpers
 		/// </summary>
 		private static Task<List<ContextMenuFlyoutItemViewModel>> GetLinuxContextMenuAsync(List<ListedItem>? selectedItems, CancellationToken cancellationToken)
 		{
-			var result = new List<ContextMenuFlyoutItemViewModel>();
-
-			if (selectedItems is { Count: 1 } &&
-				selectedItems[0].ItemPath is { Length: > 0 } path &&
-				selectedItems[0].PrimaryItemAttribute == Windows.Storage.StorageItemTypes.File)
+			var path = selectedItems is { Count: 1 } &&
+				selectedItems[0].PrimaryItemAttribute == Windows.Storage.StorageItemTypes.File
+				? selectedItems[0].ItemPath : null;
+			return Task.Run(() =>
 			{
-				var openWith = new ContextMenuFlyoutItemViewModel
+				cancellationToken.ThrowIfCancellationRequested();
+				var result = new List<ContextMenuFlyoutItemViewModel>();
+				if (path is { Length: > 0 })
 				{
-					Text = Strings.OpenWith.GetLocalizedResource(),
-					Tag = new Win32ContextMenuItem { CommandString = "openas" },
-					Items = [],
-				};
-				openWith.LoadSubMenuAction = () => LoadOpenWithItemsAsync(openWith, path, cancellationToken);
-				result.Add(openWith);
-			}
-
-			return Task.FromResult(result);
+					var openWith = new ContextMenuFlyoutItemViewModel
+					{
+						Text = Strings.OpenWith.GetLocalizedResource(),
+						Tag = new Win32ContextMenuItem { CommandString = "openas" },
+						Items = [],
+					};
+					openWith.LoadSubMenuAction = () => LoadOpenWithItemsAsync(openWith, path, cancellationToken);
+					result.Add(openWith);
+				}
+				return result;
+			}, cancellationToken);
 		}
 
 		private static async Task LoadOpenWithItemsAsync(ContextMenuFlyoutItemViewModel model, string path, CancellationToken cancellationToken)

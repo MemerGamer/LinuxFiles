@@ -5,6 +5,7 @@
 using Files.Platform.Abstractions.Tags;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,10 +16,30 @@ namespace Files.App.Utils.FileTags
 	// Files stores tag UIDs internally, so names are translated through the tag list; xattr tags with an unknown name are ignored.
 	public static partial class FileTagsHelper
 	{
+		private static readonly ConcurrentDictionary<string, byte> failedXattrWrites = new(StringComparer.Ordinal);
+
+		internal static bool TryReadDatabaseFallback(string filePath, out string[] tags)
+		{
+			if (failedXattrWrites.ContainsKey(filePath))
+			{
+				tags = GetDbInstance().GetTags(filePath, null);
+				return true;
+			}
+			tags = [];
+			return false;
+		}
+
 		public static string[] ReadFileTag(string filePath)
 		{
+			if (TryReadDatabaseFallback(filePath, out var tags))
+				return tags;
+
 			var store = Ioc.Default.GetService<IFileTagsStore>();
 			var names = store?.ReadTags(filePath);
+
+			// A write may have failed while the attribute was being read.
+			if (TryReadDatabaseFallback(filePath, out tags))
+				return tags;
 
 			if (names is { Count: > 0 })
 			{
@@ -109,7 +130,11 @@ namespace Files.App.Utils.FileTags
 			try
 			{
 				GetDbInstance().SetTags(filePath, null, tags);
-				if (store is not null && !store.WriteTags(filePath, names))
+				// Keep the DB authoritative even when a readable attribute could not be updated or removed.
+				failedXattrWrites[filePath] = 0;
+				if (store is not null && store.WriteTags(filePath, names))
+					failedXattrWrites.TryRemove(filePath, out _);
+				else
 					App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
 				return true;
 			}

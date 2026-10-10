@@ -4,6 +4,7 @@
 using Files.App.Utils;
 using Files.App.Utils.FileTags;
 using Files.Platform.Abstractions.Tags;
+using Files.Platform.Linux.Tags;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.IO;
@@ -90,14 +91,17 @@ namespace Files.Platform.Tests.Tags
 		}
 
 		[TestMethod]
-		[DataRow(true, false)]
-		[DataRow(false, false)]
-		[DataRow(true, true)]
-		[DataRow(false, true)]
-		public async Task EditsAcrossItems_MergeInsideQueueWithoutDroppingPendingTags(bool supportsXattrs, bool secondItemLoaded)
+		[DataRow(true, true, false)]
+		[DataRow(false, false, false)]
+		[DataRow(true, false, false)]
+		[DataRow(true, true, true)]
+		[DataRow(false, false, true)]
+		[DataRow(true, false, true)]
+		public async Task EditsAcrossItems_MergeInsideQueueWithoutDroppingPendingTags(bool supportsXattrs, bool writesSucceed, bool secondItemLoaded)
 		{
 			using var fixture = new TagFixture();
 			fixture.Store.SupportsXattrs = supportsXattrs;
+			fixture.Store.WritesSucceed = writesSucceed;
 			fixture.Store.Tags["/preset"] = ["A"];
 			FileTagsHelper.GetDbInstance().SetTags("/preset", null, ["a"]);
 			_ = FileTagsHelper.WriteFileTagAsync("/blocked", ["a"]);
@@ -117,7 +121,7 @@ namespace Files.Platform.Tests.Tags
 			await Task.WhenAll(firstEdit, secondEdit).WaitAsync(TimeSpan.FromSeconds(10));
 			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, secondItem.FileTags);
 			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags("/preset", null));
-			if (supportsXattrs)
+			if (supportsXattrs && writesSucceed)
 				CollectionAssert.AreEqual(new[] { "A", "B", "C" }, fixture.Store.Tags["/preset"]);
 		}
 
@@ -204,6 +208,105 @@ namespace Files.Platform.Tests.Tags
 			CollectionAssert.AreEqual(new[] { "b" }, FileTagsHelper.ReadFileTag("/fresh"));
 		}
 
+		[TestMethod]
+		public async Task FailedXattrWrite_LoadsAndEditsUseDatabaseUntilSyncSucceeds()
+		{
+			using var fixture = new TagFixture();
+			const string path = "/read-only";
+			fixture.Store.Tags[path] = ["A"];
+			fixture.Store.WritesSucceed = false;
+			CollectionAssert.AreEqual(new[] { "a" }, FileTagsHelper.ReadFileTag(path));
+
+			Assert.IsTrue(await FileTagsHelper.WriteFileTagAsync(path, ["a", "b"]));
+			CollectionAssert.AreEqual(new[] { "A" }, fixture.Store.ReadTags(path).ToArray());
+			CollectionAssert.AreEqual(new[] { "a", "b" }, FileTagsHelper.ReadFileTag(path));
+			CollectionAssert.AreEqual(new[] { "a", "b" }, await FileTagsHelper.ReadAndUpdateFileTagsAsync(path));
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" },
+				await FileTagsHelper.EditFileTagsAsync(path, tags => [.. tags, "c"]));
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags(path, null));
+
+			fixture.Store.WritesSucceed = true;
+			CollectionAssert.AreEqual(new[] { "b", "c" },
+				await FileTagsHelper.EditFileTagsAsync(path, tags => tags.Where(uid => uid != "a").ToArray()));
+			CollectionAssert.AreEqual(new[] { "B", "C" }, fixture.Store.Tags[path]);
+			fixture.Store.Tags[path] = ["A"];
+			CollectionAssert.AreEqual(new[] { "a" }, await FileTagsHelper.ReadAndUpdateFileTagsAsync(path));
+		}
+
+		[TestMethod]
+		public async Task FailedXattrRemoval_EmptyDatabaseRemainsAuthoritative()
+		{
+			using var fixture = new TagFixture();
+			const string path = "/read-only-removal";
+			fixture.Store.Tags[path] = ["A"];
+			FileTagsHelper.GetDbInstance().SetTags(path, null, ["a"]);
+			fixture.Store.WritesSucceed = false;
+
+			Assert.IsTrue(await FileTagsHelper.UntagAllFilesAsync("a"));
+			Assert.AreEqual(0, (await FileTagsHelper.ReadAndUpdateFileTagsAsync(path)).Length);
+			Assert.AreEqual(0, new FileTagsDatabase(fixture.DatabasePath).GetTags(path, null).Length);
+			CollectionAssert.AreEqual(new[] { "b" }, await FileTagsHelper.EditFileTagsAsync(path, tags => [.. tags, "b"]));
+			CollectionAssert.AreEqual(new[] { "A" }, fixture.Store.Tags[path]);
+		}
+
+		[TestMethod]
+		public async Task FailedXattrWrite_DeferredSnapshotOnAnotherItemUsesDatabase()
+		{
+			using var fixture = new TagFixture();
+			const string path = "/read-only-deferred";
+			fixture.Store.Tags[path] = ["A"];
+			fixture.Store.WritesSucceed = false;
+			var loadingItem = new ListedItem { ItemPath = path };
+			var editingItem = new ListedItem { ItemPath = path };
+			var revision = loadingItem.FileTagsRevision;
+			var snapshot = await FileTagsHelper.ReadAndUpdateFileTagsAsync(path);
+
+			await editingItem.EditFileTagsAsync(tags => [.. tags, "b"]);
+			loadingItem.SetLoadedFileTags(snapshot, revision);
+			CollectionAssert.AreEqual(new[] { "a", "b" }, loadingItem.FileTags);
+			await loadingItem.EditFileTagsAsync(tags => [.. tags, "c"]);
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, loadingItem.FileTags);
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags(path, null));
+		}
+
+		[TestMethod]
+		public async Task ReadOnlyFile_ReadableXattrCannotOverwriteDatabaseFallback()
+		{
+			if (!OperatingSystem.IsLinux())
+			{
+				Assert.Inconclusive("Requires Linux file permissions and extended attributes.");
+				return;
+			}
+
+			var store = new XattrFileTagsStore();
+			using var fixture = new TagFixture(store);
+			var path = Path.Combine(Path.GetDirectoryName(fixture.DatabasePath)!, "read-only.txt");
+			File.WriteAllText(path, "tags");
+			if (!store.WriteTags(path, ["A"]))
+				Assert.Inconclusive("The test file system has no user xattr support.");
+
+			File.SetUnixFileMode(path, UnixFileMode.UserRead);
+			try
+			{
+				if (store.WriteTags(path, ["B"]))
+					Assert.Inconclusive("The current user can bypass read-only file permissions.");
+				CollectionAssert.AreEqual(new[] { "A" }, store.ReadTags(path).ToArray());
+
+				var item = new ListedItem { ItemPath = path };
+				await item.EditFileTagsAsync(tags => [.. tags, "b"]);
+				CollectionAssert.AreEqual(new[] { "a", "b" }, await FileTagsHelper.ReadAndUpdateFileTagsAsync(path));
+				await item.EditFileTagsAsync(tags => [.. tags, "c"]);
+
+				CollectionAssert.AreEqual(new[] { "a", "b", "c" }, item.FileTags);
+				CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags(path, null));
+				CollectionAssert.AreEqual(new[] { "A" }, store.ReadTags(path).ToArray());
+			}
+			finally
+			{
+				File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+			}
+		}
+
 		private sealed class TagFixture : IDisposable
 		{
 			private readonly string root = Path.Combine(Path.GetTempPath(), "files-tags-queue-" + Guid.NewGuid().ToString("N"));
@@ -212,11 +315,11 @@ namespace Files.Platform.Tests.Tags
 			public BlockingTagStore Store { get; } = new();
 			public TagSettings Settings { get; } = new();
 
-			public TagFixture()
+			public TagFixture(IFileTagsStore? store = null)
 			{
 				Directory.CreateDirectory(root);
 				FileTagsHelper.Database = new FileTagsDatabase(DatabasePath);
-				services = new ServiceCollection().AddSingleton<IFileTagsStore>(Store)
+				services = new ServiceCollection().AddSingleton<IFileTagsStore>(store ?? Store)
 					.AddSingleton<IFileTagsSettingsService>(Settings).BuildServiceProvider();
 				Ioc.Default.Services = services;
 			}
@@ -240,6 +343,7 @@ namespace Files.Platform.Tests.Tags
 			public ManualResetEventSlim Release { get; } = new();
 			public Dictionary<string, string[]> Tags { get; } = new();
 			public bool SupportsXattrs { get; set; } = true;
+			public bool WritesSucceed { get; set; } = true;
 			public bool BlockReads { get; set; }
 			public TaskCompletionSource ReadEntered { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 			public ManualResetEventSlim ReadRelease { get; } = new();
@@ -259,7 +363,7 @@ namespace Files.Platform.Tests.Tags
 					Entered.SetResult();
 					if (!Release.Wait(TimeSpan.FromSeconds(10))) throw new TimeoutException();
 				}
-				if (!SupportsXattrs) return false;
+				if (!SupportsXattrs || !WritesSucceed) return false;
 				Tags[path] = tags.ToArray();
 				return true;
 			}
@@ -278,7 +382,16 @@ namespace Files.App.Utils.FileTags
 {
 	public static partial class FileTagsHelper
 	{
-		internal static FileTagsDatabase Database { get; set; } = null!;
+		private static FileTagsDatabase database = null!;
+		internal static FileTagsDatabase Database
+		{
+			get => database;
+			set
+			{
+				failedXattrWrites.Clear();
+				database = value;
+			}
+		}
 		public static FileTagsDatabase GetDbInstance() => Database;
 	}
 

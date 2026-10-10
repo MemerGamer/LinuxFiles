@@ -57,6 +57,12 @@ namespace Files.App.Services.Settings
 			set => Set(value.ToString());
 		}
 
+		public bool DetectCompositorDisplayScale
+		{
+			get => Get(false);
+			set => Set(value);
+		}
+
 		public float BackgroundOpacity
 		{
 			get => AppearancePreferences.ClampOpacity(Get(0.85f), 0);

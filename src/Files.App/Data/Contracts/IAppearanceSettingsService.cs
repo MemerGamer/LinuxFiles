@@ -36,6 +36,7 @@ namespace Files.App.Data.Contracts
 		ColourSource ColourSource { get; set; }
 		BackdropMode BackdropMode { get; set; }
 		float BackgroundOpacity { get; set; }
+		bool DetectCompositorDisplayScale { get; set; }
 
 		/// <summary>
 		/// Gets or sets a value for the app theme background color.

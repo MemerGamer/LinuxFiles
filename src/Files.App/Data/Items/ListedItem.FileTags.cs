@@ -64,6 +64,10 @@ namespace Files.App.Utils
 #if WINDOWS
 			FileTags = tags;
 #else
+			// A deferred snapshot may predate an edit made through another item for this path.
+			if (FileTagsHelper.TryReadDatabaseFallback(this.GetRequiredPath(), out var fallbackTags))
+				tags = fallbackTags;
+
 			if (fileTags is not null && fileTags.SequenceEqual(tags, StringComparer.Ordinal))
 				return;
 

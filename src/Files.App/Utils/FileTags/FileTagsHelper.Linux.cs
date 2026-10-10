@@ -15,10 +15,29 @@ namespace Files.App.Utils.FileTags
 	// Files stores tag UIDs internally, so names are translated through the tag list; xattr tags with an unknown name are ignored.
 	public static partial class FileTagsHelper
 	{
+		internal static bool TryReadDatabaseFallback(string filePath, out string[] tags)
+		{
+			// Persisted marker: survives restarts, so a stale readable attribute never overwrites newer database tags.
+			if (GetDbInstance().IsXattrStale(filePath))
+			{
+				tags = GetDbInstance().GetTags(filePath, null);
+				return true;
+			}
+			tags = [];
+			return false;
+		}
+
 		public static string[] ReadFileTag(string filePath)
 		{
+			if (TryReadDatabaseFallback(filePath, out var tags))
+				return tags;
+
 			var store = Ioc.Default.GetService<IFileTagsStore>();
 			var names = store?.ReadTags(filePath);
+
+			// A write may have failed while the attribute was being read.
+			if (TryReadDatabaseFallback(filePath, out tags))
+				return tags;
 
 			if (names is { Count: > 0 })
 			{
@@ -43,7 +62,8 @@ namespace Files.App.Utils.FileTags
 			return EnqueueWrite(() =>
 			{
 				var tags = ReadFileTag(filePath);
-				GetDbInstance().SetTags(filePath, null, tags);
+				if (!GetDbInstance().IsXattrStale(filePath))
+					GetDbInstance().SetTags(filePath, null, tags);
 				return tags;
 			}, Array.Empty<string>());
 		}
@@ -108,8 +128,19 @@ namespace Files.App.Utils.FileTags
 		{
 			try
 			{
-				GetDbInstance().SetTags(filePath, null, tags);
-				if (store is not null && !store.WriteTags(filePath, names))
+				var written = false;
+				try
+				{
+					written = store is not null && store.WriteTags(filePath, names);
+				}
+				catch (Exception ex) when (ex is not (OutOfMemoryException or StackOverflowException or AccessViolationException))
+				{
+					App.Logger?.LogDebug(ex, "Could not write extended attributes.");
+				}
+
+				// Keep the DB authoritative (persistently) when a readable attribute could not be updated or removed.
+				GetDbInstance().SetTags(filePath, null, tags, xattrStale: !written);
+				if (!written)
 					App.Logger?.LogDebug("Extended attributes are not available for '{FilePath}'; tags are kept in the database only.", LogPathHelper.RedactPath(filePath));
 				return true;
 			}

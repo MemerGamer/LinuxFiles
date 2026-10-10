@@ -9,5 +9,7 @@ namespace Files.App.Utils.FileTags
 		public ulong? Frn { get; set; }
 		public string FilePath { get; set; } = string.Empty;
 		public string[] Tags { get; set; } = [];
+		/// <summary>Linux: the database is newer than the file's extended attribute, which could not be updated.</summary>
+		public bool XattrStale { get; set; }
 	}
 }

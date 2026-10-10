@@ -66,12 +66,24 @@ jobs:
         else
           git checkout -b "$branch"
         fi
+        # Freeze our policy/helper before upstream can change or conflict with them.
+        git show origin/main:scripts/linux/windows-paths.txt > "$RUNNER_TEMP/windows-paths.txt"
+        git show origin/main:scripts/linux/prune-windows.sh | sed 's/\r$//' > "$RUNNER_TEMP/prune-windows.sh"
         if git merge upstream/main --no-edit; then
           echo "CONFLICTS=false" >> "$GITHUB_ENV"
         else
+          # Only keep allowlisted modify/delete conflicts where main deleted the file.
+          git rev-parse -q --verify MERGE_HEAD >/dev/null || exit 1
+          bash "$RUNNER_TEMP/prune-windows.sh" --apply --conflicts-only \
+            --paths-file "$RUNNER_TEMP/windows-paths.txt"
           git diff --name-only --diff-filter=U > "$RUNNER_TEMP/conflicts.txt"
-          git merge --abort
-          echo "CONFLICTS=true" >> "$GITHUB_ENV"
+          if [ -s "$RUNNER_TEMP/conflicts.txt" ]; then
+            git merge --abort
+            echo "CONFLICTS=true" >> "$GITHUB_ENV"
+          else
+            git commit --no-edit
+            echo "CONFLICTS=false" >> "$GITHUB_ENV"
+          fi
         fi
         git log -50 --format='- %s' main..upstream/main > "$RUNNER_TEMP/commits.txt"
 
@@ -84,7 +96,7 @@ jobs:
           echo
           cat "$RUNNER_TEMP/commits.txt"
           echo
-          echo "Merged without conflicts by the Sync Upstream workflow. The build was dispatched on this branch; check"
+          echo "Merged by the Sync Upstream workflow, keeping allowlisted Windows deletions where needed. The build was dispatched; check"
           echo "that it passes before merging."
         } > "$RUNNER_TEMP/body.md"
         number=$(gh pr list --base main --head "$BRANCH" --state open --json number,isCrossRepository \

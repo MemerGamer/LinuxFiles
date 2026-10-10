@@ -17,15 +17,15 @@
            , icu, openssl, zlib, krb5, glib, enableRootActions ? false }:
             let
               # version and both hashes are rewritten by scripts/linux/update-nix-flake.sh
-              version = "0.1.0-alpha2";
+              version = "0.1.0-alpha3";
               base = "https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v${version}";
               app = fetchurl {
                 url = "${base}/files-linux-x64.tar.gz";
-                hash = "sha256-f6zBuMzd3mb0tDnMVtcBz9RXlNvQcjKlBVcRwMpIbbc=";
+                hash = "sha256-4AsvaWZC4Mg/11XnG5ggRCz/pNFzvJzfSwjl/s2IG5A=";
               };
               packaging = fetchurl {
                 url = "${base}/files-packaging.tar.gz";
-                hash = "sha256-QhBF4IhA4+y+6ZslPTYWt0xJGot/KjoZgKDoVVo5u60=";
+                hash = "sha256-POB/aZzXxXhs5GGuHAfGwPQ+OLLMz/6VEOKs8se/kUE=";
               };
               # Opened with dlopen at runtime, so autoPatchelf cannot discover them; added to every ELF file's runpath.
               runtimeLibs = [
@@ -37,8 +37,8 @@
             stdenv.mkDerivation {
               pname = "linuxfiles";
               inherit version;
-              # Set true only after pinning a release with NixOS helper/tool discovery.
-              passthru.supportsNixRootActions = false;
+              # Alpha3 includes NixOS deployment-manifest and elevation-wrapper discovery.
+              passthru.supportsNixRootActions = true;
 
               dontUnpack = true;
               dontConfigure = true;
@@ -122,7 +122,7 @@
               environment.systemPackages = [ package ];
               assertions = [{
                 assertion = !cfg.rootActions || (package.passthru.supportsNixRootActions or false);
-                message = "programs.linuxfiles.rootActions requires a runtime with NixOS deployment-manifest and elevation-wrapper discovery (passthru.supportsNixRootActions = true). Disable rootActions or select a compatible package; the pinned alpha2 release is incompatible.";
+                message = "programs.linuxfiles.rootActions requires a runtime with NixOS deployment-manifest and elevation-wrapper discovery (passthru.supportsNixRootActions = true). Disable rootActions or select a compatible package.";
               }];
             }
             (lib.mkIf cfg.rootActions (lib.mkMerge [
@@ -147,15 +147,15 @@
 
       checks.${system}.root-actions-module =
         let
-          # This fixture checks module/layout wiring, not the pinned runtime's capabilities.
-          compatible = self.packages.${system}.linuxfiles.overrideAttrs (old: {
-            passthru = (old.passthru or { }) // { supportsNixRootActions = true; };
-          });
+          compatible = self.packages.${system}.linuxfiles;
           unsupported = nixpkgs.lib.nixosSystem {
             inherit system;
             modules = [ self.nixosModules.default {
               programs.linuxfiles.enable = true;
               programs.linuxfiles.rootActions = true;
+              programs.linuxfiles.package = compatible.overrideAttrs (old: {
+                passthru = (old.passthru or { }) // { supportsNixRootActions = false; };
+              });
             } ];
           };
           unmarked = nixpkgs.lib.nixosSystem {

@@ -75,6 +75,21 @@ namespace Files.App.Views.Layouts
 
 		private CancellationTokenSource? shellContextMenuItemCancellationToken;
 		private CancellationTokenSource? groupingCancellationToken;
+#if !WINDOWS
+		private long contextMenuVersion;
+
+		private void InvalidateContextMenuBuild()
+		{
+			contextMenuVersion++;
+			shellContextMenuItemCancellationToken?.Cancel();
+		}
+
+		private void ContextMenuContextChanged(object? sender, PropertyChangedEventArgs e)
+		{
+			if (e.PropertyName is nameof(ShellViewModel.WorkingDirectory) or nameof(ShellViewModel.CurrentFolder))
+				InvalidateContextMenuBuild();
+		}
+#endif
 
 		private bool shiftPressed;
 		private bool itemDragging;
@@ -318,6 +333,9 @@ namespace Files.App.Views.Layouts
 				if (value != selectedItems)
 				{
 					isSelectedItemsSorted = false;
+#if !WINDOWS
+					InvalidateContextMenuBuild();
+#endif
 					selectedItems = value;
 					var currentItems = value;
 
@@ -416,6 +434,11 @@ namespace Files.App.Views.Layouts
 
 		private void UnhookBaseEvents()
 		{
+#if !WINDOWS
+			InvalidateContextMenuBuild();
+			if (ParentShellPageInstance?.ShellViewModel is { } shellViewModel)
+				shellViewModel.PropertyChanged -= ContextMenuContextChanged;
+#endif
 			ItemManipulationModel.RefreshItemsOpacityInvoked -= ItemManipulationModel_RefreshItemsOpacityInvoked;
 			jumpTimer?.Stop();
 			if (jumpTimer is not null)
@@ -687,6 +710,9 @@ namespace Files.App.Views.Layouts
 
 			SetSelectedItemsOnNavigation();
 
+#if !WINDOWS
+			shellViewModel.PropertyChanged += ContextMenuContextChanged;
+#endif
 			ItemContextMenuFlyout.Opening += ItemContextFlyout_Opening;
 			BaseContextMenuFlyout.Opening += BaseContextFlyout_Opening;
 
@@ -758,16 +784,24 @@ namespace Files.App.Views.Layouts
 #if WINDOWS
 				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: selectedItems, selectedItemsPropertiesViewModel: SelectedItemsPropertiesViewModel, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: null);
 #else
+				token = RenewShellMenuToken();
+				var buildVersion = contextMenuVersion;
 				ItemContextFlyoutHost.Reset();
 				ItemContextFlyoutHost.Items.Add(new MenuFlyoutItem { Text = Strings.Loading.GetLocalizedResource(), IsEnabled = false });
 				var items = await ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItemsAsync(currentInstanceViewModel: instanceViewModel, selectedItems: selectedItems, selectedItemsPropertiesViewModel: SelectedItemsPropertiesViewModel, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: null, cancellationToken: token);
 				token.ThrowIfCancellationRequested();
+				if (buildVersion != contextMenuVersion || !parentShellPage.IsCurrentInstance || !parentShellPage.IsCurrentPane)
+					return;
 #endif
 				var host = ItemContextFlyoutHost;
 #if !WINDOWS
 				using (Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-flyout", true))
 #endif
+#if WINDOWS
 					host.Build(items);
+#else
+					host.Build(items, preservePlacement: true);
+#endif
 
 				// Edit tags: a submenu of the available tags (FileTagsContextMenu is a standalone MenuFlyout that
 				// can't be nested, so build the tag toggles directly).
@@ -824,6 +858,9 @@ namespace Files.App.Views.Layouts
 				}
 
 				host.FinalizePrimaryRowPosition();
+#if !WINDOWS
+				host.CorrectRebuiltPlacement();
+#endif
 			}
 			catch (OperationCanceledException) when (token.IsCancellationRequested)
 			{
@@ -984,6 +1021,10 @@ namespace Files.App.Views.Layouts
 		protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
 		{
 			base.OnNavigatingFrom(e);
+#if !WINDOWS
+			InvalidateContextMenuBuild();
+			ParentShellPageInstance.GetRequiredShellViewModel().PropertyChanged -= ContextMenuContextChanged;
+#endif
 			shellContextMenuItemCancellationToken?.Cancel();
 			navigationArguments = null;
 
@@ -1040,16 +1081,24 @@ namespace Files.App.Views.Layouts
 #if WINDOWS
 				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: contextItems, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: shellViewModel, selectedItemsPropertiesViewModel: null);
 #else
+				token = RenewShellMenuToken();
+				var buildVersion = contextMenuVersion;
 				BaseContextFlyoutHost.Reset();
 				BaseContextFlyoutHost.Items.Add(new MenuFlyoutItem { Text = Strings.Loading.GetLocalizedResource(), IsEnabled = false });
 				var items = await ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItemsAsync(currentInstanceViewModel: instanceViewModel, selectedItems: contextItems, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: shellViewModel, selectedItemsPropertiesViewModel: null, cancellationToken: token);
 				token.ThrowIfCancellationRequested();
+				if (buildVersion != contextMenuVersion || !parentShellPage.IsCurrentInstance || !parentShellPage.IsCurrentPane)
+					return;
 #endif
 				var host = BaseContextFlyoutHost;
 #if !WINDOWS
 				using (Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-flyout", true))
 #endif
+#if WINDOWS
 					host.Build(items);
+#else
+					host.Build(items, preservePlacement: true);
+#endif
 
 				if (!instanceViewModel.IsPageTypeSearchResults && !instanceViewModel.IsPageTypeZipFolder && !instanceViewModel.IsPageTypeFtp)
 				{
@@ -1078,6 +1127,9 @@ namespace Files.App.Views.Layouts
 				}
 
 				host.FinalizePrimaryRowPosition();
+#if !WINDOWS
+				host.CorrectRebuiltPlacement();
+#endif
 			}
 			catch (OperationCanceledException) when (token.IsCancellationRequested)
 			{

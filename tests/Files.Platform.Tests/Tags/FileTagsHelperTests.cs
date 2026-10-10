@@ -307,6 +307,80 @@ namespace Files.Platform.Tests.Tags
 			}
 		}
 
+		[TestMethod]
+		public async Task FailedXattrWrite_DatabaseStaysAuthoritativeAfterRestart()
+		{
+			using var fixture = new TagFixture();
+			const string path = "/read-only-restart";
+			fixture.Store.Tags[path] = ["A"];
+			fixture.Store.WritesSucceed = false;
+			await FileTagsHelper.EditFileTagsAsync(path, tags => [.. tags, "b"]);
+			await FileTagsHelper.EditFileTagsAsync(path, tags => [.. tags, "c"]);
+
+			FileTagsHelper.Database = new FileTagsDatabase(fixture.DatabasePath);
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, await FileTagsHelper.ReadAndUpdateFileTagsAsync(path));
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags(path, null));
+
+			fixture.Store.WritesSucceed = true;
+			await FileTagsHelper.EditFileTagsAsync(path, tags => tags.Where(uid => uid != "a").ToArray());
+			FileTagsHelper.Database = new FileTagsDatabase(fixture.DatabasePath);
+			Assert.IsFalse(FileTagsHelper.GetDbInstance().IsXattrStale(path));
+			CollectionAssert.AreEqual(new[] { "B", "C" }, fixture.Store.Tags[path]);
+			fixture.Store.Tags[path] = ["A"];
+			CollectionAssert.AreEqual(new[] { "a" }, await FileTagsHelper.ReadAndUpdateFileTagsAsync(path));
+		}
+
+		[TestMethod]
+		public async Task FailedXattrRemoval_EmptyDatabaseStaysAuthoritativeAfterRestart()
+		{
+			using var fixture = new TagFixture();
+			const string path = "/read-only-removal-restart";
+			fixture.Store.Tags[path] = ["A"];
+			fixture.Store.WritesSucceed = false;
+			await FileTagsHelper.EditFileTagsAsync(path, _ => []);
+
+			FileTagsHelper.Database = new FileTagsDatabase(fixture.DatabasePath);
+			Assert.AreEqual(0, (await FileTagsHelper.ReadAndUpdateFileTagsAsync(path)).Length);
+			Assert.AreEqual(0, FileTagsHelper.GetDbInstance().GetAll().Count());
+		}
+
+		[TestMethod]
+		public async Task ReadOnlyFile_StaleXattrDoesNotOverwriteDatabaseAfterRestart()
+		{
+			if (!OperatingSystem.IsLinux())
+			{
+				Assert.Inconclusive("Requires Linux file permissions and extended attributes.");
+				return;
+			}
+
+			var store = new XattrFileTagsStore();
+			using var fixture = new TagFixture(store);
+			var path = Path.Combine(Path.GetDirectoryName(fixture.DatabasePath)!, "read-only-restart.txt");
+			File.WriteAllText(path, "tags");
+			if (!store.WriteTags(path, ["A"]))
+				Assert.Inconclusive("The test file system has no user xattr support.");
+
+			File.SetUnixFileMode(path, UnixFileMode.UserRead);
+			try
+			{
+				if (store.WriteTags(path, ["B"]))
+					Assert.Inconclusive("The current user can bypass read-only file permissions.");
+
+				var item = new ListedItem { ItemPath = path };
+				await item.EditFileTagsAsync(tags => [.. tags, "b"]);
+				await item.EditFileTagsAsync(tags => [.. tags, "c"]);
+
+				FileTagsHelper.Database = new FileTagsDatabase(fixture.DatabasePath);
+				CollectionAssert.AreEqual(new[] { "a", "b", "c" }, await FileTagsHelper.ReadAndUpdateFileTagsAsync(path));
+				CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags(path, null));
+				CollectionAssert.AreEqual(new[] { "A" }, store.ReadTags(path).ToArray());
+			}
+			finally
+			{
+				File.SetUnixFileMode(path, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+			}
+		}
+
 		private sealed class TagFixture : IDisposable
 		{
 			private readonly string root = Path.Combine(Path.GetTempPath(), "files-tags-queue-" + Guid.NewGuid().ToString("N"));
@@ -388,7 +462,6 @@ namespace Files.App.Utils.FileTags
 			get => database;
 			set
 			{
-				failedXattrWrites.Clear();
 				database = value;
 			}
 		}

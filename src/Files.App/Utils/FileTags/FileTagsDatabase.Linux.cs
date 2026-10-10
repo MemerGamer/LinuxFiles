@@ -30,21 +30,36 @@ namespace Files.App.Utils.FileTags
 		private string DatabasePath
 			=> _databasePath ?? Path.Combine(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IAppDataPaths>().DataDirectory, "filetags.json");
 
-		public void SetTags(string filePath, ulong? frn, string[] tags)
+		public void SetTags(string filePath, ulong? frn, string[] tags) => SetTags(filePath, frn, tags, xattrStale: false);
+
+		/// <summary>
+		/// Stores the tags of a file. <paramref name="xattrStale"/> persists that the file's extended attribute could not be updated,
+		/// so the entry (even an empty one) stays authoritative over the attribute after a restart.
+		/// </summary>
+		public void SetTags(string filePath, ulong? frn, string[] tags, bool xattrStale)
 		{
 			lock (_gate)
 			{
 				var entries = Load();
-				var changed = tags.Length == 0
+				var keep = tags.Length > 0 || xattrStale;
+				var changed = !keep
 					? entries.Remove(filePath)
-					: !entries.TryGetValue(filePath, out var current) || !current.Tags.SequenceEqual(tags, StringComparer.Ordinal);
+					: !entries.TryGetValue(filePath, out var current)
+						|| current.XattrStale != xattrStale
+						|| !current.Tags.SequenceEqual(tags, StringComparer.Ordinal);
 				if (!changed && !_dirty)
 					return;
-				if (tags.Length > 0 && changed)
-					entries[filePath] = new TaggedFile { FilePath = filePath, Tags = (string[])tags.Clone() };
+				if (keep && changed)
+					entries[filePath] = new TaggedFile { FilePath = filePath, Tags = (string[])tags.Clone(), XattrStale = xattrStale };
 
 				Save(entries);
 			}
+		}
+
+		public bool IsXattrStale(string filePath)
+		{
+			lock (_gate)
+				return Load().TryGetValue(filePath, out var tagged) && tagged.XattrStale;
 		}
 
 		public void UpdateTag(string oldFilePath, ulong? frn, string? newFilePath)
@@ -81,14 +96,14 @@ namespace Files.App.Utils.FileTags
 		public IEnumerable<TaggedFile> GetAll()
 		{
 			lock (_gate)
-				return Load().Values.ToList();
+				return Load().Values.Where(x => x.Tags.Length > 0).ToList();
 		}
 
 		public IEnumerable<TaggedFile> GetAllUnderPath(string folderPath)
 		{
 			var prefix = folderPath.TrimEnd('/') + "/";
 			lock (_gate)
-				return Load().Values.Where(x => x.FilePath.StartsWith(prefix, StringComparison.Ordinal)).ToList();
+				return Load().Values.Where(x => x.Tags.Length > 0 && x.FilePath.StartsWith(prefix, StringComparison.Ordinal)).ToList();
 		}
 
 		public void Import(string json)
@@ -117,7 +132,7 @@ namespace Files.App.Utils.FileTags
 		public string Export()
 		{
 			lock (_gate)
-				return JsonSerializer.Serialize(Load().Values.ToList(), AppJsonSerializerContext.Default.ListTaggedFile);
+				return JsonSerializer.Serialize(Load().Values.Where(x => x.Tags.Length > 0).ToList(), AppJsonSerializerContext.Default.ListTaggedFile);
 		}
 
 		private Dictionary<string, TaggedFile> Load()
@@ -134,7 +149,7 @@ namespace Files.App.Utils.FileTags
 					var list = JsonSerializer.Deserialize(File.ReadAllText(path), AppJsonSerializerContext.Default.TaggedFileArray);
 					foreach (var tag in list ?? [])
 					{
-						if (!string.IsNullOrEmpty(tag.FilePath) && tag.Tags.Length > 0)
+						if (!string.IsNullOrEmpty(tag.FilePath) && (tag.Tags.Length > 0 || tag.XattrStale))
 							entries[tag.FilePath] = tag;
 					}
 				}

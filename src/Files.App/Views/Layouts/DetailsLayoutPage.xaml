@@ -990,6 +990,7 @@
 										<!--  Selection Check Box  -->
 										<CheckBox
 											x:Name="SelectionCheckbox"
+											Style="{x:Bind local:BaseLayoutPage.SelectionCheckBoxStyle}"
 											Width="20"
 											MinWidth="0"
 											HorizontalAlignment="Center"

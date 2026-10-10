@@ -37,6 +37,11 @@ namespace Files.App.Views.Layouts
 	/// </summary>
 	public abstract partial class BaseLayoutPage : Page, IBaseLayoutPage, INotifyPropertyChanged
 	{
+		public static Style? SelectionCheckBoxStyle =>
+			OperatingSystem.IsLinux()
+				? (Style)Application.Current.Resources["Files.SelectionCheckBoxStyle"]
+				: null;
+
 		// Dependency injections
 
 		protected IFileTagsSettingsService FileTagsSettingsService { get; } = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();

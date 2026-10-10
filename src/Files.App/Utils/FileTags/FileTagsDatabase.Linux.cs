@@ -115,14 +115,14 @@ namespace Files.App.Utils.FileTags
 				var entries = new Dictionary<string, TaggedFile>(StringComparer.Ordinal);
 				foreach (var tag in tags ?? [])
 				{
-					if (!string.IsNullOrEmpty(tag.FilePath) && tag.Tags.Length > 0)
+					if (!string.IsNullOrEmpty(tag.FilePath) && (tag.Tags.Length > 0 || tag.XattrStale))
 						entries[tag.FilePath] = tag;
 				}
 
 				var current = Load();
 				if (!_dirty && current.Count == entries.Count && entries.All(pair =>
 					current.TryGetValue(pair.Key, out var existing) && existing.Frn == pair.Value.Frn &&
-					existing.Tags.SequenceEqual(pair.Value.Tags, StringComparer.Ordinal)))
+					existing.XattrStale == pair.Value.XattrStale && existing.Tags.SequenceEqual(pair.Value.Tags, StringComparer.Ordinal)))
 					return;
 
 				Save(entries);
@@ -132,7 +132,7 @@ namespace Files.App.Utils.FileTags
 		public string Export()
 		{
 			lock (_gate)
-				return JsonSerializer.Serialize(Load().Values.Where(x => x.Tags.Length > 0).ToList(), AppJsonSerializerContext.Default.ListTaggedFile);
+				return JsonSerializer.Serialize(Load().Values.Where(x => x.Tags.Length > 0 || x.XattrStale).ToList(), AppJsonSerializerContext.Default.ListTaggedFile);
 		}
 
 		private Dictionary<string, TaggedFile> Load()

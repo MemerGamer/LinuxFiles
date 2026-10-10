@@ -48,6 +48,57 @@ namespace Files.Platform.Tests.Tags
 		}
 
 		[TestMethod]
+		public void ExportImport_EmptyStaleEntry_RemainsAuthoritativeAndHidden()
+		{
+			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				var source = new FileTagsDatabase(Path.Combine(root, "source.json"));
+				source.SetTags("/folder/file", null, ["a"]);
+				source.SetTags("/folder/file", null, [], xattrStale: true);
+				Assert.AreEqual(0, source.GetAll().Count());
+
+				var path = Path.Combine(root, "imported.json");
+				var imported = new FileTagsDatabase(path);
+				imported.Import(source.Export());
+				foreach (var db in new[] { imported, new FileTagsDatabase(path) })
+				{
+					Assert.IsTrue(db.IsXattrStale("/folder/file"));
+					Assert.AreEqual(0, db.GetTags("/folder/file", null).Length);
+					Assert.AreEqual(0, db.GetAll().Count());
+					Assert.AreEqual(0, db.GetAllUnderPath("/folder").Count());
+				}
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
+		[DataRow(true)]
+		[DataRow(false)]
+		public void Import_IdenticalTagsWithDifferentXattrStale_PersistsFlag(bool xattrStale)
+		{
+			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				var source = new FileTagsDatabase(Path.Combine(root, "source.json"));
+				source.SetTags("/file", null, ["a"], xattrStale);
+				var path = Path.Combine(root, "imported.json");
+				var imported = new FileTagsDatabase(path);
+				imported.SetTags("/file", null, ["a"], !xattrStale);
+
+				imported.Import(source.Export());
+				foreach (var db in new[] { imported, new FileTagsDatabase(path) })
+				{
+					Assert.AreEqual(xattrStale, db.IsXattrStale("/file"));
+					CollectionAssert.AreEqual(new[] { "a" }, db.GetTags("/file", null));
+				}
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
 		public void Save_RetriesFailedPersistenceEvenWhenTagsAreEqual()
 		{
 			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));

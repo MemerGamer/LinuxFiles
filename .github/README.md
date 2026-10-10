@@ -17,12 +17,12 @@ This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Set
 
 ## Install
 
-[![Latest release](https://img.shields.io/github/v/release/MemerGamer/LinuxFiles?include_prereleases&filter=linux-v*&label=release)](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha2)
+[![Latest release](https://img.shields.io/github/v/release/MemerGamer/LinuxFiles?include_prereleases&filter=linux-v*&label=release)](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha3)
 
 > [!NOTE]
-> **0.1.0-alpha2 is the second public alpha release.** Expect rough edges and missing features, and keep backups of anything you care about. Please report problems in the [issue tracker](https://github.com/MemerGamer/LinuxFiles/issues).
+> **0.1.0-alpha3 is the third public alpha release.** Expect rough edges and missing features, and keep backups of anything you care about. Please report problems in the [issue tracker](https://github.com/MemerGamer/LinuxFiles/issues).
 
-Grab the assets from the [0.1.0-alpha2 release page](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha2). Requirements: x86_64 Linux with an X11 session or XWayland (Wayland desktops work through XWayland); the packages are self-contained, so no .NET install is needed.
+Grab the assets from the [0.1.0-alpha3 release page](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha3). Requirements: x86_64 Linux with an X11 session or XWayland (Wayland desktops work through XWayland); the packages are self-contained, so no .NET install is needed.
 
 ### Arch Linux (AUR)
 
@@ -49,12 +49,12 @@ programs.linuxfiles = {
 };
 ```
 
-This installs a patched helper, a matching polkit action and trusted deployment manifest, and enables the pkexec wrapper. A session authentication agent is required. The current alpha2 release pin predates this runtime support: root file operations need the next release containing it and updated flake hashes. See [Nix packaging details](../docs/linux-port/packaging.md#nix-flake).
+This installs a patched helper, a matching polkit action and trusted deployment manifest, and enables the pkexec wrapper. A session authentication agent is required. The flake still pins alpha2 and rejects this opt-in through a runtime-capability assertion. Alpha3 contains the runtime support, but root file operations require a follow-up flake update with the published alpha3 assets, hashes and compatible-runtime marker. See [Nix packaging details](../docs/linux-port/packaging.md#nix-flake).
 
 ### AppImage
 
 ```sh
-curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha2/Files-x86_64.AppImage
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha3/Files-x86_64.AppImage
 chmod +x Files-x86_64.AppImage
 ./Files-x86_64.AppImage
 ```

@@ -37,8 +37,11 @@ message bodies, credentials, or process output are included.
 | `folder-enumeration` | Batch enumerator lifetime, including consumer time between batches. |
 | `folder-enumeration-batch` | Directory entries/metadata read on a worker, excluding consumer/UI rendering time. |
 
-With tracing enabled, a 10 ms dispatcher timer also writes `[files-ui] t=<unix ms> stall-ms=<n>` to stderr whenever the UI
-thread was blocked for more than 50 ms (see `investigations/ui-slowness.md`). It records timing only.
+With tracing enabled, a 10 ms dispatcher timer queues `[files-ui] t=<unix ms> stall-ms=<n>` whenever tick lateness
+(the interval between ticks minus 10 ms) exceeds 50 ms. A worker writes these timing-only records to stderr;
+its separate buffer holds at most 128 records and drops new records when full. Tick lateness includes timer scheduling
+delays and is not a direct measurement of time spent blocking the UI thread. Disabled startup still calls the probe
+and initializes the trace flag, but creates no probe closure, timer, logging worker or buffer.
 
 `completed-or-unwound` means the scope ended, including exception/cancellation paths; it does not claim success.
 D-Bus records explicitly report `reply`/`fault`. Correlate caller logs to distinguish cancellations/timeouts.

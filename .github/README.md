@@ -49,7 +49,7 @@ programs.linuxfiles = {
 };
 ```
 
-This installs a patched helper, a matching polkit action and trusted deployment manifest, and enables the pkexec wrapper. A session authentication agent is required. The flake pins alpha3, which supports this opt-in. A runtime-capability assertion rejects incompatible or unmarked package overrides. See [Nix packaging details](../docs/linux-port/packaging.md#nix-flake).
+This installs a patched helper, a matching polkit action and trusted deployment manifest, and enables the pkexec wrapper. A session authentication agent is required. The flake pins alpha4, which supports this opt-in. A runtime-capability assertion rejects incompatible or unmarked package overrides. See [Nix packaging details](../docs/linux-port/packaging.md#nix-flake).
 
 ### AppImage
 

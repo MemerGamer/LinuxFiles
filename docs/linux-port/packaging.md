@@ -151,7 +151,7 @@ First used for `linux-v0.1.0-alpha1` (prerelease; install instructions are in `.
 
 `flake.nix` (with `flake.lock`, pinned to `nixos-unstable`) exposes `packages.x86_64-linux.{linuxfiles,default}`, `apps.x86_64-linux.default`, `overlays.default` (adds `pkgs.linuxfiles`), and `nixosModules.default`. The package repackages the pinned release tarballs, patches all ELF files with `autoPatchelfHook` (including the retained Native AOT helper), and installs the app under `$out/lib/linuxfiles`. Runtime dlopen libraries are added to ELF runpaths rather than the launch environment, so child programs do not inherit Nix libraries. The unused CoreCLR LTTng tracing provider remains exempt from dependency checking.
 
-Plain `nix run` and `nix profile install` retain `.root-actions-disabled`: all root actions remain off. Installing a profile cannot activate host polkit. NixOS administrators may opt in through their configuration flake with the compatible alpha3 runtime:
+Plain `nix run` and `nix profile install` retain `.root-actions-disabled`: all root actions remain off. Installing a profile cannot activate host polkit. NixOS administrators may opt in through their configuration flake with the compatible alpha4 runtime:
 
 ```nix
 # inputs.linuxfiles.url = "github:MemerGamer/LinuxFiles";
@@ -166,7 +166,7 @@ The module selects the package's `enableRootActions` variant, removes its disabl
 
 `pkexec` uses `/run/wrappers/bin` before the system profile and `/usr/bin`/`/bin`. The module enables `security.polkit.enablePkexecWrapper` when present; older nixpkgs uses `security.wrappers.pkexec`. Only pkexec is setuid, never the LinuxFiles helper. A session authentication agent and an administrator identity are still required. The narrow store exception accepts a root-owned sticky `/nix/store` with group write (1775), but rejects other write there, non-root ownership, and any writable entries beneath it. Native `/usr` helper/policy checks retain their existing restrictions.
 
-**Release integration:** the current pin is `0.1.0-alpha3`, which includes deployment-manifest and Nix elevation-wrapper discovery. Its `passthru.supportsNixRootActions` marker is true, so the module accepts `rootActions = true`. Overrides with a false or missing marker are still rejected by the runtime-capability assertion. For future releases, verify that both runtime changes are present before retaining the compatible-runtime marker.
+**Release integration:** the current pin is `0.1.0-alpha4`, which includes deployment-manifest and Nix elevation-wrapper discovery. Its `passthru.supportsNixRootActions` marker is true, so the module accepts `rootActions = true`. Overrides with a false or missing marker are still rejected by the runtime-capability assertion. For future releases, verify that both runtime changes are present before retaining the compatible-runtime marker.
 
 Per release (after CI has attached `SHA256SUMS`; the flake's tag is `linux-v<version>`):
 
@@ -177,7 +177,7 @@ scripts/linux/update-nix-flake.sh X.Y.Z[-pre] SHA256SUMS   # rewrites version + 
 
 Commit `flake.nix` in a PR. It is deliberately not a CI step: the hashes only exist after the release job has uploaded the assets, and `main` takes changes through PRs. Run `nix flake update` separately to bump nixpkgs.
 
-The earlier plain package passed `nix flake check --no-build` and `nix build` with nix-portable. The `checks.x86_64-linux.root-actions-module` check covers rejection of packages with a false or missing capability marker, opt-out defaults, and compatible-runtime module wiring using the pinned alpha3 package. When built, it also checks helper presence, marker state, and the generated policy path. Re-run `nix flake check` against the locked revision after the release bump; sandboxed DNS failures cannot establish NixOS evaluation or packaged loader startup. See the headless checklist below.
+The earlier plain package passed `nix flake check --no-build` and `nix build` with nix-portable. The `checks.x86_64-linux.root-actions-module` check covers rejection of packages with a false or missing capability marker, opt-out defaults, and compatible-runtime module wiring using the pinned alpha4 package. When built, it also checks helper presence, marker state, and the generated policy path. Re-run `nix flake check` against the locked revision after the release bump; sandboxed DNS failures cannot establish NixOS evaluation or packaged loader startup. See the headless checklist below.
 
 ## Nightly builds
 

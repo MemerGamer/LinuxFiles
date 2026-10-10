@@ -1323,11 +1323,7 @@ namespace Files.App.Views.Layouts
 
 			if (tagId is not null)
 			{
-				var fileTags = item.FileTags
-					?? throw new InvalidOperationException("The selected item does not have initialized tags.");
-				item.FileTags = fileTags
-					.Except((string[])[tagId])
-					.ToArray();
+				await item.EditFileTagsAsync(tags => tags.Where(uid => uid != tagId).ToArray());
 
 				if (ParentShellPageInstance is not null)
 				{

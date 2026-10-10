@@ -12,6 +12,7 @@ using Files.Shared.Helpers;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 using System.IO;
+using System.Runtime.CompilerServices;
 
 namespace Files.App.Helpers
 {
@@ -21,6 +22,9 @@ namespace Files.App.Helpers
 	public static partial class NavigationHelpers
 	{
 		private static ILauncherService LinuxLauncher => Ioc.Default.GetRequiredService<ILauncherService>();
+
+		// A double click can raise the open command twice; a second navigation to the archive would need two Back presses
+		private static readonly InFlightOpenGate archiveOpenGate = new();
 
 		private static IMimeTypeService LinuxMimeTypes => Ioc.Default.GetRequiredService<IMimeTypeService>();
 
@@ -37,6 +41,10 @@ namespace Files.App.Helpers
 
 				var archiveService = Ioc.Default.GetRequiredService<IArchiveService>();
 				var isArchiveRoot = !openViaApplicationPicker && File.Exists(path) && archiveService.IsArchiveFileName(path);
+				using var archiveOpenLease = isArchiveRoot ? archiveOpenGate.TryEnter($"{RuntimeHelpers.GetHashCode(associatedInstance)}:{path}") : null;
+				if (isArchiveRoot && archiveOpenLease is null)
+					return true;
+
 				if (isArchiveRoot)
 				{
 					// Archive navigation must not launch executables, desktop entries, or editors.

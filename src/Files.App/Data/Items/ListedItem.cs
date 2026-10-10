@@ -6,7 +6,6 @@ using Files.Shared.Helpers;
 using FluentFTP;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
-using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Text;
 using Windows.Storage;
@@ -108,38 +107,6 @@ namespace Files.App.Utils
 		}
 
 		public ulong? FileFRN { get; set; }
-
-		private string[]? fileTags;
-		[DisallowNull]
-		public string[]? FileTags
-		{
-			get => fileTags;
-			set
-			{
-#if !WINDOWS
-				if (fileTags is not null && fileTags.SequenceEqual(value, StringComparer.Ordinal))
-					return;
-#endif
-				// fileTags is null when the item is first created
-				var fileTagsInitialized = fileTags is not null;
-				if (SetProperty(ref fileTags, value))
-				{
-					// only set the tags if the file tags have been changed
-					if (fileTagsInitialized)
-					{
-						var path = this.GetRequiredPath();
-#if WINDOWS
-						var dbInstance = FileTagsHelper.GetDbInstance();
-						dbInstance.SetTags(path, FileFRN, value);
-#endif
-						_ = FileTagsHelper.WriteFileTagAsync(path, value);
-					}
-
-					HasTags = !value.IsEmpty();
-					OnPropertyChanged(nameof(FileTagsUI));
-				}
-			}
-		}
 
 		public IList<TagViewModel>? FileTagsUI
 		{

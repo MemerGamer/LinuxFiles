@@ -66,6 +66,8 @@ namespace Files.App.Views.Layouts
 
 		protected NavigationArguments? navigationArguments;
 
+		internal string? NavigationPath => navigationArguments is { IsSearchResultPage: false } args ? args.NavPathParam : null;
+
 		private CancellationTokenSource? shellContextMenuItemCancellationToken;
 		private CancellationTokenSource? groupingCancellationToken;
 
@@ -852,13 +854,11 @@ namespace Files.App.Views.Layouts
 				{
 					var toggled = (ToggleMenuFlyoutItem)s;
 					var tv = (TagViewModel)toggled.Tag;
-					foreach (var it in selected.Where(i => i is not null))
-					{
-						var existing = it.FileTags ?? [];
-						it.FileTags = toggled.IsChecked
+					var addTag = toggled.IsChecked;
+					await Task.WhenAll(selected.Where(i => i is not null).Select(it =>
+						it.EditFileTagsAsync(existing => addTag
 							? (existing.Contains(tv.Uid) ? existing : [.. existing, tv.Uid])
-							: existing.Where(u => u != tv.Uid).ToArray();
-					}
+							: existing.Where(u => u != tv.Uid).ToArray())));
 					if (ParentShellPageInstance is { } parentShellPage)
 						await parentShellPage.GetRequiredShellViewModel().RefreshTagGroups();
 				};
@@ -1472,6 +1472,7 @@ namespace Files.App.Views.Layouts
 
 				if (!listedItem.ItemPropertiesInitialized)
 				{
+#if WINDOWS
 					uint callbackPhase = 3;
 					args.RegisterUpdateCallback(callbackPhase, async (s, c) =>
 					{
@@ -1483,6 +1484,18 @@ namespace Files.App.Views.Layouts
 
 						await LoadItemExtendedPropertiesAsync(listedItem, shellViewModel);
 					});
+#else
+					// Uno never raises the phased update callback, so rows were never loaded until the first scroll (no tags, no properties)
+					DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+					{
+						var shellViewModel = ParentShellPageInstance?.ShellViewModel;
+
+						if (shellViewModel is null || shellViewModel.IsScrollInFlight || listedItem.ItemPropertiesInitialized || !ReferenceEquals(container.Content, listedItem))
+							return;
+
+						await LoadItemExtendedPropertiesAsync(listedItem, shellViewModel);
+					});
+#endif
 				}
 			}
 		}

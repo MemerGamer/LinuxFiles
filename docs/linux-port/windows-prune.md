@@ -112,4 +112,12 @@ block in isolated repositories: clean, allowlisted deletion, mixed,
 non-allowlisted deletion, reverse deletion, content, add/add, and an upstream
 policy change. They verify abort/review behavior and merge ancestry.
 
-Validation results are recorded below after the disposable run completes.
+## Validation results (2026-10-10, merged with main at PR #152)
+
+In a disposable `git archive` copy with all eight allowlisted directories removed (`prune-windows.sh --apply`):
+
+- `dotnet build src/Files.App -f net10.0-desktop -c Debug -p:FilesWin32Compat=false`: succeeded, 0 errors.
+- `Files.Platform.Tests` under Xvfb (no real display): 1252 passed, 0 failed. The trust tests need a non-world-writable ancestor, so the copy was run from `~/.cache`, not `/tmp`.
+- `test_prune_windows.py`: 4 passed, including the real workflow merge step against a stubbed `gh`.
+
+The tarball size comparison and the headless launch from the earlier plan were not repeated; no source in the repository was deleted.

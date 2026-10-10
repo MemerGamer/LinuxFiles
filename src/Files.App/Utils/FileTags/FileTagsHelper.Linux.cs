@@ -61,6 +61,18 @@ namespace Files.App.Utils.FileTags
 			return EnqueueWrite(() => !cancellationToken.IsCancellationRequested && WriteTags(filePath, tags, names, store), false);
 		}
 
+		public static Task<string[]?> EditFileTagsAsync(string filePath, Func<string[], string[]> edit)
+		{
+			var store = Ioc.Default.GetService<IFileTagsStore>();
+			var settings = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
+			return EnqueueWrite<string[]?>(() =>
+			{
+				var tags = edit(ReadFileTag(filePath)).Distinct(StringComparer.Ordinal).ToArray();
+				var names = settings.GetTagsByIds(tags)?.Select(x => x.Name).ToArray() ?? [];
+				return WriteTags(filePath, tags, names, store) ? tags : null;
+			}, null);
+		}
+
 		public static Task<bool> UntagAllFilesAsync(string uid)
 		{
 			var store = Ioc.Default.GetService<IFileTagsStore>();

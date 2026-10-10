@@ -66,6 +66,8 @@ namespace Files.App.Views.Layouts
 
 		protected NavigationArguments? navigationArguments;
 
+		internal string? NavigationPath => navigationArguments is { IsSearchResultPage: false } args ? args.NavPathParam : null;
+
 		private CancellationTokenSource? shellContextMenuItemCancellationToken;
 		private CancellationTokenSource? groupingCancellationToken;
 
@@ -852,13 +854,11 @@ namespace Files.App.Views.Layouts
 				{
 					var toggled = (ToggleMenuFlyoutItem)s;
 					var tv = (TagViewModel)toggled.Tag;
-					foreach (var it in selected.Where(i => i is not null))
-					{
-						var existing = it.GetFileTagsOrRead();
-						it.FileTags = toggled.IsChecked
+					var addTag = toggled.IsChecked;
+					await Task.WhenAll(selected.Where(i => i is not null).Select(it =>
+						it.EditFileTagsAsync(existing => addTag
 							? (existing.Contains(tv.Uid) ? existing : [.. existing, tv.Uid])
-							: existing.Where(u => u != tv.Uid).ToArray();
-					}
+							: existing.Where(u => u != tv.Uid).ToArray())));
 					if (ParentShellPageInstance is { } parentShellPage)
 						await parentShellPage.GetRequiredShellViewModel().RefreshTagGroups();
 				};

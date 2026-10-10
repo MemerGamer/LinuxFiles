@@ -16,7 +16,7 @@ using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
 
 namespace Files.App.Views.Shells
 {
-	public abstract class BaseShellPage : Page, IShellPage, INotifyPropertyChanged
+	public abstract partial class BaseShellPage : Page, IShellPage, INotifyPropertyChanged
 	{
 		private DispatcherQueueTimer? _updateDateDisplayTimer;
 
@@ -543,11 +543,6 @@ namespace Files.App.Views.Shells
 				NavigateToPath(shellViewModel.WorkingDirectory, typeof(DetailsLayoutPage), args);
 			else
 				NavigateToPath(shellViewModel.WorkingDirectory, layout, args);
-		}
-
-		public void NavigateWithArguments(Type sourcePageType, NavigationArguments navArgs)
-		{
-			NavigateToPath(navArgs.NavPathParam, sourcePageType, navArgs);
 		}
 
 		public void NavigateToPath(string navigationPath, NavigationArguments? navArgs = null)

@@ -94,16 +94,16 @@ namespace Files.App.UserControls.Menus
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(ToggleMenuFlyoutItem))]
-		private void TagItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+		private async void TagItem_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
 		{
 			var tagItem = (ToggleMenuFlyoutItem)sender;
 			if (tagItem.IsChecked)
 			{
-				AddFileTag(SelectedItems, (TagViewModel)tagItem.Tag);
+				await AddFileTagAsync(SelectedItems, (TagViewModel)tagItem.Tag);
 			}
 			else
 			{
-				RemoveFileTag(SelectedItems, (TagViewModel)tagItem.Tag);
+				await RemoveFileTagAsync(SelectedItems, (TagViewModel)tagItem.Tag);
 			}
 		}
 
@@ -137,30 +137,17 @@ namespace Files.App.UserControls.Menus
 				removeItem.IsEnabled = SelectedItems.Any(item => item?.FileTags is { Length: > 0 });
 		}
 
-		private void RemoveFileTag(IEnumerable<ListedItem> selectedListedItems, TagViewModel removed)
+		private async Task RemoveFileTagAsync(IEnumerable<ListedItem> selectedListedItems, TagViewModel removed)
 		{
-			foreach (var selectedItem in selectedListedItems)
-			{
-				var existingTags = selectedItem.GetFileTagsOrRead();
-				if (existingTags.Contains(removed.Uid))
-				{
-					var tagList = existingTags.Except(new[] { removed.Uid }).ToArray();
-					selectedItem.FileTags = tagList;
-				}
-			}
+			await Task.WhenAll(selectedListedItems.ToList().Select(item =>
+				item.EditFileTagsAsync(tags => tags.Where(uid => uid != removed.Uid).ToArray())));
 			TagsChanged?.Invoke(this, EventArgs.Empty);
 		}
 
-		private void AddFileTag(IEnumerable<ListedItem> selectedListedItems, TagViewModel added)
+		private async Task AddFileTagAsync(IEnumerable<ListedItem> selectedListedItems, TagViewModel added)
 		{
-			foreach (var selectedItem in selectedListedItems)
-			{
-				var existingTags = selectedItem.GetFileTagsOrRead();
-				if (!existingTags.Contains(added.Uid))
-				{
-					selectedItem.FileTags = [.. existingTags, added.Uid];
-				}
-			}
+			await Task.WhenAll(selectedListedItems.ToList().Select(item =>
+				item.EditFileTagsAsync(tags => tags.Contains(added.Uid) ? tags : [.. tags, added.Uid])));
 			TagsChanged?.Invoke(this, EventArgs.Empty);
 		}
 

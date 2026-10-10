@@ -1702,6 +1702,7 @@ namespace Files.App.ViewModels
 								// A network share is never a cloud placeholder root, so skip that round-trip
 								var syncStatus = isItemNetwork ? CloudDriveSyncStatus.Unknown : await CheckCloudDriveSyncStatusAsync(matchingStorageFile);
 								var fileFRN = await FileTagsHelper.GetFileFRN(matchingStorageFile);
+								var tagRevision = item.FileTagsRevision;
 								var fileTag = await ReadFileTagAsync(item.GetRequiredPath());
 
 								// Extended properties open each file; load them in the background on a share
@@ -1721,7 +1722,7 @@ namespace Files.App.ViewModels
 									item.FolderRelativeId = matchingStorageFile.FolderRelativeId;
 									item.SyncStatusUI = syncStatusUI;
 									item.FileFRN = fileFRN;
-									item.SetLoadedFileTags(fileTag);
+									item.SetLoadedFileTags(fileTag, tagRevision);
 									item.IsElevationRequired = isElevationRequired;
 									item.ImageDimensions = properties?["System.Image.Dimensions"]?.ToString() ?? string.Empty;
 									item.FileVersion = properties?["System.FileVersion"]?.ToString() ?? string.Empty;
@@ -1784,6 +1785,7 @@ namespace Files.App.ViewModels
 								// A network share is never a cloud placeholder root, so skip that round-trip
 								var syncStatus = isItemNetwork ? CloudDriveSyncStatus.Unknown : await CheckCloudDriveSyncStatusAsync(matchingStorageFolder);
 								var fileFRN = await FileTagsHelper.GetFileFRN(matchingStorageFolder);
+								var tagRevision = item.FileTagsRevision;
 								var fileTag = await ReadFileTagAsync(item.GetRequiredPath());
 
 								// Folder extended properties only carry drive storage details, irrelevant on a network subfolder
@@ -1796,7 +1798,7 @@ namespace Files.App.ViewModels
 									item.FolderRelativeId = matchingStorageFolder.FolderRelativeId;
 									item.SyncStatusUI = CloudDriveSyncStatusUI.FromCloudDriveSyncStatus(syncStatus);
 									item.FileFRN = fileFRN;
-									item.SetLoadedFileTags(fileTag);
+									item.SetLoadedFileTags(fileTag, tagRevision);
 
 									if (extraProperties is not null)
 									{
@@ -1834,6 +1836,7 @@ namespace Files.App.ViewModels
 						token.ThrowIfCancellationRequested();
 						await FilesystemTasks.Wrap(async () =>
 						{
+							var tagRevision = item.FileTagsRevision;
 							var fileTag = await ReadFileTagAsync(item.GetRequiredPath());
 
 							await dispatcherQueue.EnqueueOrInvokeAsync(() =>
@@ -1841,7 +1844,7 @@ namespace Files.App.ViewModels
 								// Reset cloud sync status icon
 								item.SyncStatusUI = new CloudDriveSyncStatusUI();
 
-								item.SetLoadedFileTags(fileTag);
+								item.SetLoadedFileTags(fileTag, tagRevision);
 							},
 							Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 

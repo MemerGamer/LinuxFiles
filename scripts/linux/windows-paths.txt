@@ -1,0 +1,11 @@
+# Track 2 leaf candidates; literal repository-relative paths, directories end in /.
+# Audited in docs/linux-port/windows-prune.md. Default Linux/desktop graph only.
+# CsWin32, shared projects, app internals, assets and Windows workflows stay.
+src/Files.App.BackgroundTasks/
+src/Files.App.Launcher/
+src/Files.App.OpenDialog/
+src/Files.App.SaveDialog/
+src/Files.App.Server/
+src/Files.Platform.Windows/
+tests/Files.App.UITests/
+tests/Files.InteractionTests/

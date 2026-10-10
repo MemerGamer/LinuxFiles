@@ -141,7 +141,7 @@ namespace Files.App.UserControls.Menus
 		{
 			foreach (var selectedItem in selectedListedItems)
 			{
-				var existingTags = selectedItem.FileTags ?? [];
+				var existingTags = selectedItem.GetFileTagsOrRead();
 				if (existingTags.Contains(removed.Uid))
 				{
 					var tagList = existingTags.Except(new[] { removed.Uid }).ToArray();
@@ -155,7 +155,7 @@ namespace Files.App.UserControls.Menus
 		{
 			foreach (var selectedItem in selectedListedItems)
 			{
-				var existingTags = selectedItem.FileTags ?? [];
+				var existingTags = selectedItem.GetFileTagsOrRead();
 				if (!existingTags.Contains(added.Uid))
 				{
 					selectedItem.FileTags = [.. existingTags, added.Uid];

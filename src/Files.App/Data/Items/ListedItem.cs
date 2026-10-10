@@ -121,7 +121,12 @@ namespace Files.App.Utils
 					return;
 #endif
 				// fileTags is null when the item is first created
+#if WINDOWS
 				var fileTagsInitialized = fileTags is not null;
+#else
+				// Tags are loaded lazily, so an item that was never loaded counts as untagged and its first edit must still be saved
+				const bool fileTagsInitialized = true;
+#endif
 				if (SetProperty(ref fileTags, value))
 				{
 					// only set the tags if the file tags have been changed
@@ -139,6 +144,37 @@ namespace Files.App.Utils
 					OnPropertyChanged(nameof(FileTagsUI));
 				}
 			}
+		}
+
+		/// <summary>
+		/// Applies tags read from storage; unlike <see cref="FileTags"/> it never writes them back.
+		/// </summary>
+		public void SetLoadedFileTags(string[] tags)
+		{
+#if WINDOWS
+			FileTags = tags;
+#else
+			if (fileTags is not null && fileTags.SequenceEqual(tags, StringComparer.Ordinal))
+				return;
+
+			if (SetProperty(ref fileTags, tags, nameof(FileTags)))
+			{
+				HasTags = !tags.IsEmpty();
+				OnPropertyChanged(nameof(FileTagsUI));
+			}
+#endif
+		}
+
+		/// <summary>
+		/// Returns the item's tags, reading them from storage first when the background load has not reached the item yet,
+		/// so an edit never starts from an empty list and drops tags that are already set.
+		/// </summary>
+		public string[] GetFileTagsOrRead()
+		{
+			if (fileTags is null)
+				SetLoadedFileTags(FileTagsHelper.ReadFileTag(this.GetRequiredPath()));
+
+			return fileTags ?? [];
 		}
 
 		public IList<TagViewModel>? FileTagsUI

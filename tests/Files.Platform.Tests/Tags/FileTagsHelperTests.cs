@@ -88,6 +88,37 @@ namespace Files.Platform.Tests.Tags
 			CollectionAssert.AreEqual(new[] { "b" }, reloaded.GetTags("/existing", null));
 		}
 
+		[TestMethod]
+		public async Task EditOfNeverLoadedItem_MergesPresetTagsAndPersistsToStoreAndDatabase()
+		{
+			using var fixture = new TagFixture();
+			fixture.Store.Tags["/preset"] = ["A"];
+
+			// What ListedItem.GetFileTagsOrRead does for a row the background load has not reached: read first, then append the edit
+			var existing = FileTagsHelper.ReadFileTag("/preset");
+			CollectionAssert.AreEqual(new[] { "a" }, existing);
+			Assert.IsTrue(await FileTagsHelper.WriteFileTagAsync("/preset", [.. existing, "b"]).WaitAsync(TimeSpan.FromSeconds(10)));
+
+			CollectionAssert.AreEqual(new[] { "A", "B" }, fixture.Store.Tags["/preset"]);
+			var reloaded = new FileTagsDatabase(fixture.DatabasePath);
+			CollectionAssert.AreEqual(new[] { "a", "b" }, reloaded.GetTags("/preset", null));
+		}
+
+		[TestMethod]
+		public async Task EditOfUntaggedItem_ReachesXattrAndSurvivesRelaunch()
+		{
+			using var fixture = new TagFixture();
+			Assert.AreEqual(0, FileTagsHelper.ReadFileTag("/fresh").Length);
+
+			_ = FileTagsHelper.WriteFileTagAsync("/fresh", ["b"]);
+			await FileTagsHelper.DrainPendingWritesAsync();
+
+			// A relaunch reads the tags back from the attribute, then falls back to the database when the attribute is gone
+			CollectionAssert.AreEqual(new[] { "b" }, FileTagsHelper.ReadFileTag("/fresh"));
+			fixture.Store.Tags.Remove("/fresh");
+			CollectionAssert.AreEqual(new[] { "b" }, FileTagsHelper.ReadFileTag("/fresh"));
+		}
+
 		private sealed class TagFixture : IDisposable
 		{
 			private readonly string root = Path.Combine(Path.GetTempPath(), "files-tags-queue-" + Guid.NewGuid().ToString("N"));

@@ -1323,8 +1323,7 @@ namespace Files.App.Views.Layouts
 
 			if (tagId is not null)
 			{
-				var fileTags = item.FileTags
-					?? throw new InvalidOperationException("The selected item does not have initialized tags.");
+				var fileTags = item.GetFileTagsOrRead();
 				item.FileTags = fileTags
 					.Except((string[])[tagId])
 					.ToArray();

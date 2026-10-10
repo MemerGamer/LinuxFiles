@@ -854,7 +854,7 @@ namespace Files.App.Views.Layouts
 					var tv = (TagViewModel)toggled.Tag;
 					foreach (var it in selected.Where(i => i is not null))
 					{
-						var existing = it.FileTags ?? [];
+						var existing = it.GetFileTagsOrRead();
 						it.FileTags = toggled.IsChecked
 							? (existing.Contains(tv.Uid) ? existing : [.. existing, tv.Uid])
 							: existing.Where(u => u != tv.Uid).ToArray();
@@ -1472,6 +1472,7 @@ namespace Files.App.Views.Layouts
 
 				if (!listedItem.ItemPropertiesInitialized)
 				{
+#if WINDOWS
 					uint callbackPhase = 3;
 					args.RegisterUpdateCallback(callbackPhase, async (s, c) =>
 					{
@@ -1483,6 +1484,18 @@ namespace Files.App.Views.Layouts
 
 						await LoadItemExtendedPropertiesAsync(listedItem, shellViewModel);
 					});
+#else
+					// Uno never raises the phased update callback, so rows were never loaded until the first scroll (no tags, no properties)
+					DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
+					{
+						var shellViewModel = ParentShellPageInstance?.ShellViewModel;
+
+						if (shellViewModel is null || shellViewModel.IsScrollInFlight || listedItem.ItemPropertiesInitialized || !ReferenceEquals(container.Content, listedItem))
+							return;
+
+						await LoadItemExtendedPropertiesAsync(listedItem, shellViewModel);
+					});
+#endif
 				}
 			}
 		}

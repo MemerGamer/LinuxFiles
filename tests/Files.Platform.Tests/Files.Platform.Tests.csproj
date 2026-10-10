@@ -65,6 +65,7 @@
         <Compile Include="../../src/Files.App/Utils/FileTags/FileTagsDatabase.Linux.cs" Link="Tags/FileTagsDatabase.Linux.cs" />
         <Compile Include="../../src/Files.App/Utils/FileTags/FileTagsHelper.Linux.cs" Link="Tags/FileTagsHelper.Linux.cs" />
         <Compile Include="../../src/Files.App/Utils/FileTags/TaggedFile.cs" Link="Tags/TaggedFile.cs" />
+        <Compile Include="../../src/Files.App/Helpers/Navigation/InFlightOpenGate.cs" Link="Navigation/InFlightOpenGate.cs" />
     </ItemGroup>
 
     <ItemGroup>

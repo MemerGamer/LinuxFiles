@@ -1721,7 +1721,7 @@ namespace Files.App.ViewModels
 									item.FolderRelativeId = matchingStorageFile.FolderRelativeId;
 									item.SyncStatusUI = syncStatusUI;
 									item.FileFRN = fileFRN;
-									item.FileTags = fileTag;
+									item.SetLoadedFileTags(fileTag);
 									item.IsElevationRequired = isElevationRequired;
 									item.ImageDimensions = properties?["System.Image.Dimensions"]?.ToString() ?? string.Empty;
 									item.FileVersion = properties?["System.FileVersion"]?.ToString() ?? string.Empty;
@@ -1796,7 +1796,7 @@ namespace Files.App.ViewModels
 									item.FolderRelativeId = matchingStorageFolder.FolderRelativeId;
 									item.SyncStatusUI = CloudDriveSyncStatusUI.FromCloudDriveSyncStatus(syncStatus);
 									item.FileFRN = fileFRN;
-									item.FileTags = fileTag;
+									item.SetLoadedFileTags(fileTag);
 
 									if (extraProperties is not null)
 									{
@@ -1841,7 +1841,7 @@ namespace Files.App.ViewModels
 								// Reset cloud sync status icon
 								item.SyncStatusUI = new CloudDriveSyncStatusUI();
 
-								item.FileTags = fileTag;
+								item.SetLoadedFileTags(fileTag);
 							},
 							Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 

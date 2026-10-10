@@ -148,6 +148,15 @@
 					Value="{x:Bind ViewModel.BackgroundOpacity, Mode=TwoWay}" />
 			</wctcontrols:SettingsCard>
 
+			<wctcontrols:SettingsCard
+				Visibility="{x:Bind ViewModel.LinuxAppearanceVisibility}"
+				Header="{helpers:ResourceString Key=LinuxDetectCompositorDisplayScale}"
+				Description="{helpers:ResourceString Key=LinuxDetectCompositorDisplayScaleDescription}">
+				<ToggleSwitch
+					AutomationProperties.Name="{helpers:ResourceString Key=LinuxDetectCompositorDisplayScale}"
+					IsOn="{x:Bind ViewModel.DetectCompositorDisplayScale, Mode=TwoWay}" />
+			</wctcontrols:SettingsCard>
+
 			<!--  Whole-window opacity  -->
 			<wctcontrols:SettingsCard
 				x:Name="WindowOpacityCard"

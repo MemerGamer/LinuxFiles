@@ -5126,4 +5126,10 @@
   <data name="LinuxOpacityHighContrast" xml:space="preserve">
     <value>High contrast keeps the window opaque. Your opacity choice is retained.</value>
   </data>
+  <data name="LinuxDetectCompositorDisplayScale" xml:space="preserve">
+    <value>Detect display scale from the compositor (experimental)</value>
+  </data>
+  <data name="LinuxDetectCompositorDisplayScaleDescription" xml:space="preserve">
+    <value>Requires a restart. Uses the niri output scale when no display or toolkit scale is configured. May double-scale on some setups.</value>
+  </data>
 </root>

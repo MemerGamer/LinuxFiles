@@ -76,8 +76,11 @@ subscribing to `CompositionTarget.Rendering` makes Uno render at 60 fps (about 8
   is upstream (dirty-region/clip handling) or by reducing the number of clipped/animated elements.
 - Startup: ~4.7 s to a painted Home page in a Debug JIT build; ReadyToRun/AOT builds and trimming the work done before
   the first frame (service construction, settings load) should be measured separately on a release build.
-- Context menu build runs on the UI thread (120-230 ms); moving the model building to a worker and only creating
-  flyout items on the UI thread would cut it roughly in half.
+- Context menu model building now runs on a worker (`context-menu-snapshot` ~2-14 ms and `context-menu-flyout` ~1-15 ms on the UI
+  thread, `context-menu-model` off-thread). Before, a file/folder menu blocked the UI thread for 150-175 ms (headless, same fixture).
+  A newer menu request cancels the previous build.
+- Select-all of 10k items is still O(n^2) inside Uno (`SelectedItems.Add`); the app-side workaround only avoids the per-item
+  `ContainerFromItem` theme pass (stall 817 -> 604-630 ms headless). A real fix needs a bulk selection API in Uno.
 
 ## Reproducing
 

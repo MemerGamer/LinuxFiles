@@ -13,7 +13,7 @@ namespace Files.App.Data.Models
 			IsHidden = true,
 		};
 
-		private readonly IRichCommand command;
+		private readonly ContextMenuCommandSnapshot command;
 
 		private bool? isVisible = null;
 		public bool IsVisible
@@ -36,6 +36,11 @@ namespace Files.App.Data.Models
 
 		public ContextMenuFlyoutItemViewModelBuilder(IRichCommand command)
 		{
+			this.command = ContextMenuCommandSnapshot.Capture(command);
+		}
+
+		internal ContextMenuFlyoutItemViewModelBuilder(ContextMenuCommandSnapshot command)
+		{
 			this.command = command;
 		}
 
@@ -55,7 +60,7 @@ namespace Files.App.Data.Models
 			{
 				Text = command.Label,
 				Tag = Tag,
-				Command = command,
+				Command = command.Command,
 				IsEnabled = isExecutable,
 				IsChecked = command.IsOn,
 				IsPrimary = IsPrimary,
@@ -84,17 +89,14 @@ namespace Files.App.Data.Models
 				viewModel.GlyphFontFamilyName = glyph.FontFamily;
 			}
 
-			if (command.HotKeys.Length > 0 &&
-				!(command.HotKeys[0].Key is Keys.Enter &&
-				command.HotKeys[0].Modifier is KeyModifiers.None))
-			{
-				viewModel.KeyboardAccelerator = new Microsoft.UI.Xaml.Input.KeyboardAccelerator()
-				{
-					Key = (VirtualKey)command.HotKeys[0].Key,
-					Modifiers = (VirtualKeyModifiers)command.HotKeys[0].Modifier
-				};
-				viewModel.KeyboardAcceleratorTextOverride = command.HotKeys[0].LocalizedLabel;
-			}
+#if WINDOWS
+			if (command.Key is { } key)
+				viewModel.KeyboardAccelerator = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = key, Modifiers = command.Modifiers };
+#else
+			viewModel.KeyboardAcceleratorKey = command.Key;
+			viewModel.KeyboardAcceleratorModifiers = command.Modifiers;
+#endif
+			viewModel.KeyboardAcceleratorTextOverride = command.HotKeyLabel;
 
 			return viewModel;
 		}

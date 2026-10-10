@@ -187,9 +187,9 @@ namespace Files.App.Helpers.ContextFlyouts
 				};
 			}
 
-			if (i.KeyboardAccelerator is not null)
+			if (i.CreateKeyboardAccelerator() is { } accelerator)
 			{
-				flyoutItem.KeyboardAccelerators.Add(i.KeyboardAccelerator);
+				flyoutItem.KeyboardAccelerators.Add(accelerator);
 				// Fixes #16193: VirtualKey doesn't support OEM keys (e.g. "§"); hide the auto-generated
 				// accelerator text so rendering it can't fault.
 				flyoutItem.KeyboardAcceleratorPlacementMode = Microsoft.UI.Xaml.Input.KeyboardAcceleratorPlacementMode.Hidden;

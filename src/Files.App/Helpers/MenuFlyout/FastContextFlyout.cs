@@ -29,6 +29,10 @@ namespace Files.App.Helpers.ContextFlyouts
 		private bool openedUp;
 		private bool placementResolved;
 		private double estimatedWidth;
+#if !WINDOWS
+		private double invocationScreenY = double.NaN;
+		private bool preserveOpenPlacement;
+#endif
 		private FrameworkElement? invocationAnchor;
 		private Point? invocationPosition;
 		private readonly Stopwatch openStopwatch = new();
@@ -62,10 +66,14 @@ namespace Files.App.Helpers.ContextFlyouts
 		}
 
 		/// <summary>
-		/// Clears the menu and the per-open placement state. Call at the start of every (re)build.
+		/// Clears the menu and the per-open placement state. Call at the start of each invocation.
 		/// </summary>
 		public void Reset()
 		{
+#if !WINDOWS
+			invocationScreenY = double.NaN;
+			preserveOpenPlacement = false;
+#endif
 			Flyout.Items.Clear();
 			primaryRow = null;
 			primarySeparator = null;
@@ -80,10 +88,21 @@ namespace Files.App.Helpers.ContextFlyouts
 		/// Builds the given models into the menu: the primary commands as an icon-button row on top, the rest as
 		/// regular menu items. The overflow placeholder models ("ItemOverflow"/"OverflowSeparator") are markers
 		/// only and are skipped; shell loaders append a real "Show more options" submenu instead.
+		/// Preserve placement when replacing an already-open loading menu.
 		/// </summary>
-		public void Build(List<ContextMenuFlyoutItemViewModel> models)
+		public void Build(List<ContextMenuFlyoutItemViewModel> models, bool preservePlacement = false)
 		{
+#if !WINDOWS
+			var savedPlacement = (invocationAnchor, invocationPosition, invocationScreenY, openedUp, placementResolved);
+#endif
 			Reset();
+#if !WINDOWS
+			if (preservePlacement)
+			{
+				(invocationAnchor, invocationPosition, invocationScreenY, openedUp, placementResolved) = savedPlacement;
+				preserveOpenPlacement = !double.IsNaN(invocationScreenY);
+			}
+#endif
 
 			var primary = models.Where(x => x.IsPrimary && !x.IsHidden && x.ShowItem).ToList();
 			var secondary = models
@@ -360,6 +379,15 @@ namespace Files.App.Helpers.ContextFlyouts
 		/// </summary>
 		public void ResolvePlacement(FrameworkElement? anchor = null, Point? position = null)
 		{
+#if !WINDOWS
+			if (preserveOpenPlacement)
+			{
+				placementResolved = true;
+				FinalizePrimaryRowPosition();
+				CorrectRebuiltPlacement();
+				return;
+			}
+#endif
 			invocationAnchor = anchor;
 			invocationPosition = position;
 			openedUp = PredictOpensUpward();
@@ -499,6 +527,13 @@ namespace Files.App.Helpers.ContextFlyouts
 			return subMenu;
 		}
 
+#if !WINDOWS
+		public void CorrectRebuiltPlacement()
+		{
+			Flyout_Opened(Flyout, EventArgs.Empty);
+		}
+#endif
+
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyoutPresenter))]
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
 		private void Flyout_Opened(object? sender, object e)
@@ -541,7 +576,11 @@ namespace Files.App.Helpers.ContextFlyouts
 
 				// Pull the touch/pointer point captured after the pre-render guess; the cursor is stale for touch.
 				// Direct-position callers (widget/sidebar) leave the provider null.
-				if (InvocationPointProvider?.Invoke() is { } invocation)
+				if (
+#if !WINDOWS
+					!preserveOpenPlacement &&
+#endif
+					InvocationPointProvider?.Invoke() is { } invocation)
 				{
 					invocationAnchor = invocation.Anchor;
 					invocationPosition = invocation.Position;
@@ -554,7 +593,15 @@ namespace Files.App.Helpers.ContextFlyouts
 				// from the popup window's screen position; in-window popups fall back to the offset. The row goes
 				// on whichever end is nearest the invocation point - also the best answer when the menu is taller
 				// than the work area and the pointer lands mid-menu.
+#if WINDOWS
 				var referenceScreenY = GetInvocationReferenceScreenY();
+#else
+				if (!preserveOpenPlacement || double.IsNaN(invocationScreenY))
+					invocationScreenY = GetInvocationReferenceScreenY();
+				var referenceScreenY = invocationScreenY;
+				preserveOpenPlacement = true;
+				placementResolved = true;
+#endif
 				if (!double.IsNaN(referenceScreenY) && presenter.ActualHeight > 0)
 				{
 					var popupScale = presenter.XamlRoot.RasterizationScale;
@@ -804,14 +851,10 @@ namespace Files.App.Helpers.ContextFlyouts
 					AccessKey = model.AccessKey ?? string.Empty,
 				};
 
-				if (model.KeyboardAccelerator is { } accelerator)
+				if (model.CreateKeyboardAccelerator() is { } accelerator)
 				{
 					// Fresh instance: the row is rebuilt on placement flips and an accelerator can have only one owner.
-					button.KeyboardAccelerators.Add(new Microsoft.UI.Xaml.Input.KeyboardAccelerator
-					{
-						Key = accelerator.Key,
-						Modifiers = accelerator.Modifiers,
-					});
+					button.KeyboardAccelerators.Add(accelerator);
 					button.KeyboardAcceleratorPlacementMode = Microsoft.UI.Xaml.Input.KeyboardAcceleratorPlacementMode.Hidden;
 				}
 

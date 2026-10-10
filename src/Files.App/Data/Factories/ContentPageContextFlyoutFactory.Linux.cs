@@ -7,70 +7,93 @@ using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
 using Files.Platform.Linux.Mime;
+using Files.App.ViewModels.Layouts;
 using Microsoft.Extensions.Logging;
 
 namespace Files.App.Data.Factories
 {
 	public static partial class ContentPageContextFlyoutFactory
 	{
-		private static async Task<List<ContextMenuFlyoutItemViewModel>> GetLinuxItemContextCommandsAsync(
+		public static Task<List<ContextMenuFlyoutItemViewModel>> GetItemContextCommandsWithoutShellItemsAsync(
+			CurrentInstanceViewModel currentInstanceViewModel, List<ListedItem> selectedItems, BaseLayoutViewModel commandsViewModel,
+			bool shiftPressed, SelectedItemsPropertiesViewModel? selectedItemsPropertiesViewModel, CancellationToken cancellationToken, ShellViewModel? itemViewModel = null)
+		{
+			ContextMenuBuildState state;
+			using (Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-snapshot", true))
+				state = CaptureMenuState(commandsViewModel, selectedItemsPropertiesViewModel, selectedItems, currentInstanceViewModel, itemViewModel);
+			var selectedCount = selectedItems.Count;
+			return Task.Run(() =>
+			{
+				using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-model", false);
+				cancellationToken.ThrowIfCancellationRequested();
+				var items = Filter(BuildBaseItemMenuItems(state, cancellationToken), selectedCount, shiftPressed, state, removeOverflowMenu: false);
+				cancellationToken.ThrowIfCancellationRequested();
+				return items;
+			}, cancellationToken);
+		}
+
+		private static Task<List<ContextMenuFlyoutItemViewModel>> GetLinuxItemContextCommandsAsync(
 			string? workingDir, List<ListedItem> selectedItems, bool shiftPressed, bool showOpenMenu, CancellationToken cancellationToken)
 		{
-			var items = await ShellContextFlyoutFactory.GetShellContextmenuAsync(shiftPressed: shiftPressed, showOpenMenu: showOpenMenu,
+			var shellItems = ShellContextFlyoutFactory.GetShellContextmenuAsync(shiftPressed: shiftPressed, showOpenMenu: showOpenMenu,
 				workingDirectory: workingDir, selectedItems: selectedItems, cancellationToken: cancellationToken);
-			if (selectedItems.Count == 0 || selectedItems.Any(i => i.IsArchive || i.IsRecycleBinItem || i.IsFtpItem))
-				return items;
+			var includeServiceMenus = selectedItems.Count > 0 && !selectedItems.Any(i => i.IsArchive || i.IsRecycleBinItem || i.IsFtpItem);
 			var targets = selectedItems.Select(i => i.ItemPath ?? string.Empty).ToArray();
-			if (!await Task.Run(() => targets.All(LinuxServiceMenuService.IsLocalFileSystemTarget), cancellationToken))
-				return items;
-
-			try
+			return Task.Run(async () =>
 			{
-				var actions = await Ioc.Default.GetRequiredService<IServiceMenuService>().GetActionsAsync(targets, cancellationToken);
-				var groups = new Dictionary<string, ContextMenuFlyoutItemViewModel>(StringComparer.Ordinal);
-				foreach (var action in actions)
+				var items = await shellItems.ConfigureAwait(false);
+				if (!includeServiceMenus || !targets.All(LinuxServiceMenuService.IsLocalFileSystemTarget))
+					return items;
+
+				try
 				{
-					var captured = action;
-					var item = new ContextMenuFlyoutItemViewModel
+					var actions = await Ioc.Default.GetRequiredService<IServiceMenuService>().GetActionsAsync(targets, cancellationToken).ConfigureAwait(false);
+					var groups = new Dictionary<string, ContextMenuFlyoutItemViewModel>(StringComparer.Ordinal);
+					foreach (var action in actions)
 					{
-						Text = DisplaySanitizer.Field(action.Application.Name),
-						Glyph = "\xE756",
-						ShowInSearchPage = true,
-						Command = new AsyncRelayCommand(() => NavigationHelpers.RunServiceMenuLinuxAsync(captured, targets)),
-					};
-					if (string.IsNullOrWhiteSpace(action.Submenu))
-						items.Add(item);
-					else
-					{
-						if (!groups.TryGetValue(action.Submenu, out var group))
+						cancellationToken.ThrowIfCancellationRequested();
+						var captured = action;
+						var item = new ContextMenuFlyoutItemViewModel
 						{
-							group = new ContextMenuFlyoutItemViewModel { Text = DisplaySanitizer.Field(action.Submenu), Items = [], ShowInSearchPage = true };
-							groups.Add(action.Submenu, group);
-							items.Add(group);
+							Text = DisplaySanitizer.Field(action.Application.Name),
+							Glyph = "\xE756",
+							ShowInSearchPage = true,
+							Command = new AsyncRelayCommand(() => NavigationHelpers.RunServiceMenuLinuxAsync(captured, targets)),
+						};
+						if (string.IsNullOrWhiteSpace(action.Submenu))
+							items.Add(item);
+						else
+						{
+							if (!groups.TryGetValue(action.Submenu, out var group))
+							{
+								group = new ContextMenuFlyoutItemViewModel { Text = DisplaySanitizer.Field(action.Submenu), Items = [], ShowInSearchPage = true };
+								groups.Add(action.Submenu, group);
+								items.Add(group);
+							}
+							group.Items!.Add(item);
 						}
-						group.Items!.Add(item);
 					}
 				}
-			}
-			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-			{
-				throw;
-			}
-			catch (Exception ex)
-			{
-				App.Logger.LogWarning(ex, "Failed to list service menus");
-			}
-			return items;
+				catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+				{
+					throw;
+				}
+				catch (Exception ex)
+				{
+					App.Logger.LogWarning(ex, "Failed to list service menus");
+				}
+				return items;
+			}, cancellationToken);
 		}
 
 		/// <summary>
 		/// Builds the "New" submenu from <see cref="ITemplatesService"/>: Folder, Text Document and the files in ~/Templates.
 		/// </summary>
-		internal static List<ContextMenuFlyoutItemViewModel> GetLinuxNewItemItems(bool canCreateFileInPage)
+		internal static List<ContextMenuFlyoutItemViewModel> GetLinuxNewItemItems(bool canCreateFileInPage, ContextMenuCommandSnapshot? createFolder = null, CancellationToken cancellationToken = default)
 		{
 			var list = new List<ContextMenuFlyoutItemViewModel>()
 			{
-				new ContextMenuFlyoutItemViewModelBuilder(Commands.CreateFolder).Build(),
+				new ContextMenuFlyoutItemViewModelBuilder(createFolder ?? ContextMenuCommandSnapshot.Capture(Commands.CreateFolder)).Build(),
 			};
 
 			if (!canCreateFileInPage)
@@ -80,11 +103,12 @@ namespace Files.App.Data.Factories
 			{
 				var templates = Ioc.Default.GetRequiredService<ITemplatesService>();
 				var directories = Ioc.Default.GetRequiredService<IUserDirectories>();
-				var entries = templates.GetTemplatesAsync(directories.Templates).GetAwaiter().GetResult();
+				var entries = templates.GetTemplatesAsync(directories.Templates, cancellationToken).GetAwaiter().GetResult();
 
 				var addedSeparator = false;
 				foreach (var template in entries)
 				{
+					cancellationToken.ThrowIfCancellationRequested();
 					if (template.Kind == NewItemKind.Folder)
 						continue;
 
@@ -104,6 +128,10 @@ namespace Files.App.Data.Factories
 						ShowInZipPage = true,
 					});
 				}
+			}
+			catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{

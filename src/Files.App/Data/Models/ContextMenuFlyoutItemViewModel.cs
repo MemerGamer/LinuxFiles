@@ -4,6 +4,7 @@
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.Windows.Input;
+using Windows.System;
 
 namespace Files.App.Data.Models
 {
@@ -46,6 +47,23 @@ namespace Files.App.Data.Models
 		public bool ShowInZipPage { get; set; }
 
 		public KeyboardAccelerator? KeyboardAccelerator { get; set; }
+
+#if !WINDOWS
+		public VirtualKey? KeyboardAcceleratorKey { get; set; }
+
+		public VirtualKeyModifiers KeyboardAcceleratorModifiers { get; set; }
+#endif
+
+		internal KeyboardAccelerator? CreateKeyboardAccelerator()
+		{
+			if (KeyboardAccelerator is { } accelerator)
+				return new() { Key = accelerator.Key, Modifiers = accelerator.Modifiers };
+#if !WINDOWS
+			if (KeyboardAcceleratorKey is { } key)
+				return new() { Key = key, Modifiers = KeyboardAcceleratorModifiers };
+#endif
+			return null;
+		}
 
 		public bool IsChecked { get; set; }
 

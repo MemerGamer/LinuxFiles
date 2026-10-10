@@ -1,0 +1,6 @@
+# Dependency-free benchmark crate; keep resolution locked for offline builds.
+version = 4
+
+[[package]]
+name = "linuxfiles-core"
+version = "0.1.0"

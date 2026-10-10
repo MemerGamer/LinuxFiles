@@ -66,6 +66,36 @@ class PruneWindowsTests(unittest.TestCase):
         self.assertTrue((self.repo / "win/space name.txt").exists())
         self.assertEqual("", self.git("diff", "--cached", "--name-only").stdout)
 
+    def test_symlinked_ancestors_block_all_deletions(self):
+        self.write("win/nested/content.txt", b"base\n")
+        self.commit("nested file")
+        self.git("update-index", "--refresh")
+        for ancestor in ("win/nested", "win"):
+            with self.subTest(ancestor=ancestor), tempfile.TemporaryDirectory() as outside:
+                original = self.repo / ancestor
+                moved = Path(outside) / "moved"
+                original.rename(moved)
+                original.symlink_to(moved, target_is_directory=True)
+                try:
+                    result = self.prune("--apply", check=False)
+                    self.assertNotEqual(0, result.returncode)
+                    self.assertIn("Symlinked ancestor", result.stderr)
+                    self.assertEqual(b"base\n", (moved / "content.txt").read_bytes())
+                    self.assertTrue((self.repo / "exact.txt").exists())
+                    self.assertEqual("", self.git("diff", "--cached", "--name-only").stdout)
+                finally:
+                    original.unlink()
+                    moved.rename(original)
+
+    def test_exact_file_entries_do_not_select_descendants(self):
+        self.write("foo/bar.txt", b"keep\n")
+        self.commit("directory named like exact entry")
+        self.write("custom-paths.txt", b"foo\r\nexact.txt\r\n")
+        self.assertEqual("foo/bar.txt\n", self.git("--literal-pathspecs", "ls-files", "--", "foo").stdout)
+        self.prune("--apply", "--paths-file", "custom-paths.txt")
+        self.assertEqual(b"keep\n", (self.repo / "foo/bar.txt").read_bytes())
+        self.assertEqual("exact.txt\n", self.git("diff", "--cached", "--name-only").stdout)
+
     def test_reject_unsafe_lists(self):
         for entry in ("../shared.txt", "/tmp/file", "win/*", ".git/", "win/../shared.txt", "./win/", "."):
             with self.subTest(entry=entry):

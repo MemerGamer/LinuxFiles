@@ -72,9 +72,15 @@ else
   for path in "${paths[@]}"; do
     files=()
     mapfile -d '' -t files < <(git --literal-pathspecs ls-files -z -- "$path")
-    if [[ ${#files[@]} -gt 0 ]]; then
-      selected+=("$path")
-      printf '%s: %d tracked file(s)\n' "$path" "${#files[@]}"
+    count=0
+    for file in "${files[@]}"; do
+      if allowed "$file"; then
+        selected+=("$file")
+        count=$((count + 1))
+      fi
+    done
+    if [[ "$count" -gt 0 ]]; then
+      printf '%s: %d tracked file(s)\n' "$path" "$count"
     fi
   done
 fi
@@ -83,6 +89,18 @@ if [[ ${#selected[@]} -eq 0 ]]; then
   echo "No eligible tracked paths."
   exit 0
 fi
+
+# Git's unlink follows parent symlinks, even when its preflight sees clean files.
+for path in "${selected[@]}"; do
+  ancestor="$path"
+  while [[ "$ancestor" == */* ]]; do
+    ancestor="${ancestor%/*}"
+    if [[ -L "$ancestor" ]]; then
+      echo "Symlinked ancestor of tracked path: $path ($ancestor)" >&2
+      exit 2
+    fi
+  done
+done
 
 flags=(-r)
 [[ "$conflicts_only" == true ]] && flags+=(-f)

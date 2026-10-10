@@ -28,6 +28,15 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0-alpha4" date="2026-10-10" type="development">
+      <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha4</url>
+      <description>
+        <p>Tags are preserved when extended-attribute writes fail on read-only files, including across reloads, restarts, export and import (fixes issue #148).</p>
+        <p>Context-menu models are built off the UI thread, with stale-menu and placement fixes, selection improvements and reduced UI stalls.</p>
+        <p>Upstream-sync preparation adds a Windows path allowlist and guarded prune helper; no Windows files have been removed yet. The sync workflow updates existing branches and pull requests. The Rust backend benchmark is a documented no-go; the application keeps its C# backend.</p>
+        <p>Known limits: select-all in folders with 10,000 items remains slow due to Uno selection handling. Text and icons can remain blurry on XWayland without the compositor scale setting or UNO_DISPLAY_SCALE_OVERRIDE; issue #113 remains open.</p>
+      </description>
+    </release>
     <release version="0.1.0-alpha3" date="2026-10-10" type="development">
       <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha3</url>
       <description>

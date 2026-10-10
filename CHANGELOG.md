@@ -3,6 +3,25 @@
 LinuxFiles is an unofficial native Linux port of [Files](https://github.com/files-community/Files) by the Files
 Community. This changelog covers the fork only.
 
+## 0.1.0-alpha4 - 2026-10-10
+
+Fourth public alpha. Expect rough edges and keep backups. Report issues at
+https://github.com/MemerGamer/LinuxFiles/issues.
+
+### Highlights
+
+- Tags are preserved when extended-attribute writes fail on read-only files. The tags database stays authoritative across reloads, restarts, export and import, so successive edits no longer resurrect stale tags or drop saved tags ([#153](https://github.com/MemerGamer/LinuxFiles/pull/153), fixes [#148](https://github.com/MemerGamer/LinuxFiles/issues/148)).
+- Context-menu models are built off the UI thread, with command state captured before background work. Stale menus are rejected and rebuilt menus retain their placement; selection handling avoids redundant work and reduces UI stalls ([#155](https://github.com/MemerGamer/LinuxFiles/pull/155)).
+- Upstream-sync preparation adds a Windows path allowlist and a guarded conflict-only prune helper, with documented dry-run results. No Windows files have been removed yet ([#154](https://github.com/MemerGamer/LinuxFiles/pull/154)). The sync workflow now updates existing sync branches and PRs ([#152](https://github.com/MemerGamer/LinuxFiles/pull/152)).
+- The Rust backend benchmark is a **no-go**: it misses the required speedup over optimized C#, and application end-to-end gains remain unproven. This is benchmark documentation only for the release; the application keeps its C# backend ([#151](https://github.com/MemerGamer/LinuxFiles/pull/151), [benchmark findings](https://github.com/MemerGamer/LinuxFiles/blob/main/docs/linux-port/investigations/rust-benchmark.md)).
+
+### Known limitations
+
+- Select-all in folders with 10,000 items is still slow due to Uno selection handling.
+- Text and icons can remain blurry on XWayland without the experimental **Detect display scale from the compositor** setting or `UNO_DISPLAY_SCALE_OVERRIDE`. The setting is off by default and requires a restart; Uno font hinting at 100 percent scale remains a limitation. [#113](https://github.com/MemerGamer/LinuxFiles/issues/113) remains open.
+- X11/XWayland only; the Windows build is not restored yet.
+- The Nix flake still pins alpha3; updating release assets and hashes is a follow-up packaging step.
+
 ## 0.1.0-alpha3 - 2026-10-10
 
 Third public alpha. Expect rough edges and keep backups. Report issues at

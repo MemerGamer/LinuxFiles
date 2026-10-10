@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/linux/prune-windows.sh"
 WORKFLOW = (ROOT / ".github/workflows/sync-upstream.yml").read_text()
 MERGE = WORKFLOW.split("    - name: Merge upstream\n", 1)[1].split("      run: |\n", 1)[1]
-MERGE = "\n".join(line[8:] for line in MERGE.split("    - name: Open the sync PR", 1)[0].splitlines())
+MERGE = "\n".join(line[8:] for line in MERGE.split("    - name: Update or open the sync PR", 1)[0].splitlines())
 
 
 class PruneWindowsTests(unittest.TestCase):
@@ -116,8 +116,15 @@ class PruneWindowsTests(unittest.TestCase):
         ours = self.git("rev-parse", "HEAD").stdout.strip()
         runner = self.repo / "runner"
         runner.mkdir()
+        self.git("update-ref", "refs/remotes/origin/main", "HEAD")
+        # The workflow asks gh for an open sync PR; none exists in the fixture.
+        fake = runner / "bin"
+        fake.mkdir()
+        (fake / "gh").write_text("#!/bin/sh\nexit 0\n")
+        (fake / "gh").chmod(0o755)
         env_file = runner / "env"
-        env = dict(os.environ, RUNNER_TEMP=str(runner), GITHUB_ENV=str(env_file))
+        env = dict(os.environ, RUNNER_TEMP=str(runner), GITHUB_ENV=str(env_file),
+                   PATH=f"{fake}:{os.environ['PATH']}")
         self.run_command("bash", "-e", "-o", "pipefail", "-c", MERGE, env=env)
         success = case in ("clean", "allowed", "policy")
         self.assertIn("CONFLICTS=" + str(not success).lower(), env_file.read_text())

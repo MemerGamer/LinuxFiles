@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.App.Utils;
 using Files.App.Utils.FileTags;
 using Files.Platform.Abstractions.Tags;
 using Microsoft.Extensions.DependencyInjection;
@@ -88,6 +89,121 @@ namespace Files.Platform.Tests.Tags
 			CollectionAssert.AreEqual(new[] { "b" }, reloaded.GetTags("/existing", null));
 		}
 
+		[TestMethod]
+		[DataRow(true, false)]
+		[DataRow(false, false)]
+		[DataRow(true, true)]
+		[DataRow(false, true)]
+		public async Task EditsAcrossItems_MergeInsideQueueWithoutDroppingPendingTags(bool supportsXattrs, bool secondItemLoaded)
+		{
+			using var fixture = new TagFixture();
+			fixture.Store.SupportsXattrs = supportsXattrs;
+			fixture.Store.Tags["/preset"] = ["A"];
+			FileTagsHelper.GetDbInstance().SetTags("/preset", null, ["a"]);
+			_ = FileTagsHelper.WriteFileTagAsync("/blocked", ["a"]);
+			await fixture.Store.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+			var firstItem = new ListedItem { ItemPath = "/preset" };
+			firstItem.SetLoadedFileTags(["a"]);
+			var secondItem = new ListedItem { ItemPath = "/preset" };
+			if (secondItemLoaded)
+				secondItem.SetLoadedFileTags(["a"]);
+			var firstEdit = firstItem.EditFileTagsAsync(tags => [.. tags, "b"]);
+			var secondEdit = secondItem.EditFileTagsAsync(tags => [.. tags, "c"]);
+			Assert.IsFalse(firstEdit.IsCompleted);
+			Assert.IsFalse(secondEdit.IsCompleted);
+
+			fixture.Store.Release.Set();
+			await Task.WhenAll(firstEdit, secondEdit).WaitAsync(TimeSpan.FromSeconds(10));
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, secondItem.FileTags);
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags("/preset", null));
+			if (supportsXattrs)
+				CollectionAssert.AreEqual(new[] { "A", "B", "C" }, fixture.Store.Tags["/preset"]);
+		}
+
+		[TestMethod]
+		public async Task DeferredLoad_DiscardedAfterEditBeforeCallback_DoesNotDropTagsOnNextEdit()
+		{
+			using var fixture = new TagFixture();
+			fixture.Store.Tags["/preset"] = ["A"];
+			var item = new ListedItem { ItemPath = "/preset" };
+			var revision = item.FileTagsRevision;
+			var snapshot = await FileTagsHelper.ReadAndUpdateFileTagsAsync("/preset");
+
+			await item.EditFileTagsAsync(tags => [.. tags, "b"]);
+			item.SetLoadedFileTags(snapshot, revision);
+			CollectionAssert.AreEqual(new[] { "a", "b" }, item.FileTags);
+			Assert.IsTrue(item.HasTags);
+			await item.EditFileTagsAsync(tags => [.. tags, "c"]);
+
+			CollectionAssert.AreEqual(new[] { "A", "B", "C" }, fixture.Store.Tags["/preset"]);
+			CollectionAssert.AreEqual(new[] { "a", "b", "c" }, new FileTagsDatabase(fixture.DatabasePath).GetTags("/preset", null));
+		}
+
+		[TestMethod]
+		public async Task DeferredLoad_WhileEditIsPending_IsDiscardedAndNewerEditWins()
+		{
+			using var fixture = new TagFixture();
+			fixture.Store.Tags["/preset"] = ["A"];
+			var item = new ListedItem { ItemPath = "/preset" };
+			var revision = item.FileTagsRevision;
+			var snapshot = await FileTagsHelper.ReadAndUpdateFileTagsAsync("/preset");
+			_ = FileTagsHelper.WriteFileTagAsync("/blocked", ["a"]);
+			await fixture.Store.Entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+			var firstEdit = item.EditFileTagsAsync(tags => [.. tags, "b"]);
+			item.SetLoadedFileTags(snapshot, revision);
+			Assert.IsNull(item.FileTags);
+			var secondEdit = item.EditFileTagsAsync(tags => tags.Where(uid => uid != "a").Append("c").ToArray());
+			fixture.Store.Release.Set();
+			await Task.WhenAll(firstEdit, secondEdit).WaitAsync(TimeSpan.FromSeconds(10));
+
+			CollectionAssert.AreEqual(new[] { "b", "c" }, item.FileTags);
+			CollectionAssert.AreEqual(new[] { "B", "C" }, fixture.Store.Tags["/preset"]);
+		}
+
+		[TestMethod]
+		public async Task ExplicitReplacement_InvalidatesDeferredLoad()
+		{
+			using var fixture = new TagFixture();
+			var item = new ListedItem { ItemPath = "/preset" };
+			var revision = item.FileTagsRevision;
+			item.FileTags = ["b"];
+			item.SetLoadedFileTags(["a"], revision);
+			await FileTagsHelper.DrainPendingWritesAsync();
+
+			CollectionAssert.AreEqual(new[] { "b" }, item.FileTags);
+			CollectionAssert.AreEqual(new[] { "B" }, fixture.Store.Tags["/preset"]);
+		}
+
+		[TestMethod]
+		public void DeferredLoad_WithUnchangedRevision_UpdatesItemWithoutWriting()
+		{
+			using var fixture = new TagFixture();
+			var item = new ListedItem { ItemPath = "/preset" };
+			item.SetLoadedFileTags(["a"], item.FileTagsRevision);
+
+			CollectionAssert.AreEqual(new[] { "a" }, item.FileTags);
+			Assert.IsTrue(item.HasTags);
+			Assert.AreEqual(0, fixture.Store.Tags.Count);
+			Assert.AreEqual(0, FileTagsHelper.GetDbInstance().GetTags("/preset", null).Length);
+		}
+
+		[TestMethod]
+		public async Task EditOfUntaggedItem_ReachesXattrAndSurvivesRelaunch()
+		{
+			using var fixture = new TagFixture();
+			Assert.AreEqual(0, FileTagsHelper.ReadFileTag("/fresh").Length);
+
+			_ = FileTagsHelper.WriteFileTagAsync("/fresh", ["b"]);
+			await FileTagsHelper.DrainPendingWritesAsync();
+
+			// A relaunch reads the tags back from the attribute, then falls back to the database when the attribute is gone
+			CollectionAssert.AreEqual(new[] { "b" }, FileTagsHelper.ReadFileTag("/fresh"));
+			fixture.Store.Tags.Remove("/fresh");
+			CollectionAssert.AreEqual(new[] { "b" }, FileTagsHelper.ReadFileTag("/fresh"));
+		}
+
 		private sealed class TagFixture : IDisposable
 		{
 			private readonly string root = Path.Combine(Path.GetTempPath(), "files-tags-queue-" + Guid.NewGuid().ToString("N"));
@@ -151,7 +267,7 @@ namespace Files.Platform.Tests.Tags
 
 		private sealed class TagSettings : IFileTagsSettingsService
 		{
-			public IList<TestTag> FileTagList { get; set; } = [new("a", "A"), new("b", "B")];
+			public IList<TestTag> FileTagList { get; set; } = [new("a", "A"), new("b", "B"), new("c", "C")];
 			public IList<TestTag>? GetTagsByIds(string[] tags) => FileTagList.Where(tag => tags.Contains(tag.Uid)).ToList();
 			public IEnumerable<TestTag> GetTagsByName(string name) => FileTagList.Where(tag => tag.Name == name);
 		}
@@ -178,5 +294,26 @@ namespace Files.App.Utils.FileTags
 	internal static class LogPathHelper
 	{
 		public static string RedactPath(string path) => path;
+	}
+}
+
+// The linked item partial uses these UI-independent stand-ins for its other members.
+namespace Files.App.Utils
+{
+	public partial class ListedItem
+	{
+		public string ItemPath { get; set; } = string.Empty;
+		public string GetRequiredPath() => ItemPath;
+		public bool HasTags { get; private set; }
+		public object? FileTagsUI => null;
+
+		private bool SetProperty<T>(ref T field, T value, string? propertyName = null)
+		{
+			if (EqualityComparer<T>.Default.Equals(field, value)) return false;
+			field = value;
+			return true;
+		}
+
+		private void OnPropertyChanged(string propertyName) { }
 	}
 }

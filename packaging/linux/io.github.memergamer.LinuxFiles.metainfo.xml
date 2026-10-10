@@ -31,7 +31,10 @@
     <release version="0.1.0-alpha3" date="2026-10-10" type="development">
       <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha3</url>
       <description>
+        <p>Tags now persist across folder reloads and app restarts: Linux now loads saved row properties. Tag edits merge correctly with saved tags, and opening a zip no longer requires two Back presses. Layout switches are faster on Linux with a lightweight selection checkbox.</p>
+        <p>The experimental Detect display scale from the compositor setting can sharpen text on niri/xwayland-satellite when no display or toolkit scale is configured. It is off by default and requires a restart. UNO_DISPLAY_SCALE_OVERRIDE also works and takes precedence; some setups may double-scale. New pixelation documentation covers XWayland upscaling and Uno font hinting limits.</p>
         <p>Archive navigation and extraction progress fixes, system cursor preferences and a corrected Status Center icon, cached context-menu parsing and queued tag writes, compositor-aware backdrop modes and System colours, an opt-in NixOS root-actions module with a runtime-capability check, and fewer Windows-only assets in Linux builds.</p>
+        <p>Known limits: X11/XWayland only, slow select-all in folders with 10,000 items due to Uno selection handling, and possible lost tags after successive edits on read-only tagged files when extended-attribute writes fail (issue #148).</p>
       </description>
     </release>
     <release version="0.1.0-alpha2" date="2026-10-08" type="development">

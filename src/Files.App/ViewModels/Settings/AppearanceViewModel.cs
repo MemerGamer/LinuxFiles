@@ -48,6 +48,15 @@ namespace Files.App.ViewModels.Settings
 				OnPropertyChanged(nameof(IsBackgroundOpacityEnabled));
 			}
 		}
+		public bool DetectCompositorDisplayScale
+		{
+			get => UserSettingsService.AppearanceSettingsService.DetectCompositorDisplayScale;
+			set
+			{
+				UserSettingsService.AppearanceSettingsService.DetectCompositorDisplayScale = value;
+				OnPropertyChanged();
+			}
+		}
 		public float BackgroundOpacity
 		{
 			get => UserSettingsService.AppearanceSettingsService.BackgroundOpacity;

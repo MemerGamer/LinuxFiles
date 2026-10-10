@@ -154,8 +154,7 @@ namespace Files.App.Utils.FileTags
 			if (!confirmed)
 				return false;
 
-			foreach (var item in itemsWithTags)
-				item.FileTags = [];
+			await Task.WhenAll(itemsWithTags.Select(item => item.EditFileTagsAsync(_ => [])));
 
 			return true;
 		}

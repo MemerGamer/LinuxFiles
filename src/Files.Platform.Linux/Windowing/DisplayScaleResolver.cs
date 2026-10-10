@@ -4,21 +4,26 @@
 using System;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Threading;
 
 namespace Files.Platform.Linux.Windowing
 {
 	/// <summary>
 	/// Works out the display scale to hand to Uno. Uno's X11 host reads <c>Xft.dpi</c> (set by KDE and GNOME on X11) and honours
-	/// <c>UNO_DISPLAY_SCALE_OVERRIDE</c>; this fills the gap when <c>Xft.dpi</c> is absent (some XWayland sessions) from toolkit variables.
+	/// <c>UNO_DISPLAY_SCALE_OVERRIDE</c>; this fills the gap when <c>Xft.dpi</c> is absent (some XWayland sessions) from toolkit variables or niri IPC.
 	/// </summary>
 	public static class DisplayScaleResolver
 	{
 		public const string OverrideVariable = "UNO_DISPLAY_SCALE_OVERRIDE";
 
+		private static int niriSourceLogged;
+
 		/// <summary>
 		/// Returns the value to assign to <see cref="OverrideVariable"/>, or null when Uno's own detection should be used.
 		/// </summary>
-		public static string? Resolve(Func<string, string?> getEnv, string? xResources)
+		public static string? Resolve(Func<string, string?> getEnv, string? xResources, Func<double?>? readNiriScale = null,
+			bool detectCompositorDisplayScale = false, Func<bool>? readCompositorScaleSetting = null)
 		{
 			if (!string.IsNullOrWhiteSpace(getEnv(OverrideVariable)))
 				return null;
@@ -38,7 +43,100 @@ namespace Files.Platform.Linux.Windowing
 			double? scale = global is null && screen is null ? null : (global ?? 1.0) * (screen ?? 1.0);
 			scale ??= ParseScale(getEnv("GDK_SCALE"));
 
-			return scale is { } s && s > 1.0 ? Math.Min(s, 4.0).ToString("0.##", CultureInfo.InvariantCulture) : null;
+			if (scale is { } s && s > 1.0)
+				return Math.Min(s, 4.0).ToString("0.##", CultureInfo.InvariantCulture);
+
+			if (string.IsNullOrWhiteSpace(getEnv("NIRI_SOCKET")) || string.IsNullOrWhiteSpace(getEnv("WAYLAND_DISPLAY")) ||
+				GetXftDpiText(xResources) is not null)
+				return null;
+
+			foreach (var variable in new[] { OverrideVariable, "GDK_SCALE", "GDK_DPI_SCALE", "QT_SCALE_FACTOR", "QT_SCREEN_SCALE_FACTORS" })
+				if (!string.IsNullOrEmpty(getEnv(variable)))
+					return null;
+
+			try
+			{
+				if (!(getEnv("FILES_NIRI_SCALE") switch
+				{
+					"1" => true,
+					"0" => false,
+					_ => readCompositorScaleSetting?.Invoke() ?? detectCompositorDisplayScale,
+				}))
+					return null;
+
+				return readNiriScale?.Invoke() is { } niri && double.IsFinite(niri) && niri > 0
+					? Math.Clamp(niri, 1.0, 4.0).ToString("0.###", CultureInfo.InvariantCulture) : null;
+			}
+			catch (Exception)
+			{
+				return null;
+			}
+		}
+
+		/// <summary>
+		/// Reads niri's socket reply or CLI output, preferring the separately queried focused output.
+		/// </summary>
+		public static double? ParseNiriOutputs(string? outputsJson, string? focusedOutputJson = null)
+		{
+			if (string.IsNullOrWhiteSpace(outputsJson) || outputsJson.Length > NiriScaleClient.MaxResponseLength)
+				return null;
+
+			try
+			{
+				using var document = JsonDocument.Parse(outputsJson);
+				var outputs = UnwrapNiriReply(document.RootElement, "Outputs");
+				if (outputs.ValueKind != JsonValueKind.Object)
+					return null;
+
+				var focusedName = ParseNiriFocusedName(focusedOutputJson);
+				JsonElement? first = null;
+				foreach (var output in outputs.EnumerateObject())
+				{
+					first ??= output.Value;
+					if (output.Name == focusedName)
+						return ParseNiriOutputScale(output.Value);
+				}
+				return first is { } fallback ? ParseNiriOutputScale(fallback) : null;
+			}
+			catch (JsonException)
+			{
+				return null;
+			}
+		}
+
+		private static JsonElement UnwrapNiriReply(JsonElement root, string response)
+		{
+			if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("Err", out _))
+				return default;
+			if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("Ok", out var ok))
+				return ok.ValueKind == JsonValueKind.Object && ok.TryGetProperty(response, out var result) ? result : default;
+			return root;
+		}
+
+		private static string? ParseNiriFocusedName(string? json)
+		{
+			if (string.IsNullOrWhiteSpace(json) || json.Length > NiriScaleClient.MaxResponseLength)
+				return null;
+			try
+			{
+				using var document = JsonDocument.Parse(json);
+				var output = UnwrapNiriReply(document.RootElement, "FocusedOutput");
+				return output.ValueKind == JsonValueKind.Object && output.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String
+					? name.GetString() : null;
+			}
+			catch (JsonException)
+			{
+				return null;
+			}
+		}
+
+		private static double? ParseNiriOutputScale(JsonElement output)
+		{
+			if (output.ValueKind != JsonValueKind.Object || !output.TryGetProperty("logical", out var logical) ||
+				logical.ValueKind != JsonValueKind.Object || !logical.TryGetProperty("scale", out var value) ||
+				value.ValueKind != JsonValueKind.Number || !value.TryGetDouble(out var scale) || !double.IsFinite(scale) || scale <= 0)
+				return null;
+			return Math.Clamp(scale, 1.0, 4.0);
 		}
 
 		/// <summary>
@@ -133,9 +231,12 @@ namespace Files.Platform.Linux.Windowing
 				return;
 
 			string? resolved;
+			string? niriSource = null;
 			try
 			{
-				resolved = Resolve(Environment.GetEnvironmentVariable, ReadXResources());
+				resolved = Resolve(Environment.GetEnvironmentVariable, ReadXResources(),
+					() => NiriScaleClient.ReadScale(out niriSource),
+					readCompositorScaleSetting: () => CompositorScaleSettings.Read(new LinuxAppDataPaths().UserSettingsFilePath));
 			}
 			catch (Exception)
 			{
@@ -144,7 +245,14 @@ namespace Files.Platform.Linux.Windowing
 			}
 
 			if (resolved is not null)
+			{
 				Environment.SetEnvironmentVariable(OverrideVariable, resolved);
+				if (niriSource is not null && Interlocked.Exchange(ref niriSourceLogged, 1) == 0)
+				{
+					try { Console.Error.WriteLine($"[display-scale] Using niri {niriSource}: {resolved}"); }
+					catch (System.IO.IOException) { }
+				}
+			}
 		}
 
 		private static string? ReadXResources()

@@ -119,6 +119,10 @@ curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/Linu
 - [Showcase](../docs/linux-port/SHOWCASE.md): screenshots and the feature checklist
 - [Packaging details](../docs/linux-port/packaging.md) and the [roadmap](../docs/linux-port/PLAN.md)
 
+## Troubleshooting
+
+**Soft text or icons on niri / xwayland-satellite:** Enable **Detect display scale from the compositor (experimental)** in Settings > Appearance and restart Files to use niri's focused output scale when no Uno, Xft, GDK or Qt scale hint is present and both `NIRI_SOCKET` and `WAYLAND_DISPLAY` are set. Check stderr for `[display-scale]` to see whether IPC or CLI detection succeeded. Detection defaults off and may double-scale on some setups. `FILES_NIRI_SCALE=1` forces it on and `FILES_NIRI_SCALE=0` forces it off, overriding the saved preference. Launch with `UNO_DISPLAY_SCALE_OVERRIDE=1.25 files` to select a scale manually (replace `1.25` with your output scale). The scale is chosen at startup. See [display scale details](../docs/linux-port/appearance-transparency.md#display-scale-on-niri).
+
 ## Reporting bugs
 
 - **Linux bugs and Linux feature requests:** open an issue in [this fork](https://github.com/MemerGamer/LinuxFiles/issues).

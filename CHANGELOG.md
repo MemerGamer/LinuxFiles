@@ -10,6 +10,12 @@ https://github.com/MemerGamer/LinuxFiles/issues.
 
 ### Features
 
+- Experimental **Detect display scale from the compositor** setting (Settings > Appearance) for sharper text
+  on niri/xwayland-satellite when no display or toolkit scale is configured. Off by default; restart required.
+  `UNO_DISPLAY_SCALE_OVERRIDE` also works and takes precedence; some setups may double-scale
+  ([#147](https://github.com/MemerGamer/LinuxFiles/pull/147)).
+- [Pixelation diagnosis and workarounds](docs/linux-port/investigations/pixelation-findings.md) document
+  XWayland upscaling and Uno's font hinting limits ([#144](https://github.com/MemerGamer/LinuxFiles/pull/144)).
 - Backdrop modes (Solid / Transparent / Blur) with separate background opacity. Transparency requires a
   recognised compositor; blur requires KWin on X11 with blur support. Unsupported modes fall back to Solid.
 - Files / Adwaita / System colour sources. System reads GTK named colours and XDG portal appearance settings;
@@ -22,6 +28,11 @@ https://github.com/MemerGamer/LinuxFiles/issues.
 
 ### Fixes
 
+- Tags persist across folder reloads and app restarts: Linux now loads each row's saved properties, which it
+  never did before. Tag edits merge correctly with saved tags, and opening a zip no longer needs two Back
+  presses to return to its folder ([#146](https://github.com/MemerGamer/LinuxFiles/pull/146)).
+- Layout switches are faster on Linux with a lightweight selection checkbox that avoids per-item animation
+  overhead ([#145](https://github.com/MemerGamer/LinuxFiles/pull/145)).
 - Double-clicking recognised zip/tar/7z archives browses inside them instead of opening another application.
   Extraction reports byte progress and opens the destination only after successful completion.
 - Missing cursor theme/size settings are resolved from X resources or read-only GNOME settings, while explicit
@@ -38,7 +49,11 @@ https://github.com/MemerGamer/LinuxFiles/issues.
 
 ### Known limitations
 
-- X11/XWayland only; fractional compositor scaling can soften text and icons.
+- X11/XWayland only; fractional compositor scaling can soften text and icons. The experimental compositor
+  scale setting or `UNO_DISPLAY_SCALE_OVERRIDE` can help; Uno font hinting at 100 percent scale remains a limitation.
+- Select-all in folders with 10,000 items is still slow due to Uno selection handling.
+- Successive tag edits on read-only tagged files can drop tags when extended-attribute writes fail
+  ([#148](https://github.com/MemerGamer/LinuxFiles/issues/148)).
 - Uno's content Arrow cursor mapping can still differ from the selected cursor theme.
 - Window opacity fades the entire window. Backdrop transparency and blur are unavailable under
   niri/xwayland-satellite; Mica/Acrylic is not implemented on Linux.

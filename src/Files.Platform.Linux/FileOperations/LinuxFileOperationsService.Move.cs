@@ -82,6 +82,7 @@ namespace Files.Platform.Linux.FileOperations
 								throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being moved.", source);
 							VerifyMoveSource(sourceParent, name, openedStat, source);
 							PosixNative.UnlinkAt(sourceParent.Descriptor, name, 0, source);
+							context.PathChanged(source, destination, xattrStale: true);
 						}, stat).ConfigureAwait(false);
 				if (sourceKind == EntryKind.Symlink && copy.Status == FileOperationStatus.Succeeded)
 				{

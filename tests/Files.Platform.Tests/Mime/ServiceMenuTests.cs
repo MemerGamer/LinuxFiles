@@ -345,6 +345,32 @@ namespace Files.Platform.Tests.Mime
 			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a.png"]).Count);
 
 		[TestMethod]
+		[DataRow("env VAR=bash tool %F")]
+		[DataRow("tool VAR=bash %F")]
+		[DataRow("bash --version")]
+		public void Expansion_AllowsShellNamesWithoutScriptExecution(string exec) =>
+			Assert.AreEqual(1, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a.png"]).Count);
+
+		[TestMethod]
+		[DataRow("", "-c code")]
+		[DataRow("env VAR=bash ", "-c code")]
+		[DataRow("env env ", "script.sh")]
+		[DataRow("env ", "-lc code")]
+		public void Expansion_RejectsShellSymlinksInsideWrappers(string prefix, string arguments)
+		{
+			var directory = Path.Combine(Path.GetTempPath(), "files-shell-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(directory);
+			try
+			{
+				var alias = Path.Combine(directory, "innocent");
+				File.CreateSymbolicLink(alias, "/bin/sh");
+				var exec = prefix + alias + " " + arguments;
+				Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a.png"]).Count);
+			}
+			finally { Directory.Delete(directory, true); }
+		}
+
+		[TestMethod]
 		[DataRow("f")]
 		[DataRow("F")]
 		[DataRow("u")]

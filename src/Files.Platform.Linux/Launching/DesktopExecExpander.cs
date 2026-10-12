@@ -14,7 +14,7 @@ namespace Files.Platform.Linux.Launching
 	/// </summary>
 	public static class DesktopExecExpander
 	{
-		private static readonly HashSet<string> Shells = ["sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "csh", "tcsh"];
+		private static readonly HashSet<string> Shells = ["sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "csh", "tcsh", "rbash"];
 
 		/// <summary>
 		/// Splits an Exec value into arguments using shell quoting rules (double quotes, single quotes, backslash).
@@ -115,7 +115,7 @@ namespace Files.Platform.Linux.Launching
 			if (app.Exec.Any(c => c is '|' or '&' or ';' or '<' or '>' or '`' or '$' or '*' or '?' or '~' or '#' || char.IsControl(c))) return [];
 			var tokens = Tokenize(app.Exec);
 			if (tokens is null || tokens.Count == 0 || tokens[0].Contains('%') || tokens[0].Contains('=') ||
-				tokens.Any(t => Shells.Contains(System.IO.Path.GetFileName(t))) ||
+				InvokesShellScript(tokens) ||
 				(System.IO.Path.GetFileName(tokens[0]) == "env" && tokens.Any(t => t.StartsWith("-S", StringComparison.Ordinal) || t.StartsWith("--split-string", StringComparison.Ordinal)))) return [];
 			var targetCodes = tokens.Select(t => t is "%f" or "%F" or "%u" or "%U" ? t[1] : LongOptionTargetCode(t)).ToArray();
 			if (targetCodes.Count(c => c != '\0') > 1 ||
@@ -163,6 +163,34 @@ namespace Files.Platform.Linux.Launching
 				result.Add(argv.ToArray());
 			}
 			return result;
+		}
+
+		private static bool InvokesShellScript(IReadOnlyList<string> tokens)
+		{
+			for (var i = 0; i < tokens.Count; i++)
+			{
+				var token = tokens[i];
+				if (token.Contains('=') || token.StartsWith('-')) continue;
+				var executable = token;
+				if (!token.Contains('/'))
+				{
+					foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "/usr/bin:/bin").Split(':'))
+					{
+						var candidate = System.IO.Path.Combine(directory, token);
+						if (System.IO.File.Exists(candidate)) { executable = candidate; break; }
+					}
+				}
+				var resolved = Trash.LinuxTrashService.RealPath(executable);
+				if (!Shells.Contains(System.IO.Path.GetFileName(token)) && !Shells.Contains(System.IO.Path.GetFileName(resolved))) continue;
+				for (var j = i + 1; j < tokens.Count; j++)
+				{
+					var argument = tokens[j];
+					if (argument == "--") return j + 1 < tokens.Count;
+					if (!argument.StartsWith('-') || (argument.StartsWith('-') && !argument.StartsWith("--") && argument.Contains('c'))) return true;
+					if (argument is "-o" or "-O") j++;
+				}
+			}
+			return false;
 		}
 
 		// Accept only --name=%x with an ASCII option name and no surrounding value text.

@@ -558,6 +558,38 @@ namespace Files.Platform.Tests.Archives
 			Assert.IsTrue((await service.ExtractAsync(archive, Out)).Succeeded);
 		}
 
+		[TestMethod]
+		[DataRow("a.txt")]
+		[DataRow("./a.txt")]
+		public async Task DuplicateTarFilesUseLastContents(string secondName)
+		{
+			var tar = Path.Combine(Work, "duplicates.tar");
+			using (var stream = File.Create(tar))
+			using (var writer = new TarWriter(stream))
+			{
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "a.txt") { DataStream = new MemoryStream(Bytes("long old contents")) });
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, secondName) { DataStream = new MemoryStream(Bytes("new")) });
+			}
+			var result = await service.ExtractAsync(tar, Out);
+			Assert.IsTrue(result.Succeeded, result.Error);
+			Assert.AreEqual("new", File.ReadAllText(Path.Combine(Out, "a.txt")));
+		}
+
+		[TestMethod]
+		public async Task FileOverwriteNeverRecursivelyDeletesExistingDirectory()
+		{
+			var directory = Path.Combine(Out, "a.txt");
+			Directory.CreateDirectory(directory);
+			File.WriteAllText(Path.Combine(directory, "victim"), "preserved");
+			var zip = ZipWith(Path.Combine(Work, "overwrite.zip"), ("a.txt", Bytes("incoming")));
+			var result = await service.ExtractAsync(zip, Out, new ArchiveExtractOptions
+			{
+				ResolveConflict = (_, _) => Task.FromResult(new ConflictResolution(ConflictAction.Overwrite)),
+			});
+			Assert.IsFalse(result.Succeeded);
+			Assert.AreEqual("preserved", File.ReadAllText(Path.Combine(directory, "victim")));
+		}
+
 		// ---- conflicts ----
 
 		private async Task<string> ArchiveWithAText(string content)

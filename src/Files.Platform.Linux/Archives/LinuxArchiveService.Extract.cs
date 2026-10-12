@@ -167,9 +167,10 @@ namespace Files.Platform.Linux.Archives
 							continue;
 						}
 
+						var temporaryName = ".files-entry-" + Guid.NewGuid().ToString("N");
 						uint crc = 0;
 						using (var input = openEntry())
-						using (var output = PosixNative.OpenFileAt(parent.Descriptor, name, full, create: true))
+						using (var output = PosixNative.OpenFileAt(parent.Descriptor, temporaryName, full, create: true))
 						{
 							int read;
 							while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
@@ -190,6 +191,7 @@ namespace Files.Platform.Linux.Archives
 							ApplyMode(output.SafeFileHandle, entry);
 						}
 
+						PosixNative.RenameAt(parent.Descriptor, temporaryName, parent.Descriptor, name, true, full);
 						processed++;
 					}
 				}
@@ -364,6 +366,17 @@ namespace Files.Platform.Linux.Archives
 					continue;
 				}
 
+				// Hold the consented inode across the callback, including unlink/recreate attempts.
+				SafeFileHandle? conflictHandle = null;
+				if (exists)
+				{
+					var conflictFd = PosixNative.OpenPathAt(destination.Descriptor, name, out var conflictError);
+					if (conflictFd < 0) throw PosixNative.CreateException(conflictError, target);
+					conflictHandle = new SafeFileHandle(conflictFd, true);
+				}
+				using var heldConflict = conflictHandle;
+				if (heldConflict is not null && (!PosixNative.TryStat(heldConflict.DangerousGetHandle().ToInt32(), out var consentedStat) || !PosixNative.SameEntry(targetStat, consentedStat)))
+					throw new ArchiveSecurityException("The extraction conflict changed.");
 				var publicationName = name;
 				if (exists)
 				{
@@ -383,7 +396,23 @@ namespace Files.Platform.Linux.Archives
 						default:
 							if (!PosixNative.SameEntry(targetStat, PosixNative.StatAt(destination.Descriptor, name, target)))
 								throw new ArchiveSecurityException("The extraction conflict changed.");
-							destination.DeleteEntry(name);
+							// Never recursively remove a consented directory: it can move outside the destination.
+							if (targetStat.IsDirectory)
+								throw new ArchiveSecurityException("Cannot safely overwrite a directory with an archive file.");
+							var retiredName = ".files-overwrite-" + Guid.NewGuid().ToString("N");
+							PosixNative.RenameAt(destination.Descriptor, name, destination.Descriptor, retiredName, false, target);
+							var retiredFd = PosixNative.OpenPathAt(destination.Descriptor, retiredName, out var retiredError);
+							if (retiredFd < 0) throw PosixNative.CreateException(retiredError, target);
+							try
+							{
+								if (!PosixNative.TryStat(retiredFd, out var retiredStat) || !PosixNative.SameEntry(targetStat, retiredStat))
+								{
+									PosixNative.RenameAt(destination.Descriptor, retiredName, destination.Descriptor, name, false, target);
+									throw new ArchiveSecurityException("The extraction conflict changed.");
+								}
+								PosixNative.UnlinkAt(destination.Descriptor, retiredName, 0, target);
+							}
+							finally { PosixNative.Close(retiredFd); }
 							break;
 					}
 				}

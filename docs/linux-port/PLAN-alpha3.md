@@ -1,3 +1,5 @@
+> Historical alpha3 plan. The [upstream policy](upstream-policy.md) supersedes its upstream-sync and soft-only Windows removal guidance.
+
 # Plan: 0.1.0-alpha3 and the road to 0.2
 
 Source: seven read-only investigations (Codex, 2026-10-09), kept in [investigations/](investigations/). Findings marked
@@ -19,8 +21,8 @@ Source: seven read-only investigations (Codex, 2026-10-09), kept in [investigati
 
 ## Proposals
 
-- **Remove unused Windows code: soft only.** Hard deletion makes the daily upstream sync hit modify/delete conflicts and
-  kills the path back to Windows. Do the safe part: compile-item exclusions, drop `System.Drawing.Common`, gate SevenZip
+- **Remove unused Windows code in stages.** The independent-fork policy replaces the earlier soft-only
+  recommendation. Keep Linux consumers building: compile-item exclusions, drop `System.Drawing.Common`, gate SevenZip
   and registry generators on Windows, add a trim/AOT analysis profile. Expected gain about 7-9 MiB unpacked and little startup.
 - **Rust: no-go for now.** First take cheap C# wins (batched `getdents64`, pooling, parallel stat) and benchmark 10k/100k
   folders. Spike Rust only for read-only directory scanning, and only if it beats optimised C# by 2x on the phase and 20%

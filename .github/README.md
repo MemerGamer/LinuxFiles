@@ -11,6 +11,8 @@ Files is created and maintained by the [Files Community](https://github.com/file
 > [!WARNING]
 > **Status: alpha.** Expect missing features and rough edges, and do not rely on it for data you cannot afford to lose. The official, supported Files for Windows is at [files.community](https://files.community/).
 
+LinuxFiles is now an independent fork: upstream stays a read-only remote, fixes are cherry-picked selectively, and upstream branches are no longer merged. See the [upstream policy](../docs/linux-port/upstream-policy.md). MIT/MPL licenses and contributor notices remain preserved.
+
 ## Linux port: current state
 
 This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.

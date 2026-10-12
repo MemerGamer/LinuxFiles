@@ -33,7 +33,7 @@ Changes:
 
 - `global.json`: `"msbuild-sdks": { "Uno.Sdk": "6.7.30" }`. Only projects that opt in to `Sdk="Uno.Sdk"` resolve it.
 - `Directory.Build.props`: **renamed the repo's `TargetFrameworkVersion` property to `BaseTargetFramework`** (and the 4 csproj
-  files that use it: Files.Shared, Files.Core.Storage, Files.InteractionTests, Files.App.Controls). `TargetFrameworkVersion`
+  files that use it: Files.Shared, Files.Core.Storage, legacy Windows interaction tests, Files.App.Controls). `TargetFrameworkVersion`
   is a built-in MSBuild property (`v10.0`); Uno.Sdk pulls in .NET workload manifests that evaluate
   `VersionGreaterThanOrEquals($(TargetFrameworkVersion), 8.0)` and crash on the repo's `net10.0` value
   (`MSB4184`). Added `DesktopTargetFramework` = `$(BaseTargetFramework)-desktop`.

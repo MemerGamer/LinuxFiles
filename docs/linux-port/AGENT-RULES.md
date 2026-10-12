@@ -27,7 +27,8 @@ Read this first, then `PLAN.md` §0, then `CLAUDE.md`.
 - Route OS functionality through `Files.Platform.Abstractions` services implemented in `Files.Platform.Linux` (unit-tested in `tests/Files.Platform.Tests`). Don't call Win32 on Linux.
 - Native interop only via `[LibraryImport]` in `src/Files.Platform.Linux/Native/`. No `DllImport`/`ComImport`.
 - Mark stubs `// LINUX-TODO(<area>): ...`.
-- Shared files (`Strings/en-US/Resources.resw`, `Directory.Packages.props`, `Files.App.csproj`, `PlatformServiceCollectionExtensions.cs`, `AppLifecycleHelper.cs`): make minimal, append-only edits so merges stay trivial.
+- Keep edits to shared files scoped. New strings in `Strings/en-US/Resources.resw` are append-only.
+- This fork is independent: no upstream merges or automatic sync. Selectively cherry-pick reviewed fixes with attribution; follow [upstream-policy.md](upstream-policy.md).
 - Security: treat file names, `.desktop` files, archives and anything from disk as untrusted. No shell interpolation. Use fd-relative ops for recursive destructive actions (`Native/PosixNative`).
 - Match the surrounding style (license header, tabs, block namespaces).
 

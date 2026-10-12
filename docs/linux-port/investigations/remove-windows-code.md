@@ -1,3 +1,5 @@
+> Historical investigation. The [independent-fork policy](../upstream-policy.md) supersedes the sync-preservation recommendation below; Windows leaf projects and sync/pruning automation have since been removed.
+
 **Recommend option 1: retain the upstream tree, tighten Linux publish exclusions, then investigate trimming.** Deleting sources already excluded from compilation offers essentially **zero binary-size or startup gain**.
 
 Read-only investigation completed; no edits, builds, app launches, commits or external comments. Counts use `git ls-files`, `wc` and targeted `rg`. MSBuild item queries timed out, so compilation counts below are **static estimates**, excluding generated code.
@@ -10,7 +12,7 @@ Read-only investigation completed; no edits, builds, app launches, commits or ex
 | App Shell / Taskbar / Signatures / Services.Windows | 33 / 6,813 | Excluded except `ShellHelpers.cs` |
 | Files.App.Storage C# | 50 / 4,439 | Approximately 23 / 1,815 included; 27 / 2,624 excluded |
 | CsWin32 / BackgroundTasks / Server C# | 12 / 550; 1 / 63; 3 / 152 | Projects excluded |
-| Files.Platform.Windows C# | 2 / 77 | Project excluded |
+| legacy Windows platform project C# | 2 / 77 | Project excluded |
 | Files.Core.SourceGenerator C# | 16 / 2,172 | Built as an analyzer, not shipped |
 | App XAML | 99 / 21,056 | 9 / 1,677 excluded; 90 / 19,379 retained |
 | Localisation | 49 files / 232,436 LOC; 9.11 MiB | Shared Linux resources |
@@ -46,7 +48,7 @@ Trimming can remove unreachable managed members/framework assemblies; it does no
 | 3. Hard delete with sync automation | L ongoing | Feasible only with explicit path policy and conflict-aware processing |
 | 4. Permanent hard fork | L ongoing | Simplifies the visible tree; assumes ownership of upstream fixes and abandons routine reintegration |
 
-Daily sync **attempts a merge and opens a PR**; it aborts on conflicts ([sync-upstream.yml:14](.github/workflows/sync-upstream.yml:14), [71](.github/workflows/sync-upstream.yml:71)). Deletion causes modify/delete conflicts when upstream changes deleted paths—not necessarily every merge. New files can reappear.
+The former daily sync attempted a merge and opened a PR; it has been retired under the independent-fork policy. The conflict analysis below is historical.
 
 `-X ours` favours conflicting content hunks; it is not a deletion policy. A `merge=ours` custom driver needs Git configuration and handles file contents, not structural deletion conflicts. [Git strategy documentation](https://git-scm.com/docs/merge-strategies), [attribute documentation](https://git-scm.com/docs/gitattributes). A viable deletion script must resolve only allowlisted conflicts, re-delete matching additions, reject other conflicts and retain merge ancestry; a post-success script alone is insufficient. Broad `ours` handling risks silently losing useful upstream changes.
 

@@ -111,12 +111,16 @@ namespace Files.App
 				}))
 				.Build();
 
+			using var scaleCancellation = new CancellationTokenSource();
+			var scaleWatcher = DisplayScaleResolver.WatchCompositorScaleAsync(scaleCancellation.Token);
 			try
 			{
 				host.Run();
 			}
 			finally
 			{
+				scaleCancellation.Cancel();
+				scaleWatcher.GetAwaiter().GetResult();
 				FileTagsHelper.DrainPendingWritesAsync().GetAwaiter().GetResult();
 			}
 

@@ -38,6 +38,7 @@ namespace Files.Platform.Tests.Trash
 			var result = Single(await _service.RestoreAsync([item]));
 
 			Assert.IsTrue(result.Succeeded, result.ErrorMessage);
+			Assert.IsFalse(result.XattrStale);
 			if (kind == "directory")
 				Assert.AreEqual("data", File.ReadAllText(Path.Combine(original, "child")));
 			else if (kind == "link")
@@ -87,6 +88,7 @@ namespace Files.Platform.Tests.Trash
 			var result = Single(await _service.RestoreAsync([item]));
 
 			Assert.IsTrue(result.Succeeded, result.ErrorMessage);
+			Assert.IsTrue(result.XattrStale);
 			var restored = Path.Combine(parent + ".saved", "entry");
 			if (kind == "directory")
 			{

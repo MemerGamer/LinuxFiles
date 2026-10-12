@@ -4,6 +4,7 @@
 using Files.Platform.Linux.Native;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
 namespace Files.Platform.Linux.Elevation
@@ -22,6 +23,24 @@ namespace Files.Platform.Linux.Elevation
 				ValidateDirectory(overrides[variable]!, inspector, allowMissing: true);
 			foreach (var entry in overrides)
 				Environment.SetEnvironmentVariable(entry.Key, entry.Value);
+		}
+
+		/// <summary>Keep only root storage, display connection and locale settings for child processes.</summary>
+		public static void ApplyChildEnvironment(ProcessStartInfo info, uint effectiveUserId, string rootHome)
+		{
+			if (effectiveUserId != 0) return;
+			var overrides = GetOverrides(rootHome);
+			var kept = new Dictionary<string, string?>();
+			foreach (var name in new[] { "DISPLAY", "XAUTHORITY", "LANG", "LANGUAGE", "LC_ALL",
+				"LC_CTYPE", "LC_NUMERIC", "LC_TIME", "LC_COLLATE", "LC_MONETARY", "LC_MESSAGES",
+				"LC_PAPER", "LC_NAME", "LC_ADDRESS", "LC_TELEPHONE", "LC_MEASUREMENT", "LC_IDENTIFICATION" })
+			{
+				if (info.Environment.TryGetValue(name, out var value)) kept[name] = value;
+			}
+			info.Environment.Clear();
+			foreach (var entry in kept) info.Environment[entry.Key] = entry.Value;
+			foreach (var entry in overrides)
+				if (entry.Value is not null) info.Environment[entry.Key] = entry.Value;
 		}
 
 		public static IReadOnlyDictionary<string, string?> GetOverrides(string rootHome)

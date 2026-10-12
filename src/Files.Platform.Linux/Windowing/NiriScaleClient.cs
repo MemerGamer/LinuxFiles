@@ -17,12 +17,13 @@ namespace Files.Platform.Linux.Windowing
 		internal const int MaxResponseLength = 256 * 1024;
 		private static readonly TimeSpan Timeout = TimeSpan.FromMilliseconds(500);
 
-		internal static double? ReadScale(out string? source)
+		internal static double? ReadScale(out string? source, CancellationToken cancellationToken = default)
 		{
 			source = null;
 			var socketPath = Environment.GetEnvironmentVariable("NIRI_SOCKET");
-			using (var timeout = new CancellationTokenSource(Timeout))
+			using (var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
 			{
+				timeout.CancelAfter(Timeout);
 				var outputs = TrySocketRequest(socketPath, "Outputs", timeout.Token);
 				if (outputs is not null)
 				{
@@ -37,14 +38,16 @@ namespace Files.Platform.Linux.Windowing
 
 			try
 			{
+				cancellationToken.ThrowIfCancellationRequested();
 				var binary = new PathExecutableLocator().Locate("niri");
 				if (binary is null)
 					return null;
-				using var timeout = new CancellationTokenSource(Timeout);
-				var outputs = TryCommand(binary, "outputs", timeout.Token);
+				using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+				timeout.CancelAfter(Timeout);
+				var outputs = TryCommand(binary, ["msg", "--json", "outputs"], timeout.Token);
 				if (outputs is null)
 					return null;
-				var focused = TryCommand(binary, "focused-output", timeout.Token);
+				var focused = TryCommand(binary, ["msg", "--json", "focused-output"], timeout.Token);
 				source = "CLI";
 				return DisplayScaleResolver.ParseNiriOutputs(outputs, focused);
 			}
@@ -79,7 +82,7 @@ namespace Files.Platform.Linux.Windowing
 			return await ReadBoundedAsync(reader, true, cancellationToken).ConfigureAwait(false);
 		}
 
-		private static string? TryCommand(string binary, string command, CancellationToken cancellationToken)
+		internal static string? TryCommand(string binary, string[] arguments, CancellationToken cancellationToken)
 		{
 			try
 			{
@@ -92,9 +95,9 @@ namespace Files.Platform.Linux.Windowing
 					RedirectStandardError = true,
 					CreateNoWindow = true,
 				};
-				foreach (var argument in new[] { "msg", "--json", command })
+				foreach (var argument in arguments)
 					info.ArgumentList.Add(argument);
-				using var process = TracedProcess.Start(info);
+				var process = TracedProcess.Start(info);
 				if (process is null)
 					return null;
 				try
@@ -110,7 +113,12 @@ namespace Files.Platform.Linux.Windowing
 					if (!process.HasExited)
 					{
 						process.Kill(entireProcessTree: true);
-						process.WaitForExit((int)Timeout.TotalMilliseconds);
+						// Retain the process until reaped, without waiting on the detection thread.
+						_ = ReapAsync(process);
+					}
+					else
+					{
+						process.Dispose();
 					}
 				}
 			}
@@ -118,6 +126,13 @@ namespace Files.Platform.Linux.Windowing
 			{
 				return null;
 			}
+		}
+
+		private static async Task ReapAsync(Process process)
+		{
+			try { await process.WaitForExitAsync().ConfigureAwait(false); }
+			catch (InvalidOperationException) { }
+			finally { process.Dispose(); }
 		}
 
 		private static async Task<string?> ReadBoundedAsync(StreamReader reader, bool singleLine, CancellationToken cancellationToken)

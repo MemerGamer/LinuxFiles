@@ -20,6 +20,9 @@ namespace Files.Platform.Abstractions.FileOperations
 		/// </summary>
 		public Func<FileConflict, ValueTask<ConflictResolution>>? ConflictResolver { get; init; }
 
+		/// <summary>Called after each completed move or deletion (null destination). Recursive denotes an entire renamed/deleted tree; xattrStale denotes a copy-based move.</summary>
+		public Action<string, string?, bool, bool>? PathChanged { get; init; }
+
 		/// <summary>Copies the content of symbolic links instead of recreating the links. Defaults to <see langword="false"/>.</summary>
 		public bool FollowSymlinks { get; init; }
 	}

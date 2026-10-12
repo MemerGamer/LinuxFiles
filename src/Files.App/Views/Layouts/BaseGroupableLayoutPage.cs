@@ -242,6 +242,7 @@ namespace Files.App.Views.Layouts
 			isSelectingAll = true;
 			try
 			{
+				using var mutationTrace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("select-all.control-mutation", DispatcherQueue.HasThreadAccess);
 				foreach (var item in added)
 					ListViewBase.SelectedItems.Add(item);
 			}
@@ -250,6 +251,7 @@ namespace Files.App.Views.Layouts
 				isSelectingAll = false;
 			}
 
+			using var refreshTrace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("select-all.page-refresh", DispatcherQueue.HasThreadAccess);
 			FileList_SelectionChanged(ListViewBase, new SelectionChangedEventArgs([], added));
 		}
 

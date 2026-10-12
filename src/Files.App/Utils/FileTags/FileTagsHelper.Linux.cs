@@ -173,6 +173,13 @@ namespace Files.App.Utils.FileTags
 			}
 		}
 
+		public static void UpdatePath(string source, string? destination, bool recursive, bool xattrStale)
+			=> EnqueueWrite(() =>
+			{
+				GetDbInstance().UpdatePath(source, destination, recursive, xattrStale);
+				return true;
+			}, false).GetAwaiter().GetResult();
+
 		public static void UpdateTagsDb()
 		{
 			// Windows re-resolves moved files through their file reference numbers; Linux has none.

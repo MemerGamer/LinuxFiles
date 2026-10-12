@@ -538,7 +538,7 @@ namespace Files.Platform.Linux.Trash
 			new DirectorySizesCache(location.Root, trashRoot).Remove([name]);
 
 			// Successful restores may carry a cleanup warning in ErrorMessage; ResultPath remains usable.
-			return new TrashOperationResult(item.TrashedPath, true, warning, destination);
+			return new TrashOperationResult(item.TrashedPath, true, warning, destination) { XattrStale = copiedSource is not null };
 		}
 
 		private TrashOperationResult DeleteOne(TrashItem item)

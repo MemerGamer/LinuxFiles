@@ -96,6 +96,14 @@ class InstallerTests(unittest.TestCase):
                         self.assertIn(f"{owned_path} is owned by a distro package", diagnostic.getvalue())
                         self.assertIn("omit --install-root-helper", diagnostic.getvalue())
                         snapshot.assert_not_called()
+                        self.assertEqual(self.contents, self.helper.read_bytes())
+                        self.assertFalse(self.stage.exists())
+
+    def test_local_install_delegates_to_package_ownership_guard(self):
+        local = INSTALLER.with_name("install-local.sh").read_text()
+        self.assertIn('/usr/bin/sudo /usr/bin/python3 "$root/scripts/linux/install-root-helper.py"', local)
+        self.assertNotIn("/usr/lib/linuxfiles", local)
+        self.assertNotIn("/usr/share/polkit-1/actions", local)
 
     def test_unowned_paths_allow_tarball_helper_installation(self):
         with mock.patch.object(installer.os, "access", return_value=True), \

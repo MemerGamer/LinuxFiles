@@ -3,7 +3,6 @@
 
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.Win32;
 using System.Collections.Specialized;
 using System.IO;
 using Windows.Foundation.Metadata;

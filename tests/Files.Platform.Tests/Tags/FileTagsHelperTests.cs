@@ -381,6 +381,52 @@ namespace Files.Platform.Tests.Tags
 			}
 		}
 
+		[TestMethod]
+		[DataRow(false, false)]
+		[DataRow(false, true)]
+		[DataRow(true, false)]
+		[DataRow(true, true)]
+		public async Task TrashAndRestore_PreserveRenameAuthorityAndMarkCopies(bool copyRestore, bool alreadyStale)
+		{
+			var store = new XattrFileTagsStore();
+			using var fixture = new TagFixture(store);
+			var root = Path.GetDirectoryName(fixture.DatabasePath)!;
+			var folder = Path.Combine(root, "folder");
+			Directory.CreateDirectory(folder);
+			var path = Path.Combine(folder, "child");
+			File.WriteAllText(path, "data");
+			if (!store.WriteTags(path, ["B"]))
+				Assert.Inconclusive("The test file system has no user xattr support.");
+			FileTagsHelper.GetDbInstance().SetTags(path, null, ["a"], alreadyStale);
+			var service = new Files.Platform.Linux.Trash.LinuxTrashService(new()
+			{
+				DataHome = Path.Combine(root, "data"),
+				FileOperationsHooks = new Files.Platform.Linux.FileOperations.LinuxFileOperationsHooks
+				{
+					RenameError = (source, _, _) => copyRestore && source == "folder" ? 18 : null
+				}
+			});
+			try
+			{
+				var trashed = (await service.TrashAsync([folder]))[0];
+				Assert.IsTrue(trashed.Succeeded, trashed.ErrorMessage);
+				Assert.IsFalse(trashed.XattrStale);
+				FileTagsHelper.UpdatePath(folder, trashed.ResultPath, true, trashed.XattrStale);
+				FileTagsHelper.Database = new FileTagsDatabase(fixture.DatabasePath);
+				var trashChild = Path.Combine(trashed.ResultPath!, "child");
+				Assert.AreEqual(alreadyStale, FileTagsHelper.GetDbInstance().IsXattrStale(trashChild));
+				CollectionAssert.AreEqual(new[] { alreadyStale ? "a" : "b" }, FileTagsHelper.ReadFileTag(trashChild));
+				var restored = (await service.RestoreAsync([trashed.Item!]))[0];
+				Assert.IsTrue(restored.Succeeded, restored.ErrorMessage);
+				Assert.AreEqual(copyRestore, restored.XattrStale);
+				FileTagsHelper.UpdatePath(trashed.ResultPath!, restored.ResultPath, true, restored.XattrStale);
+				FileTagsHelper.Database = new FileTagsDatabase(fixture.DatabasePath);
+				Assert.AreEqual(copyRestore || alreadyStale, FileTagsHelper.GetDbInstance().IsXattrStale(path));
+				CollectionAssert.AreEqual(new[] { copyRestore || alreadyStale ? "a" : "b" }, FileTagsHelper.ReadFileTag(path));
+			}
+			finally { service.Watcher.Dispose(); }
+		}
+
 		private sealed class TagFixture : IDisposable
 		{
 			private readonly string root = Path.Combine(Path.GetTempPath(), "files-tags-queue-" + Guid.NewGuid().ToString("N"));

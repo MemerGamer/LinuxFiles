@@ -72,7 +72,10 @@ namespace Files.Platform.Linux.Trash
 			{
 				try
 				{
-					File.Delete(_path);
+					if (_directory is null)
+						File.Delete(_path);
+					else if (_directory.EntryExists("directorysizes"))
+						PosixNative.UnlinkAt(_directory.Descriptor, "directorysizes", 0, _path);
 				}
 				catch (IOException)
 				{

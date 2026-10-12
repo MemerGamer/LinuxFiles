@@ -17,6 +17,111 @@ namespace Files.Platform.Tests.Trash
 {
 	public sealed partial class LinuxTrashServiceTests
 	{
+		[TestMethod]
+		[DataRow("Trash")]
+		[DataRow("files")]
+		[DataRow("info")]
+		public async Task Empty_HomeContainerSymlink_PreservesOutsideEntries(string container)
+		{
+			var outside = Path.Combine(_root, "outside");
+			var victim = WriteFile(container == "Trash" ? Path.Combine(outside, "files") : outside, "important");
+			Directory.CreateDirectory(HomeTrash);
+			Directory.CreateSymbolicLink(container == "Trash" ? HomeTrash + "-link" : Path.Combine(HomeTrash, container), outside);
+			if (container == "Trash")
+			{
+				Directory.Delete(HomeTrash);
+				Directory.Move(HomeTrash + "-link", HomeTrash);
+			}
+			await _service.EmptyAsync();
+			Assert.IsTrue(File.Exists(victim));
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
+		public async Task Metadata_Oversized_IsIgnoredAndCannotRestore(bool symlink)
+		{
+			var item = Single(await _service.TrashAsync([WriteFile(_home, "large.txt")])).Item!;
+			var content = File.ReadAllText(item.TrashId) + new string('x', 65536);
+			File.Delete(item.TrashId);
+			if (symlink)
+			{
+				var target = WriteFile(_root, "metadata", content);
+				File.CreateSymbolicLink(item.TrashId, target);
+			}
+			else
+				File.WriteAllText(item.TrashId, content);
+			Assert.IsEmpty(await _service.ListAsync());
+			Assert.IsFalse(Single(await _service.RestoreAsync([item])).Succeeded);
+			Assert.IsTrue(File.Exists(item.TrashedPath));
+		}
+
+		[TestMethod]
+		public async Task Metadata_Fifo_IsIgnoredWithoutBlocking()
+		{
+			var item = Single(await _service.TrashAsync([WriteFile(_home, "pipe.txt")])).Item!;
+			File.Delete(item.TrashId);
+			var start = new System.Diagnostics.ProcessStartInfo("mkfifo") { UseShellExecute = false };
+			start.ArgumentList.Add(item.TrashId);
+			using var process = System.Diagnostics.Process.Start(start)!;
+			await process.WaitForExitAsync();
+			Assert.AreEqual(0, process.ExitCode);
+			Assert.IsEmpty(await _service.ListAsync().WaitAsync(TimeSpan.FromSeconds(5)));
+			Assert.IsFalse(Single(await _service.RestoreAsync([item])).Succeeded);
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
+		public async Task Delete_ContainerSwapAfterPinning_PreservesOutsideEntries(bool empty)
+		{
+			var outside = Path.Combine(_root, "outside");
+			var victim = WriteFile(outside, "entry");
+			var service = new LinuxTrashService(new LinuxTrashOptions
+			{
+				DataHome = _dataHome, UserId = Uid, OwnershipInspector = _inspector,
+				MountResolver = new FakeMountResolver(_root, _home, _usb),
+				FileOperationsHooks = new Files.Platform.Linux.FileOperations.LinuxFileOperationsHooks
+				{
+					BeforeDeleteEntry = _ =>
+					{
+						var files = Path.Combine(HomeTrash, "files");
+						if (new DirectoryInfo(files).LinkTarget is not null) return;
+						Directory.Move(files, files + ".old");
+						Directory.CreateSymbolicLink(files, outside);
+					}
+				}
+			});
+			using var watcher = service.Watcher;
+			var item = Single(await service.TrashAsync([WriteFile(_home, "entry")])).Item!;
+			if (empty) await service.EmptyAsync();
+			else Assert.IsTrue(Single(await service.DeletePermanentlyAsync([item])).Succeeded);
+			Assert.AreEqual("hello", File.ReadAllText(victim));
+		}
+
+		[TestMethod]
+		public async Task Metadata_ValidSymlink_IsIgnored()
+		{
+			var item = Single(await _service.TrashAsync([WriteFile(_home, "link.txt")])).Item!;
+			File.Move(item.TrashId, item.TrashId + ".real");
+			File.CreateSymbolicLink(item.TrashId, item.TrashId + ".real");
+			Assert.IsEmpty(await _service.ListAsync());
+			Assert.IsFalse(Single(await _service.RestoreAsync([item])).Succeeded);
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
+		public async Task Empty_HomeTrashUntrustedOwnerOrMode_PreservesEntries(bool wrongOwner)
+		{
+			var item = Single(await _service.TrashAsync([WriteFile(_home, "entry")])).Item!;
+			if (wrongOwner) _inspector.Owners[HomeTrash] = Uid + 1;
+			else File.SetUnixFileMode(HomeTrash, (UnixFileMode)0x1FF);
+			await _service.EmptyAsync();
+			Assert.IsTrue(File.Exists(item.TrashedPath));
+			Assert.IsFalse(Single(await _service.DeletePermanentlyAsync([item])).Succeeded);
+		}
+
 		private static string TamperInfo(string infoPath, string newPath)
 		{
 			File.WriteAllText(infoPath, $"[Trash Info]\nPath={newPath}\nDeletionDate=2026-10-04T13:05:09\n");

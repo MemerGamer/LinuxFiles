@@ -551,13 +551,30 @@ namespace Files.App.Views.Layouts
 			_ = ReloadItemIconsAsync();
 		}
 
+		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]
 		protected override void OnSelectionChanged(SelectionChangedEventArgs e)
 		{
-			foreach (var item in e.AddedItems)
-				SetCheckboxSelectionState(item);
+			if (e.AddedItems.Count + e.RemovedItems.Count > 1)
+			{
+				if (FileList.ItemsPanelRoot is { } panel)
+				{
+					// Uno's ContainerFromItem scans the source; visit realized containers once for bulk changes.
+					var selected = FileList.SelectedItems.ToHashSet(ReferenceEqualityComparer.Instance);
+					foreach (var child in panel.Children)
+					{
+						if (child is GridViewItem container && container.Content is ListedItem item)
+							SetCheckboxSelectionState(item, container, selected.Contains(item));
+					}
+				}
+			}
+			else
+			{
+				foreach (var item in e.AddedItems)
+					SetCheckboxSelectionState(item, isSelected: true);
 
-			foreach (var item in e.RemovedItems)
-				SetCheckboxSelectionState(item);
+				foreach (var item in e.RemovedItems)
+					SetCheckboxSelectionState(item, isSelected: false);
+			}
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]
@@ -1068,7 +1085,7 @@ namespace Files.App.Views.Layouts
 
 		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]
 		[DynamicWindowsRuntimeCast(typeof(CheckBox))]
-		private void SetCheckboxSelectionState(object item, GridViewItem? lviContainer = null)
+		private void SetCheckboxSelectionState(object item, GridViewItem? lviContainer = null, bool? isSelected = null)
 		{
 			var container = lviContainer ?? FileList.ContainerFromItem(item) as GridViewItem;
 			if (container is not null)
@@ -1080,7 +1097,7 @@ namespace Files.App.Views.Layouts
 					checkbox.Checked -= ItemSelected_Checked;
 					checkbox.Unchecked -= ItemSelected_Unchecked;
 
-					checkbox.IsChecked = FileList.SelectedItems.Contains(item);
+					checkbox.IsChecked = isSelected ?? FileList.SelectedItems.Contains(item);
 
 					checkbox.Checked += ItemSelected_Checked;
 					checkbox.Unchecked += ItemSelected_Unchecked;

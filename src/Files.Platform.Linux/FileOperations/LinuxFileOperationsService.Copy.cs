@@ -266,7 +266,7 @@ namespace Files.Platform.Linux.FileOperations
 			return Outcome.Success(destination);
 		}
 
-		private static async Task<Outcome> CopyFileAsync(string source, string destination, bool replace, FileOperationContext context, bool verifySource, DirectoryHandle? parent, DirectoryHandle destinationParent)
+		private static async Task<Outcome> CopyFileAsync(string source, string destination, bool replace, FileOperationContext context, bool verifySource, DirectoryHandle? parent, DirectoryHandle destinationParent, Action<FileStream, PosixStat>? afterPublish = null, PosixStat? expectedSource = null)
 		{
 			var temporary = TemporaryPathNextTo(destination);
 			long length = 0;
@@ -276,45 +276,45 @@ namespace Files.Platform.Linux.FileOperations
 
 			try
 			{
-				var input = OpenSourceFile(source, parent, context, out var sourceStat);
+				await using var input = OpenSourceFile(source, parent, context, out var sourceStat);
+				if (expectedSource is { } expected && !PosixNative.SameFileVersion(expected, sourceStat))
+					throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being copied.", source);
 				length = (long)sourceStat.Size;
 
-				await using (input.ConfigureAwait(false))
+				var output = PosixNative.OpenFileAt(destinationParent.Descriptor, Path.GetFileName(temporary), temporary, true);
+				temporaryCreated = true;
+				await using (output.ConfigureAwait(false))
 				{
-					var output = PosixNative.OpenFileAt(destinationParent.Descriptor, Path.GetFileName(temporary), temporary, true);
-					temporaryCreated = true;
-					await using (output.ConfigureAwait(false))
+					context.Hooks?.TemporaryFileCreated?.Invoke(temporary);
+					var buffer = ArrayPool<byte>.Shared.Rent(CopyBufferSize);
+					try
 					{
-						context.Hooks?.TemporaryFileCreated?.Invoke(temporary);
-						var buffer = ArrayPool<byte>.Shared.Rent(CopyBufferSize);
-						try
+						int read;
+						while ((read = await input.ReadAsync(buffer.AsMemory(0, CopyBufferSize), context.CancellationToken).ConfigureAwait(false)) > 0)
 						{
-							int read;
-							while ((read = await input.ReadAsync(buffer.AsMemory(0, CopyBufferSize), context.CancellationToken).ConfigureAwait(false)) > 0)
-							{
-								await output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
-								copied += read;
-								context.AddBytes(read, source);
-							}
+							await output.WriteAsync(buffer.AsMemory(0, read), context.CancellationToken).ConfigureAwait(false);
+							copied += read;
+							context.AddBytes(read, source);
 						}
-						finally
-						{
-							ArrayPool<byte>.Shared.Return(buffer);
-						}
-
-						await output.FlushAsync(context.CancellationToken).ConfigureAwait(false);
-						output.Flush(true);
-						if (output.Length != copied)
-							throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The copied file does not have the expected size.", destination);
-						if (verifySource && (!PosixNative.TryStat((int)input.SafeFileHandle.DangerousGetHandle(), out var after) || (long)after.Size != copied))
-							throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being copied.", source);
-						PosixNative.SetMetadata((int)output.SafeFileHandle.DangerousGetHandle(), sourceStat, temporary);
 					}
+					finally
+					{
+						ArrayPool<byte>.Shared.Return(buffer);
+					}
+
+					await output.FlushAsync(context.CancellationToken).ConfigureAwait(false);
+					output.Flush(true);
+					if (output.Length != copied)
+						throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The copied file does not have the expected size.", destination);
+					if (verifySource && (!PosixNative.TryStat((int)input.SafeFileHandle.DangerousGetHandle(), out var after) || !PosixNative.SameFileVersion(sourceStat, after) || (long)after.Size != copied))
+						throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being copied.", source);
+					PosixNative.SetMetadata((int)output.SafeFileHandle.DangerousGetHandle(), sourceStat, temporary);
 				}
 
 				context.CancellationToken.ThrowIfCancellationRequested();
 				PosixNative.RenameAt(destinationParent.Descriptor, Path.GetFileName(temporary), destinationParent.Descriptor, Path.GetFileName(destination), replace, destination, context.Hooks);
 				completed = true;
+				afterPublish?.Invoke(input, sourceStat);
 				return Outcome.Success(destination);
 			}
 			finally

@@ -21,6 +21,11 @@ namespace Files.Platform.Linux.Native
 		public static bool SameEntry(PosixStat first, PosixStat second)
 			=> first.Inode == second.Inode && first.DevMajor == second.DevMajor && first.DevMinor == second.DevMinor && first.FileType == second.FileType;
 
+		public static bool SameFileVersion(PosixStat first, PosixStat second)
+			=> SameEntry(first, second) && first.Size == second.Size
+				&& first.ModifiedSeconds == second.ModifiedSeconds && first.ModifiedNanoseconds == second.ModifiedNanoseconds
+				&& first.ChangedSeconds == second.ChangedSeconds && first.ChangedNanoseconds == second.ChangedNanoseconds;
+
 		public static PosixStat StatAt(int dirfd, string name, string displayPath)
 		{
 			if (!TryStat(dirfd, name, AtSymlinkNofollow, out var stat, out var errno))

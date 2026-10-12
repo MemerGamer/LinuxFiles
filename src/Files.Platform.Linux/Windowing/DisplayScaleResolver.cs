@@ -11,13 +11,14 @@ namespace Files.Platform.Linux.Windowing
 {
 	/// <summary>
 	/// Works out the display scale to hand to Uno. Uno's X11 host reads <c>Xft.dpi</c> (set by KDE and GNOME on X11) and honours
-	/// <c>UNO_DISPLAY_SCALE_OVERRIDE</c>; this fills the gap when <c>Xft.dpi</c> is absent (some XWayland sessions) from toolkit variables or niri IPC.
+	/// <c>UNO_DISPLAY_SCALE_OVERRIDE</c>; this fills the gap when <c>Xft.dpi</c> is absent (some XWayland sessions) from toolkit variables or opt-in compositor queries.
 	/// </summary>
 	public static class DisplayScaleResolver
 	{
 		public const string OverrideVariable = "UNO_DISPLAY_SCALE_OVERRIDE";
 
-		private static int niriSourceLogged;
+		private static int compositorSourceLogged;
+		private static bool compositorDetectionEnabled;
 
 		/// <summary>
 		/// Returns the value to assign to <see cref="OverrideVariable"/>, or null when Uno's own detection should be used.
@@ -46,7 +47,7 @@ namespace Files.Platform.Linux.Windowing
 			if (scale is { } s && s > 1.0)
 				return Math.Min(s, 4.0).ToString("0.##", CultureInfo.InvariantCulture);
 
-			if (string.IsNullOrWhiteSpace(getEnv("NIRI_SOCKET")) || string.IsNullOrWhiteSpace(getEnv("WAYLAND_DISPLAY")) ||
+			if (!CompositorScaleClient.HasSession(getEnv) ||
 				GetXftDpiText(xResources) is not null)
 				return null;
 
@@ -92,7 +93,8 @@ namespace Files.Platform.Linux.Windowing
 				JsonElement? first = null;
 				foreach (var output in outputs.EnumerateObject())
 				{
-					first ??= output.Value;
+					if (ParseNiriOutputScale(output.Value) is not null)
+						first ??= output.Value;
 					if (output.Name == focusedName)
 						return ParseNiriOutputScale(output.Value);
 				}
@@ -231,11 +233,11 @@ namespace Files.Platform.Linux.Windowing
 				return;
 
 			string? resolved;
-			string? niriSource = null;
+			string? compositorSource = null;
 			try
 			{
 				resolved = Resolve(Environment.GetEnvironmentVariable, ReadXResources(),
-					() => NiriScaleClient.ReadScale(out niriSource),
+					() => { compositorDetectionEnabled = true; return CompositorScaleClient.ReadScale(out compositorSource); },
 					readCompositorScaleSetting: () => CompositorScaleSettings.Read(new LinuxAppDataPaths().UserSettingsFilePath));
 			}
 			catch (Exception)
@@ -247,12 +249,31 @@ namespace Files.Platform.Linux.Windowing
 			if (resolved is not null)
 			{
 				Environment.SetEnvironmentVariable(OverrideVariable, resolved);
-				if (niriSource is not null && Interlocked.Exchange(ref niriSourceLogged, 1) == 0)
+				if (compositorSource is not null && Interlocked.Exchange(ref compositorSourceLogged, 1) == 0)
 				{
-					try { Console.Error.WriteLine($"[display-scale] Using niri {niriSource}: {resolved}"); }
+					try { Console.Error.WriteLine($"[display-scale] Using {compositorSource}: {resolved}"); }
 					catch (System.IO.IOException) { }
 				}
 			}
+		}
+
+		/// <summary>Monitors scales selected by the opt-in fallback. Uno caches the initial override.</summary>
+		public static System.Threading.Tasks.Task WatchCompositorScaleAsync(CancellationToken cancellationToken)
+		{
+			if (!compositorDetectionEnabled)
+				return System.Threading.Tasks.Task.CompletedTask;
+			var initial = GetEffectiveScale();
+			return CompositorScaleClient.WatchAsync(scale =>
+			{
+				if (scale == initial) return;
+				try { Console.Error.WriteLine($"[display-scale] Compositor scale changed to {scale.ToString(CultureInfo.InvariantCulture)}; restart to apply (Uno X11 caches the display override)."); }
+				catch (System.IO.IOException) { }
+			}, cancellationToken, () => Environment.GetEnvironmentVariable("FILES_NIRI_SCALE") switch
+			{
+				"1" => true,
+				"0" => false,
+				_ => CompositorScaleSettings.Read(new LinuxAppDataPaths().UserSettingsFilePath),
+			});
 		}
 
 		private static string? ReadXResources()

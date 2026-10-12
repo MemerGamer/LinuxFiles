@@ -296,6 +296,59 @@ namespace Files.Platform.Tests.FileOperations
 		}
 
 		[TestMethod]
+		[DataRow(false, false, false)]
+		[DataRow(false, true, false)]
+		[DataRow(true, false, false)]
+		[DataRow(true, true, false)]
+		[DataRow(false, false, true)]
+		public async Task Move_SourceEditedAfterCopy_KeepsOriginal(bool merge, bool grow, bool restoreMtime)
+		{
+			var tree = Path.Combine(Src, "tree");
+			var source = Write(Path.Combine(merge ? tree : Src, "a"), "OLD");
+			var destinationDirectory = merge ? Path.Combine(Dst, "tree") : Dst;
+			Directory.CreateDirectory(destinationDirectory);
+			var modified = File.GetLastWriteTimeUtc(source);
+			var updated = grow ? "NEW CONTENT" : "NEW";
+			var service = new LinuxFileOperationsService((_, _) => false, new LinuxFileOperationsHooks
+			{
+				BeforeDeleteEntry = path =>
+				{
+					if (path != source)
+						return;
+					File.WriteAllText(source, updated);
+					File.SetLastWriteTimeUtc(source, restoreMtime ? modified : modified.AddSeconds(1));
+				},
+			});
+
+			var result = await service.MoveAsync([merge ? tree : source], Dst, Resolving(ConflictAction.Overwrite));
+
+			Assert.AreEqual(FileOperationErrorKind.VerificationFailed, result[0].ErrorKind);
+			Assert.AreEqual(updated, File.ReadAllText(source));
+			Assert.AreEqual("OLD", File.ReadAllText(Path.Combine(destinationDirectory, "a")));
+		}
+
+		[TestMethod]
+		public async Task Move_SourceEditedDuringCopy_KeepsOriginalAndCleansTemporary()
+		{
+			var source = Write(Path.Combine(Src, "a"), "OLD");
+			var modified = File.GetLastWriteTimeUtc(source);
+			var service = new LinuxFileOperationsService((_, _) => false, new LinuxFileOperationsHooks
+			{
+				TemporaryFileCreated = _ =>
+				{
+					File.WriteAllText(source, "NEW");
+					File.SetLastWriteTimeUtc(source, modified.AddSeconds(1));
+				},
+			});
+
+			var result = await service.MoveAsync([source], Dst);
+
+			Assert.AreEqual(FileOperationErrorKind.VerificationFailed, result[0].ErrorKind);
+			Assert.AreEqual("NEW", File.ReadAllText(source));
+			Assert.IsEmpty(Directory.GetFileSystemEntries(Dst));
+		}
+
+		[TestMethod]
 		public async Task Move_SourceReplacedAfterCopy_KeepsReplacement()
 		{
 			var source = Write(Path.Combine(Src, "a"), "data");

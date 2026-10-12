@@ -19,14 +19,15 @@ class DesktopActionTests(unittest.TestCase):
         for script in ("packaging/linux/appimage/build-appimage.sh",
                        f"packaging/linux/flatpak/{APP_ID}.yml"):
             expression = re.search(r"sed -i '([^']+)'", (REPO / script).read_text()).group(1)
-            for suffix in ("", following):
+            for suffix in ("", following, following + "\n[Desktop Action last]\nName=Last action\nExec=files %U\n"):
                 fixture = desktop + "\n" + suffix
                 expected = before_root.replace("root-mode;", "") + suffix
                 if suffix:
-                    fixture = fixture.replace("Actions=new-window;root-mode;", "Actions=new-window;root-mode;later;")
-                    expected = expected.replace("Actions=new-window;", "Actions=new-window;later;")
+                    actions = "later;last;" if "[Desktop Action last]" in suffix else "later;"
+                    fixture = fixture.replace("Actions=new-window;root-mode;", "Actions=new-window;root-mode;" + actions)
+                    expected = expected.replace("Actions=new-window;", "Actions=new-window;" + actions)
                 for newline in ("\n", "\r\n"):
-                    with self.subTest(script=script, following_group=bool(suffix), newline=repr(newline)):
+                    with self.subTest(script=script, following_groups=suffix.count("[Desktop Action"), newline=repr(newline)):
                         result = subprocess.run(["sed", expression], input=fixture.replace("\n", newline),
                                                 text=True, capture_output=True, check=True)
                         self.assertEqual(expected.strip(), result.stdout.strip())

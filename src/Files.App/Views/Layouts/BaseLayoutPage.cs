@@ -739,6 +739,7 @@ namespace Files.App.Views.Layouts
 		{
 			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
 			var token = RenewShellMenuToken();
+			ItemContextFlyoutHost.Reset();
 			try
 			{
 				var parentShellPage = await EnsurePageIsCurrentAsync();
@@ -753,18 +754,29 @@ namespace Files.App.Views.Layouts
 					ItemManipulationModel.SetSelectedItem(li);
 
 				if (!IsItemSelected)
+				{
+					ItemContextFlyoutHost.SuppressOpening();
 					return;
+				}
 
 				var selectedItems = SelectedItems?.ToList();
 				if (selectedItems is null or { Count: 0 })
+				{
+					ItemContextFlyoutHost.SuppressOpening();
 					return;
+				}
+
+				if (selectedItems.Any(item => NavigationItemGuard.ShouldSuppress(parentShellPage, item)))
+				{
+					ItemContextFlyoutHost.SuppressOpening();
+					return;
+				}
 
 				shiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 				SelectedItemsPropertiesViewModel.CheckAllFileExtensions(selectedItems.Select(x => x.FileExtension).ToList());
 
 				token = RenewShellMenuToken();
 				var buildVersion = contextMenuVersion;
-				ItemContextFlyoutHost.Reset();
 				ItemContextFlyoutHost.Items.Add(new MenuFlyoutItem { Text = Strings.Loading.GetLocalizedResource(), IsEnabled = false });
 				var items = await ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItemsAsync(currentInstanceViewModel: instanceViewModel, selectedItems: selectedItems, selectedItemsPropertiesViewModel: SelectedItemsPropertiesViewModel, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: null, cancellationToken: token);
 				token.ThrowIfCancellationRequested();
@@ -1027,6 +1039,7 @@ namespace Files.App.Views.Layouts
 		{
 			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
 			var token = RenewShellMenuToken();
+			BaseContextFlyoutHost.Reset();
 			try
 			{
 				var parentShellPage = await EnsurePageIsCurrentAsync();
@@ -1038,12 +1051,15 @@ namespace Files.App.Views.Layouts
 
 				ItemManipulationModel.ClearSelection();
 				shiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-				var currentFolder = shellViewModel.CurrentFolder
-					?? throw new InvalidOperationException("The current folder is not available.");
+				var currentFolder = shellViewModel.CurrentFolder;
+				if (NavigationItemGuard.ShouldSuppress(parentShellPage, currentFolder) || currentFolder is null)
+				{
+					BaseContextFlyoutHost.SuppressOpening();
+					return;
+				}
 				List<ListedItem> contextItems = [currentFolder];
 				token = RenewShellMenuToken();
 				var buildVersion = contextMenuVersion;
-				BaseContextFlyoutHost.Reset();
 				BaseContextFlyoutHost.Items.Add(new MenuFlyoutItem { Text = Strings.Loading.GetLocalizedResource(), IsEnabled = false });
 				var items = await ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItemsAsync(currentInstanceViewModel: instanceViewModel, selectedItems: contextItems, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: shellViewModel, selectedItemsPropertiesViewModel: null, cancellationToken: token);
 				token.ThrowIfCancellationRequested();

@@ -72,8 +72,18 @@ namespace Files.Platform.Linux.FileOperations
 				VerifyMoveSource(sourceParent, name, stat, source);
 				var copy = sourceKind == EntryKind.Symlink
 					? CopyLink(source, destination, resolved.Replace, context, sourceParent, destinationParent)
-					: await CopyFileAsync(source, destination, resolved.Replace, context, verifySource: true, sourceParent, destinationParent).ConfigureAwait(false);
-				if (copy.Status == FileOperationStatus.Succeeded)
+					: await CopyFileAsync(source, destination, resolved.Replace, context, verifySource: true, sourceParent, destinationParent,
+						(input, openedStat) =>
+						{
+							context.Hooks?.BeforeDeleteEntry?.Invoke(source);
+							context.CancellationToken.ThrowIfCancellationRequested();
+							if (!PosixNative.TryStat((int)input.SafeFileHandle.DangerousGetHandle(), out var current)
+								|| !PosixNative.SameFileVersion(openedStat, current))
+								throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being moved.", source);
+							VerifyMoveSource(sourceParent, name, openedStat, source);
+							PosixNative.UnlinkAt(sourceParent.Descriptor, name, 0, source);
+						}, stat).ConfigureAwait(false);
+				if (sourceKind == EntryKind.Symlink && copy.Status == FileOperationStatus.Succeeded)
 				{
 					context.Hooks?.BeforeDeleteEntry?.Invoke(source);
 					context.CancellationToken.ThrowIfCancellationRequested();
@@ -142,7 +152,10 @@ namespace Files.Platform.Linux.FileOperations
 
 		private static void VerifyMoveSource(DirectoryHandle parent, string name, PosixStat expected, string source)
 		{
-			if (!PosixNative.SameEntry(expected, PosixNative.StatAt(parent.Descriptor, name, source)))
+			var current = PosixNative.StatAt(parent.Descriptor, name, source);
+			// Removing children changes directory metadata; files must retain their copied version.
+			if (!PosixNative.SameEntry(expected, current)
+				|| (!expected.IsDirectory && !PosixNative.SameFileVersion(expected, current)))
 				throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being moved.", source);
 		}
 

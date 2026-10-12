@@ -142,15 +142,6 @@ namespace Files.Shared.Helpers
 				return false;
 			}
 
-			if (OperatingSystem.IsWindows())
-			{
-				// Windows keeps the original substring matching
-				ext = new[] { ".zip", ".7z", ".rar", ".tar", ".gz", ".lzh", ".mrpack", ".jar" }
-					.FirstOrDefault(x => filePath.Contains(x, StringComparison.OrdinalIgnoreCase));
-
-				return ext is not null;
-			}
-
 			ext = null;
 			foreach (var component in filePath.Split(['/', '\\'], StringSplitOptions.RemoveEmptyEntries))
 			{

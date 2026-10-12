@@ -204,6 +204,42 @@ namespace Files.Platform.Tests.FileOperations
 		[TestMethod]
 		[DataRow(22)]
 		[DataRow(38)]
+		public async Task DirectoryFallback_CrossDeviceMove_CopiesAndDeletesSource(int errno)
+		{
+			var statService = new Files.Platform.Linux.FileStat.LinuxFileStatService();
+			if (!statService.TryGetFileId(Src, out var sourceId)
+				|| !statService.TryGetFileId("/dev/shm", out var destinationId)
+				|| sourceId.Device == destinationId.Device)
+				Assert.Inconclusive("A separate /dev/shm filesystem is required.");
+
+			var destination = Path.Combine("/dev/shm", "files-rename-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(destination);
+			try
+			{
+				var tree = Path.Combine(Src, "tree");
+				Write(Path.Combine(tree, "nested", "child"), "preserved");
+				var attempts = 0;
+				// Simulate the same-mount assumption when mountinfo cannot be read.
+				var service = new LinuxFileOperationsService((_, _) => true, new LinuxFileOperationsHooks
+				{
+					RenameError = (_, _, _) => { attempts++; return errno; },
+				});
+				var result = (await service.MoveAsync([tree], destination))[0];
+				Assert.IsTrue(result.Succeeded, result.ErrorMessage);
+				Assert.IsTrue(attempts > 0, "The rename compatibility fallback must be exercised.");
+				Assert.IsFalse(Directory.Exists(tree));
+				Assert.AreEqual("preserved", File.ReadAllText(Path.Combine(destination, "tree", "nested", "child")));
+				Assert.IsEmpty(Directory.GetFileSystemEntries(Src));
+			}
+			finally
+			{
+				Directory.Delete(destination, true);
+			}
+		}
+
+		[TestMethod]
+		[DataRow(22)]
+		[DataRow(38)]
 		public async Task DirectoryFallback_InvalidMoveReportsCheckedRenameFailure(int errno)
 		{
 			var tree = Path.Combine(Src, "tree");

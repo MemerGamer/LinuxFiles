@@ -292,6 +292,8 @@
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#0F000000" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="#0A000000" />
 			<SolidColorBrush x:Key="Files.Linux.FlyoutSurfaceBrush" Color="#F9F9F9" />
+			<SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#F9F9F9" />
+			<SolidColorBrush x:Key="FlyoutBackgroundThemeBrush" Color="#F9F9F9" />
 			<SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#33000000" />
 			<SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="#33000000" />
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#F3F3F3" />
@@ -323,6 +325,8 @@
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#14FFFFFF" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="#0DFFFFFF" />
 			<SolidColorBrush x:Key="Files.Linux.FlyoutSurfaceBrush" Color="#2B2B2B" />
+			<SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#2B2B2B" />
+			<SolidColorBrush x:Key="FlyoutBackgroundThemeBrush" Color="#2B2B2B" />
 			<SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#26FFFFFF" />
 			<SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="#26FFFFFF" />
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#202020" />
@@ -340,6 +344,7 @@
 		</ResourceDictionary>
 		<ResourceDictionary x:Key="HighContrast">
 			<SolidColorBrush x:Key="Files.Details.ForegroundBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+			<SolidColorBrush x:Key="Files.Linux.FlyoutSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
 		</ResourceDictionary>
 	</ResourceDictionary.ThemeDictionaries>
 

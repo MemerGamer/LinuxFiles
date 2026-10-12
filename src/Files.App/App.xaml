@@ -24,12 +24,15 @@
 			<CornerRadius x:Key="DetailsLayoutThumbnailCornerRadius">2</CornerRadius>
 
 			<!--  Workaround for https://github.com/files-community/Files/issues/13078  -->
+			<!--  Skia acrylic can smear file thumbnails; use the themed Linux surface.  -->
 			<Style TargetType="FlyoutPresenter">
+				<Setter Property="Background" Value="{ThemeResource Files.Linux.FlyoutSurfaceBrush}" />
 				<Setter Target="HighContrastAdjustment" Value="None" />
 				<Setter Property="CornerRadius" Value="{StaticResource OverlayCornerRadius}" />
 			</Style>
 
 			<Style TargetType="MenuFlyoutPresenter">
+				<Setter Property="Background" Value="{ThemeResource Files.Linux.FlyoutSurfaceBrush}" />
 				<Setter Target="HighContrastAdjustment" Value="None" />
 			</Style>
 

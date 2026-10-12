@@ -7,6 +7,7 @@
 using Files.Platform.Abstractions.Trash;
 using Files.Platform.Linux.Native;
 using Files.Platform.Linux.Trash;
+using System.Collections.Generic;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
@@ -17,6 +18,70 @@ namespace Files.Platform.Tests.Trash
 {
 	public sealed partial class LinuxTrashServiceTests
 	{
+		[TestMethod]
+		[DataRow("home", "restore")]
+		[DataRow("data", "delete")]
+		[DataRow("mount", "empty")]
+		[DataRow("shared", "restore")]
+		public async Task Trash_SymlinkedAncestor_RemainsAccessible(string ancestor, string operation)
+		{
+			_service.Watcher.Dispose();
+			if (ancestor is "home" or "data")
+			{
+				var path = ancestor == "home" ? _home : _dataHome;
+				Directory.CreateDirectory(path);
+				Directory.Move(path, path + ".real");
+				Directory.CreateSymbolicLink(path, path + ".real");
+			}
+			else
+			{
+				if (ancestor == "shared")
+				{
+					var shared = Path.Combine(_usb, ".Trash");
+					Directory.CreateDirectory(shared);
+					File.SetUnixFileMode(shared, UnixFileMode.StickyBit | UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+				}
+			}
+			_service = new LinuxTrashService(new LinuxTrashOptions
+			{
+				DataHome = _dataHome,
+				UserId = Uid,
+				MountResolver = new SymlinkAncestorMountResolver((_root, _root), (_home, ancestor == "home" ? _home + ".real" : _home),
+					(_usb, ancestor is "mount" or "shared" ? Path.Combine(Path.GetDirectoryName(_usb)! + ".real", "usb") : _usb)),
+			});
+			var original = WriteFile(ancestor is "home" or "data" ? _home : _usb, "linked.txt");
+			var result = Single(await _service.TrashAsync([original]));
+			Assert.IsTrue(result.Succeeded);
+			if (ancestor is "mount" or "shared")
+			{
+				var mountParent = Path.GetDirectoryName(_usb)!;
+				Directory.Move(mountParent, mountParent + ".real");
+				Directory.CreateSymbolicLink(mountParent, mountParent + ".real");
+			}
+			var item = (await _service.ListAsync()).Single();
+			if (operation == "restore")
+			{
+				Assert.IsTrue(Single(await _service.RestoreAsync([item])).Succeeded);
+				Assert.AreEqual("hello", File.ReadAllText(original));
+			}
+			else if (operation == "delete")
+				Assert.IsTrue(Single(await _service.DeletePermanentlyAsync([item])).Succeeded);
+			else
+				await _service.EmptyAsync();
+			Assert.IsEmpty(await _service.ListAsync());
+			Assert.IsFalse(File.Exists(item.TrashedPath));
+			Assert.IsFalse(File.Exists(item.TrashId));
+		}
+
+		private sealed class SymlinkAncestorMountResolver(params (string Path, string Resolved)[] mountPoints) : IMountResolver
+		{
+			public IReadOnlyList<MountEntry> GetMounts() => mountPoints.Select(m => new MountEntry(m.Path, "ext4")).ToList();
+
+			public string GetMountPoint(string realPath) => mountPoints
+				.Where(m => MountInfoMountResolver.IsUnder(realPath, Directory.Exists(m.Resolved) ? m.Resolved : m.Path))
+				.OrderByDescending(m => m.Resolved.Length).Select(m => m.Path).FirstOrDefault() ?? "/";
+		}
+
 		[TestMethod]
 		[DataRow("files")]
 		[DataRow("info")]

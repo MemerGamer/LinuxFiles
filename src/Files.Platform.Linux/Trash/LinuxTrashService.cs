@@ -666,8 +666,9 @@ namespace Files.Platform.Linux.Trash
 		{
 			var locations = new List<TrashLocation>();
 
-			if (Directory.Exists(HomeRoot) && IsTrusted(new TrashLocation(HomeRoot, null)))
-				locations.Add(new TrashLocation(HomeRoot, null));
+			var home = new TrashLocation(HomeRoot, null);
+			if (Directory.Exists(HomeRoot) && IsTrusted(home))
+				locations.Add(home);
 
 			string homeMount;
 			try
@@ -688,12 +689,14 @@ namespace Files.Platform.Linux.Trash
 				try
 				{
 					var shared = GetSharedTrashRoot(mount.MountPoint);
-					if (shared is not null && Directory.Exists(shared) && IsTrusted(new TrashLocation(shared, mount.MountPoint)))
-						locations.Add(new TrashLocation(shared, mount.MountPoint));
+					var sharedLocation = shared is null ? null : new TrashLocation(shared, mount.MountPoint);
+					if (sharedLocation is not null && Directory.Exists(shared) && IsTrusted(sharedLocation))
+						locations.Add(sharedLocation);
 
 					var perUser = GetPerUserTrashRoot(mount.MountPoint);
-					if (Directory.Exists(perUser) && IsTrusted(new TrashLocation(perUser, mount.MountPoint)))
-						locations.Add(new TrashLocation(perUser, mount.MountPoint));
+					var perUserLocation = new TrashLocation(perUser, mount.MountPoint);
+					if (Directory.Exists(perUser) && IsTrusted(perUserLocation))
+						locations.Add(perUserLocation);
 				}
 				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 				{
@@ -901,9 +904,13 @@ namespace Files.Platform.Linux.Trash
 
 		private DirectoryHandle OpenTrashRoot(TrashLocation location)
 		{
-			// Walk every component with openat/O_NOFOLLOW; never resolve a checked ancestor again.
-			using var parent = DirectoryHandle.OpenPath(Path.GetDirectoryName(location.Root)!);
-			if (location.TopDirectory is not null && Path.GetFileName(parent.Path) == ".Trash")
+			var parentPath = Path.GetDirectoryName(location.Root)!;
+			var sharedTrash = location.TopDirectory is not null && Path.GetFileName(parentPath) == ".Trash";
+			// Resolve ordinary ancestors once; trash containers remain no-follow relative to the pinned fd.
+			using var ancestor = DirectoryHandle.OpenPath(location.ResolvedAncestor);
+			using var sharedDirectory = sharedTrash ? DirectoryHandle.OpenChild(ancestor.Descriptor, ".Trash", parentPath) : null;
+			var parent = sharedDirectory ?? ancestor;
+			if (sharedTrash)
 			{
 				if (!PosixNative.TryStat(parent.Descriptor, out var shared) || (shared.Mode & 0x200) == 0)
 					throw new IOException("Shared trash directory is not sticky.");
@@ -1012,6 +1019,11 @@ namespace Files.Platform.Linux.Trash
 
 		private sealed record TrashLocation(string Root, string? TopDirectory)
 		{
+			// Capture ordinary ancestors before path-based trust checks can observe a replacement.
+			public string ResolvedAncestor { get; } = RealPath(TopDirectory is not null && Path.GetFileName(Path.GetDirectoryName(Root)) == ".Trash"
+				? Path.GetDirectoryName(Path.GetDirectoryName(Root)!)!
+				: Path.GetDirectoryName(Root)!);
+
 			public string FilesDirectory => Path.Combine(Root, FilesDirectoryName);
 
 			public string InfoDirectory => Path.Combine(Root, InfoDirectoryName);

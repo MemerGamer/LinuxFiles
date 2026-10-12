@@ -22,6 +22,14 @@ done
 
 [[ -f "$from/Files.dll" ]] || { echo "No published build at $from (run scripts/linux/publish.sh)" >&2; exit 1; }
 
+prefix="$(python3 - "$prefix" <<'PYTHON'
+import os, sys
+prefix = os.path.abspath(sys.argv[1])
+if any(c in prefix for c in '\r\n'):
+    raise SystemExit("Install prefix cannot contain line breaks")
+print(prefix)
+PYTHON
+)"
 libdir="$prefix/share/linuxfiles"
 share="$prefix/share"
 
@@ -33,8 +41,18 @@ install -Dm755 "$root/packaging/linux/files" "$prefix/bin/files"
 
 # The desktop entry gets an absolute Exec so it works even when ~/.local/bin is not on PATH.
 install -d "$share/applications"
-sed "s|^Exec=files|Exec=$prefix/bin/files|" \
-  "$root/packaging/linux/$app_id.desktop" > "$share/applications/$app_id.desktop"
+python3 - "$root/packaging/linux/$app_id.desktop" "$share/applications/$app_id.desktop" "$prefix/bin/files" <<'PYTHON'
+import sys
+source, destination, executable = sys.argv[1:]
+# Exec quoting is followed by desktop-entry string escaping.
+quoted = '"' + ''.join('\\' + c if c in '\\"`$' else '%%' if c == '%' else c for c in executable) + '"'
+quoted = quoted.replace('\\', '\\\\').replace('\t', '\\t')
+with open(source) as entry, open(destination, 'w') as output:
+    for line in entry:
+        if line.startswith('Exec=files'):
+            line = 'Exec=' + quoted + line[len('Exec=files'):]
+        output.write(line)
+PYTHON
 
 install -Dm644 "$root/packaging/linux/$app_id.metainfo.xml" "$share/metainfo/$app_id.metainfo.xml"
 

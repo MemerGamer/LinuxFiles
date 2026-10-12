@@ -1,4 +1,4 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 #pragma warning disable CA1416
@@ -159,7 +159,7 @@ namespace Files.Platform.Tests.Trash
 		}
 
 		[TestMethod]
-		public async Task Restore_HomeTrashSymlink_ResolvesRoot()
+		public async Task Restore_HomeTrashSymlink_IsRejected()
 		{
 			var original = WriteFile(_home, "entry", "data");
 			var item = Single(await _service.TrashAsync([original])).Item!;
@@ -168,9 +168,10 @@ namespace Files.Platform.Tests.Trash
 
 			var result = Single(await _service.RestoreAsync([item]));
 
-			Assert.IsTrue(result.Succeeded, result.ErrorMessage);
-			Assert.AreEqual("data", File.ReadAllText(original));
-			Assert.IsFalse(File.Exists(item.TrashId));
+			Assert.IsFalse(result.Succeeded);
+			Assert.IsFalse(File.Exists(original));
+			Assert.AreEqual("data", File.ReadAllText(item.TrashedPath));
+			Assert.IsTrue(File.Exists(item.TrashId));
 		}
 
 		[TestMethod]

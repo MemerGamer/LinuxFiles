@@ -26,8 +26,8 @@ _base="$url/releases/download/linux-v$_tag"
 source=("$pkgname-$pkgver.tar.gz::$_base/files-linux-x64.tar.gz"
         "$pkgname-packaging-$pkgver.tar.gz::$_base/files-packaging.tar.gz")
 noextract=("$pkgname-$pkgver.tar.gz" "$pkgname-packaging-$pkgver.tar.gz")
-sha256sums=('SKIP'
-            'SKIP')  # scripts/linux/gen-aur.sh fills these in
+sha256sums=('UNGENERATED'
+            'UNGENERATED')
 
 prepare() {
   mkdir -p app packaging
@@ -55,3 +55,9 @@ package() {
   done
   install -Dm644 packaging/LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
 }
+
+# This checked-in template is intentionally not consumable by makepkg.
+if [[ " ${sha256sums[*]} " == *UNGENERATED* ]]; then
+  printf '%s\n' 'Generate a checksum-pinned recipe with scripts/linux/gen-aur.sh before building.' >&2
+  return 1 2>/dev/null || exit 1
+fi

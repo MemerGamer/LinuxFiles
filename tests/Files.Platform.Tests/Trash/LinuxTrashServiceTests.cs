@@ -22,7 +22,7 @@ namespace Files.Platform.Tests.Trash
 	[TestClass]
 	public sealed partial class LinuxTrashServiceTests
 	{
-		private const uint Uid = 4242;
+		private static readonly uint Uid = ProcessIdentityNative.CurrentUserId;
 
 		private string _root = null!;
 		private string _home = null!;
@@ -671,6 +671,8 @@ namespace Files.Platform.Tests.Trash
 				_defaultOwner = defaultOwner;
 			}
 
+			public Action<string>? AfterInspect { get; set; }
+
 			public Dictionary<string, uint> Owners { get; } = [];
 
 			public bool TryGetInfo(string path, out FileEntryInfo info)
@@ -683,6 +685,7 @@ namespace Files.Platform.Tests.Trash
 
 				var owner = Owners.TryGetValue(path, out var o) ? o : _defaultOwner;
 				info = new FileEntryInfo(!link, link, owner, link ? 0 : File.GetUnixFileMode(path));
+				AfterInspect?.Invoke(path);
 				return true;
 			}
 		}

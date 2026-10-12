@@ -15,7 +15,7 @@ namespace Files.Platform.Linux.Native
 	/// <summary>Mount-related <c>statx</c> fields: attribute bits with their support mask, the mount id (when reported) and the device.</summary>
 	public readonly record struct MountInfo(ulong Attributes, ulong AttributesMask, bool MountIdValid, ulong MountId, uint DevMajor, uint DevMinor);
 
-	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0, ulong? MountId = null, long ChangedSeconds = 0, uint ChangedNanoseconds = 0)
+	internal readonly record struct PosixStat(uint Mode, ulong Size, uint OwnerUserId, long ModifiedSeconds, uint ModifiedNanoseconds, ulong Inode = 0, uint DevMajor = 0, uint DevMinor = 0, ulong? MountId = null, long ChangedSeconds = 0, uint ChangedNanoseconds = 0, uint LinkCount = 0)
 	{
 		public uint FileType => Mode & 0xF000;
 
@@ -45,6 +45,7 @@ namespace Files.Platform.Linux.Native
 
 		private const uint StatxType = 0x1;
 		private const uint StatxMode = 0x2;
+		private const uint StatxNlink = 0x4;
 		private const uint StatxUid = 0x8;
 		private const uint StatxMtime = 0x40;
 		private const uint StatxCtime = 0x80;
@@ -89,7 +90,7 @@ namespace Files.Platform.Linux.Native
 
 			try
 			{
-				const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxCtime | StatxSize | StatxIno | StatxMountId;
+				const uint mask = StatxType | StatxMode | StatxUid | StatxMtime | StatxCtime | StatxSize | StatxIno | StatxMountId | StatxNlink;
 				if (!TryStatx(dirfd, path, flags, mask, out var buffer, out errno))
 					return false;
 
@@ -106,7 +107,8 @@ namespace Files.Platform.Linux.Native
 					(returned & StatxIno) != 0 ? BitConverter.ToUInt64(buffer, 32) : 0, BitConverter.ToUInt32(buffer, 136), BitConverter.ToUInt32(buffer, 140),
 					(returned & StatxMountId) != 0 ? BitConverter.ToUInt64(buffer, 144) : null,
 					(returned & StatxCtime) != 0 ? BitConverter.ToInt64(buffer, 96) : 0,
-					(returned & StatxCtime) != 0 ? BitConverter.ToUInt32(buffer, 104) : 0);
+					(returned & StatxCtime) != 0 ? BitConverter.ToUInt32(buffer, 104) : 0,
+					(returned & StatxNlink) != 0 ? BitConverter.ToUInt32(buffer, 16) : 0);
 				return true;
 			}
 			catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)

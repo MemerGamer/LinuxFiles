@@ -154,7 +154,7 @@ namespace Files.Platform.Tests.Launching
 		{
 			using var fx = new XdgFixture();
 			var (svc, starter) = Create(fx, new Dictionary<string, string?> { ["TERMINAL"] = "xterm" }, "xterm");
-			var app = new Files.Platform.Abstractions.Mime.DesktopApplication("x.desktop", "X", "/bin/echo \"a b\" \\\\s 'c d' %c", "/x.desktop");
+			var app = new Files.Platform.Abstractions.Mime.DesktopApplication("x.desktop", "X", "/bin/echo \"a b\" \"c d\" %c", "/x.desktop");
 			var argv = DesktopExecExpander.Expand(app, [])[0];
 
 			Assert.IsTrue(await svc.RunCommandAsync(argv, false));
@@ -244,6 +244,16 @@ namespace Files.Platform.Tests.Launching
 			starter.Fail = true;
 
 			Assert.IsFalse(await svc.OpenAsync(["/a.txt"]));
+		}
+
+		[TestMethod]
+		public async Task OpenWith_ShellScriptFieldCodeDoesNotStartProcess()
+		{
+			using var fx = new XdgFixture();
+			var (service, starter) = Create(fx);
+			var app = new Files.Platform.Abstractions.Mime.DesktopApplication("t.desktop", "Test", "sh -c \"viewer \\\"%f\\\"\"", "/t.desktop");
+			Assert.IsFalse(await service.OpenWithAsync(app, ["/tmp/$(printf INJECTED).txt"]));
+			Assert.AreEqual(0, starter.Launches.Count);
 		}
 
 		[TestMethod]

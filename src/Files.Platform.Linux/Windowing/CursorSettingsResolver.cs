@@ -104,7 +104,7 @@ namespace Files.Platform.Linux.Windowing
 				if (process is null)
 					return null;
 
-				using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(1500));
+				using var timeout = new CancellationTokenSource(TimeSpan.FromMilliseconds(250));
 				var output = ReadBoundedAsync(process.StandardOutput, timeout.Token);
 				var error = ReadBoundedAsync(process.StandardError, timeout.Token);
 				try

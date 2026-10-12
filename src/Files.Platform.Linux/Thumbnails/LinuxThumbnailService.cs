@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Thumbnails;
+using Files.Platform.Linux.Native;
 using SkiaSharp;
 using System;
 using System.Collections.Generic;
@@ -176,7 +177,7 @@ namespace Files.Platform.Linux.Thumbnails
 
 			if (!options.HasFlag(ThumbnailOptions.ForceRegenerate))
 			{
-				var cached = TryReadValid(cachePath, uri, mtime, info.Length);
+				var cached = TryReadValid(cachePath, uri, mtime, info.Length, XdgThumbnailNaming.GetBucketSize(bucket));
 				if (cached is not null)
 					return cached;
 
@@ -231,20 +232,11 @@ namespace Files.Platform.Linux.Thumbnails
 		/// <inheritdoc/>
 		public void Dispose() => _gate.Dispose();
 
-		private byte[]? TryReadValid(string cacheFile, string uri, long mtime, long? size)
+		private byte[]? TryReadValid(string cacheFile, string uri, long mtime, long? size, int maxSize = 1)
 		{
-			byte[] bytes;
-			try
-			{
-				if (new FileInfo(cacheFile).Length > _options.MaxCacheEntryBytes)
-					return null;
-
-				bytes = File.ReadAllBytes(cacheFile);
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
-			{
+			var bytes = ReadBoundedPng(cacheFile);
+			if (bytes is null)
 				return null;
-			}
 
 			var text = PngTextChunks.Read(bytes);
 			if (!text.TryGetValue("Thumb::URI", out var storedUri) || storedUri != uri)
@@ -256,7 +248,31 @@ namespace Files.Platform.Linux.Thumbnails
 			if (size is not null && text.TryGetValue("Thumb::Size", out var storedSize) && storedSize != size.Value.ToString(CultureInfo.InvariantCulture))
 				return null;
 
-			return bytes;
+			return ValidateAndReencode(bytes, maxSize);
+		}
+
+		private byte[]? ReadBoundedPng(string path)
+		{
+			try
+			{
+				using var input = PosixNative.OpenFileAt(-100, path, path, false);
+				if (input.Length < 33 || input.Length > _options.MaxCacheEntryBytes)
+					return null;
+				using var output = new MemoryStream();
+				var buffer = new byte[8192];
+				int read;
+				while ((read = input.Read(buffer, 0, (int)Math.Min(buffer.Length, _options.MaxCacheEntryBytes - output.Length + 1))) > 0)
+				{
+					if (output.Length + read > _options.MaxCacheEntryBytes)
+						return null;
+					output.Write(buffer, 0, read);
+				}
+				return output.ToArray();
+			}
+			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+			{
+				return null;
+			}
 		}
 
 		// Larger buckets scale down cleanly, so they are tried first; the largest is last because decoding it is the most expensive.
@@ -275,7 +291,7 @@ namespace Files.Platform.Linux.Thumbnails
 					continue;
 
 				var file = Path.Combine(_thumbnailRoot, other, hash + ".png");
-				var bytes = TryReadValid(file, uri, mtime, size);
+				var bytes = TryReadValid(file, uri, mtime, size, XdgThumbnailNaming.GetBucketSize(other));
 				if (bytes is null)
 					continue;
 
@@ -482,24 +498,29 @@ namespace Files.Platform.Linux.Thumbnails
 		/// </summary>
 		private byte[]? ValidateAndReencode(string outputPath, int maxSize)
 		{
-			var info = new FileInfo(outputPath);
-			if (!info.Exists || info.LinkTarget is not null || (info.Attributes & (FileAttributes.ReparsePoint | FileAttributes.Directory)) != 0)
+			var bytes = ReadBoundedPng(outputPath);
+			return bytes is null ? null : ValidateAndReencode(bytes, maxSize);
+		}
+
+		private byte[]? ValidateAndReencode(byte[] bytes, int maxSize)
+		{
+			if (!PngTextChunks.TryReadDimensions(bytes, out var width, out var height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize || (long)width * height > _options.MaxImagePixels)
 				return null;
 
-			if (info.Length > _options.MaxCacheEntryBytes || info.Length < 33)
-				return null;
+			try
+			{
+				using var bitmap = SKBitmap.Decode(bytes);
+				if (bitmap is null || bitmap.Width != width || bitmap.Height != height)
+					return null;
 
-			var bytes = File.ReadAllBytes(outputPath);
-			if (!PngTextChunks.TryReadDimensions(bytes, out var width, out var height) || width <= 0 || height <= 0 || width > maxSize || height > maxSize)
+				using var image = SKImage.FromBitmap(bitmap);
+				using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
+				return encoded?.ToArray();
+			}
+			catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+			{
 				return null;
-
-			using var bitmap = SKBitmap.Decode(bytes);
-			if (bitmap is null || bitmap.Width != width || bitmap.Height != height)
-				return null;
-
-			using var image = SKImage.FromBitmap(bitmap);
-			using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
-			return encoded?.ToArray();
+			}
 		}
 
 		private static bool ExecutableExists(string tryExec)

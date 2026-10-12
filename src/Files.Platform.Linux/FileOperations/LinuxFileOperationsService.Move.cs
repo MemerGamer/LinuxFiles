@@ -69,6 +69,7 @@ namespace Files.Platform.Linux.FileOperations
 				if (stat.IsSpecial)
 					throw new FileOperationException(FileOperationErrorKind.UnsupportedFileType, "FIFOs, sockets and device files cannot be moved across file systems.", source);
 
+				using var moveSourceHandle = sourceKind == EntryKind.Symlink ? OpenMoveSource(sourceParent, name, source) : null;
 				VerifyMoveSource(sourceParent, name, stat, source);
 				var copy = sourceKind == EntryKind.Symlink
 					? CopyLink(source, destination, resolved.Replace, context, sourceParent, destinationParent)
@@ -77,19 +78,14 @@ namespace Files.Platform.Linux.FileOperations
 						{
 							context.Hooks?.BeforeDeleteEntry?.Invoke(source);
 							context.CancellationToken.ThrowIfCancellationRequested();
-							if (!PosixNative.TryStat((int)input.SafeFileHandle.DangerousGetHandle(), out var current)
-								|| !PosixNative.SameFileVersion(openedStat, current))
-								throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being moved.", source);
-							VerifyMoveSource(sourceParent, name, openedStat, source);
-							PosixNative.UnlinkAt(sourceParent.Descriptor, name, 0, source);
+							DeleteMoveSource(sourceParent, name, openedStat, source, (int)input.SafeFileHandle.DangerousGetHandle(), context);
 							context.PathChanged(source, destination, xattrStale: true);
 						}, stat).ConfigureAwait(false);
 				if (sourceKind == EntryKind.Symlink && copy.Status == FileOperationStatus.Succeeded)
 				{
 					context.Hooks?.BeforeDeleteEntry?.Invoke(source);
 					context.CancellationToken.ThrowIfCancellationRequested();
-					VerifyMoveSource(sourceParent, name, stat, source);
-					PosixNative.UnlinkAt(sourceParent.Descriptor, name, 0, source);
+					DeleteMoveSource(sourceParent, name, stat, source, (int)moveSourceHandle!.DangerousGetHandle(), context);
 					context.PathChanged(source, destination, xattrStale: true);
 				}
 				return copy;
@@ -133,12 +129,14 @@ namespace Files.Platform.Linux.FileOperations
 
 			if (result.Status == FileOperationStatus.Succeeded)
 			{
+				if (!PosixNative.TryStat(sourceDirectory.Descriptor, out var removalStat))
+					throw PosixNative.CreateException(5, source);
 				context.Hooks?.BeforeDeleteEntry?.Invoke(source);
 				context.CancellationToken.ThrowIfCancellationRequested();
 				VerifyMoveSource(sourceParent, Path.GetFileName(source), stat, source);
 				try
 				{
-					PosixNative.UnlinkAt(sourceParent.Descriptor, Path.GetFileName(source), PosixNative.AtRemoveDir, source);
+					DeleteMoveSource(sourceParent, Path.GetFileName(source), removalStat, source, sourceDirectory.Descriptor, context);
 					context.PathChanged(source, created ? destination : null, xattrStale: created);
 				}
 				catch (IOException ex) when (ex.HResult == 39 && sourceDirectory.ListNames().Count > 0)
@@ -149,6 +147,77 @@ namespace Files.Platform.Linux.FileOperations
 
 			context.ItemDone(source);
 			return result;
+		}
+
+		private static Microsoft.Win32.SafeHandles.SafeFileHandle OpenMoveSource(DirectoryHandle parent, string name, string source)
+		{
+			var fd = PosixNative.OpenAt(parent.Descriptor, name, PosixNative.ReadOnlyFlags | PosixNative.ONofollow | 0x200000, out var errno); // O_PATH
+			if (fd < 0)
+				throw PosixNative.CreateException(errno, source);
+			return new Microsoft.Win32.SafeHandles.SafeFileHandle(fd, true);
+		}
+
+		private static void DeleteMoveSource(DirectoryHandle parent, string name, PosixStat expected, string source, int fd, FileOperationContext context)
+		{
+			void Changed() => throw new FileOperationException(FileOperationErrorKind.VerificationFailed, "The source changed while it was being moved.", source);
+			bool Matches(PosixStat current) => PosixNative.SameFileVersion(expected, current) && expected.LinkCount == current.LinkCount;
+			VerifyMoveSource(parent, name, expected, source);
+			context.Hooks?.AfterMoveSourceVerified?.Invoke(source);
+			if (!PosixNative.TryStat(fd, out var before) || !Matches(before) || !Matches(PosixNative.StatAt(parent.Descriptor, name, source)))
+				Changed();
+			void VerifyBeforeRename()
+			{
+				if (!PosixNative.TryStat(fd, out var current) || !Matches(current)
+					|| !Matches(PosixNative.StatAt(parent.Descriptor, name, source)))
+					Changed();
+			}
+			// Protect accidental concurrent saves: never knowingly delete a version absent from the copy.
+			// Writes change ctime even when mtime is restored. Only a verified pre-rename version may
+			// accept rename's ctime update. Hostile same-user quarantine-name races are out of scope:
+			// POSIX has no unlink-by-inode, so final stat/rename and stat/unlink windows remain.
+			var quarantine = ".linuxfiles-move-" + Guid.NewGuid().ToString("N");
+			while (!PosixNative.TryQuarantineRename(parent.Descriptor, name, quarantine, out var errno, context.Hooks, VerifyBeforeRename))
+			{
+				if (errno == 17)
+				{
+					quarantine = ".linuxfiles-move-" + Guid.NewGuid().ToString("N");
+					continue;
+				}
+				if (errno is 22 or 38 or 95) // RENAME_NOREPLACE unsupported; recheck the held version and name.
+				{
+					context.Hooks?.BeforeMoveSourceUnlink?.Invoke(source, source);
+					var fallbackEntry = PosixNative.StatAt(parent.Descriptor, name, source);
+					if (!PosixNative.TryStat(fd, out var fallback) || !Matches(fallback)
+						|| !Matches(fallbackEntry) || !PosixNative.SameEntry(fallback, fallbackEntry))
+						Changed();
+					PosixNative.UnlinkAt(parent.Descriptor, name, expected.IsDirectory ? PosixNative.AtRemoveDir : 0, source);
+					return;
+				}
+				throw PosixNative.CreateException(errno, source);
+			}
+			try
+			{
+				context.Hooks?.MoveSourceQuarantined?.Invoke(source, Path.Combine(Path.GetDirectoryName(source)!, quarantine));
+				var entry = PosixNative.StatAt(parent.Descriptor, quarantine, source);
+				// The pre-rename fd check passed; only rename's ctime update is permitted.
+				var renamedExpected = expected with { ChangedSeconds = entry.ChangedSeconds, ChangedNanoseconds = entry.ChangedNanoseconds };
+				var held = default(PosixStat);
+				if (!PosixNative.SameFileVersion(renamedExpected, entry) || expected.LinkCount != entry.LinkCount
+					|| !PosixNative.TryStat(fd, out held) || !PosixNative.SameFileVersion(entry, held) || entry.LinkCount != held.LinkCount)
+					Changed();
+				context.Hooks?.BeforeMoveSourceUnlink?.Invoke(source, Path.Combine(Path.GetDirectoryName(source)!, quarantine));
+				if (!PosixNative.TryStat(fd, out var finalHeld) || !PosixNative.SameFileVersion(held, finalHeld)
+					|| held.LinkCount != finalHeld.LinkCount
+					|| !PosixNative.SameFileVersion(finalHeld, PosixNative.StatAt(parent.Descriptor, quarantine, source)))
+					Changed();
+				PosixNative.UnlinkAt(parent.Descriptor, quarantine, expected.IsDirectory ? PosixNative.AtRemoveDir : 0, source);
+			}
+			catch
+			{
+				// Never overwrite a newly created source name. If restoration fails, retain quarantine.
+				PosixNative.TryQuarantineRename(parent.Descriptor, quarantine, name, out _, context.Hooks);
+				throw;
+			}
 		}
 
 		private static void VerifyMoveSource(DirectoryHandle parent, string name, PosixStat expected, string source)

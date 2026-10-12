@@ -26,6 +26,7 @@ namespace Files.Platform.Linux.Trash
 		private const string FilesDirectoryName = "files";
 		private const string InfoDirectoryName = "info";
 		private const int MaxUniqueNameAttempts = 10000;
+		private const int MaxMetadataBytes = 64 * 1024;
 		private const string OutsideVolumeMessage = "Original location outside the volume";
 
 		private const UnixFileMode PrivateDirectoryMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
@@ -176,26 +177,40 @@ namespace Files.Platform.Linux.Trash
 				{
 					cancellationToken.ThrowIfCancellationRequested();
 
-					foreach (var directory in new[] { location.FilesDirectory, location.InfoDirectory })
+					try
 					{
-						if (!Directory.Exists(directory))
-							continue;
-
-						foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+						using var root = OpenTrashRoot(location);
+						foreach (var child in new[] { FilesDirectoryName, InfoDirectoryName })
 						{
-							cancellationToken.ThrowIfCancellationRequested();
-							try
+							var path = Path.Combine(location.Root, child);
+							using var directory = DirectoryHandle.TryOpen(root.Descriptor, child, path, true, out var errno);
+							if (directory is null)
 							{
-								DeleteEntry(entry);
-							}
-							catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-							{
+								if (PosixNative.IsNotFound(errno)) continue;
 								failures++;
+								continue;
+							}
+							ValidateTrustedDirectory(directory);
+							foreach (var name in directory.ListNames())
+							{
+								cancellationToken.ThrowIfCancellationRequested();
+								try
+								{
+									_options.FileOperationsHooks?.BeforeDeleteEntry?.Invoke(Path.Combine(directory.Path, name));
+									directory.DeleteEntry(name);
+								}
+								catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+								{
+									failures++;
+								}
 							}
 						}
+						new DirectorySizesCache(location.Root, root).Clear();
 					}
-
-					new DirectorySizesCache(location.Root).Clear();
+					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+					{
+						failures++;
+					}
 				}
 
 				if (failures > 0)
@@ -288,7 +303,7 @@ namespace Files.Platform.Linux.Trash
 			if (isDirectory)
 				new DirectorySizesCache(location.Root).Set(name, size, new DateTimeOffset(info.LastWriteTimeUtc).ToUnixTimeSeconds());
 
-			var deletionDate = ReadDeletionDate(infoPath) ?? new DateTimeOffset(_options.LocalNow());
+			var deletionDate = ReadDeletionDate(infoPath, CancellationToken.None) ?? new DateTimeOffset(_options.LocalNow());
 			var item = new TrashItem(trashedPath, full, deletionDate, size, isDirectory, infoPath);
 			return TrashOperationResult.Success(path, trashedPath, item);
 		}
@@ -343,35 +358,29 @@ namespace Files.Platform.Linux.Trash
 
 			foreach (var location in GetLocations())
 			{
-				if (!Directory.Exists(location.InfoDirectory))
-					continue;
-
-				var cache = new DirectorySizesCache(location.Root);
-
-				IEnumerable<string> infoFiles;
 				try
 				{
-					infoFiles = Directory.EnumerateFiles(location.InfoDirectory, "*" + TrashInfoFile.Extension).ToList();
+					using var root = OpenTrashRoot(location);
+					using var files = OpenTrustedChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
+					using var info = OpenTrustedChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
+					var cache = new DirectorySizesCache(location.Root, root);
+					foreach (var infoName in info.ListNames().Where(n => n.EndsWith(TrashInfoFile.Extension, StringComparison.Ordinal)))
+					{
+						cancellationToken.ThrowIfCancellationRequested();
+						var item = TryReadItem(location, Path.Combine(location.InfoDirectory, infoName), cache, info, files, cancellationToken);
+						if (item is not null)
+							result.Add(item);
+					}
 				}
 				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 				{
-					continue;
-				}
-
-				foreach (var infoPath in infoFiles)
-				{
-					cancellationToken.ThrowIfCancellationRequested();
-
-					var item = TryReadItem(location, infoPath, cache);
-					if (item is not null)
-						result.Add(item);
 				}
 			}
 
 			return result;
 		}
 
-		private TrashItem? TryReadItem(TrashLocation location, string infoPath, DirectorySizesCache cache)
+		private TrashItem? TryReadItem(TrashLocation location, string infoPath, DirectorySizesCache cache, DirectoryHandle info, DirectoryHandle files, CancellationToken cancellationToken)
 		{
 			try
 			{
@@ -380,15 +389,18 @@ namespace Files.Platform.Linux.Trash
 				var trashedPath = Path.Combine(location.FilesDirectory, name);
 
 				// Orphaned or corrupt .trashinfo files are ignored.
-				if (!IsValidEntryName(name) || !EntryExists(trashedPath))
+				if (!IsValidEntryName(name) || !files.EntryExists(name))
 					return null;
 
-				if (!TrashInfoFile.TryParse(File.ReadAllText(infoPath), out var storedPath, out var date))
+				using var stream = OpenMetadataAt(info.Descriptor, fileName, infoPath);
+				if (!TrashInfoFile.TryParse(ReadMetadata(stream, cancellationToken), out var storedPath, out var date))
 					return null;
 
 				var originalPath = ResolveOriginalPath(location, storedPath, out var invalidReason) ?? storedPath;
 
-				var infoMtime = new DateTimeOffset(new FileInfo(infoPath).LastWriteTimeUtc);
+				if (!PosixNative.TryStat(stream.SafeFileHandle.DangerousGetHandle().ToInt32(), out var metadataStat))
+					return null;
+				var infoMtime = new DateTimeOffset(metadataStat.ModifiedUtc);
 				var deletionDate = date is { } d
 					? new DateTimeOffset(DateTime.SpecifyKind(d, DateTimeKind.Unspecified), TimeZoneInfo.Local.GetUtcOffset(d))
 					: infoMtime;
@@ -413,11 +425,11 @@ namespace Files.Platform.Linux.Trash
 			}
 		}
 
-		private static DateTimeOffset? ReadDeletionDate(string infoPath)
+		private static DateTimeOffset? ReadDeletionDate(string infoPath, CancellationToken cancellationToken)
 		{
 			try
 			{
-				if (TrashInfoFile.TryParse(File.ReadAllText(infoPath), out _, out var date) && date is { } d)
+				if (TrashInfoFile.TryParse(ReadMetadata(infoPath, cancellationToken), out _, out var date) && date is { } d)
 					return new DateTimeOffset(DateTime.SpecifyKind(d, DateTimeKind.Unspecified), TimeZoneInfo.Local.GetUtcOffset(d));
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -436,18 +448,15 @@ namespace Files.Platform.Linux.Trash
 			if (!TryGetItemLocation(item, out var location, out var name, out var infoPath))
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
-			using var trashRoot = DirectoryHandle.OpenPath(location.TopDirectory is null
-				? RealPath(location.Root)
-				: Path.Combine(RealPath(Path.GetDirectoryName(location.Root)!), Path.GetFileName(location.Root)));
-			using var files = DirectoryHandle.OpenChild(trashRoot.Descriptor, FilesDirectoryName, location.FilesDirectory);
-			using var info = DirectoryHandle.OpenChild(trashRoot.Descriptor, InfoDirectoryName, location.InfoDirectory);
+			using var trashRoot = OpenTrashRoot(location);
+			using var files = OpenTrustedChild(trashRoot.Descriptor, FilesDirectoryName, location.FilesDirectory);
+			using var info = OpenTrustedChild(trashRoot.Descriptor, InfoDirectoryName, location.InfoDirectory);
 			if (!files.EntryExists(name))
 				return TrashOperationResult.Failure(item.TrashedPath, "The trashed item no longer exists.");
 
 			// Re-derive the destination from the pinned .trashinfo, never from the caller-supplied item.
-			using var infoStream = PosixNative.OpenFileAt(info.Descriptor, name + TrashInfoFile.Extension, infoPath, false);
-			using var reader = new StreamReader(infoStream);
-			if (!TrashInfoFile.TryParse(reader.ReadToEnd(), out var storedPath, out _))
+			using var infoStream = OpenMetadataAt(info.Descriptor, name + TrashInfoFile.Extension, infoPath);
+			if (!TrashInfoFile.TryParse(ReadMetadata(infoStream, cancellationToken), out var storedPath, out _))
 				return TrashOperationResult.Failure(item.TrashedPath, "The .trashinfo file is invalid.");
 
 			var destination = ResolveOriginalPath(location, storedPath, out var invalidReason);
@@ -544,11 +553,17 @@ namespace Files.Platform.Linux.Trash
 			if (!TryGetItemLocation(item, out var location, out var name, out var infoPath))
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
-			if (EntryExists(item.TrashedPath))
-				DeleteEntry(item.TrashedPath);
-
-			TryDelete(infoPath);
-			new DirectorySizesCache(location.Root).Remove([name]);
+			using var root = OpenTrashRoot(location);
+			using var files = OpenTrustedChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
+			using var info = OpenOptionalTrustedChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
+			if (files.EntryExists(name))
+			{
+				_options.FileOperationsHooks?.BeforeDeleteEntry?.Invoke(item.TrashedPath);
+				files.DeleteEntry(name);
+			}
+			if (info is not null && info.EntryExists(name + TrashInfoFile.Extension))
+				info.DeleteEntry(name + TrashInfoFile.Extension);
+			new DirectorySizesCache(location.Root, root).Remove([name]);
 
 			return TrashOperationResult.Success(item.TrashedPath);
 		}
@@ -651,8 +666,9 @@ namespace Files.Platform.Linux.Trash
 		{
 			var locations = new List<TrashLocation>();
 
-			if (Directory.Exists(HomeRoot))
-				locations.Add(new TrashLocation(HomeRoot, null));
+			var home = new TrashLocation(HomeRoot, null);
+			if (Directory.Exists(HomeRoot) && IsTrusted(home))
+				locations.Add(home);
 
 			string homeMount;
 			try
@@ -673,12 +689,14 @@ namespace Files.Platform.Linux.Trash
 				try
 				{
 					var shared = GetSharedTrashRoot(mount.MountPoint);
-					if (shared is not null && Directory.Exists(shared) && IsTrusted(new TrashLocation(shared, mount.MountPoint)))
-						locations.Add(new TrashLocation(shared, mount.MountPoint));
+					var sharedLocation = shared is null ? null : new TrashLocation(shared, mount.MountPoint);
+					if (sharedLocation is not null && Directory.Exists(shared) && IsTrusted(sharedLocation))
+						locations.Add(sharedLocation);
 
 					var perUser = GetPerUserTrashRoot(mount.MountPoint);
-					if (Directory.Exists(perUser) && IsTrusted(new TrashLocation(perUser, mount.MountPoint)))
-						locations.Add(new TrashLocation(perUser, mount.MountPoint));
+					var perUserLocation = new TrashLocation(perUser, mount.MountPoint);
+					if (Directory.Exists(perUser) && IsTrusted(perUserLocation))
+						locations.Add(perUserLocation);
 				}
 				catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 				{
@@ -727,8 +745,8 @@ namespace Files.Platform.Linux.Trash
 
 		private TrashLocation? PrepareLocation(TrashLocation location, bool create)
 		{
-			// A topdir trash that another user pre-created, symlinked or made writable must never be used.
-			if (location.TopDirectory is not null && EntryExists(location.Root) && !IsTrusted(location))
+			// A trash directory that another user pre-created, symlinked or made writable must never be used.
+			if (EntryExists(location.Root) && !IsTrusted(location))
 				return null;
 
 			if (!create)
@@ -737,7 +755,7 @@ namespace Files.Platform.Linux.Trash
 			try
 			{
 				EnsureLayout(location);
-				return location.TopDirectory is not null && !IsTrusted(location) ? null : location;
+				return !IsTrusted(location) ? null : location;
 			}
 			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 			{
@@ -746,14 +764,11 @@ namespace Files.Platform.Linux.Trash
 		}
 
 		/// <summary>
-		/// Checks that a topdir trash and its <c>files</c>/<c>info</c> subdirectories are real directories owned by the current
-		/// user that are not writable by group or others. The home trash is not checked.
+		/// Checks that a trash and its <c>files</c>/<c>info</c> subdirectories are real directories owned by the current
+		/// user that are not writable by group or others.
 		/// </summary>
 		private bool IsTrusted(TrashLocation location)
 		{
-			if (location.TopDirectory is null)
-				return true;
-
 			var forbidden = UnixFileMode.GroupWrite | UnixFileMode.OtherWrite;
 
 			foreach (var directory in new[] { location.Root, location.FilesDirectory, location.InfoDirectory })
@@ -887,39 +902,76 @@ namespace Files.Platform.Linux.Trash
 			}
 		}
 
-		private static void DeleteEntry(string path)
+		private DirectoryHandle OpenTrashRoot(TrashLocation location)
 		{
-			if (!IsDirectoryEntry(path))
+			var parentPath = Path.GetDirectoryName(location.Root)!;
+			var sharedTrash = location.TopDirectory is not null && Path.GetFileName(parentPath) == ".Trash";
+			// Resolve ordinary ancestors once; trash containers remain no-follow relative to the pinned fd.
+			using var ancestor = DirectoryHandle.OpenPath(location.ResolvedAncestor);
+			using var sharedDirectory = sharedTrash ? DirectoryHandle.OpenChild(ancestor.Descriptor, ".Trash", parentPath) : null;
+			var parent = sharedDirectory ?? ancestor;
+			if (sharedTrash)
 			{
-				File.Delete(path);
-				return;
+				if (!PosixNative.TryStat(parent.Descriptor, out var shared) || (shared.Mode & 0x200) == 0)
+					throw new IOException("Shared trash directory is not sticky.");
 			}
-
-			try
-			{
-				Directory.Delete(path, recursive: true);
-			}
-			catch (UnauthorizedAccessException)
-			{
-				// Directories without write permission cannot be emptied; make the tree writable and retry.
-				MakeTreeWritable(path);
-				Directory.Delete(path, recursive: true);
-			}
+			return OpenTrustedChild(parent.Descriptor, Path.GetFileName(location.Root), location.Root);
 		}
 
-		private static void MakeTreeWritable(string path)
+		private DirectoryHandle OpenTrustedChild(int descriptor, string name, string path)
 		{
-			var mode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+			var directory = DirectoryHandle.OpenChild(descriptor, name, path);
+			try { ValidateTrustedDirectory(directory); return directory; }
+			catch { directory.Dispose(); throw; }
+		}
 
-			try
+		private DirectoryHandle? OpenOptionalTrustedChild(int descriptor, string name, string path)
+		{
+			try { return OpenTrustedChild(descriptor, name, path); }
+			catch (FileNotFoundException) { return null; }
+		}
+
+		private void ValidateTrustedDirectory(DirectoryHandle directory)
+		{
+			if (!PosixNative.TryStat(directory.Descriptor, out var stat) || !stat.IsDirectory ||
+				stat.OwnerUserId != _options.UserId || (stat.Mode & 0x12) != 0)
+				throw new IOException("Trash directory is not trusted.");
+		}
+
+		private static FileStream OpenMetadataAt(int descriptor, string name, string path)
+		{
+			var stat = PosixNative.StatAt(descriptor, name, path);
+			if (!stat.IsRegularFile || stat.Size > MaxMetadataBytes)
+				throw new IOException("Trash metadata is not a bounded regular file.");
+			// OpenFileAt also validates the opened inode and refuses links or blocking special files.
+			return PosixNative.OpenFileAt(descriptor, name, path, false);
+		}
+
+		private static string ReadMetadata(string path, CancellationToken cancellationToken)
+		{
+			using var parent = DirectoryHandle.OpenPath(Path.GetDirectoryName(path)!);
+			using var stream = OpenMetadataAt(parent.Descriptor, Path.GetFileName(path), path);
+			return ReadMetadata(stream, cancellationToken);
+		}
+
+		private static string ReadMetadata(FileStream stream, CancellationToken cancellationToken)
+		{
+			if (stream.Length > MaxMetadataBytes)
+				throw new IOException("Trash metadata is too large.");
+			var bytes = new byte[MaxMetadataBytes + 1];
+			var count = 0;
+			while (count < bytes.Length)
 			{
-				File.SetUnixFileMode(path, File.GetUnixFileMode(path) | mode);
-				foreach (var directory in Directory.EnumerateDirectories(path, "*", new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = true }))
-					File.SetUnixFileMode(directory, File.GetUnixFileMode(directory) | mode);
+				cancellationToken.ThrowIfCancellationRequested();
+				var read = stream.Read(bytes, count, Math.Min(4096, bytes.Length - count));
+				if (read == 0)
+					break;
+				count += read;
 			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-			{
-			}
+			if (count > MaxMetadataBytes)
+				throw new IOException("Trash metadata is too large.");
+			using var reader = new StreamReader(new MemoryStream(bytes, 0, count), Encoding.UTF8);
+			return reader.ReadToEnd();
 		}
 
 		/// <summary>
@@ -973,6 +1025,11 @@ namespace Files.Platform.Linux.Trash
 
 		private sealed record TrashLocation(string Root, string? TopDirectory)
 		{
+			// Capture ordinary ancestors before path-based trust checks can observe a replacement.
+			public string ResolvedAncestor { get; } = RealPath(TopDirectory is not null && Path.GetFileName(Path.GetDirectoryName(Root)) == ".Trash"
+				? Path.GetDirectoryName(Path.GetDirectoryName(Root)!)!
+				: Path.GetDirectoryName(Root)!);
+
 			public string FilesDirectory => Path.Combine(Root, FilesDirectoryName);
 
 			public string InfoDirectory => Path.Combine(Root, InfoDirectoryName);

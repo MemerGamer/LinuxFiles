@@ -4,13 +4,7 @@
 
     <!--  Generic properties  -->
     <BaseTargetFramework>net10.0</BaseTargetFramework>
-    <TargetWindowsVersion>10.0.26100.0</TargetWindowsVersion>
-    <MinimalWindowsVersion>10.0.19041.0</MinimalWindowsVersion>
-    <WindowsSdkPackageVersion>10.0.26100.67-preview</WindowsSdkPackageVersion>
-    <WindowsTargetFramework>$(BaseTargetFramework)-windows$(TargetWindowsVersion)</WindowsTargetFramework>
     <DesktopTargetFramework>$(BaseTargetFramework)-desktop</DesktopTargetFramework>
-    <!-- Opt-in (-p:FilesWin32Compat=true): compiles the leftover Win32 code on the desktop TFM against CsWin32 types, for inventory only. -->
-    <FilesWin32Compat Condition="'$(FilesWin32Compat)' == ''">false</FilesWin32Compat>
     <LangVersion>preview</LangVersion>
     <!-- Uno's nullability annotations differ from WinUI's; keep nullable diagnostics as warnings on the Linux desktop build for now. -->
     <WarningsAsErrors Condition="!$(TargetFramework.EndsWith('-desktop'))">nullable</WarningsAsErrors>
@@ -20,9 +14,6 @@
 
     <!--  Use strict Roslyn compilation mode  -->
     <Features>strict</Features>
-
-    <!--  Enable all C#/WinRT trimming and NativeAOT diagnostics  -->
-    <CsWinRTAotWarningLevel>3</CsWinRTAotWarningLevel>
 
   </PropertyGroup>
 </Project>

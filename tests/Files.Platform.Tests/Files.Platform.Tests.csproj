@@ -9,7 +9,7 @@
         <Configurations>Debug;Release</Configurations>
         <DefineConstants>$(DefineConstants);DESKTOP</DefineConstants>
         <Platforms>x86;x64;arm64</Platforms>
-        <RuntimeIdentifiers>win-x86;win-x64;win-arm64;linux-x64;linux-arm64</RuntimeIdentifiers>
+        <RuntimeIdentifiers>linux-x64;linux-arm64</RuntimeIdentifiers>
         <OutputType>Exe</OutputType>
     </PropertyGroup>
 
@@ -20,15 +20,12 @@
         <PackageReference Include="TagLibSharp" />
         <PackageReference Include="FluentFTP" />
         <PackageReference Include="SharpZipLib" />
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
-        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
         <PackageReference Include="MSTest.TestAdapter" />
         <PackageReference Include="MSTest.TestFramework" />
         <PackageReference Include="Microsoft.Testing.Extensions.TrxReport" />
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="../../src/Files.Core.SourceGenerator/Files.Core.SourceGenerator.csproj" />
         <ProjectReference Include="..\..\src\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
         <ProjectReference Include="..\..\src\Files.Platform.Linux\Files.Platform.Linux.csproj" />
         <ProjectReference Include="../../src/Files.Platform.Linux.ElevationHelper/Files.Platform.Linux.ElevationHelper.csproj" Aliases="ElevationHelper" />

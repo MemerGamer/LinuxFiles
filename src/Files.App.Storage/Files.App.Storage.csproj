@@ -3,8 +3,6 @@
 
     <PropertyGroup>
         <TargetFrameworks>$(DesktopTargetFramework)</TargetFrameworks>
-        <!--  Linux-first: Windows TFM is not built; Windows/ is excluded from the desktop build  -->
-        <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
         <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
         <UnoSingleProject>false</UnoSingleProject>
         <Nullable>enable</Nullable>
@@ -20,36 +18,6 @@
         <PackageReference Include="Uno.WinUI" />
         <PackageReference Include="FluentFTP" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    </ItemGroup>
-
-    <!--  Win32/WinRT-only storage implementation; not part of the Linux build  -->
-    <ItemGroup Condition="'$(FilesWin32Compat)' != 'true'">
-        <Compile Remove="Windows\**" />
-        <Compile Remove="Legacy\HomeFolder\HomeFolder.cs" />
-    </ItemGroup>
-
-    <!--  Transitional inventory mode (-p:FilesWin32Compat=true), see Files.App.csproj  -->
-    <ItemGroup Condition="'$(FilesWin32Compat)' == 'true'">
-        <Reference Include="Files.App.CsWin32">
-            <HintPath>..\Files.App.CsWin32\bin\x64\$(Configuration)\$(WindowsTargetFramework)\Files.App.CsWin32.dll</HintPath>
-        </Reference>
-    </ItemGroup>
-
-    <Target Name="BuildCsWin32ForCompat" BeforeTargets="ResolveAssemblyReferences" Condition="'$(FilesWin32Compat)' == 'true' And !$(TargetFramework.Contains('-windows'))">
-        <MSBuild Projects="..\Files.App.CsWin32\Files.App.CsWin32.csproj" Targets="Restore" Properties="Configuration=$(Configuration);Platform=x64;EnableWindowsTargeting=true;_FilesCompatRestore=true" RemoveProperties="TargetFramework;RuntimeIdentifier" />
-        <MSBuild Projects="..\Files.App.CsWin32\Files.App.CsWin32.csproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=x64;EnableWindowsTargeting=true" RemoveProperties="TargetFramework;RuntimeIdentifier" />
-    </Target>
-
-    <!--  Uno.Sdk drops a root-level Windows/ folder from Compile on non-Windows targets; add it back late in compat mode  -->
-    <Target Name="AddWin32CompatSources" BeforeTargets="BeforeCompile;CoreCompile" Condition="'$(FilesWin32Compat)' == 'true'">
-        <ItemGroup>
-            <Compile Include="Windows\**\*.cs" Exclude="**\*.Windows.cs" />
-        </ItemGroup>
-    </Target>
-
-    <!--  Windows-only sources (*.Windows.cs) never build for non-Windows TFMs, compat mode included  -->
-    <ItemGroup Condition="!$(TargetFramework.Contains('-windows'))">
-        <Compile Remove="**\*.Windows.cs" />
     </ItemGroup>
 
     <ItemGroup>

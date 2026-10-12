@@ -10,7 +10,6 @@
         <Platforms>x86;x64;arm64</Platforms>
         <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
         <UnoSingleProject>false</UnoSingleProject>
-        <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
     </PropertyGroup>
 
     <ItemGroup>

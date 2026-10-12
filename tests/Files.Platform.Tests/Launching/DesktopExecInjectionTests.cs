@@ -83,6 +83,41 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
+		[DataRow("sh -c 'exec \"$@\"' sh bash -c %f")]
+		[DataRow("env sh -c 'exec \"$@\"' sh env bash -c %f")]
+		[DataRow("sh -c 'exec \"$0\" \"$@\"' bash -c %f")]
+		[DataRow("rbash -c %f")]
+		[DataRow("bash %f")]
+		public void NestedShellsAndScriptFiles_RejectTargetScripts(string exec)
+		{
+			Assert.AreEqual(0, Expand(exec, "/nonexistent/$(printf BYPASS >&2).txt").Length);
+		}
+
+		[TestMethod]
+		public void ShellSymlink_RejectsTargetScript()
+		{
+			var directory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), System.Guid.NewGuid().ToString());
+			System.IO.Directory.CreateDirectory(directory);
+			try
+			{
+				var alias = System.IO.Path.Combine(directory, "launcher");
+				System.IO.File.CreateSymbolicLink(alias, "/bin/bash");
+				Assert.AreEqual(0, Expand(alias + " -c %f", "/tmp/$(id).txt").Length);
+				Assert.AreEqual(0, Expand("env " + alias + " %f", "/tmp/$(id).txt").Length);
+			}
+			finally { System.IO.Directory.Delete(directory, true); }
+		}
+
+		[TestMethod]
+		[DataRow("env SHELL=/bin/bash viewer %f")]
+		[DataRow("env VAR=bash viewer %f")]
+		[DataRow("viewer bash")]
+		public void OrdinaryShellNamedArguments_AreAccepted(string exec)
+		{
+			Assert.AreEqual(1, Expand(exec, "/tmp/file.txt").Length);
+		}
+
+		[TestMethod]
 		public void UnbalancedQuotes_AreRejected()
 		{
 			Assert.AreEqual(0, Expand("viewer \"unterminated %f", "/x").Length);

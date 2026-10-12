@@ -14,7 +14,7 @@ namespace Files.Platform.Linux.Launching
 	/// </summary>
 	public static class DesktopExecExpander
 	{
-		private static readonly HashSet<string> Shells = ["sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "csh", "tcsh"];
+		private static readonly HashSet<string> Shells = ["sh", "bash", "dash", "zsh", "ksh", "fish", "ash", "csh", "tcsh", "rbash"];
 
 		/// <summary>
 		/// Splits an Exec value into arguments using shell quoting rules (double quotes, single quotes, backslash).
@@ -117,19 +117,31 @@ namespace Files.Platform.Linux.Launching
 			}
 			if (targetCodes > 1) return [];
 
-			// Do not substitute into shell options or script text, including through env wrappers.
+			// Inspect every interpreter in wrapper chains, but not assignments or shell argv[0].
+			var shellNames = new HashSet<int>();
 			for (var i = 0; i < tokens.Count; i++)
 			{
-				if (System.IO.Path.GetFileName(tokens[i]) == "env" && tokens.Skip(i + 1).Any(t => t.StartsWith("-S", StringComparison.Ordinal) || t.StartsWith("--split-string", StringComparison.Ordinal))) return [];
-				if (!Shells.Contains(System.IO.Path.GetFileName(tokens[i]))) continue;
+				if (tokens[i].Contains('=')) continue;
+				if (shellNames.Contains(i) && (i + 1 == tokens.Count || !tokens[i + 1].StartsWith('-'))) continue;
+				var executable = ExecutableName(tokens[i]);
+				if (executable == "env" && tokens.Skip(i + 1).Any(t => t.StartsWith("-S", StringComparison.Ordinal) || t.StartsWith("--split-string", StringComparison.Ordinal))) return [];
+				if (!Shells.Contains(executable)) continue;
 				var script = -1;
+				var commandString = false;
 				for (var j = i + 1; j < tokens.Count; j++)
 				{
-					if (tokens[j].StartsWith('-') && !tokens[j].StartsWith("--", StringComparison.Ordinal) && tokens[j].Contains('c')) { script = j + 1; break; }
+					if (tokens[j] == "--") { script = j + 1; break; }
+					if (!tokens[j].StartsWith('-') || tokens[j] == "-") { script = j; break; }
+					if (!tokens[j].StartsWith("--", StringComparison.Ordinal) && tokens[j].Contains('c'))
+					{
+						script = j + 1;
+						commandString = true;
+						break;
+					}
 				}
-				if (script < 0 || script >= tokens.Count) return [];
-				if (tokens.Take(script + 1).Any(t => t.Replace("%%", "", StringComparison.Ordinal).Contains('%'))) return [];
-				break;
+				if (script < 0 || script >= tokens.Count) continue;
+				if (tokens.Skip(i).Take(script - i + 1).Any(t => t.Replace("%%", "", StringComparison.Ordinal).Contains('%'))) return [];
+				if (commandString) shellNames.Add(script + 1);
 			}
 
 			var perTarget = tokens.Any(t => HasCode(t, 'f') || HasCode(t, 'u'));
@@ -224,6 +236,14 @@ namespace Files.Platform.Linux.Launching
 				result.Add(argv.ToArray());
 			}
 			return result;
+		}
+
+		private static string ExecutableName(string token)
+		{
+			var name = System.IO.Path.GetFileName(token);
+			if (Shells.Contains(name)) return name;
+			var path = new PathExecutableLocator().Locate(token);
+			return path is null ? name : System.IO.Path.GetFileName(Trash.LinuxTrashService.RealPath(path));
 		}
 
 		// Accept only --name=%x with an ASCII option name and no surrounding value text.

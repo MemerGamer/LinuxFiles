@@ -24,18 +24,5 @@ namespace Files.App.Extensions
 			};
 		}
 
-		/// <summary>
-		/// Converts a <see cref="ShowWindowCommand"/> to the Win32 show command value stored in shortcuts;
-		/// <see cref="ShowWindowCommand.Default"/> maps to SW_NORMAL (1).
-		/// </summary>
-		public static int ToWin32(this ShowWindowCommand command)
-		{
-			return command switch
-			{
-				ShowWindowCommand.Maximized => 3,
-				ShowWindowCommand.Minimized => 7,
-				_ => 1,
-			};
-		}
 	}
 }

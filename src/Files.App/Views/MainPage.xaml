@@ -361,6 +361,14 @@
 			IsOpen="{x:Bind ViewModel.ShowSponsorPrompt, Mode=OneWay}"
 			Subtitle="{helpers:ResourceString Key=SponsorSubtitle}" />
 
+		<!--  Properties is a separate X11 window; dim its owner without blocking modeless interaction.  -->
+		<Border
+			x:Name="PropertiesSmokeLayer"
+			Grid.RowSpan="3"
+			Background="{ThemeResource SmokeFillColorDefaultBrush}"
+			IsHitTestVisible="False"
+			Visibility="Collapsed" />
+
 		<VisualStateManager.VisualStateGroups>
 			<VisualStateGroup x:Name="SidebarWidthStates">
 				<VisualState x:Name="SmallSidebarWidthState">

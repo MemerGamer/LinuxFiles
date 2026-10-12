@@ -6,6 +6,7 @@ using Files.Platform.Linux.Native;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
 namespace Files.Platform.Tests.SystemIntegration
@@ -76,6 +77,32 @@ namespace Files.Platform.Tests.SystemIntegration
 			var directories = new Files.Platform.Linux.Mime.XdgDirectories(name => inherited.GetValueOrDefault(name));
 			CollectionAssert.AreEqual(new[] { "/usr/local/share", "/usr/share" }, new List<string>(directories.DataDirs));
 			CollectionAssert.AreEqual(new[] { "/etc/xdg" }, new List<string>(directories.ConfigDirs));
+		}
+
+		[TestMethod]
+		[DataRow(0u)]
+		[DataRow(1000u)]
+		public void ChildEnvironmentUsesKeepListOnlyForRoot(uint uid)
+		{
+			var info = new ProcessStartInfo("/usr/bin/env") { UseShellExecute = false };
+			info.Environment.Clear();
+			var rejected = new[] { "LD_PRELOAD", "LD_LIBRARY_PATH", "QT_PLUGIN_PATH", "GTK_MODULES",
+				"PYTHONPATH", "PERL5OPT", "BASH_ENV", "ENV", "UNKNOWN_FUTURE_INJECTION", "DBUS_SESSION_BUS_ADDRESS" };
+			foreach (var name in rejected) info.Environment[name] = "untrusted";
+			info.Environment["DISPLAY"] = ":99";
+			info.Environment["XAUTHORITY"] = "/tmp/private-display-auth";
+			info.Environment["LANG"] = "en_US.UTF-8";
+			info.Environment["LC_MESSAGES"] = "C";
+			info.Environment["HOME"] = "/home/user";
+			info.Environment["PATH"] = "/home/user/bin";
+			RootStartupEnvironment.ApplyChildEnvironment(info, uid, "/root");
+			foreach (var name in rejected) Assert.AreEqual(uid != 0, info.Environment.ContainsKey(name), name);
+			Assert.AreEqual(":99", info.Environment["DISPLAY"]);
+			Assert.AreEqual("/tmp/private-display-auth", info.Environment["XAUTHORITY"]);
+			Assert.AreEqual("en_US.UTF-8", info.Environment["LANG"]);
+			Assert.AreEqual("C", info.Environment["LC_MESSAGES"]);
+			Assert.AreEqual(uid == 0 ? "/root" : "/home/user", info.Environment["HOME"]);
+			Assert.AreEqual(uid == 0 ? RootStartupEnvironment.GetOverrides("/root")["PATH"] : "/home/user/bin", info.Environment["PATH"]);
 		}
 
 		private sealed class Inspector : IFileOwnershipInspector

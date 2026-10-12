@@ -300,6 +300,7 @@
 									VerticalAlignment="Center"
 									Opacity="{x:Bind Opacity, Mode=OneWay}"
 									Text="{x:Bind Name, Mode=OneWay}"
+									MaxLines="1"
 									TextTrimming="CharacterEllipsis"
 									TextWrapping="NoWrap" />
 
@@ -312,7 +313,7 @@
 									VerticalAlignment="Stretch"
 									BeforeTextChanging="ItemNameTextBox_BeforeTextChanging"
 									TextAlignment="Left"
-									TextWrapping="Wrap"
+									TextWrapping="NoWrap"
 									Visibility="Collapsed">
 									<TextBox.Resources>
 										<ResourceDictionary>

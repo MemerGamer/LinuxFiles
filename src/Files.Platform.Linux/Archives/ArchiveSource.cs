@@ -128,6 +128,14 @@ namespace Files.Platform.Linux.Archives
 
 			public override IEnumerable<(EntryData Entry, Func<Stream> Open)> Entries(bool headersOnly = false)
 			{
+				if (archive.Type == ArchiveType.Tar)
+				{
+					// Parse the detected format on the same opened input, regardless of its filename.
+					input.Position = 0;
+					foreach (var entry in TarSource.ReadEntries(input, default))
+						yield return entry;
+					yield break;
+				}
 				if (IsSolid && !headersOnly)
 				{
 					using var reader = archive.ExtractAllEntries();
@@ -180,7 +188,13 @@ namespace Files.Platform.Linux.Archives
 				using var file = OpenInput(path, maxBytes, cancellationToken);
 				using var codecStream = Decompress(file, codec);
 				using var decompressed = maxBytes is { } limit ? new PreviewReadStream(codecStream, limit, cancellationToken) : codecStream;
-				using var reader = new TarReader(decompressed);
+				foreach (var entry in ReadEntries(decompressed, cancellationToken))
+					yield return entry;
+			}
+
+			internal static IEnumerable<(EntryData Entry, Func<Stream> Open)> ReadEntries(Stream input, CancellationToken cancellationToken)
+			{
+				using var reader = new TarReader(input, leaveOpen: true);
 				TarEntry? entry;
 				var skipped = 0;
 				while ((entry = reader.GetNextEntry()) is not null)

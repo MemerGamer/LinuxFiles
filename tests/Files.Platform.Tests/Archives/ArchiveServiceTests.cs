@@ -80,14 +80,18 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
-		public async Task TarHardlink_IsReportedSkippedRatherThanReinterpretedAsSymlink()
+		[DataRow("hardlink.tar")]
+		[DataRow("payload.zip")]
+		public async Task TarHardlink_IsReportedSkippedRatherThanReinterpretedAsSymlink(string name)
 		{
-			var archive = Path.Combine(Work, "hardlink.tar");
+			var archive = Path.Combine(Work, name);
 			using (var output = File.Create(archive))
 			using (var writer = new TarWriter(output))
 			{
 				using var data = new MemoryStream(Encoding.UTF8.GetBytes("base data"));
 				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "base") { DataStream = data });
+				using var attackerData = new MemoryStream(Encoding.UTF8.GetBytes("attacker data"));
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "dir/base") { DataStream = attackerData });
 				writer.WriteEntry(new PaxTarEntry(TarEntryType.HardLink, "dir/alias") { LinkName = "base" });
 			}
 			var result = await service.ExtractAsync(archive, Out);

@@ -759,6 +759,9 @@ namespace Files.App.Views.Layouts
 				if (selectedItems is null or { Count: 0 })
 					return;
 
+				if (selectedItems.Any(item => NavigationItemGuard.ShouldSuppress(parentShellPage, item)))
+					return;
+
 				shiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 				SelectedItemsPropertiesViewModel.CheckAllFileExtensions(selectedItems.Select(x => x.FileExtension).ToList());
 
@@ -1038,8 +1041,9 @@ namespace Files.App.Views.Layouts
 
 				ItemManipulationModel.ClearSelection();
 				shiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-				var currentFolder = shellViewModel.CurrentFolder
-					?? throw new InvalidOperationException("The current folder is not available.");
+				var currentFolder = shellViewModel.CurrentFolder;
+				if (NavigationItemGuard.ShouldSuppress(parentShellPage, currentFolder) || currentFolder is null)
+					return;
 				List<ListedItem> contextItems = [currentFolder];
 				token = RenewShellMenuToken();
 				var buildVersion = contextMenuVersion;

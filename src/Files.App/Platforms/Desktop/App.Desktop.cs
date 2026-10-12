@@ -150,7 +150,7 @@ namespace Files.App
 
 			if (userSettingsService.GeneralSettingsService.ContinueLastSessionOnStartUp || userSettingsService.AppSettingsService.RestoreTabsOnStartup)
 				AppLifecycleHelper.SaveSessionTabs();
-			else
+			else if (MainPageViewModel.StartupTabsLoadedTask.IsCompletedSuccessfully)
 				await commandManager.CloseAllTabs.ExecuteAsync();
 
 			// TODO: "leave app running" (background parking) is not supported on desktop yet

@@ -415,6 +415,12 @@ namespace Files.App.Helpers
 		/// </summary>
 		public static void SaveSessionTabs()
 		{
+#if DESKTOP
+			// Navigation can still be restoring tabs while the window closes.
+			if (!MainPageViewModel.StartupTabsLoadedTask.IsCompletedSuccessfully)
+				return;
+#endif
+
 			var userSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
 			userSettingsService.GeneralSettingsService.LastSessionTabList = MainPageViewModel.AppInstances.DefaultIfEmpty().Select(tab =>

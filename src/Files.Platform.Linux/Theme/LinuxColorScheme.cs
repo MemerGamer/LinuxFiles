@@ -98,7 +98,7 @@ namespace Files.Platform.Linux.Theme
 				var outer = reader.ReadVariantValue();
 				var inner = outer.Type == VariantValueType.Variant ? outer.GetVariantValue() : outer;
 				return inner.Type == VariantValueType.UInt32 ? (uint?)inner.GetUInt32() : null;
-			}, null).WaitAsync(TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
+			}, null).WaitAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
 		}
 
 		private static MessageBuffer BuildReadMessage(DBusConnection connection)
@@ -175,18 +175,30 @@ namespace Files.Platform.Linux.Theme
 						if (ex is not null || value is null)
 							return;
 
-						var dark = value is 1 or 2 ? value == 1 : FromGtkThemeEnv() ?? FromKdeGlobals() ?? FromGSettings() ?? false;
-						if (_isDark != dark)
-						{
-							_isDark = dark;
-							Changed?.Invoke(null, EventArgs.Empty);
-						}
+						ApplyPortalValue(value.Value);
 					}, null, null, false, ObserverFlags.None);
+
+					// Reconcile preferences missed before subscription, including slow startup reads.
+					if (await ReadPortalAsync().ConfigureAwait(false) is { } current)
+						ApplyPortalValue(current);
 				}
 				catch (Exception)
 				{
 				}
 			});
+		}
+
+		private static void ApplyPortalValue(uint value)
+		{
+			if (OverrideValue() is not null)
+				return;
+
+			var dark = value is 1 or 2 ? value == 1 : FromGtkThemeEnv() ?? FromKdeGlobals() ?? FromGSettings() ?? false;
+			if (_isDark != dark)
+			{
+				_isDark = dark;
+				Changed?.Invoke(null, EventArgs.Empty);
+			}
 		}
 
 		private static bool? FromGtkThemeEnv()

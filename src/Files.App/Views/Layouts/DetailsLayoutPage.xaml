@@ -157,7 +157,7 @@
 				<Setter Property="TextTrimming" Value="CharacterEllipsis" />
 				<Setter Property="VerticalAlignment" Value="Center" />
 				<Setter Property="HorizontalAlignment" Value="Stretch" />
-				<Setter Property="Opacity" Value="0.6" />
+				<Setter Property="Foreground" Value="{ThemeResource Files.Details.ForegroundBrush}" />
 			</Style>
 
 			<Style
@@ -1021,7 +1021,9 @@
 											VerticalAlignment="Center"
 											Opacity="{x:Bind Opacity, Mode=OneWay}"
 											Text="{x:Bind Name, Mode=OneWay}"
-											TextTrimming="CharacterEllipsis" />
+											MaxLines="1"
+											TextTrimming="CharacterEllipsis"
+											TextWrapping="NoWrap" />
 
 										<TextBox
 											x:Name="ItemNameTextBox"
@@ -1029,6 +1031,7 @@
 											HorizontalAlignment="Left"
 											VerticalAlignment="Center"
 											BeforeTextChanging="ItemNameTextBox_BeforeTextChanging"
+											TextWrapping="NoWrap"
 											Visibility="Collapsed">
 											<TextBox.Resources>
 												<ResourceDictionary>

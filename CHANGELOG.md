@@ -1,7 +1,16 @@
 # Changelog
 
-LinuxFiles is an unofficial native Linux port of [Files](https://github.com/files-community/Files) by the Files
-Community. This changelog covers the fork only.
+LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files-community/Files) by the Files Community. This changelog covers the fork only; older entries describe the policy and limitations at their release dates.
+
+## Unreleased
+
+Pull requests merged after `linux-v0.1.0-alpha4`, from the stored `origin/main` history:
+
+- [#157](https://github.com/MemerGamer/LinuxFiles/pull/157): Update the Nix flake to alpha4 and its release hashes, including compatible NixOS root-actions support.
+- [#158](https://github.com/MemerGamer/LinuxFiles/pull/158): Merge the final upstream sync, including translation updates and preventing hidden progress rings from animating. This predates the independent-fork policy below.
+- [#159](https://github.com/MemerGamer/LinuxFiles/pull/159): Establish LinuxFiles as an independent Linux-only fork; remove Windows build/packaging projects and CI, retire upstream-sync automation, and document selective fixes with preserved attribution.
+- [#160](https://github.com/MemerGamer/LinuxFiles/pull/160): Remove Windows-only application branches, storage/interop code, tests and obsolete build configuration; rewrite developer guidance for Linux and mark platform tests Linux-only.
+- [#163](https://github.com/MemerGamer/LinuxFiles/pull/163): Add a native Wayland host spike report. This is investigation documentation; the app continues to use X11/XWayland.
 
 ## 0.1.0-alpha4 - 2026-10-10
 

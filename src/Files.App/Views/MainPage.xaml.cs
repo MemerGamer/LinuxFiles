@@ -32,6 +32,14 @@ namespace Files.App.Views
 		public MainPageViewModel ViewModel { get; }
 
 
+		private int openPropertiesWindowCount;
+
+		internal void UpdatePropertiesBackdrop(bool opening)
+		{
+			openPropertiesWindowCount = Math.Max(0, openPropertiesWindowCount + (opening ? 1 : -1));
+			PropertiesSmokeLayer.Visibility = openPropertiesWindowCount > 0 ? Visibility.Visible : Visibility.Collapsed;
+		}
+
 		private bool keyReleased = true;
 
 		private DispatcherQueueTimer _updateDateDisplayTimer;

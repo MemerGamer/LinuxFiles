@@ -2,20 +2,32 @@
   <img alt="LinuxFiles on Linux: Home page" src="../docs/linux-port/showcase/home.png" width="820" />
 </p>
 
-# LinuxFiles: Files for Linux
+# LinuxFiles
 
-**LinuxFiles, Files for Linux, based on Files by the Files Community, is an independent, community-maintained Linux-only fork of [Files](https://github.com/files-community/Files) by the Files Community. It is not affiliated with or endorsed by the Files Community.**
+LinuxFiles is an independent Linux-only file manager built with C#/.NET 10 and Uno Platform's Skia desktop host. It runs on X11, including XWayland on Wayland desktops, without Windows or Wine.
 
-Files is created and maintained by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors). This fork builds on their work and keeps their MIT-licensed code, history and credit. The Linux port itself ([Uno Platform](https://platform.uno), Skia, X11, and the Linux platform layer) is the work of the LinuxFiles contributors. See [Credits](#credits) and [NOTICE.md](../NOTICE.md).
+Based on [Files](https://github.com/files-community/Files) by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors), this fork is not affiliated with or endorsed by the Files Community. LinuxFiles has no Windows support or upstream sync. Individual upstream fixes may be brought over selectively with attribution; see the [upstream policy](../docs/linux-port/upstream-policy.md).
 
-> [!WARNING]
-> **Status: alpha.** Expect missing features and rough edges, and do not rely on it for data you cannot afford to lose. The official, supported Files for Windows is at [files.community](https://files.community/).
+**Status: alpha.** Expect missing features and rough edges. Keep backups and report problems in [this fork's issue tracker](https://github.com/MemerGamer/LinuxFiles/issues).
 
-LinuxFiles supports Linux only and has no upstream sync: upstream stays a read-only remote, fixes are cherry-picked selectively, and upstream branches are no longer merged. See the [upstream policy](../docs/linux-port/upstream-policy.md). MIT/MPL licenses and contributor notices remain preserved.
+## Features
 
-## Linux port: current state
+- Tabs, Home and sidebar navigation, Details/List/Grid/Cards layouts, sorting and grouped views.
+- Copy, move, rename, delete, trash and restore; file clipboard and X11 drag and drop.
+- Archive browsing and extraction, search, file previews, tags and a Properties window with POSIX permissions.
+- UDisks2 drive mounting and ejecting, GVfs network/MTP locations, desktop file launchers and KDE service menus.
+- Open with, templates, terminals, desktop portal pickers and FileManager1 integration.
+- Appearance settings, system colours and optional polkit-authenticated root operations in supported native packages.
 
-This fork runs Files natively on Linux (Uno Platform, Skia, X11). The shell, Settings, file operations, trash, archives, clipboard and drag and drop, UDisks2 volumes and desktop integration are in place. See the [showcase](../docs/linux-port/SHOWCASE.md) for the full feature checklist and what is not working yet.
+See the [showcase](../docs/linux-port/SHOWCASE.md) for screenshots and [packaging details](../docs/linux-port/packaging.md) for integration requirements.
+
+## Known limits
+
+- X11/XWayland only; native Wayland and AT-SPI accessibility are not implemented. Text and icons can look soft under XWayland, particularly with fractional scaling. See [Troubleshooting](#troubleshooting).
+- Select-all in folders with around 10,000 items remains slow because of Uno selection handling.
+- Tags use Linux extended attributes and a local database. Extended-attribute writes can fail on read-only files or unsupported filesystems; alpha4 preserves edits in the database across reloads and restarts, but those edits cannot be written back to the file when xattrs fail.
+- Release packages target x86_64. arm64 publishing is wired but untested. Network/MTP browsing requires a working GVfs session.
+- AppImage, Flatpak and plain Nix installs disable root actions; see [Root actions](#root-actions).
 
 ## Install
 
@@ -66,15 +78,17 @@ Root actions remain disabled in the AppImage. Administrators can separately [pro
 ### Flatpak bundle
 
 ```sh
-flatpak install --user Files-x86_64.flatpak
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha4/Files-x86_64.flatpak
+flatpak install --user ./Files-x86_64.flatpak
 flatpak run io.github.memergamer.LinuxFiles
 ```
 
-The bundle needs the `org.freedesktop.Platform//25.08` runtime; Flatpak offers to install it from Flathub. Root actions remain disabled. An optional [companion host-helper installer](../docs/linux-port/packaging.md#companion-host-helper-opt-in-appimage--flatpak) provisions the native host only; this bundle has no host-spawn bridge and keeps its sandbox permissions unchanged.
+The bundle needs the `org.freedesktop.Platform//25.08` runtime and a configured Flathub remote to obtain it. It is a downloadable bundle, not a Flathub app listing. Root actions remain disabled. An optional [companion host-helper installer](../docs/linux-port/packaging.md#companion-host-helper-opt-in-appimage--flatpak) provisions the native host only; this bundle has no host-spawn bridge and keeps its sandbox permissions unchanged.
 
 ### Tarball
 
 ```sh
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha4/files-linux-x64.tar.gz
 tar xzf files-linux-x64.tar.gz
 ./linux-x64/Files                      # run it in place
 ```
@@ -125,6 +139,25 @@ curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/Linu
 
 **Soft text or icons on niri / xwayland-satellite:** Enable **Detect display scale from the compositor (experimental)** in Settings > Appearance and restart Files to use niri's focused output scale when no Uno, Xft, GDK or Qt scale hint is present and both `NIRI_SOCKET` and `WAYLAND_DISPLAY` are set. Check stderr for `[display-scale]` to see whether IPC or CLI detection succeeded. Detection defaults off and may double-scale on some setups. `FILES_NIRI_SCALE=1` forces it on and `FILES_NIRI_SCALE=0` forces it off, overriding the saved preference. Launch with `UNO_DISPLAY_SCALE_OVERRIDE=1.25 files` to select a scale manually (replace `1.25` with your output scale). The scale is chosen at startup. See [display scale details](../docs/linux-port/appearance-transparency.md#display-scale-on-niri).
 
+## Building from source
+
+Install the .NET 10 SDK and the native Linux dependencies: fontconfig, FreeType, X11 libraries (Xcursor, Xrandr, Xi and Xext), Mesa/OpenGL and GLib. An X11 server or XWayland is required to run the app. See the [AUR recipe](../packaging/linux/aur/linuxfiles-bin/PKGBUILD) for the Arch package names.
+
+```sh
+git clone https://github.com/MemerGamer/LinuxFiles.git
+cd LinuxFiles
+dotnet build src/Files.App -f net10.0-desktop
+```
+
+For self-contained publishing and a user-local install:
+
+```sh
+scripts/linux/publish.sh
+scripts/linux/install-local.sh
+```
+
+Publishing the Native AOT elevation helper also requires clang and zlib development files. See [packaging](../docs/linux-port/packaging.md) for package builds and helper installation, and [CONTRIBUTING.md](../CONTRIBUTING.md) for validation instructions.
+
 ## Reporting bugs
 
 - **Linux bugs and Linux feature requests:** open an issue in [this fork](https://github.com/MemerGamer/LinuxFiles/issues).
@@ -132,7 +165,7 @@ curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/Linu
 
 ## Contributing
 
-Contributions to this independent Linux fork are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md).
+Submit focused pull requests to `main` in [MemerGamer/LinuxFiles](https://github.com/MemerGamer/LinuxFiles), using the PR template. Disclose AI-assisted work and include `Co-Authored-By` trailers for co-authors. See [CONTRIBUTING.md](../CONTRIBUTING.md) for development, validation and attribution requirements.
 
 ## Credits
 
@@ -145,4 +178,4 @@ The full list of third-party components and licenses is in [NOTICE.md](../NOTICE
 
 ## License
 
-[MIT](../LICENSE-MIT). Copyright (c) 2018 - present Files Community; Copyright (c) 2026 LinuxFiles contributors (modifications for Linux).
+Inherited MIT code and LinuxFiles modifications are covered by [LICENSE-MIT](../LICENSE-MIT): Copyright (c) 2018 - present Files Community; Copyright (c) 2026 LinuxFiles contributors (Linux modifications). [LICENSE-MPL](../LICENSE-MPL) applies to files bearing Mozilla Public License headers. Preserve both licenses, applicable file headers, contributor attribution and [NOTICE.md](../NOTICE.md), including the inherited [third-party notices](./NOTICE.md).

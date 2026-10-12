@@ -276,10 +276,24 @@
 	<ResourceDictionary.ThemeDictionaries>
 		<!--  No Mica on Linux: the window backdrop is a solid fill equal to the Mica base colour, so the translucent Files layers on top keep their look  -->
 		<ResourceDictionary x:Key="Light">
+			<SolidColorBrush x:Key="Files.Details.ForegroundBrush" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForeground" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForegroundPointerOver" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForegroundSubMenuOpened" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForeground" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForegroundPointerOver" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForegroundSubMenuOpened" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarToggleButtonForeground" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarToggleButtonForegroundPointerOver" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarToggleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
 			<SolidColorBrush x:Key="App.Theme.FileArea.BackgroundBrush" Color="#C0FCFCFC" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#0F000000" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="#0A000000" />
 			<SolidColorBrush x:Key="Files.Linux.FlyoutSurfaceBrush" Color="#F9F9F9" />
+			<SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#F9F9F9" />
+			<SolidColorBrush x:Key="FlyoutBackgroundThemeBrush" Color="#F9F9F9" />
 			<SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#33000000" />
 			<SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="#33000000" />
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#F3F3F3" />
@@ -296,9 +310,23 @@
 			<SolidColorBrush x:Key="Files.Tile.BorderSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.5" />
 		</ResourceDictionary>
 		<ResourceDictionary x:Key="Dark">
+			<SolidColorBrush x:Key="Files.Details.ForegroundBrush" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForeground" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForegroundPointerOver" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonForegroundSubMenuOpened" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForeground" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForegroundPointerOver" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarButtonSubItemChevronForegroundSubMenuOpened" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarToggleButtonForeground" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarToggleButtonForegroundPointerOver" Color="{ThemeResource TextFillColorPrimary}" />
+			<SolidColorBrush x:Key="AppBarToggleButtonForegroundPressed" Color="{ThemeResource TextFillColorPrimary}" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPointerOver" Color="#14FFFFFF" />
 			<SolidColorBrush x:Key="TabViewItemHeaderBackgroundPressed" Color="#0DFFFFFF" />
 			<SolidColorBrush x:Key="Files.Linux.FlyoutSurfaceBrush" Color="#2B2B2B" />
+			<SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="#2B2B2B" />
+			<SolidColorBrush x:Key="FlyoutBackgroundThemeBrush" Color="#2B2B2B" />
 			<SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="#26FFFFFF" />
 			<SolidColorBrush x:Key="FlyoutBorderThemeBrush" Color="#26FFFFFF" />
 			<SolidColorBrush x:Key="App.Theme.BackgroundBrush" Color="#202020" />
@@ -313,6 +341,10 @@
 			<SolidColorBrush x:Key="Files.Tile.BackgroundSelectedPointerOver" Color="{ThemeResource SystemAccentColor}" Opacity="0.34" />
 			<SolidColorBrush x:Key="Files.Tile.BackgroundSelectedPressed" Color="{ThemeResource SystemAccentColor}" Opacity="0.22" />
 			<SolidColorBrush x:Key="Files.Tile.BorderSelected" Color="{ThemeResource SystemAccentColor}" Opacity="0.6" />
+		</ResourceDictionary>
+		<ResourceDictionary x:Key="HighContrast">
+			<SolidColorBrush x:Key="Files.Details.ForegroundBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+			<SolidColorBrush x:Key="Files.Linux.FlyoutSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
 		</ResourceDictionary>
 	</ResourceDictionary.ThemeDictionaries>
 

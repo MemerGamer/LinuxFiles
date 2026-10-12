@@ -30,13 +30,10 @@ namespace Files.Platform.Linux.Launching
 	}
 
 	/// <summary>
-	/// Starts processes through <c>setsid</c> with stdio redirected to /dev/null so they outlive and ignore this process.
+	/// Starts processes through <c>setsid</c> when available, passing arguments directly without a shell.
 	/// </summary>
 	public sealed class DetachedProcessStarter : IProcessStarter
 	{
-		private const string RedirectScript = "exec \"$@\" </dev/null >/dev/null 2>&1";
-		private const string BackgroundScript = "exec \"$@\" </dev/null >/dev/null 2>&1 &";
-
 		private readonly IExecutableLocator locator;
 
 		/// <summary>
@@ -55,20 +52,16 @@ namespace Files.Platform.Linux.Launching
 		}
 
 		/// <inheritdoc/>
-		public async Task StartDetachedAsync(ProcessLaunch launch, CancellationToken cancellationToken = default)
+		public Task StartDetachedAsync(ProcessLaunch launch, CancellationToken cancellationToken = default)
 		{
 			var program = locator.Locate(launch.FileName)
 				?? throw new FileNotFoundException("Executable not found.", launch.FileName);
 
-			var sh = locator.Locate("sh") ?? "/bin/sh";
 			var setsid = locator.Locate("setsid");
 
 			var startInfo = new ProcessStartInfo
 			{
 				UseShellExecute = false,
-				RedirectStandardInput = true,
-				RedirectStandardOutput = true,
-				RedirectStandardError = true,
 				CreateNoWindow = true,
 			};
 
@@ -79,29 +72,20 @@ namespace Files.Platform.Linux.Launching
 			{
 				startInfo.FileName = setsid;
 				startInfo.ArgumentList.Add("--fork");
-				startInfo.ArgumentList.Add(sh);
+				startInfo.ArgumentList.Add(program);
 			}
 			else
 			{
-				startInfo.FileName = sh;
+				startInfo.FileName = program;
 			}
 
-			startInfo.ArgumentList.Add("-c");
-			startInfo.ArgumentList.Add(setsid is not null ? RedirectScript : BackgroundScript);
-			startInfo.ArgumentList.Add("sh");
-			startInfo.ArgumentList.Add(program);
 			foreach (var argument in launch.Arguments)
 				startInfo.ArgumentList.Add(argument);
 
 			using var process = Files.Platform.Linux.Launching.TracedProcess.Start(startInfo)
 				?? throw new InvalidOperationException("The process could not be started.");
 
-			process.StandardInput.Close();
-			process.StandardOutput.Close();
-			process.StandardError.Close();
-
-			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("process-wrapper-exit");
-			await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+			return Task.CompletedTask;
 		}
 	}
 

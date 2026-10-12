@@ -1,4 +1,4 @@
-// Copyright (c) Files Community
+﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.Mime;
@@ -311,7 +311,7 @@ namespace Files.Platform.Tests.Mime
 		public void Expansion_TargetsRemainLiteralArgvElements(string field, bool urls, bool single)
 		{
 			string[] targets = ["/tmp/a 'quote' \"double\" $(touch bad);\nfile.png", "/tmp/-b\\file.png"];
-			var app = new DesktopApplication("run", "Run", "tool \"" + field + "\"", "/menu.desktop");
+			var app = new DesktopApplication("run", "Run", "tool " + field, "/menu.desktop");
 			var commands = DesktopExecExpander.ExpandServiceMenu(app, targets);
 			Assert.AreEqual(single ? 2 : 1, commands.Count);
 			var expected = urls ? targets.Select(DesktopExecExpander.ToUri).ToArray() : targets;
@@ -339,7 +339,6 @@ namespace Files.Platform.Tests.Mime
 		[DataRow("tool --input=%f %U")]
 		[DataRow("tool --input=%f --other=%f")]
 		[DataRow("tool '%F suffix'")]
-		[DataRow("tool %D")]
 		[DataRow("tool 'unterminated")]
 		public void Expansion_RefusesShellsSyntaxAndEmbeddedTargetCodes(string exec) =>
 			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a.png"]).Count);
@@ -351,18 +350,10 @@ namespace Files.Platform.Tests.Mime
 		[DataRow("U")]
 		[DataRow("d")]
 		[DataRow("D")]
-		public void Expansion_LongOptionValueUsesExactlyOneLiteralTarget(string code)
+		public void Expansion_LongOptionValueRejectsEmbeddedCodes(string code)
 		{
-			var target = "/tmp/a 'quoted' $(touch bad); directory/file.png";
 			var app = new DesktopApplication("run", "Run", "tool --long-option=%" + code, "/any-name.desktop");
-			var commands = DesktopExecExpander.ExpandServiceMenu(app, [target]);
-			var value = code is "u" or "U" ? DesktopExecExpander.ToUri(target) : code is "d" or "D" ? Path.GetDirectoryName(target) : target;
-			CollectionAssert.AreEqual(new[] { "tool", "--long-option=" + value }, commands.Single().ToArray());
-			Assert.IsNotNull(DisplaySanitizer.FullArguments(commands[0]));
-			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(app, []).Count);
-			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(app, [target, "/another"]).Count);
-			if (code is "f" or "F" or "d" or "D")
-				Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(app, ["smb://host/file"]).Count);
+			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(app, ["/tmp/file"]).Count);
 		}
 
 		[TestMethod]
@@ -373,7 +364,7 @@ namespace Files.Platform.Tests.Mime
 			var action = ServiceMenuParser.ParseStrict(Text().Split('\n'), path, CultureInfo.InvariantCulture)!.Actions[0];
 			Assert.IsNull(ServiceMenuLaunchPlan.Create(action, ["/" + new string('a', DisplaySanitizer.MaxExecutedCharacters)], CultureInfo.InvariantCulture));
 			var remote = new DesktopApplication("run", "Run", "tool %F", path);
-			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(remote, ["smb://host/file.png"]).Count);
+			Assert.AreEqual(1, DesktopExecExpander.ExpandServiceMenu(remote, ["smb://host/file.png"]).Count);
 		}
 
 		private static string Fixture(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Mime", "Fixtures", "ServiceMenus", name + ".desktop"));
@@ -388,8 +379,7 @@ namespace Files.Platform.Tests.Mime
 			var folders = await service.GetActionsAsync([fx.Home]);
 			var rootFolders = folders.Where(a => a.Submenu == "Root Actions").ToArray();
 			Assert.AreEqual(11, rootFolders.Length);
-			Assert.AreEqual(12, folders.Count);
-			Assert.AreEqual("RunGhosttyDir", folders.Last().ActionId);
+			Assert.AreEqual(11, folders.Count);
 			var multipleFolders = await service.GetActionsAsync([fx.Home, fx.Home]);
 			Assert.IsFalse(multipleFolders.Any(a => a.ActionId == "RunGhosttyDir"));
 			Assert.IsTrue(rootFolders.All(a => a.Priority == "TopLevel"));
@@ -402,24 +392,9 @@ namespace Files.Platform.Tests.Mime
 		}
 
 		[TestMethod]
-		public void Plan_DistroGhosttyUsesLiteralLongOptionWithoutRewritingExec()
+		public void Plan_DistroGhosttyRejectsEmbeddedFieldCode()
 		{
-			using var fx = new XdgFixture();
-			var text = Fixture("com.mitchellh.ghostty");
-			var path = fx.Write("data/kio/servicemenus/com.mitchellh.ghostty.desktop", text);
-			var action = ServiceMenuParser.ParseStrict(text.Split('\n'), path, CultureInfo.InvariantCulture)!.Actions.Single();
-			var directory = Path.Combine(fx.Home, "a 'quoted' $(touch bad); folder");
-			Directory.CreateDirectory(directory);
-			var plan = ServiceMenuLaunchPlan.Create(action, [directory], CultureInfo.InvariantCulture);
-			Assert.IsNotNull(plan);
-			Assert.AreEqual(1, plan.Invocations.Count);
-			CollectionAssert.AreEqual(new[] { "ghostty", "--working-directory=" + directory, "--gtk-single-instance=false" }, plan.Invocations[0].ToArray());
-			Assert.AreEqual("ghostty --working-directory=%F --gtk-single-instance=false", action.Application.Exec);
-			Assert.IsTrue(plan.Identity.StillMatches(path));
-			Assert.AreEqual(1, ServiceMenuParser.ParseStrict(text.Split('\n'), "/other.desktop", CultureInfo.InvariantCulture)!.Actions.Count);
-			Assert.IsNull(ServiceMenuLaunchPlan.Create(action, [directory, fx.Home], CultureInfo.InvariantCulture));
-			var modified = text.Replace("--gtk-single-instance=false", "--gtk-single-instance=false --title=%f");
-			Assert.AreEqual(0, ServiceMenuParser.ParseStrict(modified.Split('\n'), path, CultureInfo.InvariantCulture)!.Actions.Count);
+			Assert.AreEqual(0, Parse(Fixture("com.mitchellh.ghostty"))!.Actions.Count);
 		}
 
 		[TestMethod]

@@ -14,7 +14,7 @@ Priorities: P0 critical immediate exposure; P1 command execution or significant 
 
 **Evidence:** Reproduced with `/bin/sh` and harmless `printf INJECTED`. The expanded script contained the literal `$(printf INJECTED)` filename; shell output instead contained `INJECTED`. Existing `DesktopExecInjectionTests` cover unquoted placeholders inside scripts, not this nested case. Service-menu expansion uses a separate restrictive path; this finding concerns `Expand`.
 
-**Suggested fix:** Tokenize the desktop Exec before substituting filenames and keep targets as argv data. Reject field-code substitution into shell script arguments; support a safe explicitly defined form passing targets as positional arguments to a fixed script (`sh -c 'viewer "$1"' sh <target>`). Do not attempt to fix arbitrary nested script syntax with another escaping pass. Add nested double/single quotes, substitutions and backticks to launch tests.
+**Resolution:** Parse Exec using Desktop Entry quoting rules and reject field codes embedded in or quoted within arguments. Expand codes only into separate argv entries; `%%` represents a literal percent. Remove shell/wrapper detection entirely. Exec lines from installed desktop entries and service menus are trusted configuration (the same trust model as GIO); filenames are untrusted data and are only ever passed as separate argv. A configured interpreter can intentionally interpret an argument as code; identifying or policing such trusted commands is outside this boundary. LinuxFiles must not evaluate Exec through a shell and uses `ProcessStartInfo.ArgumentList`.
 
 ### R2 — P1: Archive merge can delete/overwrite outside the extraction destination
 

@@ -154,7 +154,7 @@ namespace Files.Platform.Tests.Launching
 		{
 			using var fx = new XdgFixture();
 			var (svc, starter) = Create(fx, new Dictionary<string, string?> { ["TERMINAL"] = "xterm" }, "xterm");
-			var app = new Files.Platform.Abstractions.Mime.DesktopApplication("x.desktop", "X", "/bin/echo \"a b\" \\\\s 'c d' %c", "/x.desktop");
+			var app = new Files.Platform.Abstractions.Mime.DesktopApplication("x.desktop", "X", "/bin/echo \"a b\" \"c d\" %c", "/x.desktop");
 			var argv = DesktopExecExpander.Expand(app, [])[0];
 
 			Assert.IsTrue(await svc.RunCommandAsync(argv, false));

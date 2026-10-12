@@ -22,7 +22,26 @@ namespace Files.Platform.Tests.Launching
 		{
 			CollectionAssert.AreEqual(
 				new[] { "my app", "--arg=a b", "say \"hi\"", "$HOME", "" },
-				DesktopExecExpander.Tokenize("\"my app\" --arg=\"a b\" \"say \\\"hi\\\"\" \"\\$HOME\" \"\""));
+				DesktopExecExpander.Tokenize("\"my app\" \"--arg=a b\" \"say \\\"hi\\\"\" \"\\$HOME\" \"\""));
+		}
+
+		[TestMethod]
+		[DataRow("viewer 'single quotes'")]
+		[DataRow("viewer prefix\"quoted\"")]
+		[DataRow("viewer \"quoted\"suffix")]
+		[DataRow("viewer $(id)")]
+		[DataRow("viewer a;b")]
+		[DataRow("viewer a\\b")]
+		[DataRow("viewer \"$HOME\"")]
+		public void InvalidExecQuoting_IsRejected(string exec)
+		{
+			Assert.IsNull(DesktopExecExpander.Tokenize(exec));
+		}
+
+		[TestMethod]
+		public void LiteralPercent_IsUnescapedOnlyOnce()
+		{
+			CollectionAssert.AreEqual(new[] { "viewer", "%f", "100%", "" }, Expand("viewer %%f \"100%%\" \"\"")[0]);
 		}
 
 		[TestMethod]
@@ -55,10 +74,10 @@ namespace Files.Platform.Tests.Launching
 		[TestMethod]
 		public void IconNameAndKeyCodes()
 		{
-			var result = Expand("viewer %i --title=%c --desktop=%k 100%% %f", "my-icon", "/x");
+			var result = Expand("viewer %i --title %c --desktop %k 100%% %f", "my-icon", "/x");
 
 			CollectionAssert.AreEqual(
-				new[] { "viewer", "--icon", "my-icon", "--title=Test App", "--desktop=/usr/share/applications/t.desktop", "100%", "/x" },
+				new[] { "viewer", "--icon", "my-icon", "--title", "Test App", "--desktop", "/usr/share/applications/t.desktop", "100%", "/x" },
 				result[0]);
 		}
 
@@ -99,6 +118,9 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
+		[DataRow("viewer --file=%f")]
+		[DataRow("viewer prefix%c")]
+		[DataRow("viewer \"%f\"")]
 		[DataRow("viewer %x")]
 		[DataRow("viewer %")]
 		[DataRow("viewer %f %U")]
@@ -111,9 +133,9 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
-		public void EmbeddedSingleCode_IsLiteralAndExpandedOnlyOnce()
+		public void SingleCode_IsExpandedOnlyOnce()
 		{
-			CollectionAssert.AreEqual(new[] { "viewer", "--file=/x %U $(id)" }, Expand("viewer --file=%f", null, "/x %U $(id)")[0]);
+			CollectionAssert.AreEqual(new[] { "viewer", "/x %U $(id)" }, Expand("viewer %f", null, "/x %U $(id)")[0]);
 		}
 
 		[TestMethod]

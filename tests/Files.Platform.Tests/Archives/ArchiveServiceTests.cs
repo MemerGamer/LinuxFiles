@@ -606,6 +606,44 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		[DataRow("publish-opening", false, true)]
+		[DataRow("publish-opened", false, true)]
+		[DataRow("publish-renamed", false, true)]
+		[DataRow("retire-opening", true, true)]
+		[DataRow("retire-opened", true, true)]
+		[DataRow("retire-renamed", true, true)]
+		[DataRow("publish-renamed", false, false)]
+		[DataRow("retire-renamed", true, false)]
+		public async Task MovedPublicationParentIsRejectedAndRolledBack(string checkpoint, bool overwrite, bool replaceParent)
+		{
+			ExistingFile();
+			var outside = Path.Combine(root, "moved-parent");
+			var moved = false;
+			var extracting = new LinuxArchiveService
+			{
+				PublicationCheckpoint = phase =>
+				{
+					if (phase != checkpoint || moved) return;
+					Directory.Move(Path.Combine(Out, "dir"), outside);
+					// A replacement tests inode comparison; a missing path tests failed re-resolution.
+					if (replaceParent) Directory.CreateDirectory(Path.Combine(Out, "dir"));
+					moved = true;
+				},
+			};
+			var zip = ZipWith(Path.Combine(Work, "race.zip"), (overwrite ? "dir/a.txt" : "dir/new.txt", Bytes("incoming")));
+			var result = await extracting.ExtractAsync(zip, Out, new ArchiveExtractOptions
+			{
+				ResolveConflict = (_, _) => Task.FromResult(new ConflictResolution(ConflictAction.Overwrite)),
+			});
+			Assert.IsTrue(moved);
+			Assert.IsFalse(result.Succeeded);
+			Assert.AreEqual("old", File.ReadAllText(Path.Combine(outside, "a.txt")));
+			CollectionAssert.AreEquivalent(new[] { "a.txt" }, Directory.GetFileSystemEntries(outside).Select(Path.GetFileName).ToArray());
+			if (replaceParent) Assert.AreEqual(0, Directory.GetFileSystemEntries(Path.Combine(Out, "dir")).Length);
+			else Assert.IsFalse(Directory.Exists(Path.Combine(Out, "dir")));
+		}
+
+		[TestMethod]
 		public async Task ExistingFilesAreNeverOverwrittenWithoutCallback()
 		{
 			ExistingFile();

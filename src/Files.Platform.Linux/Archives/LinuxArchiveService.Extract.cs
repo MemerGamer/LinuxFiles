@@ -19,6 +19,8 @@ namespace Files.Platform.Linux.Archives
 {
 	public sealed partial class LinuxArchiveService
 	{
+		internal Action<string>? PublicationCheckpoint { get; set; }
+
 		/// <inheritdoc/>
 		public Task<ArchiveResult> ExtractAsync(string archivePath, string destinationFolder, ArchiveExtractOptions? options = null, CancellationToken cancellationToken = default)
 		{
@@ -199,7 +201,7 @@ namespace Files.Platform.Linux.Archives
 				if (!extract)
 					return new ArchiveResult(true, false, processed, skipped);
 
-				var state = new MergeState(options, ct, destination!);
+				var state = new MergeState(options, ct, destination!, destinationHandle!, PublicationCheckpoint);
 				var rootIdentity = PosixNative.StatAt(destinationHandle!.Descriptor, ".", destination!);
 				void ValidateRoot()
 				{
@@ -292,16 +294,22 @@ namespace Files.Platform.Linux.Archives
 			private readonly ArchiveExtractOptions options;
 			private ConflictResolution? sticky;
 
-			public MergeState(ArchiveExtractOptions options, CancellationToken cancellationToken, string root)
+			public MergeState(ArchiveExtractOptions options, CancellationToken cancellationToken, string root, DirectoryHandle rootHandle, Action<string>? checkpoint)
 			{
 				this.options = options;
 				CancellationToken = cancellationToken;
 				Root = root;
+				RootHandle = rootHandle;
+				Checkpoint = checkpoint;
 			}
 
 			public CancellationToken CancellationToken { get; }
 
 			public string Root { get; }
+
+			public DirectoryHandle RootHandle { get; }
+
+			public Action<string>? Checkpoint { get; }
 
 			public long Skipped { get; set; }
 
@@ -394,31 +402,84 @@ namespace Files.Platform.Linux.Archives
 							publicationName = FileNameGenerator.GenerateUniqueName(name, isDirectory, destination.EntryExists);
 							break;
 						default:
+						{
 							if (!PosixNative.SameEntry(targetStat, PosixNative.StatAt(destination.Descriptor, name, target)))
 								throw new ArchiveSecurityException("The extraction conflict changed.");
 							// Never recursively remove a consented directory: it can move outside the destination.
 							if (targetStat.IsDirectory)
 								throw new ArchiveSecurityException("Cannot safely overwrite a directory with an archive file.");
+							using var retirementParent = OpenPublicationParent(state, relative, destination, "retire");
+							var parentFd = retirementParent.DangerousGetHandle().ToInt32();
+							if (!PosixNative.SameEntry(targetStat, PosixNative.StatAt(parentFd, name, target)))
+								throw new ArchiveSecurityException("The extraction conflict changed.");
 							var retiredName = ".files-overwrite-" + Guid.NewGuid().ToString("N");
-							PosixNative.RenameAt(destination.Descriptor, name, destination.Descriptor, retiredName, false, target);
-							var retiredFd = PosixNative.OpenPathAt(destination.Descriptor, retiredName, out var retiredError);
+							PosixNative.RenameAt(parentFd, name, parentFd, retiredName, false, target);
+							try
+							{
+								state.Checkpoint?.Invoke("retire-renamed");
+								VerifyPublicationParent(state, relative, retirementParent);
+							}
+							catch
+							{
+								PosixNative.RenameAt(parentFd, retiredName, parentFd, name, false, target);
+								throw;
+							}
+							var retiredFd = PosixNative.OpenPathAt(parentFd, retiredName, out var retiredError);
 							if (retiredFd < 0) throw PosixNative.CreateException(retiredError, target);
 							try
 							{
 								if (!PosixNative.TryStat(retiredFd, out var retiredStat) || !PosixNative.SameEntry(targetStat, retiredStat))
 								{
-									PosixNative.RenameAt(destination.Descriptor, retiredName, destination.Descriptor, name, false, target);
+									PosixNative.RenameAt(parentFd, retiredName, parentFd, name, false, target);
 									throw new ArchiveSecurityException("The extraction conflict changed.");
 								}
-								PosixNative.UnlinkAt(destination.Descriptor, retiredName, 0, target);
+								PosixNative.UnlinkAt(parentFd, retiredName, 0, target);
 							}
 							finally { PosixNative.Close(retiredFd); }
 							break;
+						}
 					}
 				}
 				validateDestination();
-				PosixNative.RenameAt(source.Descriptor, name, destination.Descriptor, publicationName, false, target);
+				using var publicationParent = OpenPublicationParent(state, relative, destination, "publish");
+				var publicationFd = publicationParent.DangerousGetHandle().ToInt32();
+				PosixNative.RenameAt(source.Descriptor, name, publicationFd, publicationName, false, target);
+				try
+				{
+					state.Checkpoint?.Invoke("publish-renamed");
+					VerifyPublicationParent(state, relative, publicationParent);
+				}
+				catch
+				{
+					PosixNative.RenameAt(publicationFd, publicationName, source.Descriptor, name, false, target);
+					throw;
+				}
 			}
+		}
+
+		private static SafeFileHandle OpenPublicationParent(MergeState state, string relative, DirectoryHandle expected, string operation)
+		{
+			state.Checkpoint?.Invoke(operation + "-opening");
+			var handle = new SafeFileHandle(ElevationNative.OpenBeneath(state.RootHandle.Descriptor, relative, PosixNative.PathFlags | PosixNative.ODirectory), true);
+			try
+			{
+				if (!PosixNative.TryStat(handle.DangerousGetHandle().ToInt32(), out var stat) || !expected.IsSameEntry(stat))
+					throw new ArchiveSecurityException("The extraction destination changed.");
+				state.Checkpoint?.Invoke(operation + "-opened");
+				return handle;
+			}
+			catch { handle.Dispose(); throw; }
+		}
+
+		private static void VerifyPublicationParent(MergeState state, string relative, SafeFileHandle parent)
+		{
+			// Same-user renames can still move a pinned parent during the syscall or after this check.
+			// Re-resolve beneath the root and roll back on mismatch; this is detection, not isolation.
+			using var current = new SafeFileHandle(ElevationNative.OpenBeneath(state.RootHandle.Descriptor, relative, PosixNative.PathFlags | PosixNative.ODirectory), true);
+			if (!PosixNative.TryStat(parent.DangerousGetHandle().ToInt32(), out var before)
+				|| !PosixNative.TryStat(current.DangerousGetHandle().ToInt32(), out var after)
+				|| !PosixNative.SameEntry(before, after))
+				throw new ArchiveSecurityException("The extraction destination changed.");
 		}
 
 		private sealed class ExtractionGuard

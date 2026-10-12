@@ -209,6 +209,14 @@ namespace Files.Platform.Linux.Native
 			return fd;
 		}
 
+		internal static int OpenBeneath(int rootFd, string relativePath, int flags)
+		{
+			var how = new OpenHow { Flags = (ulong)flags, Resolve = 0x08 | 0x04 | 0x02 }; // BENEATH | NO_SYMLINKS | NO_MAGICLINKS
+			var fd = (int)OpenAt2(437, rootFd, relativePath.Length == 0 ? "." : relativePath, ref how, 24);
+			if (fd < 0) throw PosixNative.CreateException(Marshal.GetLastPInvokeError(), relativePath);
+			return fd; // Fail closed: a component-walk fallback cannot enforce containment during rename races.
+		}
+
 		internal static void Rename(int sourceFd, string source, int targetFd, string target)
 		{
 			if (RenameAt2(sourceFd, source, targetFd, target, 1) != 0)

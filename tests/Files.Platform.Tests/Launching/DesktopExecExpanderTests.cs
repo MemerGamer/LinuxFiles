@@ -87,15 +87,33 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
-		public void EmbeddedFieldCode_IsSubstituted()
+		public void QuotedFieldCode_IsRejected()
 		{
-			CollectionAssert.AreEqual(new[] { "viewer", "--file=/x y" }, Expand("viewer \"--file=%f\"", null, "/x y")[0]);
+			Assert.AreEqual(0, Expand("viewer \"--file=%f\"", null, "/x y").Length);
 		}
 
 		[TestMethod]
 		public void DeprecatedCodes_AreRemoved()
 		{
 			CollectionAssert.AreEqual(new[] { "viewer" }, Expand("viewer %d %D %n %N %v %m")[0]);
+		}
+
+		[TestMethod]
+		[DataRow("viewer %x")]
+		[DataRow("viewer %")]
+		[DataRow("viewer %f %U")]
+		[DataRow("viewer prefix%F")]
+		[DataRow("viewer --icon=%i")]
+		[DataRow("viewer \"%c\"")]
+		public void InvalidFieldCodes_AreRejected(string exec)
+		{
+			Assert.AreEqual(0, Expand(exec, null, "/x").Length);
+		}
+
+		[TestMethod]
+		public void EmbeddedSingleCode_IsLiteralAndExpandedOnlyOnce()
+		{
+			CollectionAssert.AreEqual(new[] { "viewer", "--file=/x %U $(id)" }, Expand("viewer --file=%f", null, "/x %U $(id)")[0]);
 		}
 
 		[TestMethod]

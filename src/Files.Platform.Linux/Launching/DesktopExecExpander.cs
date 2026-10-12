@@ -80,31 +80,92 @@ namespace Files.Platform.Linux.Launching
 		}
 
 		/// <summary>
-		/// Expands the application's Exec into one or more argument vectors for the given targets (paths or URIs).
-		/// Field codes are substituted into the raw Exec string as shell-quoted words before tokenizing, so a value
-		/// stays one literal word, including inside <c>sh -c "..."</c> scripts. The first element of each vector is the program.
-		/// Returns an empty list when the Exec is empty or has unbalanced quotes.
+		/// Expands field codes after tokenizing, keeping replacements as argument data.
+		/// Shell scripts must be fixed; targets may only be supplied as positional arguments.
 		/// </summary>
 		public static IReadOnlyList<IReadOnlyList<string>> Expand(DesktopApplication application, IReadOnlyList<string> targets)
 		{
-			var exec = application.Exec;
-			if (string.IsNullOrWhiteSpace(exec))
-				return [];
+			var tokens = Tokenize(application.Exec);
+			if (tokens is null || tokens.Count == 0 || tokens[0].Contains('%') || tokens[0].Contains('=')) return [];
 
-			var hasShell = (Tokenize(exec) ?? []).Any(t => Shells.Contains(System.IO.Path.GetFileName(t)));
-			var perTarget = HasCode(exec, 'f') || HasCode(exec, 'u');
-			IReadOnlyList<string?> singles = !perTarget ? new string?[] { null } : targets.Count == 0 ? new string?[] { string.Empty } : [.. targets];
+			// Quoted field codes have undefined semantics in the desktop entry specification.
+			var quote = '\0';
+			for (var i = 0; i < application.Exec.Length; i++)
+			{
+				var c = application.Exec[i];
+				if (c == '\\' && quote != '\'' && i + 1 < application.Exec.Length) { i++; continue; }
+				if (c == quote) quote = '\0';
+				else if (quote == '\0' && c is '\'' or '"') quote = c;
+				else if (c == '%' && i + 1 < application.Exec.Length)
+				{
+					if (application.Exec[++i] != '%' && quote != '\0') return [];
+				}
+			}
 
+			var targetCodes = 0;
+			foreach (var token in tokens)
+			{
+				for (var i = 0; i < token.Length; i++)
+				{
+					if (token[i] != '%') continue;
+					if (++i == token.Length) return [];
+					var code = token[i];
+					if (!"%fFuUickdDnNvm".Contains(code)) return [];
+					if (code is 'f' or 'F' or 'u' or 'U') targetCodes++;
+					if (code is 'F' or 'U' or 'i' && token.Length != 2) return [];
+				}
+			}
+			if (targetCodes > 1) return [];
+
+			// Do not substitute into shell options or script text, including through env wrappers.
+			for (var i = 0; i < tokens.Count; i++)
+			{
+				if (System.IO.Path.GetFileName(tokens[i]) == "env" && tokens.Skip(i + 1).Any(t => t.StartsWith("-S", StringComparison.Ordinal) || t.StartsWith("--split-string", StringComparison.Ordinal))) return [];
+				if (!Shells.Contains(System.IO.Path.GetFileName(tokens[i]))) continue;
+				var script = -1;
+				for (var j = i + 1; j < tokens.Count; j++)
+				{
+					if (tokens[j].StartsWith('-') && !tokens[j].StartsWith("--", StringComparison.Ordinal) && tokens[j].Contains('c')) { script = j + 1; break; }
+				}
+				if (script < 0 || script >= tokens.Count) return [];
+				if (tokens.Take(script + 1).Any(t => t.Replace("%%", "", StringComparison.Ordinal).Contains('%'))) return [];
+				break;
+			}
+
+			var perTarget = tokens.Any(t => HasCode(t, 'f') || HasCode(t, 'u'));
+			IReadOnlyList<string?> singles = !perTarget || targets.Count == 0 ? new string?[] { null } : [.. targets];
 			var result = new List<IReadOnlyList<string>>();
 			foreach (var single in singles)
 			{
-				var argv = Tokenize(Substitute(application, exec, targets, single, hasShell));
-				if (argv is null || argv.Count == 0)
-					return [];
-
-				result.Add(argv);
+				var argv = new List<string>();
+				foreach (var token in tokens)
+				{
+					if (token == "%F") { argv.AddRange(targets.Select(PathArgument)); continue; }
+					if (token == "%U") { argv.AddRange(targets.Select(ToUri)); continue; }
+					if (token == "%i")
+					{
+						if (!string.IsNullOrEmpty(application.IconName)) { argv.Add("--icon"); argv.Add(application.IconName); }
+						continue;
+					}
+					var value = new StringBuilder();
+					for (var i = 0; i < token.Length; i++)
+					{
+						if (token[i] != '%') { value.Append(token[i]); continue; }
+						value.Append(token[++i] switch
+						{
+							'%' => "%",
+							'f' => single is null ? "" : PathArgument(single),
+							'u' => single is null ? "" : ToUri(single),
+							'c' => application.Name,
+							'k' => application.DesktopFilePath,
+							_ => "",
+						});
+					}
+					if (value.Length > 0 || token.Length == 0) argv.Add(value.ToString());
+				}
+				if (argv.Count == 0 || argv.Any(a => a.Contains('\0'))) return [];
+				result.Add(argv.ToArray());
 			}
-
 			return result;
 		}
 
@@ -218,71 +279,6 @@ namespace Files.Platform.Linux.Launching
 			}
 
 			return false;
-		}
-
-		private static string Substitute(DesktopApplication app, string exec, IReadOnlyList<string> targets, string? single, bool hasShell)
-		{
-			var sb = new StringBuilder();
-			var quote = '\0';
-
-			for (var i = 0; i < exec.Length; i++)
-			{
-				var c = exec[i];
-				if (c != '%' || i + 1 >= exec.Length)
-				{
-					if (quote == '\0' && c is '"' or '\'')
-						quote = c;
-					else if (c == quote)
-						quote = '\0';
-					else if (c == '\\' && quote != '\'' && i + 1 < exec.Length)
-					{
-						sb.Append(c).Append(exec[++i]);
-						continue;
-					}
-
-					sb.Append(c);
-					continue;
-				}
-
-				var code = exec[++i];
-				var value = code switch
-				{
-					'f' => string.IsNullOrEmpty(single) ? null : Quote(PathArgument(single), quote, hasShell),
-					'u' => string.IsNullOrEmpty(single) ? null : Quote(ToUri(single), quote, hasShell),
-					'F' => targets.Count == 0 ? null : string.Join(' ', targets.Select(t => Quote(PathArgument(t), quote, hasShell))),
-					'U' => targets.Count == 0 ? null : string.Join(' ', targets.Select(t => Quote(ToUri(t), quote, hasShell))),
-					'c' => Quote(app.Name, quote, hasShell),
-					'k' => Quote(app.DesktopFilePath, quote, hasShell),
-					'i' => string.IsNullOrEmpty(app.IconName) ? null : "--icon " + Quote(app.IconName, quote, hasShell),
-					_ => null,
-				};
-
-				if (code == '%')
-					sb.Append('%');
-				else if (value is not null)
-					sb.Append(value);
-			}
-
-			return sb.ToString();
-		}
-
-		/// <summary>
-		/// Quotes a value for insertion at the current quote context of the Exec string.
-		/// </summary>
-		private static string Quote(string value, char context, bool hasShell)
-		{
-			var quoted = ShellQuote(value);
-			if (context == '"' && !hasShell)
-				quoted = value;
-			return context switch
-			{
-				// Our tokenizer consumes one level of double-quote escapes, so escape for it
-				'"' => quoted.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("`", "\\`").Replace("$", "\\$"),
-
-				// Shells: escape the quoted word for the raw single-quoted script. Others: close the region, insert the word, reopen
-				'\'' => hasShell ? quoted.Replace("'", "'\\''") : "'" + quoted + "'",
-				_ => quoted,
-			};
 		}
 
 		/// <summary>

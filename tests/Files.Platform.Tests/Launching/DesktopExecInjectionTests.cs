@@ -5,6 +5,7 @@ using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Launching;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System.Linq;
+using System.Diagnostics;
 
 namespace Files.Platform.Tests.Launching
 {
@@ -51,46 +52,34 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
-		public void ShellDashC_ValueIsSingleQuotedInScript()
+		[DataRow("sh -c \"app %f\"")]
+		[DataRow("sh -c \"app \\\"%f\\\"\"")]
+		[DataRow("sh -c \"app '%f'\"")]
+		[DataRow("bash -c 'app %U; echo %c'")]
+		[DataRow("sh -c %f")]
+		[DataRow("env sh -lc %f")]
+		public void ShellScript_FieldCodesAreRejected(string exec)
+		{
+			foreach (var name in Nasty)
+				Assert.AreEqual(0, Expand(exec, name).Length, exec);
+		}
+
+		[TestMethod]
+		public void FixedShellScript_TargetsAreLiteralPositionalArguments()
 		{
 			foreach (var name in Nasty)
 			{
-				var argv = Expand("sh -c \"app %f\"", name)[0];
-				Assert.AreEqual(3, argv.Length);
-				Assert.AreEqual("sh", argv[0]);
-				Assert.AreEqual("-c", argv[1]);
-				Assert.AreEqual("app " + DesktopExecExpander.ShellQuote(Safe(name)), argv[2]);
+				var argv = Expand("sh -c \"printf '%%s' \\\"\\$1\\\"\" sh %f", name)[0];
+				CollectionAssert.AreEqual(new[] { "sh", "-c", "printf '%s' \"$1\"", "sh", Safe(name) }, argv);
+				var start = new ProcessStartInfo("/bin/sh") { UseShellExecute = false, RedirectStandardOutput = true };
+				foreach (var argument in argv.Skip(1)) start.ArgumentList.Add(argument);
+				using var process = Process.Start(start)!;
+				var output = process.StandardOutput.ReadToEnd();
+				process.WaitForExit();
+				Assert.AreEqual(0, process.ExitCode);
+				Assert.AreEqual(Safe(name), output);
+
 			}
-
-			Assert.AreEqual("app '/tmp/$(curl x|sh).txt'", Expand("sh -c \"app %f\"", Nasty[0])[0][2]);
-			Assert.AreEqual("app '/tmp/it'\\''s \"quoted\".txt'", Expand("sh -c \"app %f\"", Nasty[3])[0][2]);
-		}
-
-		[TestMethod]
-		public void ShellDashC_MultipleFiles_AreEachQuoted()
-		{
-			var argv = Expand("bash -c \"app %F\"", "/a b", "/c'd")[0];
-
-			Assert.AreEqual("app '/a b' '/c'\\''d'", argv[2]);
-		}
-
-		[TestMethod]
-		public void ShellSingleQuotedScript_AndUriCodes()
-		{
-			var argv = Expand("bash -c 'app %U; echo %c'", "/tmp/$(x).txt")[0];
-
-			Assert.AreEqual("app 'file:///tmp/$(x).txt'; echo 'Test App'", argv[2]);
-			Assert.AreEqual("app '/it'\\''s'", Expand("bash -c 'app %f'", "/it's")[0][2]);
-		}
-
-		[TestMethod]
-		public void NameAndDesktopPath_AreQuoted()
-		{
-			var app = new DesktopApplication("t.desktop", "Evil $(x) 'name'", "sh -c \"echo %c %k\"", "/a b/t.desktop");
-
-			var argv = DesktopExecExpander.Expand(app, [])[0];
-
-			Assert.AreEqual("echo 'Evil $(x) '\\''name'\\''' '/a b/t.desktop'", argv[2]);
 		}
 
 		[TestMethod]

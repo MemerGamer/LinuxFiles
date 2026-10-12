@@ -247,6 +247,16 @@ namespace Files.Platform.Tests.Launching
 		}
 
 		[TestMethod]
+		public async Task OpenWith_ShellScriptFieldCodeDoesNotStartProcess()
+		{
+			using var fx = new XdgFixture();
+			var (service, starter) = Create(fx);
+			var app = new Files.Platform.Abstractions.Mime.DesktopApplication("t.desktop", "Test", "sh -c \"viewer \\\"%f\\\"\"", "/t.desktop");
+			Assert.IsFalse(await service.OpenWithAsync(app, ["/tmp/$(printf INJECTED).txt"]));
+			Assert.AreEqual(0, starter.Launches.Count);
+		}
+
+		[TestMethod]
 		public async Task OpenWith_TerminalApp_IsWrappedInTerminal()
 		{
 			using var fx = new XdgFixture();

@@ -46,6 +46,10 @@ Copy verification checks only output length and the source's current size. `Veri
 
 **Suggested fix:** Carry the opened source's identity, size, nanosecond mtime and ctime through publication and recheck the pinned inode and source name immediately before unlink. Verify copied content against the source and preserve the original on detected changes. Use the helper's content/metadata checks as a reference while acknowledging the unavoidable final check/unlink race; the present gap accepts changes made before the final check.
 
+**Remediation and threat model:** Cross-device deletion protects against accidental concurrent modification, such as an application saving during a move: data differing from the copied version must be retained. Before each quarantine rename, fstat of the held descriptor must match the copied identity, size, mtime and ctime; writes bump ctime, which a writer cannot restore by setting mtime. Only after that check passes may post-rename verification accept rename's ctime update, while still requiring size, mtime, device/inode and link count to match. Immediately before unlink, recheck the held version and lstat the quarantine name against its device/inode. Unsupported atomic rename uses the same final held-fd/version and original-name identity checks. Verification failure retains or restores the source without overwriting a newly created original name. Regular-file tag re-keying runs only after successful deletion.
+
+A hostile process running as the same user and racing the quarantine name is outside this threat model. POSIX offers no unlink-by-inode; a writer using an open descriptor can still write in the final stat/rename or stat/unlink window. These checks reject observed changes, but cannot guarantee exclusion of writes during those unavoidable syscall gaps.
+
 ### R5 — P2: Direct thumbnail cache hits bypass image validation
 
 **Location:** `src/Files.Platform.Linux/Thumbnails/LinuxThumbnailService.cs:179`, `:239`, `:249`, `:259`; contrast external output validation at `:481`.

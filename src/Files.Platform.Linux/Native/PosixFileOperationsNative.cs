@@ -34,11 +34,13 @@ namespace Files.Platform.Linux.Native
 		}
 
 		// Strict atomic rename: quarantine must never use the compatibility check/rename or link/unlink paths.
-		public static bool TryQuarantineRename(int dirfd, string source, string destination, out int errno, LinuxFileOperationsHooks? hooks)
+		public static bool TryQuarantineRename(int dirfd, string source, string destination, out int errno, LinuxFileOperationsHooks? hooks, Action? beforeRename = null)
 		{
 			try
 			{
-				errno = hooks?.RenameError?.Invoke(source, destination, false)
+				var injected = hooks?.RenameError?.Invoke(source, destination, false);
+				beforeRename?.Invoke();
+				errno = injected
 					?? (renameat2(dirfd, source, dirfd, destination, 1) == 0 ? 0 : Marshal.GetLastPInvokeError());
 			}
 			catch (EntryPointNotFoundException)

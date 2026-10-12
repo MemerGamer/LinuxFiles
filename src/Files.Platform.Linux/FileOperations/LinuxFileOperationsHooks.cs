@@ -48,5 +48,8 @@ namespace Files.Platform.Linux.FileOperations
 
 		/// <summary>Invoked after an atomic quarantine rename, before verification and deletion.</summary>
 		public Action<string, string>? MoveSourceQuarantined { get; init; }
+
+		/// <summary>Invoked before the final held-fd and entry checks immediately preceding move source unlink.</summary>
+		public Action<string, string>? BeforeMoveSourceUnlink { get; init; }
 	}
 }

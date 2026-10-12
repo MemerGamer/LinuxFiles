@@ -17,6 +17,33 @@ namespace Files.Platform.Tests.FileOperations
 		[TestMethod]
 		[DataRow(false)]
 		[DataRow(true)]
+		public async Task SuccessfulFileDeletion_ReportsPathChangeAfterUnlink(bool child)
+		{
+			var source = Write(Path.Combine(Src, child ? "tree/a" : "a"), "OLD");
+			var destination = Path.Combine(Dst, child ? "tree/a" : "a");
+			var reported = false;
+			var result = await new LinuxFileOperationsService((_, _) => false).MoveAsync(
+				[child ? Path.GetDirectoryName(source)! : source], Dst, new FileOperationOptions
+				{
+					PathChanged = (from, to, recursive, stale) =>
+					{
+						if (from != source)
+							return;
+						reported = true;
+						Assert.AreEqual(destination, to);
+						Assert.IsFalse(recursive);
+						Assert.IsTrue(stale);
+						Assert.IsFalse(File.Exists(source));
+						Assert.IsEmpty(Directory.GetFileSystemEntries(Path.GetDirectoryName(source)!, ".linuxfiles-move-*"));
+					},
+				});
+			Assert.IsTrue(result[0].Succeeded, result[0].ErrorMessage);
+			Assert.IsTrue(reported);
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
 		public async Task ChangedAfterVerification_PreservesSource(bool directory)
 		{
 			var source = directory ? Path.Combine(Src, "tree") : Write(Path.Combine(Src, "a"), "OLD");
@@ -122,6 +149,67 @@ namespace Files.Platform.Tests.FileOperations
 			Assert.AreEqual(FileOperationErrorKind.VerificationFailed, result[0].ErrorKind);
 			Assert.AreEqual("CHANGED AFTER STAT", File.ReadAllText(source));
 			Assert.AreEqual("OLD", File.ReadAllText(Path.Combine(Dst, "a")));
+			Assert.IsEmpty(Directory.GetFileSystemEntries(Src, ".linuxfiles-move-*"));
+		}
+
+		[TestMethod]
+		public async Task EqualLengthEditWithRestoredMtimeBeforeRename_PreservesSource()
+		{
+			var source = Write(Path.Combine(Src, "a"), "OLD");
+			var mtime = File.GetLastWriteTimeUtc(source);
+			var edited = false;
+			var service = new LinuxFileOperationsService((_, _) => false, new LinuxFileOperationsHooks
+			{
+				RenameError = (from, to, _) =>
+				{
+					if (from == "a" && to.StartsWith(".linuxfiles-move-"))
+					{
+						edited = true;
+						Write(source, "NEW");
+						File.SetLastWriteTimeUtc(source, mtime);
+					}
+					return null;
+				},
+			});
+			var result = await service.MoveAsync([source], Dst);
+			Assert.IsTrue(edited);
+			Assert.AreEqual(FileOperationErrorKind.VerificationFailed, result[0].ErrorKind);
+			Assert.AreEqual("NEW", File.ReadAllText(source));
+			Assert.AreEqual("OLD", File.ReadAllText(Path.Combine(Dst, "a")));
+			Assert.IsEmpty(Directory.GetFileSystemEntries(Src, ".linuxfiles-move-*"));
+		}
+
+		[TestMethod]
+		[DataRow(0, false)]
+		[DataRow(0, true)]
+		[DataRow(22, false)]
+		[DataRow(38, false)]
+		[DataRow(95, false)]
+		[DataRow(22, true)]
+		public async Task ChangedImmediatelyBeforeUnlink_PreservesNewData(int errno, bool replacement)
+		{
+			var source = Write(Path.Combine(Src, "a"), "OLD");
+			var invoked = false;
+			var service = new LinuxFileOperationsService((_, _) => false, new LinuxFileOperationsHooks
+			{
+				RenameError = (_, to, _) => errno != 0 && to.StartsWith(".linuxfiles-move-") ? errno : null,
+				BeforeMoveSourceUnlink = (_, entry) =>
+				{
+					invoked = true;
+					var mtime = File.GetLastWriteTimeUtc(entry);
+					if (replacement)
+						File.Move(entry, source + ".saved");
+					Write(entry, "NEW");
+					File.SetLastWriteTimeUtc(entry, mtime);
+				},
+			});
+			var result = await service.MoveAsync([source], Dst);
+			Assert.IsTrue(invoked);
+			Assert.AreEqual(FileOperationErrorKind.VerificationFailed, result[0].ErrorKind);
+			Assert.AreEqual("NEW", File.ReadAllText(source));
+			Assert.AreEqual("OLD", File.ReadAllText(Path.Combine(Dst, "a")));
+			if (replacement)
+				Assert.AreEqual("OLD", File.ReadAllText(source + ".saved"));
 			Assert.IsEmpty(Directory.GetFileSystemEntries(Src, ".linuxfiles-move-*"));
 		}
 

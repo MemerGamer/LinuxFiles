@@ -79,6 +79,7 @@ namespace Files.Platform.Linux.FileOperations
 							context.Hooks?.BeforeDeleteEntry?.Invoke(source);
 							context.CancellationToken.ThrowIfCancellationRequested();
 							DeleteMoveSource(sourceParent, name, openedStat, source, (int)input.SafeFileHandle.DangerousGetHandle(), context);
+							context.PathChanged(source, destination, xattrStale: true);
 						}, stat).ConfigureAwait(false);
 				if (sourceKind == EntryKind.Symlink && copy.Status == FileOperationStatus.Succeeded)
 				{
@@ -164,18 +165,30 @@ namespace Files.Platform.Linux.FileOperations
 			context.Hooks?.AfterMoveSourceVerified?.Invoke(source);
 			if (!PosixNative.TryStat(fd, out var before) || !Matches(before) || !Matches(PosixNative.StatAt(parent.Descriptor, name, source)))
 				Changed();
+			void VerifyBeforeRename()
+			{
+				if (!PosixNative.TryStat(fd, out var current) || !Matches(current)
+					|| !Matches(PosixNative.StatAt(parent.Descriptor, name, source)))
+					Changed();
+			}
+			// Protect accidental concurrent saves: never knowingly delete a version absent from the copy.
+			// Writes change ctime even when mtime is restored. Only a verified pre-rename version may
+			// accept rename's ctime update. Hostile same-user quarantine-name races are out of scope:
+			// POSIX has no unlink-by-inode, so final stat/rename and stat/unlink windows remain.
 			var quarantine = ".linuxfiles-move-" + Guid.NewGuid().ToString("N");
-			while (!PosixNative.TryQuarantineRename(parent.Descriptor, name, quarantine, out var errno, context.Hooks))
+			while (!PosixNative.TryQuarantineRename(parent.Descriptor, name, quarantine, out var errno, context.Hooks, VerifyBeforeRename))
 			{
 				if (errno == 17)
 				{
 					quarantine = ".linuxfiles-move-" + Guid.NewGuid().ToString("N");
 					continue;
 				}
-				if (errno is 22 or 38 or 95) // RENAME_NOREPLACE unsupported; preserve legacy verification.
+				if (errno is 22 or 38 or 95) // RENAME_NOREPLACE unsupported; recheck the held version and name.
 				{
-					VerifyMoveSource(parent, name, expected, source);
-					if (!PosixNative.TryStat(fd, out var fallback) || !Matches(fallback))
+					context.Hooks?.BeforeMoveSourceUnlink?.Invoke(source, source);
+					var fallbackEntry = PosixNative.StatAt(parent.Descriptor, name, source);
+					if (!PosixNative.TryStat(fd, out var fallback) || !Matches(fallback)
+						|| !Matches(fallbackEntry) || !PosixNative.SameEntry(fallback, fallbackEntry))
 						Changed();
 					PosixNative.UnlinkAt(parent.Descriptor, name, expected.IsDirectory ? PosixNative.AtRemoveDir : 0, source);
 					return;
@@ -186,13 +199,16 @@ namespace Files.Platform.Linux.FileOperations
 			{
 				context.Hooks?.MoveSourceQuarantined?.Invoke(source, Path.Combine(Path.GetDirectoryName(source)!, quarantine));
 				var entry = PosixNative.StatAt(parent.Descriptor, quarantine, source);
-				// Linux rename itself updates ctime: check the recorded ctime before rename and require
-				// the held fd and quarantined entry to agree afterward. A writer with an already open fd
-				// (or another hardlink) can still write after the final stat; POSIX cannot close that window,
-				// nor distinguish a ctime-only change between the pre-rename stat and rename's own update.
+				// The pre-rename fd check passed; only rename's ctime update is permitted.
 				var renamedExpected = expected with { ChangedSeconds = entry.ChangedSeconds, ChangedNanoseconds = entry.ChangedNanoseconds };
+				var held = default(PosixStat);
 				if (!PosixNative.SameFileVersion(renamedExpected, entry) || expected.LinkCount != entry.LinkCount
-					|| !PosixNative.TryStat(fd, out var held) || !PosixNative.SameFileVersion(entry, held) || entry.LinkCount != held.LinkCount)
+					|| !PosixNative.TryStat(fd, out held) || !PosixNative.SameFileVersion(entry, held) || entry.LinkCount != held.LinkCount)
+					Changed();
+				context.Hooks?.BeforeMoveSourceUnlink?.Invoke(source, Path.Combine(Path.GetDirectoryName(source)!, quarantine));
+				if (!PosixNative.TryStat(fd, out var finalHeld) || !PosixNative.SameFileVersion(held, finalHeld)
+					|| held.LinkCount != finalHeld.LinkCount
+					|| !PosixNative.SameFileVersion(finalHeld, PosixNative.StatAt(parent.Descriptor, quarantine, source)))
 					Changed();
 				PosixNative.UnlinkAt(parent.Descriptor, quarantine, expected.IsDirectory ? PosixNative.AtRemoveDir : 0, source);
 			}

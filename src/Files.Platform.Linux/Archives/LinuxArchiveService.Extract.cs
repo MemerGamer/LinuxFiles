@@ -140,8 +140,9 @@ namespace Files.Platform.Linux.Archives
 
 						if (entry.LinkTarget is not null)
 						{
+							// Hardlinks use archive-root targets and are reported as unsupported, never converted to symlinks.
 							// Parent segments could escape through another archive link; accept only downward relative targets.
-							if (!ArchivePathValidator.IsSafeLinkTarget(relative, entry.LinkTarget) || entry.LinkTarget.Split('/').Contains("..", StringComparer.Ordinal) || FileSystemEntry.GetKind(full) != EntryKind.None)
+							if (entry.IsHardLink || !ArchivePathValidator.IsSafeLinkTarget(relative, entry.LinkTarget) || entry.LinkTarget.Split('/').Contains("..", StringComparer.Ordinal) || FileSystemEntry.GetKind(full) != EntryKind.None)
 							{
 								skipped++;
 								continue;

@@ -135,7 +135,11 @@ namespace Files.Platform.Linux.Native
 			// Without RENAME_NOREPLACE, directories and entries that cannot be hardlinked retain a check/rename race.
 			var result = renameat(sourceFd, source, destinationFd, destination);
 			errno = result == 0 ? 0 : Marshal.GetLastPInvokeError();
-			return result == 0;
+			if (IsCrossDevice(errno))
+				return false;
+			if (result != 0)
+				throw new IOException($"Checked rename failed for '{destination}' with errno {errno}: {CreateException(errno, destination).Message}", errno);
+			return true;
 		}
 
 		public static void RenameAt(int sourceFd, string source, int destinationFd, string destination, bool replace, string displayPath, LinuxFileOperationsHooks? hooks = null)

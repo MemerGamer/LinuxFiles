@@ -12,7 +12,7 @@ App id (used everywhere): `io.github.memergamer.LinuxFiles`. Binary/launcher: `f
 | `packaging/linux/icons/hicolor/<N>x<N>/apps/` | Icons 16, 24, 32, 48, 64, 128, 256, 512 (PNG). |
 | `packaging/linux/files` | Launcher: finds `Files.dll` (`FILES_LIBDIR`, next to itself, `../share/linuxfiles`, `/usr/lib/linuxfiles`, ...) and execs the apphost if present, else `dotnet Files.dll`. |
 | `packaging/linux/flatpak/` | Flatpak manifest (repackages the publish tarball). |
-| `packaging/linux/aur/linuxfiles-bin/PKGBUILD` | AUR binary package (release tarball); `linuxfiles/PKGBUILD` is the unverified from-source variant. |
+| `packaging/linux/aur/linuxfiles-bin/PKGBUILD` | Guarded AUR binary and source recipe templates; generate checksum-pinned recipes before use. |
 | `packaging/linux/appimage/build-appimage.sh` | AppImage builder; downloads pinned `appimagetool` + type2 runtime into `.cache/tools`. |
 | `scripts/linux/build-flatpak.sh`, `gen-aur.sh` | Build the Flatpak bundle; render PKGBUILD + `.SRCINFO` with real checksums. |
 | `scripts/linux/publish.sh` | `dotnet publish` to `artifacts/linux-<rid>/`. |
@@ -120,12 +120,14 @@ found, so a launch that could not see the folders retries instead of freezing an
 
 `packaging/linux/aur/linuxfiles-bin/PKGBUILD` repackages the release tarballs (`files-linux-x64.tar.gz` plus
 `files-packaging.tar.gz`, which carries the desktop entry, metainfo, icons, launcher and `LICENSE-MIT`) into
-`/usr/lib/linuxfiles` + `/usr/bin/files`; x86_64 only. The checked-in `sha256sums` are `SKIP`:
-`scripts/linux/gen-aur.sh <version> <dir> [out]` renders a PKGBUILD with real sums and `.SRCINFO` (CI does this on
-tags and uploads both; push them to the AUR repo by hand). `AUR_BASE_URL=file:///dir` points the sources at local
-files, which is how the package was build-tested with `makepkg` here (resulting file list checked). `namcap` is not
-installed on the dev box, so the package is not linted. `aur/linuxfiles/PKGBUILD` (from source) is unchanged and
-unbuilt.
+`/usr/lib/linuxfiles` + `/usr/bin/files`; x86_64 only. Both checked-in recipes are guarded templates:
+they fail when sourced until `scripts/linux/gen-aur.sh <version> <dir> [out] [binary|source]`
+generates a recipe with SHA-256 checksums and `.SRCINFO`. Binary mode (the default) uses the two release
+assets above; source mode requires the exact GitHub tag archive saved as `linuxfiles-<version>.tar.gz`.
+Obtain the input artifacts from a trusted release before generating checksums. CI generates the binary
+recipe on tags and uploads it; the AUR remote is updated separately. `AUR_BASE_URL=file:///dir` can
+point generated recipes at local inputs for offline testing. Native package builds and `namcap` validation
+remain separate release checks.
 
 ### Publishing a release (exact procedure)
 

@@ -14,7 +14,7 @@ makedepends=('dotnet-sdk>=10.0' 'git' 'clang' 'zlib')
 optdepends=('polkit: authenticated root actions' 'gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives')
 options=('!strip')  # .NET single-file/self-contained binaries break when stripped
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/linux-v$pkgver.tar.gz")
-sha256sums=('SKIP')  # replace with the real checksum on release
+sha256sums=('UNGENERATED')
 
 build() {
   cd "LinuxFiles-linux-v$pkgver"
@@ -52,3 +52,9 @@ package() {
   done
   install -Dm644 LICENSE-MIT "$pkgdir/usr/share/licenses/$pkgname/LICENSE-MIT"
 }
+
+# This checked-in template is intentionally not consumable by makepkg.
+if [[ " ${sha256sums[*]} " == *UNGENERATED* ]]; then
+  printf '%s\n' 'Generate a checksum-pinned recipe with scripts/linux/gen-aur.sh before building.' >&2
+  return 1 2>/dev/null || exit 1
+fi

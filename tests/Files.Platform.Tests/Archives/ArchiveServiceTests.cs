@@ -80,6 +80,27 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		[DataRow("hardlink.tar")]
+		[DataRow("payload.zip")]
+		public async Task TarHardlink_IsReportedSkippedRatherThanReinterpretedAsSymlink(string name)
+		{
+			var archive = Path.Combine(Work, name);
+			using (var output = File.Create(archive))
+			using (var writer = new TarWriter(output))
+			{
+				using var data = new MemoryStream(Encoding.UTF8.GetBytes("base data"));
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "base") { DataStream = data });
+				using var attackerData = new MemoryStream(Encoding.UTF8.GetBytes("attacker data"));
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "dir/base") { DataStream = attackerData });
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.HardLink, "dir/alias") { LinkName = "base" });
+			}
+			var result = await service.ExtractAsync(archive, Out);
+			Assert.AreEqual(1, result.ItemsSkipped);
+			Assert.AreEqual("base data", File.ReadAllText(Path.Combine(Out, "base")));
+			Assert.IsNull(new FileInfo(Path.Combine(Out, "dir/alias")).LinkTarget);
+		}
+
+		[TestMethod]
 		public async Task PreviewListsUntrustedNamesWithoutExtracting()
 		{
 			var archive = ZipWith(Path.Combine(Work, "preview.zip"), ("../evil.txt", Bytes("no extraction")), ("normal.txt", Bytes("text")));

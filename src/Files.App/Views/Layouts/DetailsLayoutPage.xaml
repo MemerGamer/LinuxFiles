@@ -157,7 +157,7 @@
 				<Setter Property="TextTrimming" Value="CharacterEllipsis" />
 				<Setter Property="VerticalAlignment" Value="Center" />
 				<Setter Property="HorizontalAlignment" Value="Stretch" />
-				<Setter Property="Opacity" Value="0.6" />
+				<Setter Property="Foreground" Value="{ThemeResource Files.Details.ForegroundBrush}" />
 			</Style>
 
 			<Style

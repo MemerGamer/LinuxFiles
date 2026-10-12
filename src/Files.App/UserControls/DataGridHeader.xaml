@@ -134,7 +134,7 @@
 					HorizontalAlignment="{x:Bind HorizontalContentAlignment}"
 					FontSize="12"
 					FontWeight="SemiBold"
-					Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+					Foreground="{ThemeResource Files.Details.ForegroundBrush}"
 					Text="{x:Bind Header, Mode=OneWay}"
 					TextTrimming="CharacterEllipsis" />
 
@@ -145,7 +145,7 @@
 					VerticalAlignment="Center"
 					FontFamily="{ThemeResource SymbolThemeFontFamily}"
 					FontSize="8"
-					Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+					Foreground="{ThemeResource Files.Details.ForegroundBrush}"
 					Glyph="{StaticResource SortIconAscending}"
 					RenderTransformOrigin="0.5, 0.5"
 					Visibility="Collapsed">

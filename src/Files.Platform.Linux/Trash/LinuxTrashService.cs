@@ -555,13 +555,13 @@ namespace Files.Platform.Linux.Trash
 
 			using var root = OpenTrashRoot(location);
 			using var files = OpenTrustedChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
-			using var info = OpenTrustedChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
+			using var info = OpenOptionalTrustedChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
 			if (files.EntryExists(name))
 			{
 				_options.FileOperationsHooks?.BeforeDeleteEntry?.Invoke(item.TrashedPath);
 				files.DeleteEntry(name);
 			}
-			if (info.EntryExists(name + TrashInfoFile.Extension))
+			if (info is not null && info.EntryExists(name + TrashInfoFile.Extension))
 				info.DeleteEntry(name + TrashInfoFile.Extension);
 			new DirectorySizesCache(location.Root, root).Remove([name]);
 
@@ -923,6 +923,12 @@ namespace Files.Platform.Linux.Trash
 			var directory = DirectoryHandle.OpenChild(descriptor, name, path);
 			try { ValidateTrustedDirectory(directory); return directory; }
 			catch { directory.Dispose(); throw; }
+		}
+
+		private DirectoryHandle? OpenOptionalTrustedChild(int descriptor, string name, string path)
+		{
+			try { return OpenTrustedChild(descriptor, name, path); }
+			catch (FileNotFoundException) { return null; }
 		}
 
 		private void ValidateTrustedDirectory(DirectoryHandle directory)

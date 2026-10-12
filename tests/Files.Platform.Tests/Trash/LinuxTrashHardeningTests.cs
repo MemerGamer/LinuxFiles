@@ -96,6 +96,51 @@ namespace Files.Platform.Tests.Trash
 		[TestMethod]
 		[DataRow(false)]
 		[DataRow(true)]
+		public async Task DeletePermanently_MissingInfoDirectory_DeletesPayload(bool directory)
+		{
+			var original = directory ? Path.Combine(_home, "folder") : WriteFile(_home, "entry");
+			if (directory)
+				WriteFile(original, "child");
+			Assert.IsTrue(Single(await _service.TrashAsync([original])).Succeeded);
+			var item = (await _service.ListAsync()).Single();
+			Directory.Delete(Path.Combine(HomeTrash, "info"), true);
+
+			Assert.IsTrue(Single(await _service.DeletePermanentlyAsync([item])).Succeeded);
+			Assert.IsFalse(Path.Exists(item.TrashedPath));
+			Assert.IsFalse(Directory.Exists(Path.Combine(HomeTrash, "info")));
+		}
+
+		[TestMethod]
+		[DataRow("symlink")]
+		[DataRow("dangling-symlink")]
+		[DataRow("writable")]
+		[DataRow("file")]
+		public async Task DeletePermanently_UntrustedInfoDirectory_PreservesPayload(string replacement)
+		{
+			Assert.IsTrue(Single(await _service.TrashAsync([WriteFile(_home, "entry")])).Succeeded);
+			var item = (await _service.ListAsync()).Single();
+			var info = Path.Combine(HomeTrash, "info");
+			var outside = Path.Combine(_root, "outside");
+			var metadata = WriteFile(outside, Path.GetFileName(item.TrashId), "untouched");
+			Directory.Delete(info, true);
+			if (replacement is "symlink" or "dangling-symlink")
+				Directory.CreateSymbolicLink(info, replacement == "symlink" ? outside : outside + "-missing");
+			else if (replacement == "file")
+				File.WriteAllText(info, "untouched");
+			else
+			{
+				Directory.CreateDirectory(info);
+				File.SetUnixFileMode(info, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute | UnixFileMode.OtherWrite);
+			}
+
+			Assert.IsFalse(Single(await _service.DeletePermanentlyAsync([item])).Succeeded);
+			Assert.AreEqual("hello", File.ReadAllText(item.TrashedPath));
+			Assert.AreEqual("untouched", File.ReadAllText(metadata));
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
 		public async Task Empty_AncestorSwapDuringTrustCheck_PreservesOutsideEntries(bool shared)
 		{
 			var item = Single(await _service.TrashAsync([WriteFile(_home, "entry")])).Item!;

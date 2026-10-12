@@ -574,12 +574,12 @@
 								<TextBlock
 									x:Name="ItemName"
 									Foreground="{ThemeResource TextFillColorPrimaryBrush}"
-									MaxLines="{Binding ElementName=PageRoot, Path=CardsViewItemNameMaxLines, Mode=OneWay}"
+									MaxLines="1"
 									Opacity="{x:Bind Opacity, Mode=OneWay}"
 									Style="{ThemeResource App.Theme.BodyStrongTextBlockStyle}"
 									Text="{x:Bind Name, Mode=OneWay}"
 									TextTrimming="CharacterEllipsis"
-									TextWrapping="Wrap" />
+									TextWrapping="NoWrap" />
 
 								<!--  Item Type  -->
 								<TextBlock
@@ -601,7 +601,7 @@
 								BeforeTextChanging="ItemNameTextBox_BeforeTextChanging"
 								Canvas.ZIndex="1"
 								Text="{x:Bind Name, Mode=OneWay}"
-								TextWrapping="Wrap"
+								TextWrapping="NoWrap"
 								Visibility="Collapsed">
 								<TextBox.Resources>
 									<ResourceDictionary>

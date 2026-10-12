@@ -22,7 +22,7 @@ namespace Files.Platform.Linux.Archives
 	/// <summary>
 	/// An entry as read from an archive. Names, sizes and link targets are untrusted.
 	/// </summary>
-	internal sealed record EntryData(string? Key, bool IsDirectory, long Size, long CompressedSize, DateTime? Modified, bool IsEncrypted, string? LinkTarget, long Crc, int? Attrib, bool IsTar);
+	internal sealed record EntryData(string? Key, bool IsDirectory, long Size, long CompressedSize, DateTime? Modified, bool IsEncrypted, string? LinkTarget, long Crc, int? Attrib, bool IsTar, bool IsHardLink = false);
 
 	/// <summary>
 	/// A readable archive, hiding which SharpCompress API (archive, tar reader, single compressed file) is behind it.
@@ -196,7 +196,7 @@ namespace Files.Platform.Linux.Archives
 						continue;
 					}
 					yield return (new EntryData(entry.Name, entry.EntryType == TarEntryType.Directory, entry.Length, 0,
-						entry.ModificationTime.UtcDateTime, false, link, 0, (int)entry.Mode, true), () => current.DataStream ?? Stream.Null);
+						entry.ModificationTime.UtcDateTime, false, link, 0, (int)entry.Mode, true, entry.EntryType == TarEntryType.HardLink), () => current.DataStream ?? Stream.Null);
 				}
 			}
 		}

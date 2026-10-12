@@ -60,6 +60,33 @@ namespace Files.Platform.Tests.Thumbnails
 			Path.Combine(_cacheHome, "thumbnails", bucket, XdgThumbnailNaming.GetHash(XdgThumbnailNaming.ToFileUri(path)) + ".png");
 
 		[TestMethod]
+		[DataRow("oversized")]
+		[DataRow("corrupt")]
+		[DataRow("symlink")]
+		public async Task DirectCache_RejectsUntrustedImages(string kind)
+		{
+			var path = CreateImage("source.png", 1, 1);
+			var cache = CachePath(path, "normal");
+			Directory.CreateDirectory(Path.GetDirectoryName(cache)!);
+			var bytes = TestImages.CreatePng(kind == "oversized" ? 129 : 1, 1);
+			if (kind == "corrupt")
+				bytes = bytes[..33];
+			bytes = PngTextChunks.Insert(bytes,
+				[new("Thumb::URI", XdgThumbnailNaming.ToFileUri(path)),
+				 new("Thumb::MTime", new DateTimeOffset(File.GetLastWriteTimeUtc(path)).ToUnixTimeSeconds().ToString())]);
+			if (kind == "symlink")
+			{
+				var target = Path.Combine(_root, "outside.png");
+				File.WriteAllBytes(target, bytes);
+				File.CreateSymbolicLink(cache, target);
+			}
+			else
+				File.WriteAllBytes(cache, bytes);
+			using var service = CreateService();
+			Assert.IsNull(await service.GetThumbnailAsync(path, 128, ThumbnailOptions.ReturnOnlyIfCached));
+		}
+
+		[TestMethod]
 		public void Naming_MatchesSpecKnownVector()
 		{
 			// Example from the XDG Thumbnail Managing Standard.

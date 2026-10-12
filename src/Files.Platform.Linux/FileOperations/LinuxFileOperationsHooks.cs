@@ -42,5 +42,11 @@ namespace Files.Platform.Linux.FileOperations
 
 		/// <summary>Invoked after an entry was classified and right before it is deleted or descended into.</summary>
 		public Action<string>? BeforeDeleteEntry { get; init; }
+
+		/// <summary>Invoked after move source verification, before the final quarantine checks and rename.</summary>
+		public Action<string>? AfterMoveSourceVerified { get; init; }
+
+		/// <summary>Invoked after an atomic quarantine rename, before verification and deletion.</summary>
+		public Action<string, string>? MoveSourceQuarantined { get; init; }
 	}
 }

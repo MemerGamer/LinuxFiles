@@ -1,76 +1,23 @@
 # Contributing to LinuxFiles
-LinuxFiles is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files); it is not affiliated with the Files Community. The guidance below is adapted from upstream's contributing guide and still applies unless noted.
 
-- Issues and pull requests for the **Linux port** go to this repository. Issues about the Windows app belong [upstream](https://github.com/files-community/Files/issues).
-- Please read [docs/linux-port/PLAN.md](../docs/linux-port/PLAN.md) and [docs/linux-port/AGENT-RULES.md](../docs/linux-port/AGENT-RULES.md) first. Linux code lives in `*.Linux.cs` files and the Linux platform projects; keep Windows code paths unchanged.
-- Upstream's "Ready to build" label and Windows-only tooling (Appium, WinAppDriver, the Files.Package) do not apply to this fork. Open an issue to discuss larger changes first.
-- Do not copy code from upstream without keeping its MIT notice, and do not claim upstream work as your own. Changes that are not Linux-specific are best sent upstream too.
-- Security issues: see [SECURITY.md](./SECURITY.md).
+LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files-community/Files), unaffiliated with the Files Community. There is no upstream sync or Windows support. Preserve inherited license headers, notices and contributor credit.
 
-Files thrives off of the contributions and input from users. There are several ways you can get involved.
+Report issues and submit pull requests in [this repository](https://github.com/MemerGamer/LinuxFiles). Discuss larger changes before implementing them, and follow our [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [SECURITY.md](SECURITY.md).
 
-We are happy to hear your feedback for the future of Files. Check the
-[issues tab](https://github.com/MemerGamer/LinuxFiles/issues) to see if others have
-submitted similar feedback. You can add your feedback to existing issues or you can open a new issue.
+Read [AGENTS.md](../AGENTS.md), [Linux agent rules](../docs/linux-port/AGENT-RULES.md) and the [fork policy](../docs/linux-port/upstream-policy.md). The porting plans are archived historical context.
 
-We always look at your feedback when we decide what to work on next and we look forward to hearing your ideas. Remember that
-all community interactions must abide by the [Code of Conduct](./CODE_OF_CONDUCT.md).
+## Build and validation
 
-## Finding issues you can help with
-Looking for something to work on?
-Issues marked as ready to build are a good place to start. If you're interested in working on an issue, leave a comment to let everyone know and to help
-avoid duplicated effort from others.
+Use the .NET 10 SDK and the Linux desktop dependencies described in [README.md](README.md).
 
-## Contributions we accept
-We welcome your contributions to the Files project, especially to fix bugs and to make
-improvements which address the top issues reported by Files users. Some general guidelines:
-
-* **DO** create one pull request per Issue, and ensure that the Issue is linked in the pull request.
-* **DO** follow our [Coding and Style](https://files.community/docs/contributing/code-style) guidelines, and keep code changes as small as possible.
-* **DO** include corresponding tests whenever possible.
-* **DO** check for additional occurrences of the same problem in other parts of the codebase before submitting your PR.
-* **DO** [link the issue](https://docs.github.com/en/github/managing-your-work-on-github/linking-a-pull-request-to-an-issue#manually-linking-a-pull-request-to-an-issue) you are addressing in the 
-   pull request.
-* **DO** write a good description for your pull request. More detail is better. Describe *why* the change is being 
-   made and *why* you have chosen a particular solution. Describe any manual testing you performed to validate your change.
-* **DO NOT** submit a PR unless the connected issue is marked as ready to build or approved by an org member.
-   This enables us to have a discussion on the idea before anyone invests time on the implementation.
-* **DO NOT** merge multiple changes into one PR unless they have the same root cause.
-
-> Submitting a pull request for an approved Issue is not a guarantee it will be approved.
-> The change must meet our high bar for code quality, architecture, and performance.
-
-## Making changes to the code
-
-If your change is complex, please clean up the branch history before submitting a pull request.
-You can use [git rebase](https://docs.microsoft.com/en-us/azure/devops/repos/git/rebase#squash-local-commits)
-to group your changes into a small number of commits which we can review one at a time.
-
-When completing a pull request, we will generally squash your changes into a single commit. Please
-let us know if your pull request needs to be merged as separate commits.
-
-## Running interaction tests (optional)
-The tests drive the app through [Appium](https://appium.io), which automates it using WinAppDriver.
-Install WinAppDriver, and Node.js to run Appium on:
-```powershell
-winget install Microsoft.WindowsApplicationDriver
-winget install OpenJS.NodeJS
+```sh
+dotnet build src/Files.App -f net10.0-desktop
+dotnet build tests/Files.Platform.Tests
+dotnet test --project tests/Files.Platform.Tests/Files.Platform.Tests.csproj --no-build
 ```
-Then install Appium and the Windows driver it automates through:
-```powershell
-npm install --global appium
-appium driver install --source=npm appium-windows-driver
-```
-The tests launch Appium themselves when it is not already running, so keep it on your `PATH`.
 
-Finally, you will need to run the Files.Package at least once to have the debug version be registered on your machine.
-Once you have the debug version registered, you can run the tests from the test explorer in Visual Studio.
+Run builds sequentially. For UI validation, use `scripts/linux/headless-run.sh` with its private Xvfb display and throwaway home; do not alter the user's desktop or settings.
 
-## Review Process
-After submitting a pull request, members of the Files team will review your code. Any member of the community may
-participate in the review, but at least one member of the Files team will ultimately approve
-the request.
+## Pull requests
 
-Often, multiple iterations will be needed to respond to feedback from reviewers. Try looking at
-[past pull requests](https://github.com/files-community/Files/pulls?q=is%3Apr+is%3Aclosed) to see
-what the experience might be like.
+Keep each change focused, follow `.editorconfig` and surrounding code, and include relevant validation. Use [the PR template](PULL_REQUEST_TEMPLATE.md), link the issue where applicable, and explain the resulting behavior and any limitations. Maintainers review contributions in this fork; upstream approval or labels are not required.

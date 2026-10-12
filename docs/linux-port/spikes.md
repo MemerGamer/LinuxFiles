@@ -1,3 +1,5 @@
+> **Archived historical document.** This records an earlier plan or investigation, not current developer guidance. LinuxFiles is an independent Linux-only fork with no upstream sync or Windows support. See the [current policy](upstream-policy.md) and [developer guidance](../../AGENTS.md).
+
 # Phase 0 Spikes A + B: Uno Platform host for Files.App.Controls
 
 Date: 2026-10-04 · Branch `linux/p0-uno-spike` (based on `linux/main` 09e42fcb4) · Host: Garuda Linux, KDE Plasma

@@ -1,3 +1,5 @@
+> **Archived historical document.** This records an earlier plan or investigation, not current developer guidance. LinuxFiles is an independent Linux-only fork with no upstream sync or Windows support. See the [current policy](../upstream-policy.md) and [developer guidance](../../../AGENTS.md).
+
 > Historical investigation. The [independent-fork policy](../upstream-policy.md) supersedes the sync-preservation recommendation below; Windows leaf projects and sync/pruning automation have since been removed.
 
 **Recommend option 1: retain the upstream tree, tighten Linux publish exclusions, then investigate trimming.** Deleting sources already excluded from compilation offers essentially **zero binary-size or startup gain**.

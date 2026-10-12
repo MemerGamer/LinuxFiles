@@ -4,14 +4,14 @@
 
 # LinuxFiles: Files for Linux
 
-**LinuxFiles, Files for Linux, based on Files by the Files Community, is an unofficial, community-maintained Linux port of [Files](https://github.com/files-community/Files) by the Files Community. It is not affiliated with or endorsed by the Files Community.**
+**LinuxFiles, Files for Linux, based on Files by the Files Community, is an independent, community-maintained Linux-only fork of [Files](https://github.com/files-community/Files) by the Files Community. It is not affiliated with or endorsed by the Files Community.**
 
 Files is created and maintained by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors). This fork builds on their work and keeps their MIT-licensed code, history and credit. The Linux port itself ([Uno Platform](https://platform.uno), Skia, X11, and the Linux platform layer) is the work of the LinuxFiles contributors. See [Credits](#credits) and [NOTICE.md](../NOTICE.md).
 
 > [!WARNING]
 > **Status: alpha.** Expect missing features and rough edges, and do not rely on it for data you cannot afford to lose. The official, supported Files for Windows is at [files.community](https://files.community/).
 
-LinuxFiles is now an independent fork: upstream stays a read-only remote, fixes are cherry-picked selectively, and upstream branches are no longer merged. See the [upstream policy](../docs/linux-port/upstream-policy.md). MIT/MPL licenses and contributor notices remain preserved.
+LinuxFiles supports Linux only and has no upstream sync: upstream stays a read-only remote, fixes are cherry-picked selectively, and upstream branches are no longer merged. See the [upstream policy](../docs/linux-port/upstream-policy.md). MIT/MPL licenses and contributor notices remain preserved.
 
 ## Linux port: current state
 
@@ -128,22 +128,11 @@ curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/Linu
 ## Reporting bugs
 
 - **Linux bugs and Linux feature requests:** open an issue in [this fork](https://github.com/MemerGamer/LinuxFiles/issues).
-- **Windows bugs:** report them to [upstream Files](https://github.com/files-community/Files/issues) only if you can reproduce them in the official Windows app. Please do not report LinuxFiles problems upstream.
 - **Security issues:** use this fork's private [Security Advisories](https://github.com/MemerGamer/LinuxFiles/security/advisories/new). See [SECURITY.md](./SECURITY.md).
-
-## About upstream Files
-
-The text and images in this section describe the upstream project and are the Files Community's work, not ours.
-
-![Upstream Files screenshot (Windows)](./assets/FilesScreenshot.png)
-
-Files is a modern file manager that helps users organize their files and folders. The upstream mission is to build the best file manager for Windows, built in the open by the community, with robust multitasking, file tags, deep integrations and an intuitive design. See the [upstream repository](https://github.com/files-community/Files) and [website](https://files.community/).
-
-For the official Windows app, use the upstream distribution channels (Microsoft Store and classic installer from [files.community/download](https://files.community/download)); this fork does not distribute Windows builds.
 
 ## Contributing
 
-Contributions to the Linux port are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md). Contributions to the Windows app belong in the [upstream repository](https://github.com/files-community/Files).
+Contributions to this independent Linux fork are welcome. See [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Credits
 

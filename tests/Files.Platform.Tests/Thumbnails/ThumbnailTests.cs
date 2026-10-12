@@ -124,8 +124,7 @@ namespace Files.Platform.Tests.Thumbnails
 			Assert.AreEqual(XdgThumbnailNaming.ToFileUri(path), text["Thumb::URI"]);
 			Assert.AreEqual(new DateTimeOffset(2024, 1, 2, 3, 4, 5, TimeSpan.Zero).ToUnixTimeSeconds().ToString(), text["Thumb::MTime"]);
 			Assert.AreEqual(new FileInfo(path).Length.ToString(), text["Thumb::Size"]);
-			if (!OperatingSystem.IsWindows())
-				Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(cached));
+			Assert.AreEqual(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(cached));
 			Assert.AreEqual(0, Directory.GetFiles(Path.GetDirectoryName(cached)!, "*.tmp").Length);
 		}
 

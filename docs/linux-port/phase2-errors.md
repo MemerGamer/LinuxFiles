@@ -1,3 +1,5 @@
+> **Archived historical document.** This records an earlier plan or investigation, not current developer guidance. LinuxFiles is an independent Linux-only fork with no upstream sync or Windows support. See the [current policy](upstream-policy.md) and [developer guidance](../../AGENTS.md).
+
 # Phase 2: Files.App on Uno (net10.0-desktop) build inventory
 
 > **Status (2026-10-05, P4-Z): resolved.** Win32 compat mode is off by default, and `dotnet build src/Files.App -f net10.0-desktop` reports

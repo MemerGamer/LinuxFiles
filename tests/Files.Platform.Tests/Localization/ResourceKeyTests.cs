@@ -48,7 +48,7 @@ namespace Files.Platform.Tests.Localization
 
 		private static IEnumerable<string> SourceFiles(string pattern) =>
 			Directory.EnumerateFiles(AppDir, pattern, SearchOption.AllDirectories)
-				.Where(f => !f.EndsWith(".Windows.cs", StringComparison.Ordinal) && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
+				.Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}") && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
 
 		[TestMethod]
 		public void LiteralKeysUsedInCode_ExistInEnUs()

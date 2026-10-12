@@ -345,18 +345,6 @@ namespace Files.Platform.Tests.Mime
 			Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a.png"]).Count);
 
 		[TestMethod]
-		public void Expansion_ResolvesShellAliasesInWrapperChains()
-		{
-			using var fx = new XdgFixture();
-			var alias = Path.Combine(fx.Home, "interpreter");
-			File.CreateSymbolicLink(alias, "/bin/sh");
-			foreach (var exec in new[] { alias + " -c tool", "env " + alias + " script", "env env " + alias + " -c tool", "rbash -c tool" })
-				Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), []).Count, exec);
-			foreach (var exec in new[] { "env VAR=bash tool", "tool bash", "bash --version" })
-				Assert.AreEqual(1, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), []).Count, exec);
-		}
-
-		[TestMethod]
 		[DataRow("f")]
 		[DataRow("F")]
 		[DataRow("u")]

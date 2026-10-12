@@ -24,7 +24,7 @@ namespace Files.Platform.Tests.FileOperations
 		[DataRow(95, true)]
 		[DataRow(38, true)]
 		[DataRow(31, true)]
-		public async Task HardlinkUnavailable_FailsClosed(int linkError, bool conflict)
+		public async Task HardlinkUnavailable_UsesCheckedRename(int linkError, bool conflict)
 		{
 			var source = Write(Path.Combine(Src, "entry"), "data");
 			var destination = Path.Combine(Dst, "entry");
@@ -49,9 +49,9 @@ namespace Files.Platform.Tests.FileOperations
 			}
 			else
 			{
-				Assert.IsFalse(result.Succeeded);
-				Assert.IsFalse(File.Exists(destination));
-				Assert.AreEqual("data", File.ReadAllText(source));
+				Assert.IsTrue(result.Succeeded, result.ErrorMessage);
+				Assert.AreEqual("data", File.ReadAllText(destination));
+				Assert.IsFalse(File.Exists(source));
 			}
 		}
 
@@ -202,6 +202,30 @@ namespace Files.Platform.Tests.FileOperations
 		}
 
 		[TestMethod]
+		[DataRow(22)]
+		[DataRow(38)]
+		public async Task DirectoryFallback_InvalidMoveReportsCheckedRenameFailure(int errno)
+		{
+			var tree = Path.Combine(Src, "tree");
+			Write(Path.Combine(tree, "child"), "preserved");
+			var service = new LinuxFileOperationsService((_, _) => true, new LinuxFileOperationsHooks
+			{
+				RenameError = (_, _, _) =>
+				{
+					// Move the already-open destination into the source after the service's path checks.
+					Directory.Move(Dst, Path.Combine(tree, "destination"));
+					return errno;
+				},
+			});
+			var result = (await service.MoveAsync([tree], Dst))[0];
+			Assert.IsFalse(result.Succeeded);
+			StringAssert.Contains(result.ErrorMessage!, "Checked rename failed");
+			StringAssert.Contains(result.ErrorMessage!, "errno");
+			Assert.AreEqual("preserved", File.ReadAllText(Path.Combine(tree, "child")));
+			Assert.IsFalse(Directory.Exists(Path.Combine(tree, "tree")));
+		}
+
+		[TestMethod]
 		public async Task DirectoryEinval_DoesNotPoisonMountCache()
 		{
 			var attempts = 0;
@@ -211,8 +235,7 @@ namespace Files.Platform.Tests.FileOperations
 			{
 				RenameError = (_, _, _) => { attempts++; return 22; },
 			});
-			Assert.IsFalse((await service.RenameAsync(tree, "renamed-tree")).Succeeded);
-			Assert.AreEqual("content", File.ReadAllText(Path.Combine(tree, "child")));
+			Assert.IsTrue((await service.RenameAsync(tree, "renamed-tree")).Succeeded);
 			var file = Write(Path.Combine(Src, "file"));
 			Assert.IsTrue((await service.RenameAsync(file, "renamed-file")).Succeeded);
 			Assert.AreEqual(2, attempts, "Directory EINVAL must not suppress the next renameat2 attempt.");

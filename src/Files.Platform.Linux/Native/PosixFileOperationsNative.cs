@@ -132,9 +132,12 @@ namespace Files.Platform.Linux.Native
 			}
 			if (!IsNotFound(errno))
 				return false;
-			// Never weaken the no-replace contract with a check followed by overwriting rename.
-			errno = 95; // EOPNOTSUPP
-			return false;
+			// Without RENAME_NOREPLACE, directories and entries that cannot be hardlinked retain a check/rename race.
+			var result = renameat(sourceFd, source, destinationFd, destination);
+			errno = result == 0 ? 0 : Marshal.GetLastPInvokeError();
+			if (result != 0)
+				throw new IOException($"Checked rename failed for '{destination}' with errno {errno}: {CreateException(errno, destination).Message}", errno);
+			return true;
 		}
 
 		public static void RenameAt(int sourceFd, string source, int destinationFd, string destination, bool replace, string displayPath, LinuxFileOperationsHooks? hooks = null)

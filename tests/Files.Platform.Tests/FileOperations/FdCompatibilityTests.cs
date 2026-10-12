@@ -46,9 +46,9 @@ namespace Files.Platform.Tests.FileOperations
 			var directory = Path.Combine(Src, "tree");
 			Write(Path.Combine(directory, "nested", "child"), "nested data");
 			var movedDirectory = await service.MoveAsync([directory], Dst);
-			Assert.IsFalse(movedDirectory[0].Succeeded);
-			Assert.AreEqual("nested data", File.ReadAllText(Path.Combine(directory, "nested", "child")));
-			Assert.IsFalse(Directory.Exists(Path.Combine(Dst, "tree")));
+			Assert.IsTrue(movedDirectory[0].Succeeded, movedDirectory[0].ErrorMessage);
+			Assert.AreEqual("nested data", File.ReadAllText(Path.Combine(Dst, "tree", "nested", "child")));
+			Assert.IsFalse(Directory.Exists(directory));
 			Assert.AreEqual(errno == 22 ? 1 : 4, attempts, "Only unambiguous EINVAL results are cached.");
 		}
 

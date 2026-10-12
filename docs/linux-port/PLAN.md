@@ -4,15 +4,21 @@
 
 Status: phases 0–7 done (2026-10-06); phase 8 optional · draft v1 · 2026-10-04 · fork base `0e3c17ca4` (in sync with `files-community/Files` main)
 
-## 0. Revision 2 (2026-10-04): Linux-first
+## 0. Independent fork (Stage 1)
+
+The [upstream policy](upstream-policy.md) overrides earlier merge-preservation and Windows-restoration guidance below. LinuxFiles no longer merges upstream; the upstream remote is read-only and individual fixes are cherry-picked selectively. Windows leaf projects, their build references, Windows CI/MSIX packaging, and sync/pruning automation are removed. Windows code inside `Files.App` remains for later stages. Preserve MIT/MPL licenses and NOTICE credit.
+
+The remaining sections record the original porting plan and its completed phases.
+
+### Revision 2 (2026-10-04): Linux-first
 
 **This section overrides anything below that conflicts with it.**
 
 ### Decision
 The owner decided to focus on Linux first. Windows support is revisited only after the Linux version works.
-- The Windows build no longer has to stay green. `ci-windows.yml` is manual (`workflow_dispatch`) and informational.
-- We still put platform code behind `Files.Platform.Abstractions` interfaces. That keeps the Linux code clean, keeps
-  upstream merges manageable, and leaves a path back to Windows. Windows-only code may be excluded from the build
+- The Windows build no longer has to stay green; Windows workflows have been removed.
+- We still put platform code behind `Files.Platform.Abstractions` interfaces. That keeps the Linux code clean and
+  gives selectively imported fixes clear platform boundaries. Windows-only code may be excluded from the build
   or left uncompiled instead of carefully wrapped.
 - Fork autonomy: agents may push branches, open and merge PRs on `MemerGamer/LinuxFiles` freely. Never touch upstream.
 
@@ -80,14 +86,13 @@ largely independent problems:
      IFileOperation, preview handlers)
 
 Strategy: **introduce a platform abstraction layer, move Windows code behind it unchanged, then add a Linux backend
-and an Uno head.** The Windows build must keep working at every step so the fork can keep merging upstream.
+and an Uno head.** The Linux desktop build must keep working at every step.
 
 ## 2. Guiding principles
 
-- **Keep upstream mergeable.** Prefer additive files, partial classes, DI registration, and `#if` in a few
-  well-known seams over rewriting upstream files. Each upstream sync should be a routine merge.
-- **Windows build never breaks.** Every PR must build `net10.0-windows` (CI on Windows) *and* whatever Linux targets
-  exist at that point (CI on Linux).
+- **Independent fork.** Use clear platform seams and selectively cherry-pick upstream fixes with attribution.
+  Do not merge upstream branches; see [upstream-policy.md](upstream-policy.md).
+- **Linux build stays green.** Every PR must build the desktop app and remaining Linux tests.
 - **Drop, don't port, Windows-only features** (listed in §6). Hide them in the UI on Linux via a capability flag.
 - **Managed first, native second.** Prefer `System.IO`, `FileSystemWatcher`, SharpCompress, TagLibSharp,
   Tmds.DBus over P/Invoking GLib. Use GIO only where a managed path is clearly worse (thumbnails, mime/app info).
@@ -107,9 +112,9 @@ and an Uno head.** The Windows build must keep working at every step so the fork
 | Files.App.Controls | windows (WinUI) | Clean of Win32/Composition — ports to Uno with minor changes |
 | Files.App | windows (WinUI, MSIX) | The bulk of the work |
 | Files.App.CsWin32 | windows | Windows-only |
-| Files.App.Server | windows (OOP WinRT server) | Drop on Linux |
-| Files.App.BackgroundTasks | windows (MSIX update task) | Drop on Linux |
-| Files.App.Launcher / OpenDialog / SaveDialog | C++ vcxproj | Drop on Linux (see §6 for replacements) |
+| legacy Windows COM server | windows (OOP WinRT server) | Drop on Linux |
+| legacy Windows update-task project | windows (MSIX update task) | Drop on Linux |
+| legacy Windows launcher / OpenDialog / SaveDialog | C++ vcxproj | Drop on Linux (see §6 for replacements) |
 | tests/* | windows (Appium/WinAppDriver, WinUI gallery) | No unit tests exist today |
 
 All csproj files hard-code `RuntimeIdentifiers=win-x86;win-x64;win-arm64`, including the neutral ones.
@@ -169,9 +174,8 @@ Directory watching is implemented separately in five places (`ShellViewModel`, `
 Files.Shared                (net10.0)  — unchanged
 Files.Core.Storage          (net10.0)  — unchanged (OwlCore contracts)
 Files.Platform.Abstractions (net10.0)  — NEW: interfaces + capability flags, no implementations
-Files.Platform.Windows      (net10.0-windows) — NEW: wraps existing Windows code (moved, not rewritten)
 Files.Platform.Linux        (net10.0)  — NEW: Linux implementations
-Files.App.Storage           — split: portable parts → net10.0; Windows/ → Files.Platform.Windows
+Files.App.Storage           — split: portable parts → net10.0; Windows/ retained for later removal
 Files.App.Controls          — multi-target: net10.0-windows (WinAppSDK) + net10.0-desktop (Uno)
 Files.App                   — multi-target: net10.0-windows (WinAppSDK) + net10.0-desktop (Uno Skia)
 ```
@@ -226,13 +230,13 @@ Each phase lists its **exit criteria**. Phases 2 and 3 overlap heavily once Phas
   Uno vs Avalonia decision confirmed.
 
 ### Phase 1 — Abstraction skeleton (serial, blocks everything)
-- Create `Files.Platform.Abstractions` (interfaces from §4.1 + `IPlatformCapabilities`), `Files.Platform.Windows`,
+- Create `Files.Platform.Abstractions` (interfaces from §4.1 + `IPlatformCapabilities`), the former Windows platform project,
   `Files.Platform.Linux` (empty), and a `tests/Files.Platform.Tests` (MSTest, net10.0) project. Add them to `Files.slnx`.
 - Add `AddWindowsPlatform()` / `AddLinuxPlatform()` DI entry points; call `AddWindowsPlatform()` from `AppLifecycleHelper`.
 - **Exit:** Windows build and behaviour unchanged; new projects build on Linux.
 
 ### Phase 2 — Move Windows code behind the seams (parallel, W1–W8)
-Each workstream: define its interface methods from real call sites, implement them in `Files.Platform.Windows` by
+Each workstream: define its interface methods from real call sites, implement them in the former Windows platform project by
 **moving or wrapping** existing code, then update call sites to use the interface. No behaviour change on Windows.
 - **Exit per workstream:** zero direct `PInvoke.`/`Windows.Storage`/Registry calls remaining in the workstream's
   owned consumer files (checked with `rg --no-ignore`); Windows CI green.
@@ -313,7 +317,7 @@ files (outside `*.Windows.cs`) → 0. Exit: compat off by default, 0 errors, hea
 
 ### Phase 6 — Desktop integration & packaging
 - `org.freedesktop.FileManager1` D-Bus service (ShowFolders/ShowItems/ShowItemProperties): the Linux equivalent of
-  `Files.App.Launcher`.
+  `legacy Windows launcher`.
 - `.desktop` entry, `inode/directory` MIME association, AppStream metainfo, icons.
 - Packages: Flatpak (primary; needs `--filesystem=host`, `org.freedesktop.Flatpak` spawn for launching host apps
   carefully considered), AppImage, AUR `PKGBUILD`.
@@ -336,7 +340,7 @@ files (outside `*.Windows.cs`) → 0. Exit: compat off by default, 0 errors, hea
 | NTFS ACL Security tab / object picker | Replace with POSIX owner/group/permissions editor |
 | `.lnk` / `.url` shortcuts | Read-only support optional; create symlinks / `.desktop` Link entries |
 | Jump lists, Start-menu pinning, taskbar progress | Drop (taskbar progress could use Unity LauncherEntry D-Bus later) |
-| Files.App.Server, BackgroundTasks, MSIX update task | Drop |
+| legacy Windows COM server, BackgroundTasks, MSIX update task | Drop |
 | Open/Save dialog replacement (C++ COM) | Defer; portal backend in Phase 6 |
 | WSL distro listing, PowerShell helpers | Drop |
 | Format drive dialog | Replace with `gnome-disks` launch if present, else hide |
@@ -362,7 +366,7 @@ files (outside `*.Windows.cs`) → 0. Exit: compat off by default, 0 errors, hea
    capped log.
 4. **Opus** reviews the diff (correctness, CRLF, `.editorconfig`, AOT rules, no scope creep), then merges into
    `main` in dependency order.
-5. **Haiku** merges `upstream/main` into `main` (via a sync PR) weekly and reports conflicts. **Opus** resolves non-trivial ones.
+5. Review upstream fixes selectively and cherry-pick with attribution. No weekly upstream merges or sync PRs.
 
 Windows builds can't run locally on Linux. Validate them through GitHub Actions on `windows-2025-vs2026`, with a
 Haiku agent polling `gh run` results.
@@ -397,7 +401,7 @@ Phase 1.
 ```
 WP-ID:        W2-a
 Goal:         Introduce IFileOperationsService; Windows impl wraps ShellFilesystemOperations
-Owns:         src/Files.App/Utils/Storage/Operations/**, src/Files.Platform.Windows/FileOperations/**
+Owns:         src/Files.App/Utils/Storage/Operations/**, the former Windows file-operations backend
 Must not edit: ShellViewModel.cs, Actions/**, AppLifecycleHelper.cs
 Contract:     (interface signature pasted here by Opus)
 Acceptance:   - Windows CI green
@@ -411,7 +415,7 @@ Runner checks: dotnet build src/Files.Platform.Abstractions; dotnet test tests/F
 | Risk | Impact | Mitigation |
 |---|---|---|
 | Uno gaps (InteractionTracker, title bar, TabView tear-out, InputKeyboardSource) | UI features missing | Phase 0 spike; degrade behind capability flags |
-| Upstream churn in hot files (`ShellViewModel`, layout pages) | Painful merges | Weekly upstream merges; additive/partial-class style; keep moved code byte-identical where possible |
+| Upstream churn in hot files (`ShellViewModel`, layout pages) | Painful merges | Selective, reviewed cherry-picks; clear platform boundaries |
 | Windows build can't be verified locally | Silent Windows breakage | Mandatory Windows CI on every `linux/*` PR |
 | File-operation correctness (data loss) | Critical | Extensive temp-dir unit tests; cross-device move, conflict, cancel, permission-denied, symlink cases |
 | Performance of managed enumeration / thumbnails | Sluggish large folders | Benchmarks against 100k entries; batch `stat`; async thumbnail queue with XDG cache |

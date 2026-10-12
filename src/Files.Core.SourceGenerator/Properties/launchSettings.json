@@ -8,10 +8,6 @@
       "commandName": "DebugRoslynComponent",
       "targetProject": "..\\Files.App.Controls\\Files.App.Controls.csproj"
     },
-    "Files.App.Server": {
-      "commandName": "DebugRoslynComponent",
-      "targetProject": "..\\Files.App.Server\\Files.App.Server.csproj"
-    },
     "Files.App": {
       "commandName": "DebugRoslynComponent",
       "targetProject": "..\\Files.App\\Files.App.csproj"

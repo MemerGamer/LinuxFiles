@@ -4,9 +4,6 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # Custom files
-Files.App.OpenDialog*.dll
-Files.App.SaveDialog*.dll
-Files.App.Launcher.exe
 
 # User-specific files
 *.rsuser
@@ -408,7 +405,6 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 .idea/
-src/Files.App/Assets/FilesOpenDialog/Files.App.Launcher.exe.sha256
 .cache/
 
 # Shared opt-in Linux publish analysis profile

@@ -1,6 +1,6 @@
 # Plan: keep Uno, Rust backend, drop Windows code
 
-Decision (user, 2026-10-09): keep Uno for the UI, move hot backend paths to Rust, and remove Windows-specific code without breaking the fork's upstream sync. Supersedes the "Rust no-go until benchmark" verdict in `investigations/rust.md` only in direction; the benchmark gate still applies per component.
+Decision (user, 2026-10-09): keep Uno for the UI, move hot backend paths to Rust, and remove Windows-specific code from the independent fork. Supersedes the "Rust no-go until benchmark" verdict in `investigations/rust.md` only in direction; the benchmark gate still applies per component.
 
 ## Track 1: Rust backend (`native/linuxfiles-core`, cdylib)
 
@@ -17,16 +17,17 @@ Packaging: cargo build in CI per target, `.so` bundled in AppImage/Flatpak/tarba
 
 Phases: P0 benchmark harness (C# baseline, 1 week). P1 enumeration spike behind flag. P2 watcher + archives. P3 default-on if gates pass. Release as alpha4+.
 
-## Track 2: Windows code removal without breaking sync
+## Track 2: Windows code removal in the independent fork
 
-Already done: soft trim (compile exclusions, #1 `#if WINDOWS`, analysis publish profile).
+The [upstream policy](upstream-policy.md) supersedes the earlier sync-preservation plan. Upstream stays read-only; fixes are cherry-picked selectively, with no upstream merges.
 
-Hard deletion becomes viable with sync automation:
-1. List Windows-only paths in `scripts/linux/windows-paths.txt` (projects, CsWin32, BackgroundTasks, Package manifests, Windows installers, Windows-only tests).
-2. Daily sync workflow merges upstream, then for modify/delete conflicts on listed paths runs `git rm` (keep our deletion) and commits; all other conflicts still open a PR for review.
-3. Shared files (Files.App.csproj, Files.slnx, Directory.Packages.props) stay, with Windows items conditioned, to keep conflict surface small.
-4. Staged: (a) build/bundle exclusion verified by size comparison (`compare-publish.py`), (b) delete leaf Windows-only projects first, (c) delete Windows-only files inside Files.App last, after two clean syncs.
-Rollback: every stage is one revertable PR. If a sync produces non-trivial conflicts twice in a row, stop at the previous stage.
+Already done: soft trim (compile exclusions, `#if WINDOWS`, analysis publish profile).
+
+1. Stage 1: remove Windows leaf projects, their build references, Windows CI/packaging, and sync/pruning automation. Keep the desktop app and remaining tests building.
+2. Later stages: remove Windows-only code inside `Files.App` after checking Linux consumers and build exclusions. Preserve shared assets needed by Linux, localization, licenses and notices.
+3. Verify each stage with focused builds and tests; compare publish manifests when changing shipped assets (`compare-publish.py`).
+
+Rollback: each stage remains a scoped, revertible change.
 
 ## Track 3: Parallel, not blocked
 
@@ -34,5 +35,5 @@ Pixelation diagnosis (1x/1.5x/2x), Wayland host spike decision, per `PLAN-alpha3
 
 ## Order
 
-alpha3 (Wave 1 merged) -> P0 benchmark + Track 2(a) -> P1 Rust enumeration + Track 2(b) -> alpha4 -> P2/P3 + Track 2(c) -> alpha5.
+alpha3 (Wave 1 merged) -> P0 benchmark + Track 2 publish verification -> P1 Rust enumeration + Track 2 Stage 1 -> alpha4 -> P2/P3 + later Windows removal -> alpha5.
 Work split: Codex implements Rust crates and CI; Claude Sonnet verifies headless; cross-review before merge.

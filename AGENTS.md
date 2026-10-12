@@ -43,8 +43,6 @@ This project is a C#/.NET WinUI 3 desktop app; an alternative to File Explorer.
 ├── Files.App.Controls           Shared app controls
 ├── Files.App.Storage            App storage abstractions and implementations
 ├── Files.App.CsWin32            Generated/native Win32 interop project
-├── Files.App.BackgroundTasks    Background task project
-├── Files.App.Server             App service/server project
 ├── Files.Core.SourceGenerator   Roslyn source generators and analyzers
 ├── Files.Core.Storage           Core storage abstractions
 └── Files.Shared                 Shared attributes, extensions, and common code
@@ -52,9 +50,7 @@ This project is a C#/.NET WinUI 3 desktop app; an alternative to File Explorer.
 
 ```text
 /tests
-├── Files.App.UITests
-├── Files.App.UnitTests
-└── Files.InteractionTests
+└── Files.Platform.Tests         Linux platform tests
 ```
 
 ## Build

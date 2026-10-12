@@ -30,7 +30,7 @@ namespace Files.Platform.Linux.Launching
 	}
 
 	/// <summary>
-	/// Starts processes through <c>setsid</c> when available, passing arguments directly without a shell.
+	/// Starts processes through <c>setsid</c> when available, using a fixed shell wrapper to isolate stdio while preserving separate arguments.
 	/// </summary>
 	public sealed class DetachedProcessStarter : IProcessStarter
 	{
@@ -63,21 +63,25 @@ namespace Files.Platform.Linux.Launching
 			{
 				UseShellExecute = false,
 				CreateNoWindow = true,
+				FileName = "/bin/sh",
 			};
 
 			if (launch.WorkingDirectory is not null)
 				startInfo.WorkingDirectory = launch.WorkingDirectory;
 
+			// Only this fixed script is parsed by the shell; program and arguments remain positional parameters.
+			startInfo.ArgumentList.Add("-c");
+			startInfo.ArgumentList.Add("exec \"$@\" </dev/null >/dev/null 2>&1");
+			startInfo.ArgumentList.Add("linuxfiles-launch");
+
 			if (setsid is not null)
 			{
-				startInfo.FileName = setsid;
+				startInfo.ArgumentList.Add(setsid);
 				startInfo.ArgumentList.Add("--fork");
-				startInfo.ArgumentList.Add(program);
+				startInfo.ArgumentList.Add("--");
 			}
-			else
-			{
-				startInfo.FileName = program;
-			}
+
+			startInfo.ArgumentList.Add(program);
 
 			foreach (var argument in launch.Arguments)
 				startInfo.ArgumentList.Add(argument);

@@ -1,17 +1,12 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-using Files.Platform.Linux.DBus;
 using Files.Platform.Linux.Theme;
-using Files.Platform.Tests.SystemIntegration;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
 using System.IO;
 using System.Reflection;
-using System.Net.Sockets;
-using System.Threading;
 using System.Threading.Tasks;
-using Tmds.DBus.Protocol;
 
 namespace Files.Platform.Tests.Theme
 {
@@ -24,47 +19,104 @@ namespace Files.Platform.Tests.Theme
 		[DataRow(true)]
 		public async Task UnavailableBus_RetriesSlowConnectionAndDiscardsStaleReconciliation(bool sendNewerSignal)
 		{
-			using var bus = PrivateBus.Start();
-			await using var proxy = new SlowBusProxy(bus.Address);
-			using var server = await DBusSession.TryConnectAsync(bus.Address, TimeSpan.FromSeconds(2))
-				?? throw new AssertFailedException("no private bus");
-			var settings = new SlowSettingsServer(server, sendNewerSignal);
-			server.AddMethodHandler(settings);
-			Assert.IsTrue(await server.TryRequestNameAsync("org.freedesktop.portal.Desktop", RequestNameOptions.None));
-
-			var address = Environment.GetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS");
+			var type = typeof(LinuxColorScheme);
+			const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
+			var fields = new[] { "_isDark", "_watching", "_watchStarting", "_updateVersion" };
+			var saved = Array.ConvertAll(fields, name => type.GetField(name, flags)!.GetValue(null));
 			var forced = Environment.GetEnvironmentVariable("FILES_COLOR_SCHEME");
-			var gtk = Environment.GetEnvironmentVariable("GTK_THEME");
-			var changed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-			settings.SignalObserved = changed.Task;
-			void OnChanged(object? sender, EventArgs args) => changed.TrySetResult();
-			LinuxColorScheme.Changed += OnChanged;
+			var retry = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			var connecting = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			var connected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			var snapshot = new TaskCompletionSource<uint?>(TaskCreationOptions.RunContinuationsAsynchronously);
+			var reading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			var attempts = 0;
+			var resets = 0;
+			Task? watching = null;
 			try
 			{
-				Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/linuxfiles-theme-bus");
 				Environment.SetEnvironmentVariable("FILES_COLOR_SCHEME", null);
-				Environment.SetEnvironmentVariable("GTK_THEME", "Adwaita:light");
-				Assert.IsFalse(LinuxColorScheme.Initialize(), "The startup budget must return the local fallback.");
-				await Task.Delay(350);
-				Assert.IsFalse((bool)typeof(LinuxColorScheme).GetField("_watching", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!,
-					"A failed connection must not mark the watcher subscribed.");
-				Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", proxy.Address);
-				await changed.Task.WaitAsync(TimeSpan.FromSeconds(5));
-				await settings.Replied.Task.WaitAsync(TimeSpan.FromSeconds(5));
-				await Task.Delay(100);
-				Assert.IsTrue(LinuxColorScheme.IsDark, "The preference must reconcile unless a newer signal superseded the read.");
+				type.GetField("_isDark", flags)!.SetValue(null, false);
+				type.GetField("_watching", flags)!.SetValue(null, false);
+				type.GetField("_watchStarting", flags)!.SetValue(null, true);
+				Func<Task> subscribe = () =>
+				{
+					if (++attempts == 1)
+						return Task.FromException(new IOException("Unavailable test bus"));
+					connecting.TrySetResult();
+					return connected.Task;
+				};
+				Func<Task<uint?>> read = () => { reading.TrySetResult(); return snapshot.Task; };
+				Func<Task> reset = () => { resets++; return Task.CompletedTask; };
+				Func<TimeSpan, Task> wait = delay =>
+				{
+					Assert.AreEqual(TimeSpan.FromMilliseconds(250), delay);
+					return retry.Task;
+				};
+				watching = (Task)type.GetMethod("WatchAsync", flags)!.Invoke(null, [subscribe, read, reset, wait])!;
+				Assert.AreEqual(1, attempts);
+				Assert.AreEqual(1, resets);
+				Assert.IsFalse((bool)type.GetField("_watching", flags)!.GetValue(null)!);
+				Assert.IsFalse(LinuxColorScheme.IsDark);
+				retry.SetResult();
+				await connecting.Task.WaitAsync(TimeSpan.FromSeconds(2));
+				Assert.IsFalse(watching.IsCompleted, "A slow connection must remain pending, without another attempt.");
+				Assert.IsFalse((bool)type.GetField("_watching", flags)!.GetValue(null)!);
+				connected.SetResult();
+				await reading.Task.WaitAsync(TimeSpan.FromSeconds(2));
+				Assert.AreEqual(2, attempts);
+				Assert.IsTrue((bool)type.GetField("_watching", flags)!.GetValue(null)!);
+				if (sendNewerSignal)
+				{
+					var version = type.GetMethod("NextUpdateVersion", flags)!.Invoke(null, null);
+					type.GetMethod("ApplyPortalValue", flags)!.Invoke(null, [1u, version]);
+				}
+				snapshot.SetResult(sendNewerSignal ? 2u : 1u);
+				await watching.WaitAsync(TimeSpan.FromSeconds(2));
+				Assert.IsTrue(LinuxColorScheme.IsDark, "Reconcile the read unless a newer signal superseded it.");
 			}
 			finally
 			{
-				LinuxColorScheme.Changed -= OnChanged;
-				var connectionField = typeof(LinuxColorScheme).GetField("_connection", BindingFlags.NonPublic | BindingFlags.Static)!;
-				(connectionField.GetValue(null) as IDisposable)?.Dispose();
-				connectionField.SetValue(null, null);
-				typeof(LinuxColorScheme).GetField("_watching", BindingFlags.NonPublic | BindingFlags.Static)!.SetValue(null, false);
-				Environment.SetEnvironmentVariable("DBUS_SESSION_BUS_ADDRESS", address);
+				retry.TrySetResult();
+				connected.TrySetResult();
+				snapshot.TrySetResult(null);
+				if (watching is not null)
+					await watching.WaitAsync(TimeSpan.FromSeconds(2));
+				for (var i = 0; i < fields.Length; i++)
+					type.GetField(fields[i], flags)!.SetValue(null, saved[i]);
 				Environment.SetEnvironmentVariable("FILES_COLOR_SCHEME", forced);
-				Environment.SetEnvironmentVariable("GTK_THEME", gtk);
 			}
+		}
+
+		[TestMethod]
+		public async Task UnavailableBus_RetryBackoffIsBounded()
+		{
+			var delays = new System.Collections.Generic.List<TimeSpan>();
+			var attempts = 0;
+			var resets = 0;
+			Func<Task> subscribe = () =>
+			{
+				attempts++;
+				return Task.FromException(new IOException("Unavailable test bus"));
+			};
+			Func<Task<uint?>> read = () => throw new AssertFailedException("Do not read before subscribing.");
+			Func<Task> reset = () => { resets++; return Task.CompletedTask; };
+			Func<TimeSpan, Task> wait = delay =>
+			{
+				delays.Add(delay);
+				return delays.Count == 10 ? Task.FromCanceled(new System.Threading.CancellationToken(true)) : Task.CompletedTask;
+			};
+			var watching = (Task)typeof(LinuxColorScheme).GetMethod("WatchAsync", BindingFlags.NonPublic | BindingFlags.Static)!
+				.Invoke(null, [subscribe, read, reset, wait])!;
+			try
+			{
+				await watching;
+				Assert.Fail("The fake clock must stop the retry loop.");
+			}
+			catch (OperationCanceledException) { }
+			Assert.AreEqual(10, attempts);
+			Assert.AreEqual(attempts, resets);
+			for (var i = 0; i < delays.Count; i++)
+				Assert.AreEqual(TimeSpan.FromMilliseconds(Math.Min(250 * Math.Pow(2, i), 30000)), delays[i]);
 		}
 
 		[TestMethod]
@@ -94,82 +146,6 @@ namespace Files.Platform.Tests.Theme
 				version.SetValue(null, savedVersion);
 				preference.SetValue(null, savedPreference);
 				Environment.SetEnvironmentVariable("FILES_COLOR_SCHEME", forced);
-			}
-		}
-
-		private sealed class SlowBusProxy : IAsyncDisposable
-		{
-			private readonly Socket listener = new(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-			private readonly CancellationTokenSource stop = new();
-			private readonly string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "theme-bus-" + Guid.NewGuid().ToString("N"));
-			private readonly Task pump;
-			public string Address => "unix:path=" + path;
-
-			public SlowBusProxy(string target)
-			{
-				listener.Bind(new UnixDomainSocketEndPoint(path));
-				listener.Listen(4);
-				pump = ForwardAsync(target.Split(',')[0]["unix:path=".Length..]);
-			}
-
-			private async Task ForwardAsync(string target)
-			{
-				try
-				{
-					using var incoming = await listener.AcceptAsync(stop.Token);
-					// Authentication takes longer than the synchronous startup budget.
-					await Task.Delay(400, stop.Token);
-					using var outgoing = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-					await outgoing.ConnectAsync(new UnixDomainSocketEndPoint(target), stop.Token);
-					using var input = new NetworkStream(incoming);
-					using var output = new NetworkStream(outgoing);
-					await Task.WhenAll(input.CopyToAsync(output, stop.Token), output.CopyToAsync(input, stop.Token));
-				}
-				catch (OperationCanceledException) { }
-			}
-
-			public async ValueTask DisposeAsync()
-			{
-				await stop.CancelAsync();
-				await pump;
-				listener.Dispose();
-				stop.Dispose();
-				File.Delete(path);
-			}
-		}
-
-		private sealed class SlowSettingsServer(DBusConnection connection, bool sendNewerSignal) : IPathMethodHandler
-		{
-			public Task SignalObserved { get; set; } = Task.CompletedTask;
-			public TaskCompletionSource Replied { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
-			public string Path => "/org/freedesktop/portal/desktop";
-			public bool HandlesChildPaths => false;
-
-			public async ValueTask HandleMethodAsync(MethodContext context)
-			{
-				if (context.Request.MemberAsString != "Read")
-				{
-					context.ReplyUnknownMethodError();
-					return;
-				}
-
-				await Task.Delay(400);
-				if (sendNewerSignal)
-				{
-					{
-						using var signal = connection.GetMessageWriter();
-						signal.WriteSignalHeader(null, Path, "org.freedesktop.portal.Settings", "SettingChanged", "ssv");
-						signal.WriteString("org.freedesktop.appearance");
-						signal.WriteString("color-scheme");
-						signal.WriteVariantUInt32(1);
-						connection.TrySendMessage(signal.CreateMessage());
-					}
-					await SignalObserved.WaitAsync(TimeSpan.FromSeconds(5));
-				}
-				using var writer = context.CreateReplyWriter("v");
-				writer.WriteVariantUInt32(sendNewerSignal ? 2u : 1u);
-				context.Reply(writer.CreateMessage());
-				Replied.TrySetResult();
 			}
 		}
 

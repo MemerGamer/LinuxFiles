@@ -156,74 +156,87 @@ namespace Files.Platform.Linux.Theme
 				_watchStarting = true;
 			}
 
-			_ = Task.Run(async () =>
+			_ = Task.Run(() => WatchAsync(SubscribeAsync, ReadPortalAsync, ResetConnectionAsync, Task.Delay));
+		}
+
+		private static async Task SubscribeAsync()
+		{
+			var connection = await GetConnectionAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+			if (connection is null)
+				throw new IOException("Session bus is unavailable.");
+
+			var rule = new MatchRule
 			{
-				var delay = TimeSpan.FromMilliseconds(250);
-				while (true)
+				Type = MessageType.Signal,
+				Sender = PortalService,
+				Path = PortalPath,
+				Interface = SettingsInterface,
+				Member = "SettingChanged",
+			};
+
+			await connection.AddMatchAsync(rule, static (Message message, object? _) =>
+			{
+				var reader = message.GetBodyReader();
+				var ns = reader.ReadString();
+				var key = reader.ReadString();
+				var outer = reader.ReadVariantValue();
+				if (ns != "org.freedesktop.appearance" || key != "color-scheme")
+					return (uint?)null;
+
+				return outer.Type == VariantValueType.UInt32 ? outer.GetUInt32() : (uint?)null;
+			}, static (Exception? ex, uint? value, object? _, object? _) =>
+			{
+				if (ex is not null || value is null)
+					return;
+
+				ApplyPortalValue(value.Value, NextUpdateVersion());
+			}, null, null, false, ObserverFlags.None);
+		}
+
+		private static async Task ResetConnectionAsync()
+		{
+			await _connectionGate.WaitAsync().ConfigureAwait(false);
+			try
+			{
+				_connection?.Dispose();
+				_connection = null;
+			}
+			finally { _connectionGate.Release(); }
+		}
+
+		// Keep retry scheduling and reconciliation independent of the session bus and wall clock.
+		private static async Task WatchAsync(Func<Task> subscribe, Func<Task<uint?>> read,
+			Func<Task> resetConnection, Func<TimeSpan, Task> wait)
+		{
+			var delay = TimeSpan.FromMilliseconds(250);
+			while (true)
+			{
+				try
 				{
+					await subscribe().ConfigureAwait(false);
+					lock (_gate)
+					{
+						_watching = true;
+						_watchStarting = false;
+					}
+
+					// A later signal takes precedence over this snapshot.
+					var version = NextUpdateVersion();
 					try
 					{
-						var connection = await GetConnectionAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
-						if (connection is null)
-							throw new IOException("Session bus is unavailable.");
-
-						var rule = new MatchRule
-						{
-							Type = MessageType.Signal,
-							Sender = PortalService,
-							Path = PortalPath,
-							Interface = SettingsInterface,
-							Member = "SettingChanged",
-						};
-
-						await connection.AddMatchAsync(rule, static (Message message, object? _) =>
-						{
-							var reader = message.GetBodyReader();
-							var ns = reader.ReadString();
-							var key = reader.ReadString();
-							var outer = reader.ReadVariantValue();
-							if (ns != "org.freedesktop.appearance" || key != "color-scheme")
-								return (uint?)null;
-
-							return outer.Type == VariantValueType.UInt32 ? outer.GetUInt32() : (uint?)null;
-						}, static (Exception? ex, uint? value, object? _, object? _) =>
-						{
-							if (ex is not null || value is null)
-								return;
-
-							ApplyPortalValue(value.Value, NextUpdateVersion());
-						}, null, null, false, ObserverFlags.None);
-
-						lock (_gate)
-						{
-							_watching = true;
-							_watchStarting = false;
-						}
-
-						// A later signal takes precedence over this snapshot.
-						var version = NextUpdateVersion();
-						try
-						{
-							if (await ReadPortalAsync().ConfigureAwait(false) is { } current)
-								ApplyPortalValue(current, version);
-						}
-						catch (Exception) { }
-						return;
+						if (await read().ConfigureAwait(false) is { } current)
+							ApplyPortalValue(current, version);
 					}
-					catch (Exception)
-					{
-						await _connectionGate.WaitAsync().ConfigureAwait(false);
-						try
-						{
-							_connection?.Dispose();
-							_connection = null;
-						}
-						finally { _connectionGate.Release(); }
-					}
-					await Task.Delay(delay).ConfigureAwait(false);
-					delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 30000));
+					catch (Exception) { }
+					return;
 				}
-			});
+				catch (Exception)
+				{
+					await resetConnection().ConfigureAwait(false);
+				}
+				await wait(delay).ConfigureAwait(false);
+				delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 30000));
+			}
 		}
 
 		private static long NextUpdateVersion()

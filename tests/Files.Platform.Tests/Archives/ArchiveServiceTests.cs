@@ -585,6 +585,68 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		[DataRow(ConflictAction.Overwrite, false, false)]
+		[DataRow(ConflictAction.KeepBoth, false, false)]
+		[DataRow(ConflictAction.Overwrite, true, false)]
+		[DataRow(ConflictAction.Overwrite, false, true)]
+		[DataRow(ConflictAction.KeepBoth, false, true)]
+		public async Task ConflictAncestorSwapCannotModifyOutsideDestination(ConflictAction action, bool directoryConflict, bool swapRoot)
+		{
+			var outside = Path.Combine(root, "outside");
+			Directory.CreateDirectory(outside);
+			ExistingFile();
+			if (directoryConflict)
+			{
+				File.Delete(Path.Combine(Out, "dir", "a.txt"));
+				Directory.CreateDirectory(Path.Combine(Out, "dir", "a.txt"));
+				Directory.CreateDirectory(Path.Combine(outside, "a.txt"));
+				File.WriteAllText(Path.Combine(outside, "a.txt", "victim"), "outside");
+			}
+			else
+				File.WriteAllText(Path.Combine(outside, "a.txt"), "outside");
+
+			var result = await service.ExtractAsync(await ArchiveWithAText("incoming"), Out, new ArchiveExtractOptions
+			{
+				ResolveConflict = (_, _) =>
+				{
+					if (swapRoot)
+					{
+						Directory.CreateDirectory(Path.Combine(outside, "dir"));
+						File.Move(Path.Combine(outside, "a.txt"), Path.Combine(outside, "dir", "a.txt"));
+						Directory.Move(Out, Path.Combine(root, "saved"));
+						Directory.CreateSymbolicLink(Out, outside);
+					}
+					else
+					{
+						Directory.Move(Path.Combine(Out, "dir"), Path.Combine(Out, "saved"));
+						Directory.CreateSymbolicLink(Path.Combine(Out, "dir"), outside);
+					}
+					return Task.FromResult(new ConflictResolution(action));
+				},
+			});
+
+			Assert.IsFalse(result.Succeeded);
+			if (swapRoot)
+				Assert.AreEqual(1, Directory.GetFileSystemEntries(Path.Combine(outside, "dir")).Length);
+			Assert.AreEqual("outside", File.ReadAllText(swapRoot ? Path.Combine(outside, "dir", "a.txt") : directoryConflict ? Path.Combine(outside, "a.txt", "victim") : Path.Combine(outside, "a.txt")));
+			Assert.AreEqual(1, Directory.GetFileSystemEntries(outside).Length);
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
+		public async Task ExtractionRejectsSymlinkedDestinationAncestors(bool linkIsRoot)
+		{
+			var outside = Path.Combine(root, "outside");
+			Directory.CreateDirectory(outside);
+			var link = Path.Combine(Out, "link");
+			Directory.CreateSymbolicLink(link, outside);
+			var result = await service.ExtractAsync(await ArchiveWithAText("incoming"), linkIsRoot ? link : Path.Combine(link, "nested"));
+			Assert.IsFalse(result.Succeeded);
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(outside).Length);
+		}
+
+		[TestMethod]
 		public async Task ConflictCallbackDecides()
 		{
 			var zip = await ArchiveWithAText("incoming");

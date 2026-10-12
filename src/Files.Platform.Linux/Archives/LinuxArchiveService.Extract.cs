@@ -11,6 +11,8 @@ using System.Threading.Tasks;
 using Files.Platform.Abstractions.Archives;
 using Files.Platform.Abstractions.FileOperations;
 using Files.Platform.Linux.FileOperations;
+using Files.Platform.Linux.Native;
+using Microsoft.Win32.SafeHandles;
 using SharpCompress.Common;
 
 namespace Files.Platform.Linux.Archives
@@ -35,7 +37,11 @@ namespace Files.Platform.Linux.Archives
 		{
 			string? staging = null;
 			string? destination = null;
+			DirectoryHandle? destinationHandle = null;
+			DirectoryHandle? destinationParent = null;
 			var createdDestination = false;
+			DirectoryHandle? stagingHandle = null;
+			string? stagingName = null;
 			long processed = 0, skipped = 0;
 
 			try
@@ -66,18 +72,19 @@ namespace Files.Platform.Linux.Archives
 
 				if (extract)
 				{
-					destination = Path.GetFullPath(destinationFolder);
-					if (File.Exists(destination))
-						throw new IOException("The destination is a file.");
-
-					if (!Directory.Exists(destination))
+					destination = Path.TrimEndingDirectorySeparator(Path.GetFullPath(destinationFolder));
+					if (destination != "/")
 					{
-						Directory.CreateDirectory(destination);
-						createdDestination = true;
+						destinationParent = DirectoryHandle.OpenPath(Path.GetDirectoryName(destination)!, create: true);
+						createdDestination = !destinationParent.EntryExists(Path.GetFileName(destination));
+						destinationHandle = destinationParent.OpenRelativePath(Path.GetFileName(destination), create: true);
 					}
-
-					staging = Path.Combine(destination, ".files-extract-" + Guid.NewGuid().ToString("N"));
-					UnixMode.CreatePrivateDirectory(staging);
+					else
+						destinationHandle = DirectoryHandle.OpenPath(destination);
+					stagingName = ".files-extract-" + Guid.NewGuid().ToString("N");
+					staging = Path.Combine(destination, stagingName);
+					PosixNative.MkdirAt(destinationHandle.Descriptor, stagingName, 0x1C0, staging);
+					stagingHandle = DirectoryHandle.OpenChild(destinationHandle.Descriptor, stagingName, staging);
 				}
 
 				// Pass 2: stream the entries
@@ -136,38 +143,33 @@ namespace Files.Platform.Linux.Archives
 							continue;
 
 						var full = ArchivePathValidator.ResolveInside(staging!, relative);
-						ArchivePathValidator.EnsureNoLinkInPath(staging!, full);
+						using var parent = stagingHandle!.OpenRelativePath(Path.GetDirectoryName(relative) ?? string.Empty, create: true);
+						var name = Path.GetFileName(relative);
 
 						if (entry.LinkTarget is not null)
 						{
 							// Parent segments could escape through another archive link; accept only downward relative targets.
-							if (!ArchivePathValidator.IsSafeLinkTarget(relative, entry.LinkTarget) || entry.LinkTarget.Split('/').Contains("..", StringComparer.Ordinal) || FileSystemEntry.GetKind(full) != EntryKind.None)
+							if (!ArchivePathValidator.IsSafeLinkTarget(relative, entry.LinkTarget) || entry.LinkTarget.Split('/').Contains("..", StringComparer.Ordinal) || parent.EntryExists(name))
 							{
 								skipped++;
 								continue;
 							}
 
-							Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-							File.CreateSymbolicLink(full, entry.LinkTarget);
+							PosixNative.SymlinkAt(entry.LinkTarget, parent.Descriptor, name, full);
 							processed++;
 							continue;
 						}
 
 						if (entry.IsDirectory)
 						{
-							Directory.CreateDirectory(full);
+							using var directory = parent.OpenRelativePath(name, create: true);
 							processed++;
 							continue;
 						}
 
-						Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-						var streamOptions = new FileStreamOptions { Mode = FileMode.Create, Access = FileAccess.Write, Share = FileShare.None };
-						if (!OperatingSystem.IsWindows())
-							streamOptions.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-
 						uint crc = 0;
 						using (var input = openEntry())
-						using (var output = new FileStream(full, streamOptions))
+						using (var output = PosixNative.OpenFileAt(parent.Descriptor, name, full, create: true))
 						{
 							int read;
 							while ((read = input.Read(buffer, 0, buffer.Length)) > 0)
@@ -179,17 +181,15 @@ namespace Files.Platform.Linux.Archives
 								bytesDone += read;
 								ReportProgress(currentEntry);
 							}
+							VerifyCrc(entry, crc);
+							if (entry.Modified is { } modified)
+							{
+								try { File.SetLastWriteTime(output.SafeFileHandle, modified); }
+								catch (Exception ex) when (ex is ArgumentOutOfRangeException or IOException) { }
+							}
+							ApplyMode(output.SafeFileHandle, entry);
 						}
 
-						VerifyCrc(entry, crc);
-
-						if (entry.Modified is { } modified)
-						{
-							try { File.SetLastWriteTime(full, modified); }
-							catch (Exception ex) when (ex is ArgumentOutOfRangeException or IOException) { }
-						}
-
-						ApplyMode(full, entry);
 						processed++;
 					}
 				}
@@ -198,7 +198,14 @@ namespace Files.Platform.Linux.Archives
 					return new ArchiveResult(true, false, processed, skipped);
 
 				var state = new MergeState(options, ct, destination!);
-				Merge(staging!, destination!, string.Empty, state);
+				var rootIdentity = PosixNative.StatAt(destinationHandle!.Descriptor, ".", destination!);
+				void ValidateRoot()
+				{
+					using var current = DirectoryHandle.OpenPath(destination!);
+					if (!current.IsSameEntry(rootIdentity))
+						throw new ArchiveSecurityException("The extraction destination changed.");
+				}
+				Merge(stagingHandle!, destinationHandle, string.Empty, state, ValidateRoot);
 				skipped += state.Skipped;
 
 				ReportProgress(null, force: true);
@@ -229,15 +236,23 @@ namespace Files.Platform.Linux.Archives
 			}
 			finally
 			{
-				if (staging is not null)
+				stagingHandle?.Dispose();
+				if (destinationHandle is not null && stagingName is not null)
 				{
-					try { Directory.Delete(staging, recursive: true); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+					try { destinationHandle.DeleteEntry(stagingName); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
 				}
-
-				if (createdDestination && destination is not null)
+				if (createdDestination && destinationParent is not null && destinationHandle is not null)
 				{
-					try { Directory.Delete(destination, recursive: false); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+					try
+					{
+						var name = Path.GetFileName(destination!);
+						if (destinationHandle.IsSameEntry(PosixNative.StatAt(destinationParent.Descriptor, name, destination!)))
+							PosixNative.UnlinkAt(destinationParent.Descriptor, name, PosixNative.AtRemoveDir, destination!);
+					}
+					catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
 				}
+				destinationHandle?.Dispose();
+				destinationParent?.Dispose();
 			}
 		}
 
@@ -247,7 +262,7 @@ namespace Files.Platform.Linux.Archives
 				throw new InvalidDataException($"CRC mismatch, the archive is corrupt or the password is wrong: '{ArchivePathValidator.Printable(entry.Key ?? string.Empty)}'.");
 		}
 
-		private static void ApplyMode(string path, EntryData entry)
+		private static void ApplyMode(SafeFileHandle handle, EntryData entry)
 		{
 			if (OperatingSystem.IsWindows() || entry.Attrib is not { } attributes)
 				return;
@@ -266,7 +281,7 @@ namespace Files.Platform.Linux.Archives
 			if (executable)
 				result |= UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
 
-			try { File.SetUnixFileMode(path, result); }
+			try { File.SetUnixFileMode(handle, result); }
 			catch (IOException) { }
 		}
 
@@ -305,26 +320,26 @@ namespace Files.Platform.Linux.Archives
 		}
 
 		// Moves the staged tree into the destination one item at a time. Folders merge, existing files only change via the callback.
-		private static void Merge(string source, string destination, string relative, MergeState state)
+		private static void Merge(DirectoryHandle source, DirectoryHandle destination, string relative, MergeState state, Action validateDestination)
 		{
-			foreach (var child in Directory.EnumerateFileSystemEntries(source, "*", FileSystemEntry.AllEntries))
+			foreach (var name in source.ListNames())
 			{
 				state.CancellationToken.ThrowIfCancellationRequested();
-				var name = Path.GetFileName(child);
+				validateDestination();
 				var relativePath = relative.Length == 0 ? name : relative + "/" + name;
-				var target = Path.Combine(destination, name);
+				var target = ArchivePathValidator.ResolveInside(state.Root, relativePath);
+				var sourceStat = PosixNative.StatAt(source.Descriptor, name, target);
+				var isDirectory = sourceStat.IsDirectory;
+				var exists = PosixNative.TryStat(destination.Descriptor, name, PosixNative.AtSymlinkNofollow, out var targetStat, out var errno);
+				if (!exists && !PosixNative.IsNotFound(errno))
+					throw PosixNative.CreateException(errno, target);
 
-				var sourceKind = FileSystemEntry.GetKind(child);
-				var targetKind = FileSystemEntry.GetKind(target);
-				var isDirectory = sourceKind == EntryKind.Directory;
-
-				if (sourceKind == EntryKind.Symlink)
+				if (sourceStat.IsSymbolicLink)
 				{
 					try
 					{
-						var linkTarget = new FileInfo(child).LinkTarget!;
-						var resolved = Path.GetFullPath(Path.Combine(destination, linkTarget));
-						ArchivePathValidator.ResolveInside(state.Root, Path.GetRelativePath(state.Root, resolved));
+						var linkTarget = PosixNative.ReadLinkAt(source.Descriptor, name, target);
+						var resolved = ArchivePathValidator.ResolveInside(state.Root, Path.GetRelativePath(state.Root, Path.GetFullPath(Path.Combine(destination.Path, linkTarget))));
 						ArchivePathValidator.EnsureNoLinkInPath(state.Root, resolved);
 					}
 					catch (ArchiveSecurityException)
@@ -334,49 +349,47 @@ namespace Files.Platform.Linux.Archives
 					}
 				}
 
-				if (targetKind == EntryKind.None)
+				if (isDirectory && exists && targetStat.IsDirectory)
 				{
-					MoveItem(child, target, isDirectory);
+					using var sourceChild = DirectoryHandle.OpenChild(source.Descriptor, name, target);
+					using var targetChild = DirectoryHandle.OpenChild(destination.Descriptor, name, target);
+					void ValidateChild()
+					{
+						validateDestination();
+						var current = PosixNative.StatAt(destination.Descriptor, name, target);
+						if (!PosixNative.SameEntry(targetStat, current) || !targetChild.IsSameEntry(targetStat))
+							throw new ArchiveSecurityException("The extraction destination changed.");
+					}
+					Merge(sourceChild, targetChild, relativePath, state, ValidateChild);
 					continue;
 				}
 
-				if (isDirectory && targetKind == EntryKind.Directory)
+				var publicationName = name;
+				if (exists)
 				{
-					Merge(child, target, relativePath, state);
-					continue;
+					var action = state.Resolve(new ArchiveConflict(ArchivePathValidator.Printable(relativePath), target, isDirectory));
+					state.CancellationToken.ThrowIfCancellationRequested();
+					validateDestination();
+					switch (action)
+					{
+						case ConflictAction.Cancel:
+							throw new OperationCanceledException();
+						case ConflictAction.Skip:
+							state.Skipped++;
+							continue;
+						case ConflictAction.KeepBoth:
+							publicationName = FileNameGenerator.GenerateUniqueName(name, isDirectory, destination.EntryExists);
+							break;
+						default:
+							if (!PosixNative.SameEntry(targetStat, PosixNative.StatAt(destination.Descriptor, name, target)))
+								throw new ArchiveSecurityException("The extraction conflict changed.");
+							destination.DeleteEntry(name);
+							break;
+					}
 				}
-
-				switch (state.Resolve(new ArchiveConflict(ArchivePathValidator.Printable(relativePath), target, isDirectory)))
-				{
-					case ConflictAction.Cancel:
-						throw new OperationCanceledException();
-
-					case ConflictAction.Skip:
-						state.Skipped++;
-						break;
-
-					case ConflictAction.KeepBoth:
-						MoveItem(child, Path.Combine(destination, FileNameGenerator.GenerateUniqueName(destination, name, isDirectory)), isDirectory);
-						break;
-
-					default:
-						if (targetKind == EntryKind.Directory)
-							Directory.Delete(target, recursive: true);
-						else
-							File.Delete(target);
-
-						MoveItem(child, target, isDirectory);
-						break;
-				}
+				validateDestination();
+				PosixNative.RenameAt(source.Descriptor, name, destination.Descriptor, publicationName, false, target);
 			}
-		}
-
-		private static void MoveItem(string source, string target, bool isDirectory)
-		{
-			if (isDirectory)
-				Directory.Move(source, target);
-			else
-				File.Move(source, target);
 		}
 
 		private sealed class ExtractionGuard

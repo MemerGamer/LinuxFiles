@@ -1,6 +1,7 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using CommunityToolkit.WinUI;
 using Files.App.Views.Properties;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
@@ -158,6 +159,13 @@ namespace Files.App.Utils.Storage
 			}
 
 			appWindow.Show();
+
+			if (OperatingSystem.IsLinux() && associatedInstance is FrameworkElement ownerElement &&
+				ownerElement.FindAscendant<MainPage>() is { } ownerPage)
+			{
+				ownerPage.UpdatePropertiesBackdrop(true);
+				propertiesWindow.Closed += (_, _) => ownerPage.UpdatePropertiesBackdrop(false);
+			}
 
 			(frame.Content as MainPropertiesPage)?.TryNavigateToPage(defaultPage);
 		}

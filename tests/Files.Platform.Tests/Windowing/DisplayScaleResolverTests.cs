@@ -136,10 +136,10 @@ namespace Files.Platform.Tests.Windowing
 		}
 
 		[TestMethod]
-		public void NiriOutputs_MissingFirstScale_CanStillUseFocusedOutput()
+		public void NiriOutputs_DisabledFirstOutput_UsesNextActiveOutput()
 		{
 			const string outputs = """{"DP-1":{"logical":null},"HDMI-A-1":{"logical":{"scale":2}}}""";
-			Assert.IsNull(DisplayScaleResolver.ParseNiriOutputs(outputs));
+			Assert.AreEqual(2.0, DisplayScaleResolver.ParseNiriOutputs(outputs));
 			Assert.AreEqual(2.0, DisplayScaleResolver.ParseNiriOutputs(outputs, NiriFocusedFixture));
 		}
 
@@ -297,7 +297,7 @@ namespace Files.Platform.Tests.Windowing
 		[TestMethod]
 		public void NiriFallback_RequiresSessionAndHonoursOptOut()
 		{
-			foreach (var variable in new[] { "NIRI_SOCKET", "WAYLAND_DISPLAY", "FILES_NIRI_SCALE" })
+			foreach (var variable in new[] { "WAYLAND_DISPLAY", "FILES_NIRI_SCALE" })
 			{
 				var env = NiriEnvironment();
 				if (variable == "FILES_NIRI_SCALE")

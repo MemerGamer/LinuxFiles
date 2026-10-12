@@ -100,7 +100,7 @@ namespace Files.Platform.Linux.Windowing
 				info.ArgumentList.Add("get");
 				info.ArgumentList.Add("org.gnome.desktop.interface");
 				info.ArgumentList.Add(key);
-				using var process = Process.Start(info);
+				using var process = Files.Platform.Linux.Launching.TracedProcess.Start(info);
 				if (process is null)
 					return null;
 

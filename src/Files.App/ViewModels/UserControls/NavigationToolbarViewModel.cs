@@ -600,6 +600,7 @@ namespace Files.App.ViewModels.UserControls
 			var shellViewModel = shellPage.ShellViewModel
 				?? throw new InvalidOperationException("The current shell page does not have a view model.");
 
+			var sourceShellPage = shellPage;
 			var currentPath = PathComponents.LastOrDefault()?.Path;
 			var isFtp = FtpHelpers.IsFtpPath(path);
 			var normalizedInput = NormalizePathInput(path, isFtp);
@@ -704,8 +705,7 @@ namespace Files.App.ViewModels.UserControls
 
 						if (!isValid)
 						{
-							await DialogDisplayHelper.ShowDialogAsync(Strings.InvalidItemDialogTitle.GetLocalizedResource(),
-								string.Format(Strings.InvalidItemDialogContent.GetLocalizedResource(), Environment.NewLine, resFolder.ErrorCode.ToString()));
+							await NavigationItemGuard.ShowInvalidItemAsync(sourceShellPage, resFolder.ErrorCode);
 							return false;
 						}
 					}
@@ -1007,13 +1007,11 @@ namespace Files.App.ViewModels.UserControls
 							try
 							{
 								if (!await Windows.System.Launcher.LaunchUriAsync(new Uri(currentInput)))
-									await DialogDisplayHelper.ShowDialogAsync(Strings.InvalidItemDialogTitle.GetLocalizedResource(),
-										string.Format(Strings.InvalidItemDialogContent.GetLocalizedResource(), Environment.NewLine, resFolder.ErrorCode.ToString()));
+									await NavigationItemGuard.ShowInvalidItemAsync(shellPage, resFolder.ErrorCode);
 							}
 							catch (Exception ex) when (ex is UriFormatException || ex is ArgumentException)
 							{
-								await DialogDisplayHelper.ShowDialogAsync(Strings.InvalidItemDialogTitle.GetLocalizedResource(),
-									string.Format(Strings.InvalidItemDialogContent.GetLocalizedResource(), Environment.NewLine, resFolder.ErrorCode.ToString()));
+								await NavigationItemGuard.ShowInvalidItemAsync(shellPage, resFolder.ErrorCode);
 							}
 						}
 					}

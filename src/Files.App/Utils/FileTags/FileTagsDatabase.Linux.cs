@@ -63,18 +63,34 @@ namespace Files.App.Utils.FileTags
 
 		public void UpdateTag(string oldFilePath, ulong? frn, string? newFilePath)
 		{
-			if (newFilePath is null || string.Equals(oldFilePath, newFilePath, StringComparison.Ordinal))
+			UpdatePath(oldFilePath, newFilePath, recursive: false);
+		}
+
+		/// <summary>Re-keys or removes completed operations, including hidden stale entries.</summary>
+		public void UpdatePath(string oldFilePath, string? newFilePath, bool recursive, bool xattrStale = false)
+		{
+			oldFilePath = Path.TrimEndingDirectorySeparator(Path.GetFullPath(oldFilePath));
+			newFilePath = newFilePath is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(newFilePath));
+			if (string.Equals(oldFilePath, newFilePath, StringComparison.Ordinal))
 				return;
 
 			lock (_gate)
 			{
 				var entries = Load();
-				if (!entries.Remove(oldFilePath, out var existing))
-					return;
-
-				existing.FilePath = newFilePath;
-				entries[newFilePath] = existing;
-				Save(entries);
+				bool Matches(string path, string root) => path == root || (recursive && path.StartsWith(root + "/", StringComparison.Ordinal));
+				var moved = entries.Values.Where(entry => Matches(entry.FilePath, oldFilePath)).ToList();
+				var removed = entries.Keys.Where(path => Matches(path, oldFilePath) || (newFilePath is not null && Matches(path, newFilePath))).ToList();
+				foreach (var path in removed)
+					entries.Remove(path);
+				if (newFilePath is not null)
+					foreach (var entry in moved)
+					{
+						entry.FilePath = newFilePath + entry.FilePath[oldFilePath.Length..];
+						entry.XattrStale |= xattrStale;
+						entries[entry.FilePath] = entry;
+					}
+				if (removed.Count > 0 || _dirty)
+					Save(entries);
 			}
 		}
 

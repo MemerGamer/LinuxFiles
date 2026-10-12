@@ -43,6 +43,9 @@ namespace Files.Platform.Linux.FileOperations
 		/// <summary>Canonical paths of folders currently being walked through symbolic links, to detect cycles.</summary>
 		public HashSet<string> ActiveDirectories { get; } = new(StringComparer.Ordinal);
 
+		public void PathChanged(string source, string? destination, bool recursive = false, bool xattrStale = false)
+			=> _options.PathChanged?.Invoke(source, destination, recursive, xattrStale);
+
 		public void AddTotals(long items, long bytes)
 		{
 			_itemsTotal += items;

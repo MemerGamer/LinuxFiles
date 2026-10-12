@@ -54,6 +54,7 @@ namespace Files.Platform.Linux.FileOperations
 				{
 					if (PosixNative.TryRenameAt(sourceParent.Descriptor, name, destinationParent.Descriptor, destinationName, resolved.Replace, out var errno, context.Hooks))
 					{
+						context.PathChanged(source, destination, stat.IsDirectory);
 						context.AddBytes(stat.IsRegularFile ? (long)stat.Size : 0, source);
 						context.ItemDone(source);
 						return Outcome.Success(destination);
@@ -78,6 +79,7 @@ namespace Files.Platform.Linux.FileOperations
 					context.CancellationToken.ThrowIfCancellationRequested();
 					VerifyMoveSource(sourceParent, name, stat, source);
 					PosixNative.UnlinkAt(sourceParent.Descriptor, name, 0, source);
+					context.PathChanged(source, destination, xattrStale: true);
 				}
 				return copy;
 			}
@@ -126,6 +128,7 @@ namespace Files.Platform.Linux.FileOperations
 				try
 				{
 					PosixNative.UnlinkAt(sourceParent.Descriptor, Path.GetFileName(source), PosixNative.AtRemoveDir, source);
+					context.PathChanged(source, created ? destination : null, xattrStale: created);
 				}
 				catch (IOException ex) when (ex.HResult == 39 && sourceDirectory.ListNames().Count > 0)
 				{
@@ -170,7 +173,10 @@ namespace Files.Platform.Linux.FileOperations
 							result = result.Combine(DeleteChild(directory, childName, Path.Combine(fullPath, childName), context), null);
 
 						if (result.Status == FileOperationStatus.Succeeded)
+						{
 							PosixNative.UnlinkAt(parent.Descriptor, name, PosixNative.AtRemoveDir, fullPath);
+							context.PathChanged(fullPath, null, recursive: true);
+						}
 
 						context.ItemDone(fullPath);
 						return result;
@@ -183,6 +189,7 @@ namespace Files.Platform.Linux.FileOperations
 				}
 
 				PosixNative.UnlinkAt(parent.Descriptor, name, 0, fullPath);
+				context.PathChanged(fullPath, null);
 				context.AddBytes(stat.IsRegularFile ? (long)stat.Size : 0, fullPath);
 				context.ItemDone(fullPath);
 				return Outcome.Success(null);
@@ -221,7 +228,9 @@ namespace Files.Platform.Linux.FileOperations
 			{
 				var temporary = Path.GetFileName(TemporaryPathNextTo(destination));
 				PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, temporary, false, destination, context.Hooks);
+				context.PathChanged(source, Path.Combine(parentPath, temporary), stat.IsDirectory);
 				PosixNative.RenameAt(parent.Descriptor, temporary, parent.Descriptor, newName, false, destination, context.Hooks);
+				context.PathChanged(Path.Combine(parentPath, temporary), destination, stat.IsDirectory);
 				return Outcome.Success(destination);
 			}
 
@@ -234,6 +243,7 @@ namespace Files.Platform.Linux.FileOperations
 			context.Hooks?.BeforeMoveEntry?.Invoke(source, resolved.Destination);
 			context.CancellationToken.ThrowIfCancellationRequested();
 			PosixNative.RenameAt(parent.Descriptor, sourceName, parent.Descriptor, Path.GetFileName(resolved.Destination), resolved.Replace, resolved.Destination, context.Hooks);
+			context.PathChanged(source, resolved.Destination, stat.IsDirectory);
 			return Outcome.Success(resolved.Destination);
 		}
 	}

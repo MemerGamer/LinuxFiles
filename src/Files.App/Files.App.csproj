@@ -30,7 +30,7 @@
         <!--  XAML cannot see generator output on Uno; ICommandManager is checked in under Platforms/Desktop/Generated  -->
         <FilesPregeneratedICommandManager Condition="'$(FilesPregeneratedICommandManager)' == ''">true</FilesPregeneratedICommandManager>
         <DefineConstants>$(DefineConstants);DESKTOP</DefineConstants>
-        <!--  Precompile (ReadyToRun) published Linux builds: roughly 25-30% faster cold start. Composite stays off (self-contained Uno assemblies)  -->
+        <!--  Precompile (ReadyToRun) published Linux builds to reduce startup JIT work. Composite stays off (self-contained Uno assemblies)  -->
         <PublishReadyToRun Condition="'$(Configuration)' != 'Debug' and '$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
         <PublishReadyToRunComposite>false</PublishReadyToRunComposite>
     </PropertyGroup>

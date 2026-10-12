@@ -62,6 +62,7 @@ namespace Files.Platform.Linux.Theme
 
 		private static bool Detect()
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.theme-detection");
 			if (OverrideValue() is { } forced)
 				return forced;
 
@@ -73,8 +74,11 @@ namespace Files.Platform.Linux.Theme
 		{
 			try
 			{
-				using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-				return Task.Run(ReadPortalAsync, cts.Token).Wait(TimeSpan.FromSeconds(2)) ? _lastRead : null;
+				return Task.Run(async () =>
+				{
+					try { return await ReadPortalAsync().ConfigureAwait(false); }
+					catch (Exception) { return (uint?)null; }
+				}).WaitAsync(TimeSpan.FromMilliseconds(250)).GetAwaiter().GetResult();
 			}
 			catch (Exception)
 			{
@@ -82,22 +86,19 @@ namespace Files.Platform.Linux.Theme
 			}
 		}
 
-		private static uint? _lastRead;
-
-		private static async Task ReadPortalAsync()
+		private static async Task<uint?> ReadPortalAsync()
 		{
-			_lastRead = null;
 			var connection = await GetConnectionAsync();
 			if (connection is null)
-				return;
+				return null;
 
-			_lastRead = await connection.CallTracedAsync("dbus.theme", BuildReadMessage(connection), static (Message message, object? _) =>
+			return await connection.CallTracedAsync("dbus.theme", BuildReadMessage(connection), static (Message message, object? _) =>
 			{
 				var reader = message.GetBodyReader();
 				var outer = reader.ReadVariantValue();
 				var inner = outer.Type == VariantValueType.Variant ? outer.GetVariantValue() : outer;
 				return inner.Type == VariantValueType.UInt32 ? (uint?)inner.GetUInt32() : null;
-			}, null);
+			}, null).WaitAsync(TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
 		}
 
 		private static MessageBuffer BuildReadMessage(DBusConnection connection)
@@ -120,8 +121,7 @@ namespace Files.Platform.Linux.Theme
 				var connection = _connection;
 				if (connection is null)
 				{
-					connection = new DBusConnection(address);
-					await connection.ConnectAsync();
+					connection = await DBusSession.TryConnectAsync(address, TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
 					_connection = connection;
 				}
 
@@ -246,7 +246,7 @@ namespace Files.Platform.Linux.Theme
 				if (process is null)
 					return null;
 
-				if (!process.WaitForExit(1500))
+				if (!process.WaitForExit(250))
 				{
 					process.Kill();
 					return null;

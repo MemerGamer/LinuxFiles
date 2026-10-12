@@ -91,6 +91,7 @@ namespace Files.App.Services.Settings
 
 		public UserSettingsService()
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.user-settings", true);
 			var settingsSerializer = new DefaultSettingsSerializer(message => App.Logger.LogWarning(message));
 			SettingsSerializer = settingsSerializer;
 

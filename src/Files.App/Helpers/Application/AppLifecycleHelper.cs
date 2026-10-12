@@ -302,6 +302,7 @@ namespace Files.App.Helpers
 		/// <param name="appModel">Constructed on the UI thread by the caller (its ctor is UI-thread-only).</param>
 		public static IServiceProvider ConfigureHost(AppModel appModel)
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.configure-services", true);
 			var services = new ServiceCollection();
 			var fileLoggerProvider = new FileLoggerProvider(Path.Combine(ApplicationData.Current.LocalFolder.Path, "debug.log"));
 

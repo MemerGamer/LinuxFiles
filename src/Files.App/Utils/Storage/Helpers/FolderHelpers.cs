@@ -2,12 +2,6 @@
 // Licensed under the MIT License.
 
 using System.IO;
-#if WINDOWS
-using Windows.Win32;
-#endif
-#if WINDOWS
-using Windows.Win32.Storage.FileSystem;
-#endif
 
 namespace Files.App.Utils.Storage
 {
@@ -17,17 +11,9 @@ namespace Files.App.Utils.Storage
 	{
 		public static unsafe bool CheckFolderAccessWithWin32(string path)
 		{
-#if !WINDOWS
 			return SafeEnumerates(path);
-#else
-			WIN32_FIND_DATAW findData = default;
-			using FindCloseSafeHandle hFile = PInvoke.FindFirstFileEx($"{path}{Path.DirectorySeparatorChar}*.*", FINDEX_INFO_LEVELS.FindExInfoBasic,
-				&findData, FINDEX_SEARCH_OPS.FindExSearchNameMatch, FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
-			return !hFile.IsInvalid;
-#endif
 		}
 
-#if !WINDOWS
 		// Opening the directory for listing is the access test (an empty readable folder is accessible)
 		private static bool SafeEnumerates(string path)
 		{
@@ -42,7 +28,6 @@ namespace Files.App.Utils.Storage
 				return false;
 			}
 		}
-#endif
 
 		public static async Task<bool> CheckBitlockerStatusAsync(BaseStorageFolder? rootFolder, string path)
 		{
@@ -66,7 +51,6 @@ namespace Files.App.Utils.Storage
 		///
 		public static unsafe bool CheckForFilesFolders(string targetPath)
 		{
-#if !WINDOWS
 			try
 			{
 				using var e = Directory.EnumerateFileSystemEntries(targetPath).GetEnumerator();
@@ -76,29 +60,11 @@ namespace Files.App.Utils.Storage
 			{
 				return false;
 			}
-#else
-			WIN32_FIND_DATAW findData = default;
-			using FindCloseSafeHandle hFile = PInvoke.FindFirstFileEx($"{targetPath}{Path.DirectorySeparatorChar}*.*", FINDEX_INFO_LEVELS.FindExInfoBasic,
-				&findData, FINDEX_SEARCH_OPS.FindExSearchNameMatch, FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
-			if (hFile.IsInvalid)
-				return false;
-
-			do
-			{
-				string fileName = findData.cFileName.ToString();
-				if (fileName is not "." and not "..")
-					return true;
-			}
-			while (PInvoke.FindNextFile(hFile, out findData));
-
-			return false;
-#endif
 		}
 
 		public static unsafe List<SubfolderEntry> EnumerateSubfolders(string path, bool showHidden, bool showProtected, bool showDot, int limit = 1000)
 		{
 			var results = new List<SubfolderEntry>();
-#if !WINDOWS
 			try
 			{
 				foreach (var dir in new DirectoryInfo(path).EnumerateDirectories())
@@ -122,54 +88,10 @@ namespace Files.App.Utils.Storage
 			var comparer = NaturalStringComparer.GetForProcessor();
 			results.Sort((a, b) => comparer.Compare(a.Name, b.Name));
 			return results;
-#else
-			WIN32_FIND_DATAW findData = default;
-			using FindCloseSafeHandle hFind = PInvoke.FindFirstFileEx(
-				path + "\\*.*",
-				FINDEX_INFO_LEVELS.FindExInfoBasic,
-				&findData,
-				FINDEX_SEARCH_OPS.FindExSearchNameMatch,
-				FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
-			if (hFind.IsInvalid)
-				return results;
-
-			do
-			{
-				var attrs = (FileAttributes)findData.dwFileAttributes;
-				if ((attrs & FileAttributes.Directory) != FileAttributes.Directory)
-					continue;
-
-				string fileName = findData.cFileName.ToString();
-				if (fileName is "." or "..")
-					continue;
-
-				var isHidden = (attrs & FileAttributes.Hidden) == FileAttributes.Hidden;
-				var isSystem = (attrs & FileAttributes.System) == FileAttributes.System;
-
-				if (!showDot && fileName.StartsWith('.'))
-					continue;
-				if (isHidden && !showHidden)
-					continue;
-				if (isHidden && isSystem && !showProtected)
-					continue;
-
-				var subPath = Path.Combine(path, fileName);
-				results.Add(new SubfolderEntry(subPath, fileName, HasSubfolders(subPath), isHidden));
-
-				if (results.Count == limit)
-					break;
-			}
-			while (PInvoke.FindNextFile(hFind, out findData));
-
-			var naturalComparer = NaturalStringComparer.GetForProcessor();
-			results.Sort((a, b) => naturalComparer.Compare(a.Name, b.Name));
-			return results;
-#endif
 		}
 
 		public static unsafe bool HasSubfolders(string path)
 		{
-#if !WINDOWS
 			try
 			{
 				using var e = Directory.EnumerateDirectories(path).GetEnumerator();
@@ -179,28 +101,6 @@ namespace Files.App.Utils.Storage
 			{
 				return false;
 			}
-#else
-			WIN32_FIND_DATAW findData = default;
-			using FindCloseSafeHandle hFind = PInvoke.FindFirstFileEx(
-				path + "\\*.*",
-				FINDEX_INFO_LEVELS.FindExInfoBasic,
-				&findData,
-				FINDEX_SEARCH_OPS.FindExSearchNameMatch,
-				FIND_FIRST_EX_FLAGS.FIND_FIRST_EX_LARGE_FETCH);
-			if (hFind.IsInvalid)
-				return false;
-
-			do
-			{
-				string fileName = findData.cFileName.ToString();
-				if (fileName is "." or "..")
-					continue;
-				if (((FileAttributes)findData.dwFileAttributes & FileAttributes.Directory) == FileAttributes.Directory)
-					return true;
-			}
-			while (PInvoke.FindNextFile(hFind, out findData));
-			return false;
-#endif
 		}
 	}
 }

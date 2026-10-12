@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions.Archives;
 using System.IO;
 
@@ -159,4 +158,3 @@ namespace Files.App.Data.Models
 	}
 }
 
-#endif

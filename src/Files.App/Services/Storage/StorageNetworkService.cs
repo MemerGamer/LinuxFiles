@@ -1,31 +1,11 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if WINDOWS
-using System.Text;
-using Windows.Win32;
-using Windows.Win32.Foundation;
-using Windows.Win32.NetworkManagement.WNet;
-using Windows.Win32.Security.Credentials;
-#endif
 
 namespace Files.App.Services
 {
 	public sealed partial class NetworkService : ObservableObject, INetworkService
 	{
-#if WINDOWS
-		private ICommonDialogService CommonDialogService { get; } = Ioc.Default.GetRequiredService<ICommonDialogService>();
-
-		private readonly static string guid = "::{f02c1a0d-be21-4350-88b0-7367fc96ef3c}";
-
-		// Virtual disk path prefixes that don't work with Windows networking APIs
-		private readonly static string[] VirtualDiskPrefixes =
-		[
-			@"\\RaiDrive-",
-			@"\\cryptomator-vault\",
-			@"\\EgnyteDrive\"
-		];
-#endif
 
 
 		private ObservableCollection<IFolder> _Computers = [];
@@ -53,11 +33,7 @@ namespace Files.App.Services
 			{
 				DeviceID = "network-folder",
 				Text = Strings.Network.GetLocalizedResource(),
-#if WINDOWS
-				Path = Constants.UserEnvironmentPaths.NetworkFolderPath,
-#else
 				Path = NetworkRootPath,
-#endif
 				Type = DriveType.Network,
 				ItemType = NavigationControlItemType.Drive,
 			};
@@ -72,97 +48,20 @@ namespace Files.App.Services
 			lock (_Computers)
 				_Computers.Add(networkItem);
 
-#if !WINDOWS
 			StartLinuxWatching();
-#endif
 		}
 
 		/// <inheritdoc/>
 		public async Task<IEnumerable<IFolder>> GetComputersAsync()
 		{
-#if !WINDOWS
 			// Connected GVfs locations (smb, sftp, ftp, dav, nfs...); LINUX-TODO(network-discovery): browse the LAN with Avahi
 			return await Task.FromResult(GetLinuxNetworkItems());
-#else
-			var result = await Win32Helper.GetShellFolderAsync(guid, false, true, 0, int.MaxValue);
-
-			return result.Enumerate.Where(item => item.IsFolder).Select(item =>
-			{
-				var networkItem = new DriveItem()
-				{
-					Text = item.FileName,
-					Path = item.FilePath,
-					DeviceID = item.FilePath,
-					Type = DriveType.Network,
-					ItemType = NavigationControlItemType.Drive,
-				};
-
-				networkItem.MenuOptions = new ContextMenuOptions()
-				{
-					IsLocationItem = true,
-					ShowEjectDevice = networkItem.IsRemovable,
-					ShowShellItems = true,
-					ShowProperties = true,
-				};
-
-				return networkItem;
-			});
-#endif
 		}
 
 		/// <inheritdoc/>
 		public async Task<IEnumerable<IFolder>> GetShortcutsAsync()
 		{
-#if !WINDOWS
 			return await Task.FromResult(GetLinuxNetworkItems());
-#else
-			var networkLocations = await STATask.Run(() =>
-			{
-				var locations = new List<ShellLinkItem>();
-				using (var netHood = new ShellFolder(PInvoke.FOLDERID_NetHood))
-				{
-					foreach (var item in netHood)
-					{
-						if (item is ShellLink link)
-						{
-							if (ShellFolderExtensions.GetShellLinkItem(link) is { } linkItem)
-								locations.Add(linkItem);
-						}
-						else
-						{
-							var linkPath = item.Properties["System.Link.TargetParsingPath"] as string;
-							if (linkPath is not null &&
-								ShellFolderExtensions.GetShellFileItem(item) is { } linkItem)
-							{
-								locations.Add(new(linkItem) { TargetPath = linkPath });
-							}
-						}
-					}
-				}
-				return locations;
-			}, App.Logger);
-
-			return (networkLocations ?? Enumerable.Empty<ShellLinkItem>()).Select(item =>
-			{
-				var networkItem = new DriveItem()
-				{
-					Text = item.FileName,
-					Path = item.TargetPath,
-					DeviceID = item.FilePath,
-					Type = DriveType.Network,
-					ItemType = NavigationControlItemType.Drive,
-				};
-
-				networkItem.MenuOptions = new ContextMenuOptions()
-				{
-					IsLocationItem = true,
-					ShowEjectDevice = networkItem.IsRemovable,
-					ShowShellItems = true,
-					ShowProperties = true,
-				};
-				return networkItem;
-			});
-#endif
 		}
 
 		/// <inheritdoc/>
@@ -205,166 +104,5 @@ namespace Files.App.Services
 				Shortcuts.AddIfNotPresent(item);
 		}
 
-#if WINDOWS
-		/// <inheritdoc/>
-		public Task<NetworkAvailability?> GetNetworkAvailabilityAsync()
-		{
-			return STATask.Run<NetworkAvailability?>(() => DetectionAndSharingHelper.GetNetworkAvailability(), App.Logger);
-		}
-
-		/// <inheritdoc/>
-		public Task OpenNetworkSharingSettingsAsync()
-		{
-			return STATask.Run(DetectionAndSharingHelper.OpenNetworkSharingSettings, App.Logger);
-		}
-
-		/// <inheritdoc/>
-		public bool DisconnectNetworkDrive(IFolder drive)
-		{
-			return
-				PInvoke.WNetCancelConnection2W(
-					drive.Id.TrimEnd('\\'),
-					NET_CONNECT_FLAGS.CONNECT_UPDATE_PROFILE,
-					true)
-				is WIN32_ERROR.NO_ERROR;
-		}
-
-		/// <inheritdoc/>
-		public Task OpenMapNetworkDriveDialogAsync()
-		{
-			return STATask.Run(() =>
-			{
-				return CommonDialogService.Open_NetworkConnectionDialog(
-					MainWindow.Instance.WindowHandle,
-					useMostRecentPath: true,
-					hideRestoreConnectionCheckBox: false);
-			}, App.Logger);
-		}
-
-		/// <inheritdoc/>
-		public async Task<bool> AuthenticateNetworkShare(string path, CancellationToken cancellationToken)
-		{
-			if (await Task.Run(() =>
-			{
-				unsafe
-				{
-					if (!path.StartsWith(@"\\", StringComparison.Ordinal))
-					{
-						//  Special handling for network drives
-						//  This part will change path from "y:\Download" to "\\192.168.0.1\nfs\Download"
-						Span<char> remoteName = stackalloc char[300];
-						uint length = (uint)remoteName.Length;
-						string lpLocalName = path.Substring(0, 2);
-
-						WIN32_ERROR ret = PInvoke.WNetGetConnection(lpLocalName, remoteName, ref length);
-
-						if (ret == WIN32_ERROR.NO_ERROR)
-							path = path.Replace(lpLocalName, remoteName[..(int)length].TrimEnd('\0').ToString());
-
-					}
-
-					// Skip authentication for virtual disk shares
-					// These providers create virtual disk paths that don't work with Windows networking APIs
-					if (VirtualDiskPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
-					{
-						return (Skip: true, Result: WIN32_ERROR.NO_ERROR);
-					}
-
-					// WNetAddConnection3W only accepts "\\server" or "\\server\share" as lpRemoteName;
-					// deeper paths fail (e.g. ERROR_DIRECTORY when the path points to a file such as an archive)
-					var shareRootSegments = path.Substring(2).Split('\\', StringSplitOptions.RemoveEmptyEntries);
-					if (shareRootSegments.Length > 2)
-						path = @"\\" + shareRootSegments[0] + @"\" + shareRootSegments[1];
-
-					// If credentials are saved, this will return NO_ERROR
-					fixed (char* lpcPath = path)
-					{
-						var netRes = new NETRESOURCEW()
-						{
-							dwType = NET_RESOURCE_TYPE.RESOURCETYPE_DISK,
-							lpRemoteName = new PWSTR(lpcPath)
-						};
-
-						return (Skip: false, Result: (WIN32_ERROR)PInvoke.WNetAddConnection3W(new(nint.Zero), netRes, null, null, 0));
-					}
-				}
-			}) is not (Skip: false, Result: var res))
-			{
-				return true;
-			}
-
-			if (cancellationToken.IsCancellationRequested) return false;
-
-			if (res == WIN32_ERROR.ERROR_LOGON_FAILURE || res == WIN32_ERROR.ERROR_ACCESS_DENIED)
-			{
-				var dialog = DynamicDialogFactory.GetFor_CredentialEntryDialog(path);
-				await dialog.ShowAsync();
-				var credentialsReturned = dialog.ViewModel.AdditionalData as string[];
-
-				if (credentialsReturned is not null && credentialsReturned[1] != null)
-				{
-					res = await Task.Run(() =>
-					{
-						unsafe
-						{
-							fixed (char* lpcPath = path)
-							{
-								var netRes = new NETRESOURCEW()
-								{
-									dwType = NET_RESOURCE_TYPE.RESOURCETYPE_DISK,
-									lpRemoteName = new PWSTR(lpcPath)
-								};
-
-								return (WIN32_ERROR)PInvoke.WNetAddConnection3W(new(nint.Zero), netRes, credentialsReturned[1], credentialsReturned[0], 0);
-							}
-						}
-					});
-
-					if (credentialsReturned[2] == "y" && res == WIN32_ERROR.NO_ERROR)
-					{
-						var creds = new CREDENTIALW()
-						{
-							Type = CRED_TYPE.CRED_TYPE_DOMAIN_PASSWORD,
-							AttributeCount = 0,
-							Persist = CRED_PERSIST.CRED_PERSIST_ENTERPRISE
-						};
-
-						unsafe
-						{
-							fixed (char* lpcTargetName = path.Substring(2))
-								creds.TargetName = new(lpcTargetName);
-
-							fixed (char* lpcUserName = credentialsReturned[0])
-								creds.UserName = new(lpcUserName);
-
-							byte[] bPassword = Encoding.Unicode.GetBytes(credentialsReturned[1]);
-							fixed (byte* lpCredentialBlob = bPassword)
-								creds.CredentialBlob = lpCredentialBlob;
-
-							creds.CredentialBlobSize = (uint)bPassword.Length;
-						}
-
-						PInvoke.CredWrite(creds, 0);
-					}
-				}
-				else
-				{
-					return false;
-				}
-			}
-
-			if (res == WIN32_ERROR.ERROR_LOGON_FAILURE || res == WIN32_ERROR.ERROR_ACCESS_DENIED)
-			{
-				await DialogDisplayHelper.ShowDialogAsync(Strings.NetworkFolderErrorDialogTitle.GetLocalizedResource(), res.ToString());
-
-				return false;
-			}
-
-			// Other results (e.g. ERROR_SESSION_CREDENTIAL_CONFLICT when a connection already exists,
-			// or provider errors on unusual paths) don't imply the share is inaccessible through the
-			// SMB redirector — proceed and let the enumeration itself surface any failure.
-			return true;
-		}
-#endif
 	}
 }

@@ -536,9 +536,7 @@ namespace Files.App.Views
 			// Focus
 			ActivePane = GetPane(GetPaneCount() - 1);
 
-#if !WINDOWS
 			RootGrid.Margin = GetPaneCount() > 1 ? new Thickness(0, 0, 8, 0) : new Thickness(0);
-#endif
 			NotifyPropertyChanged(nameof(IsMultiPaneActive));
 		}
 
@@ -603,9 +601,7 @@ namespace Files.App.Views
 			}
 
 			Pane_ContentChanged(null, null!);
-#if !WINDOWS
 			RootGrid.Margin = GetPaneCount() > 1 ? new Thickness(0, 0, 8, 0) : new Thickness(0);
-#endif
 			NotifyPropertyChanged(nameof(IsMultiPaneActive));
 		}
 
@@ -954,13 +950,11 @@ namespace Files.App.Views
 
 		private void Pane_ContentChanged(object? sender, TabBarItemParameter e)
 		{
-#if !WINDOWS
 			// Uno reloads pane content when its tab is reattached; retain the current location.
 			for (var i = 0; i < GetPaneCount(); i++)
 				if (GetPane(i) is ModernShellPage { NavParams: { } navParams } pane &&
 					pane.TabBarItemParameter?.NavigationParameter is string path)
 					navParams.NavPath = path;
-#endif
 			TabBarItemParameter = new()
 			{
 				InitialPageType = typeof(ShellPanesPage),

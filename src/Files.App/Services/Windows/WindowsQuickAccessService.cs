@@ -54,18 +54,6 @@ namespace Files.App.Services
 					?? throw new InvalidOperationException("The Windows Shell Home namespace returned an item without a path.");
 				bool shouldUnpin = folderPaths.Contains(pathStr);
 
-#if WINDOWS
-				if (ShellStorageFolder.IsShellPath(pathStr))
-				{
-					var folder = await ShellStorageFolder.FromPathAsync(pathStr);
-					var path = folder?.Path;
-
-					shouldUnpin = shouldUnpin || path is not null &&
-						(folderPaths.Contains(path) ||
-						(path.StartsWith(@"\\SHELL\\") && folderPaths.Any(x => x.StartsWith(@"\\SHELL\\"))));
-				}
-
-#endif
 				if (!shouldUnpin)
 					continue;
 

@@ -188,10 +188,8 @@ namespace Files.App.Helpers
 					}
 				}
 			}
-#if !WINDOWS
 			foreach (var tab in MainPageViewModel.AppInstances.Where(tab => !string.IsNullOrEmpty(tab.Header)))
 				tab.Header = MainWindow.FormatRootModeTitle(tab.Header!);
-#endif
 		}
 
 		private static string[] AncestorHints(string? path)
@@ -389,10 +387,8 @@ namespace Files.App.Helpers
 				if (isCurrent)
 				{
 					var title = $"{windowTitle} - {(OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : "Files")}";
-#if !WINDOWS
 					title = Files.Platform.Linux.Windowing.X11WindowChrome.SanitizeTitle(MainWindow.FormatRootModeTitle(title));
 					MainWindow.Instance.UpdateLinuxWindowTitle(title);
-#endif
 					MainWindow.Instance.AppWindow.Title = title;
 				}
 			});
@@ -446,10 +442,8 @@ namespace Files.App.Helpers
 
 				startInfo.Environment["FILES_NO_SINGLE_INSTANCE"] = "1";
 				startInfo.ArgumentList.Add("--new-window");
-#if !WINDOWS
 				if (Files.Platform.Linux.Elevation.RootActionMode.IsRequested(Program.LaunchArguments))
 					startInfo.ArgumentList.Add("--root");
-#endif
 				System.Diagnostics.Process.Start(startInfo)?.Dispose();
 			}
 			catch (Exception ex)
@@ -501,17 +495,11 @@ namespace Files.App.Helpers
 			if (!openViaApplicationPicker &&
 				selectedItems.Count > 1 &&
 				selectedItems.All(x => x.PrimaryItemAttribute == StorageItemTypes.File && !x.IsExecutable && !x.IsShortcut)
-#if !WINDOWS
 				&& selectedItems.All(x => !FileExtensionHelpers.IsZipPath(x.GetRequiredPath()) &&
 					!Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().IsArchiveFileName(x.GetRequiredPath()))
-#endif
 				)
 			{
-#if !WINDOWS
 				opened = await OpenFilesLinuxAsync(selectedItems.Select(x => x.GetRequiredPath()));
-#else
-				opened = await Win32Helper.InvokeWin32ComponentAsync(string.Join('|', selectedItems.Select(x => x.ItemPath)), associatedInstance);
-#endif
 			}
 
 			if (opened)
@@ -527,9 +515,7 @@ namespace Files.App.Helpers
 				await OpenPath(itemPath, associatedInstance, type, false, openViaApplicationPicker, forceOpenInNewTab: forceOpenInNewTab);
 
 				if (type == FilesystemItemType.Directory
-#if !WINDOWS
 					|| (!openViaApplicationPicker && Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().IsArchiveFileName(itemPath))
-#endif
 					)
 					forceOpenInNewTab = true;
 			}
@@ -548,12 +534,7 @@ namespace Files.App.Helpers
 			if (workingDirectory.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal))
 				return;
 
-#if WINDOWS
-			var arguments = string.Join(" ", items.Select(item => $"\"{item.Path}\""));
-			await Win32Helper.InvokeWin32ComponentAsync(executablePath, associatedInstance, arguments);
-#else
 			await RunWithItemsLinuxAsync(executablePath, items.Select(item => item.Path).ToArray());
-#endif
 		}
 
 		/// <summary>
@@ -592,11 +573,7 @@ namespace Files.App.Helpers
 				return true;
 			}
 
-#if !WINDOWS
 			return await OpenPathLinuxAsync(path, associatedInstance, openViaApplicationPicker, selectItems, forceOpenInNewTab);
-#else
-			return await OpenPathWindowsAsync(path, associatedInstance, itemType, openSilent, openViaApplicationPicker, selectItems, args, forceOpenInNewTab);
-#endif
 		}
 
 

@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
 using Microsoft.UI.Xaml;
@@ -77,4 +76,3 @@ namespace Files.App.Dialogs
 		}
 	}
 }
-#endif

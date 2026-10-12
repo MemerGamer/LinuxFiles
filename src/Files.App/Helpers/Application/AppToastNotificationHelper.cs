@@ -31,11 +31,7 @@ namespace Files.App.Helpers.Application
 			var toastContent = new AppNotificationBuilder()
 				.AddText(Strings.EjectNotificationHeader.GetLocalizedResource())
 				.AddText(Strings.EjectNotificationBody.GetLocalizedResource())
-#if WINDOWS
-				.SetAttributionText("Files")
-#else
 				.SetAttributionText(Strings.LinuxAppDisplayName.GetLocalizedResource())
-#endif
 				.BuildNotification();
 			AppNotificationManager.Default.Show(toastContent);
 		}

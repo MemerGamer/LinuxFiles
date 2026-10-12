@@ -208,13 +208,6 @@ namespace Files.App
 
 		public static class UserEnvironmentPaths
 		{
-#if WINDOWS
-			public static readonly string DesktopPath = Windows.Storage.UserDataPaths.GetDefault().Desktop;
-
-			public static readonly string DownloadsPath = Windows.Storage.UserDataPaths.GetDefault().Downloads;
-
-			public static readonly string LocalAppDataPath = Windows.Storage.UserDataPaths.GetDefault().LocalAppData;
-#else
 			private static readonly Files.Platform.Linux.LinuxUserDirectories _userDirectories = new();
 
 			public static readonly string DesktopPath = _userDirectories.Desktop;
@@ -225,33 +218,20 @@ namespace Files.App
 			public static readonly string LocalAppDataPath = Environment.GetEnvironmentVariable("XDG_DATA_HOME") is { Length: > 0 } dataHome && System.IO.Path.IsPathRooted(dataHome)
 				? dataHome
 				: System.IO.Path.Combine(_userDirectories.Home, ".local", "share");
-#endif
 
 			// Currently is the command to open the folder from cmd ("cmd /c start Shell:RecycleBinFolder")
-#if WINDOWS
-			public const string RecycleBinPath = @"Shell:RecycleBinFolder";
-#else
 			// Virtual location of the freedesktop.org trash; listed through ITrashService
 			public const string RecycleBinPath = @"trash:///";
-#endif
 
 			public const string NetworkFolderPath = @"Shell:NetworkPlacesFolder";
 
 			public const string MyComputerPath = @"Shell:MyComputerFolder";
 
-#if WINDOWS
-			public static readonly string TempPath = Environment.GetEnvironmentVariable("TEMP") ?? "";
-#else
 			public static readonly string TempPath = System.IO.Path.GetTempPath();
-#endif
 
 			public static readonly string HomePath = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
 
-#if WINDOWS
-			public static readonly string SystemRootPath = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-#else
 			public static readonly string SystemRootPath = "/";
-#endif
 
 			public static readonly string RecentItemsPath = Environment.GetFolderPath(Environment.SpecialFolder.Recent);
 
@@ -260,11 +240,7 @@ namespace Files.App
 			static UserEnvironmentPaths()
 			{
 				var systemDrive = Environment.GetEnvironmentVariable("SystemDrive");
-#if WINDOWS
-				SystemDrivePath = !string.IsNullOrEmpty(systemDrive) ? systemDrive : "C:";
-#else
 				SystemDrivePath = "/";
-#endif
 			}
 
 			public static Dictionary<string, string> ShellPlaces =

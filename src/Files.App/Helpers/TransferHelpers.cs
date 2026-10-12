@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Microsoft.Extensions.Logging;
 using Windows.ApplicationModel.DataTransfer;
 using Files.App.Services.Desktop;
@@ -50,4 +49,3 @@ namespace Files.App.Helpers
 		}
 	}
 }
-#endif

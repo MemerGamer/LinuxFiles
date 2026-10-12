@@ -83,9 +83,7 @@ namespace Files.App.Views.Layouts
 		public ColumnLayoutPage() : base()
 		{
 			InitializeComponent();
-#if !WINDOWS
 			HoistSemanticZoomContent(RootGridZoom);
-#endif
 			var selectionRectangle = RectangleSelection.Create(FileList, SelectionRectangle, FileList_SelectionChanged);
 			selectionRectangle.SelectionStarted += SelectionRectangle_SelectionStarted;
 			selectionRectangle.SelectionEnded += SelectionRectangle_SelectionEnded;

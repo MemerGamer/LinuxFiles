@@ -43,18 +43,10 @@ namespace Files.App.Actions
 
 		// Windows opens the shell format dialog; Linux opens GNOME Disks or KDE Partition Manager when one is installed (else the command is hidden)
 		protected static bool IsFormatAvailable(string? path)
-#if !WINDOWS
 			=> DriveHelpers.CanFormat(path);
-#else
-			=> true;
-#endif
 
 		protected static Task FormatDrive(string? path)
-#if !WINDOWS
 			=> DriveHelpers.OpenFormatDialogAsync(path);
-#else
-			=> Win32Helper.OpenFormatDriveDialog(path ?? string.Empty);
-#endif
 
 		public void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

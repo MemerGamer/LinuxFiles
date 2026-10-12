@@ -23,12 +23,8 @@ namespace Files.App.Helpers
 
 		public static async Task<List<ContextMenuFlyoutItemViewModel>> GetShellContextmenuAsync(bool showOpenMenu, bool shiftPressed, string? workingDirectory, List<ListedItem>? selectedItems, CancellationToken cancellationToken)
 		{
-#if !WINDOWS
 			// No shell extensions on Linux: skip the Win32 shell menu entirely (no COM, no delay)
 			return await GetLinuxContextMenuAsync(selectedItems, cancellationToken);
-#else
-			return await GetWindowsContextMenuAsync(showOpenMenu, shiftPressed, workingDirectory, selectedItems, cancellationToken);
-#endif
 		}
 
 

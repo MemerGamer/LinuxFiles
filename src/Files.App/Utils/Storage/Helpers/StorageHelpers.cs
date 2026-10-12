@@ -8,7 +8,6 @@ namespace Files.App.Helpers
 {
 	public static partial class StorageHelpers
 	{
-#if !WINDOWS
 		// LINUX-TODO(storage): remove the remaining WinRT entry points (ToStorageItem<T>, FromStorageItem) once their callers use storables.
 		public static async Task<TRequested?> ToStorageItem<TRequested>(string path) where TRequested : IStorageItem
 		{
@@ -35,6 +34,5 @@ namespace Files.App.Helpers
 			=> FromPathAndType(!string.IsNullOrEmpty(item?.Path) ? item.Path : customPath
 				?? throw new InvalidOperationException("A path is required when converting a missing storage item."),
 				item is null ? itemType : item.IsOfType(StorageItemTypes.Folder) ? FilesystemItemType.Directory : FilesystemItemType.File);
-#endif
 	}
 }

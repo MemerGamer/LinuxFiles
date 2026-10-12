@@ -37,28 +37,6 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
 
-#if WINDOWS
-		/// <summary>
-		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source item to be copied</param>
-		/// <param name="destination">The destination fullPath</param>
-		/// <param name="collision">The item naming collision</param>
-		/// <param name="progress">Progress of the operation</param>
-		/// <param name="cancellationToken">Can be cancelled with <see cref="CancellationToken"/></param>
-		/// <returns><see cref="IStorageHistory"/> where:
-		/// <br/>
-		/// Source: The <paramref name="source"/> item fullPath (as <see cref="PathWithType"/>)
-		/// <br/>
-		/// Destination: The <paramref name="destination"/> item fullPath (as <see cref="PathWithType"/>) the <paramref name="source"/> was copied
-		/// </returns>
-		Task<IStorageHistory?> CopyAsync(
-			IStorageItem source,
-			string destination,
-			NameCollisionOption collision,
-			IProgress<StatusCenterItemProgressModel> progress,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -81,17 +59,6 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
 
-#if WINDOWS
-		/// <summary>
-		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		Task<IStorageHistory?> CopyItemsAsync(
-			IList<IStorageItem> source,
-			IList<string> destination,
-			IList<FileNameConflictResolveOptionType> collisions,
-			IProgress<StatusCenterItemProgressModel> progress,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -104,28 +71,6 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
-#if WINDOWS
-		/// <summary>
-		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source item to be moved</param>
-		/// <param name="destination">The destination fullPath</param>
-		/// <param name="collision">The item naming collision</param>
-		/// <param name="progress">Progress of the operation</param>
-		/// <param name="cancellationToken">Can be cancelled with <see cref="CancellationToken"/></param>
-		/// <returns><see cref="IStorageHistory"/> where:
-		/// <br/>
-		/// Source: The source item fullPath (as <see cref="PathWithType"/>)
-		/// <br/>
-		/// Destination: The <paramref name="destination"/> item fullPath (as <see cref="PathWithType"/>) the <paramref name="source"/> was moved
-		/// </returns>
-		Task<IStorageHistory?> MoveAsync(
-			IStorageItem source,
-			string destination,
-			NameCollisionOption collision,
-			IProgress<StatusCenterItemProgressModel> progress,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -148,17 +93,6 @@ namespace Files.App.Utils.Storage
 			IProgress<StatusCenterItemProgressModel> progress,
 			CancellationToken cancellationToken);
 
-#if WINDOWS
-		/// <summary>
-		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		Task<IStorageHistory?> MoveItemsAsync(
-			IList<IStorageItem> source,
-			IList<string> destination,
-			IList<FileNameConflictResolveOptionType> collisions,
-			IProgress<StatusCenterItemProgressModel> progress,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -171,30 +105,6 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
-#if WINDOWS
-		/// <summary>
-		/// Deletes <paramref name="source"/>
-		/// </summary>
-		/// <param name="source">The source to delete</param>
-		/// <param name="progress">Progress of the operation</param>
-		/// <param name="permanently">Determines whether <paramref name="source"/> is be deleted permanently</param>
-		/// <param name="cancellationToken">Can be cancelled with <see cref="CancellationToken"/></param>
-		/// <returns><see cref="IStorageHistory"/> where:
-		/// <br/>
-		/// Source: The deleted item fullPath (as <see cref="PathWithType"/>)
-		/// <br/>
-		/// Destination:
-		/// <br/>
-		/// Returns null if <paramref name="permanently"/> was true
-		/// <br/>
-		/// If <paramref name="permanently"/> was false, returns path to recycled item
-		/// </returns>
-		Task<IStorageHistory?> DeleteAsync(
-			IStorageItem source,
-			IProgress<StatusCenterItemProgressModel> progress,
-			bool permanently,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Deletes <paramref name="source"/>
@@ -219,16 +129,6 @@ namespace Files.App.Utils.Storage
 			bool permanently,
 			CancellationToken cancellationToken);
 
-#if WINDOWS
-		/// <summary>
-		/// Deletes provided <paramref name="source"/>
-		/// </summary>
-		Task<IStorageHistory?> DeleteItemsAsync(
-			IList<IStorageItem> source,
-			IProgress<StatusCenterItemProgressModel> progress,
-			bool permanently,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Deletes provided <paramref name="source"/>
@@ -240,27 +140,6 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
-#if WINDOWS
-		/// <summary>
-		/// Renames <paramref name="source"/> with <paramref name="newName"/>
-		/// </summary>
-		/// <param name="source">The item to rename</param>
-		/// <param name="newName">Desired new name</param>
-		/// <param name="collision">Determines what to do if item already exists</param>
-		/// <param name="cancellationToken">Can be cancelled with <see cref="CancellationToken"/></param>
-		/// <returns><see cref="IStorageHistory"/> where:
-		/// <br/>
-		/// Source: The original item fullPath (as <see cref="PathWithType"/>)
-		/// <br/>
-		/// Destination: The renamed item fullPath (as <see cref="PathWithType"/>)
-		/// </returns>
-		Task<IStorageHistory?> RenameAsync(
-			IStorageItem source,
-			string newName,
-			NameCollisionOption collision,
-			IProgress<StatusCenterItemProgressModel> progress,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Renames <paramref name="source"/> fullPath with <paramref name="newName"/>
@@ -283,47 +162,7 @@ namespace Files.App.Utils.Storage
 			CancellationToken cancellationToken,
 			bool asAdmin = false);
 
-#if WINDOWS
-		/// <summary>
-		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source Recycle Bin item path</param>
-		/// <param name="destination">The destination fullPath to restore to</param>
-		/// <param name="progress">Progress of the operation</param>
-		/// <param name="cancellationToken">Can be cancelled with <see cref="CancellationToken"/></param>
-		/// <returns><see cref="IStorageHistory"/> where:
-		/// <br/>
-		/// Source: The trash item fullPath
-		/// <br/>
-		/// Destination: The <paramref name="destination"/> item fullPath (as <see cref="PathWithType"/>) the <paramref name="source"/> has been restored
-		/// </returns>
-		Task<IStorageHistory?> RestoreItemsFromTrashAsync(
-			IList<IStorageItem> source,
-			IList<string> destination,
-			IProgress<StatusCenterItemProgressModel> progress,
-			CancellationToken cancellationToken);
-#endif
 
-#if WINDOWS
-		/// <summary>
-		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source Recycle Bin item path</param>
-		/// <param name="destination">The destination fullPath to restore to</param>
-		/// <param name="progress">Progress of the operation</param>
-		/// <param name="cancellationToken">Can be cancelled with <see cref="CancellationToken"/></param>
-		/// <returns><see cref="IStorageHistory"/> where:
-		/// <br/>
-		/// Source: The trash item fullPath
-		/// <br/>
-		/// Destination: The <paramref name="destination"/> item fullPath (as <see cref="PathWithType"/>) the <paramref name="source"/> has been restored
-		/// </returns>
-		Task<IStorageHistory?> RestoreFromTrashAsync(
-			IStorageItem source,
-			string destination,
-			IProgress<StatusCenterItemProgressModel> progress,
-			CancellationToken cancellationToken);
-#endif
 
 		/// <summary>
 		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath

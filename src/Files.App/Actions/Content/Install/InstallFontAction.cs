@@ -49,11 +49,7 @@ namespace Files.App.Actions
 			var paths = context.SelectedItems.Select(item => item.ItemPath!).ToArray();
 			var outcome = ReturnResult.Success;
 			var installed = (long)context.SelectedItems.Count;
-#if WINDOWS
-			await Win32Helper.InstallFontsAsync(paths, false);
-#else
 			(outcome, installed) = await InstallForCurrentUserAsync(paths);
-#endif
 
 			StatusCenterViewModel.RemoveItem(banner);
 			var currentWorkingDirectory = context.ShellPage.GetRequiredShellViewModel().WorkingDirectory!;

@@ -7,10 +7,6 @@ using Microsoft.UI.Xaml.Input;
 using System.Runtime.InteropServices;
 using System.Windows.Input;
 using Windows.ApplicationModel.DataTransfer;
-#if WINDOWS
-using Windows.Win32.System.Com;
-using Windows.Win32.UI.Shell;
-#endif
 using WinRT;
 using DragEventArgs = Microsoft.UI.Xaml.DragEventArgs;
 using Visibility = Microsoft.UI.Xaml.Visibility;
@@ -43,11 +39,7 @@ namespace Files.App.UserControls
 				return;
 
 			// Get items
-#if WINDOWS
-			var storageService = Ioc.Default.GetRequiredService<IStorageService>();
-#else
 			var resolver = Ioc.Default.GetRequiredService<Files.Core.Storage.Contracts.IStorableResolver>();
-#endif
 			var storageItems = (await FilesystemHelpers.GetDraggedStorageItems(e.DataView)).ToArray();
 
 			// Add to list
@@ -57,17 +49,8 @@ namespace Files.App.UserControls
 				if (ItemsSource.Any(x => x.Inner.Id == item.Path))
 					continue;
 
-#if WINDOWS
-				var storable = item switch
-				{
-					StorageFileWithPath => (IStorableChild?)await storageService.TryGetFileAsync(item.Path),
-					StorageFolderWithPath => (IStorableChild?)await storageService.TryGetFolderAsync(item.Path),
-					_ => null
-				};
-#else
 				var resolved = await resolver.TryGetAsync(item.Path);
 				var storable = resolved.Item as IStorableChild;
-#endif
 
 				if (storable is null)
 					continue;
@@ -85,28 +68,8 @@ namespace Files.App.UserControls
 			if (paths.Length is 0)
 				return;
 
-#if WINDOWS
-			var items = new List<ShellItem>(paths.Length);
-			try
-			{
-				items.AddRange(paths.Select(path => new ShellItem(path)));
-				IDataObject dataObject = ShellDataObject.Create(items);
-				e.Data.Properties["Files_ActionBinder"] = "Files_ShelfBinder";
-				e.Data.As<IDataObjectProvider>().SetDataObject(dataObject).ThrowOnFailure();
-			}
-			catch (COMException exception)
-			{
-				Debug.WriteLine(exception);
-			}
-			finally
-			{
-				foreach (ShellItem item in items)
-					item.Dispose();
-			}
-#else
 			e.Data.Properties["Files_ActionBinder"] = "Files_ShelfBinder";
 			Files.App.Services.Desktop.DesktopFileDragHelper.StartExternalDrag(paths);
-#endif
 		}
 
 		private void ShelfItemsList_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)

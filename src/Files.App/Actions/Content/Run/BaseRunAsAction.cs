@@ -28,11 +28,9 @@ namespace Files.App.Actions
 			_context.PropertyChanged += Context_PropertyChanged;
 		}
 
-#if !WINDOWS
 		// LINUX-TODO(launching): Windows shell elevation verbs are hidden on Linux.
 		public Task ExecuteAsync(object? parameter = null)
 			=> Task.CompletedTask;
-#endif
 
 		public void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Windows.Foundation;
@@ -114,4 +113,3 @@ namespace Files.App.Views.Layouts
 		}
 	}
 }
-#endif

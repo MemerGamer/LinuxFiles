@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Linux.Clipboard;
 using Microsoft.Extensions.Logging;
 using System.IO;
@@ -46,4 +45,3 @@ namespace Files.App.Utils.Storage
 		}
 	}
 }
-#endif

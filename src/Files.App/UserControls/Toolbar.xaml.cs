@@ -64,9 +64,6 @@ namespace Files.App.UserControls
 			UserSettingsService.AppearanceSettingsService.PropertyChanged -= AppearanceSettings_PropertyChanged;
 			if (editTagsMenu is not null)
 				editTagsMenu.TagsChanged -= EditTagsMenu_TagsChanged;
-#if WINDOWS
-			openWithMenu?.Dispose();
-#endif
 			++openWithFlyoutRequestId;
 		}
 
@@ -557,7 +554,6 @@ namespace Files.App.UserControls
 				return;
 			}
 
-#if !WINDOWS
 			if (group is NewItemCommandGroup)
 			{
 				// Same items as the context menu's New submenu
@@ -570,14 +566,9 @@ namespace Files.App.UserControls
 				}
 				return;
 			}
-#endif
 
 			foreach (var code in group.Commands)
-#if WINDOWS
-				if (Commands[code] is { Code: not CommandCodes.None } cmd)
-#else
 				if (Commands[code] is { Code: not CommandCodes.None, IsExecutable: true } cmd)
-#endif
 					flyout.Items.Add(CreateGroupMenuItem(cmd));
 
 			if (group is NewItemCommandGroup && ViewModel?.InstanceViewModel.CanCreateFileInPage == true
@@ -598,7 +589,6 @@ namespace Files.App.UserControls
 
 
 
-#if !WINDOWS
 		private async Task PopulateOpenWithFlyoutAsync(MenuFlyout flyout)
 		{
 			var requestId = ++openWithFlyoutRequestId;
@@ -631,7 +621,6 @@ namespace Files.App.UserControls
 			if (flyout.Items.Count == 0)
 				flyout.Items.Add(CreateChooseAnotherAppMenuItem());
 		}
-#endif
 
 		private MenuFlyoutItem CreateChooseAnotherAppMenuItem()
 		{

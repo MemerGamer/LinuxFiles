@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using System.IO;
 using System.Text;
 using System.Windows.Input;
@@ -183,4 +182,3 @@ namespace Files.App.ViewModels.Dialogs
 	}
 }
 
-#endif

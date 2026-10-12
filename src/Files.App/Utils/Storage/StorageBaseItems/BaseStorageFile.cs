@@ -41,11 +41,7 @@ namespace Files.App.Utils.Storage
 		public abstract IStorageItemExtraProperties Properties { get; }
 		[MaybeNull]
 		StorageItemContentProperties IStorageItemProperties.Properties
-#if WINDOWS
-			=> this is SystemStorageFile file ? file.File.Properties : null;
-#else
 			=> null;
-#endif
 
 		public static implicit operator BaseStorageFile?(StorageFile? value)
 		{
@@ -170,21 +166,12 @@ namespace Files.App.Utils.Storage
 			return Task.FromResult<StorageItemThumbnail?>(null).AsAsyncOperation();
 		}
 
-#if WINDOWS
-		public static IAsyncOperation<BaseStorageFile?> GetFileFromPathAsync(string path)
-		{
-			return AsyncInfo.Run<BaseStorageFile?>(async (cancellationToken)
-					=> await ZipStorageFile.FromPathAsync(path) ?? await FtpStorageFile.FromPathAsync(path) ?? await ShellStorageFile.FromPathAsync(path) ?? await NativeStorageFile.FromPathAsync(path) ?? await SystemStorageFile.FromPathAsync(path)
-				);
-		}
-#else
 		// LINUX-TODO(storage): remove legacy WinRT resolution after downstream consumers use IStorableResolver.
 		public static IAsyncOperation<BaseStorageFile?> GetFileFromPathAsync(string path)
 		{
 			return AsyncInfo.Run<BaseStorageFile?>(async (cancellationToken)
 				=> await FtpStorageFile.FromPathAsync(path) ?? await SystemStorageFile.FromPathAsync(path));
 		}
-#endif
 
 		public async Task<string> ReadTextAsync(int maxLength = -1)
 		{

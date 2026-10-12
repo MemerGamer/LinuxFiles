@@ -755,11 +755,6 @@ namespace Files.App.ViewModels
 			fileTagsSettingsService.OnTagsUpdated += FileTagsSettingsService_OnSettingUpdated;
 			folderSizeProvider.SizeChanged += FolderSizeProvider_SizeChanged;
 			folderSettings.LayoutModeChangeRequested += LayoutModeChangeRequested;
-#if WINDOWS
-			StorageTrashBinService.Watcher.ItemAdded += RecycleBinItemCreatedAsync;
-			StorageTrashBinService.Watcher.ItemDeleted += RecycleBinItemDeletedAsync;
-			StorageTrashBinService.Watcher.RefreshRequested += RecycleBinRefreshRequestedAsync;
-#endif
 		}
 
 		private async void LayoutModeChangeRequested(object? sender, LayoutModeEventArgs e)
@@ -1100,7 +1095,6 @@ namespace Files.App.ViewModels
 
 							pendingSearchResults.Clear();
 
-#if !WINDOWS
 							// A few watcher changes must not rebuild (and visibly blank) the whole list
 							if (TryApplyIncrementalDisplayChanges(displayedFilesAndFolders))
 							{
@@ -1109,7 +1103,6 @@ namespace Files.App.ViewModels
 								DirectoryInfoUpdated?.Invoke(this, EventArgs.Empty);
 								return;
 							}
-#endif
 
 							FilesAndFolders.BeginBulkOperation();
 							try
@@ -1577,20 +1570,9 @@ namespace Files.App.ViewModels
 
 		private static Task<string[]> ReadFileTagAsync(string filePath)
 		{
-#if WINDOWS
-			return Task.Run(() => FileTagsHelper.ReadFileTag(filePath));
-#else
 			return FileTagsHelper.ReadAndUpdateFileTagsAsync(filePath);
-#endif
 		}
 
-#if WINDOWS
-		private static void SetFileTag(ListedItem item)
-		{
-			var dbInstance = FileTagsHelper.GetDbInstance();
-			dbInstance.SetTags(item.GetRequiredPath(), item.FileFRN, item.FileTags ?? []);
-		}
-#endif
 
 		// Loads extended file properties off the critical path so a slow per-file read never blocks the row's essentials.
 		private async Task LoadExtendedFilePropertiesInBackgroundAsync(ListedItem item, BaseStorageFile file, CancellationToken token)
@@ -1748,9 +1730,6 @@ namespace Files.App.ViewModels
 								},
 								Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 
-#if WINDOWS
-								await Task.Run(() => SetFileTag(item));
-#endif
 
 								if (isItemNetwork)
 									_ = LoadExtendedFilePropertiesInBackgroundAsync(item, matchingStorageFile, token);
@@ -1815,9 +1794,6 @@ namespace Files.App.ViewModels
 								},
 								Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 
-#if WINDOWS
-								await Task.Run(() => SetFileTag(item));
-#endif
 								wasSyncStatusLoaded = true;
 							}
 						}
@@ -1848,9 +1824,6 @@ namespace Files.App.ViewModels
 							},
 							Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
 
-#if WINDOWS
-							await Task.Run(() => SetFileTag(item));
-#endif
 						});
 					}
 					else
@@ -2159,9 +2132,6 @@ namespace Files.App.ViewModels
 
 			var isRecycleBin = path.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal);
 			var addFilesToken = addFilesCTS.Token;
-#if WINDOWS
-			var enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesToken, library);
-#else
 			int enumerated;
 			try { enumerated = await EnumerateItemsFromStandardFolderAsync(path, addFilesToken, library); }
 			catch (OperationCanceledException) { enumerated = -1; }
@@ -2169,47 +2139,12 @@ namespace Files.App.ViewModels
 			// Abandoned requests must not register watchers for a location we've navigated away from
 			if (addFilesToken.IsCancellationRequested)
 				enumerated = -1;
-#endif
 
 			// Hide progressbar after enumeration
 			IsLoadingItems = false;
 
 			switch (enumerated)
 			{
-#if WINDOWS
-				// Enumerated with FindFirstFileExFromApp
-				// Is folder synced to cloud storage?
-				case 0:
-					currentStorageFolder ??= await FilesystemTasks.Wrap(() => StorageFileExtensions.DangerousGetFolderWithPathFromPathAsync(path));
-					var syncStatus = enumeratedCloudSyncStatus ?? await CheckCloudDriveSyncStatusAsync(currentStorageFolder?.Item);
-
-					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs()
-					{
-						IsTypeCloudDrive = syncStatus != CloudDriveSyncStatus.NotSynced && syncStatus != CloudDriveSyncStatus.Unknown,
-						IsTypeGitRepository = IsValidGitDirectory
-					});
-
-					if (!HasNoWatcher)
-						WatchForDirectoryChanges(path, syncStatus);
-					if (IsValidGitDirectory)
-						WatchForGitChanges();
-					break;
-
-				// Enumerated with StorageFolder
-				case 1:
-					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs() { IsTypeCloudDrive = false, IsTypeRecycleBin = isRecycleBin });
-					currentStorageFolder ??= await FilesystemTasks.Wrap(() => StorageFileExtensions.DangerousGetFolderWithPathFromPathAsync(path));
-					if (!HasNoWatcher)
-						_ = WatchForStorageFolderChangesAsync(currentStorageFolder?.Item);
-					break;
-
-				// Watch for changes using Win32 in Box Drive folder (#7428) and network drives (#5869)
-				case 2:
-					PageTypeUpdated?.Invoke(this, new PageTypeUpdatedEventArgs() { IsTypeCloudDrive = false });
-					if (!HasNoWatcher)
-						WatchForWin32FolderChanges(path);
-					break;
-#endif
 
 				// Enumerated through IFileSystemEnumerator (Linux)
 				case 3:
@@ -2255,9 +2190,7 @@ namespace Files.App.ViewModels
 
 			watcher?.Dispose();
 			watcher = null;
-#if !WINDOWS
 			CloseLinuxWatcher();
-#endif
 
 			aProcessQueueAction = null;
 			gitProcessQueueAction = null;
@@ -2269,11 +2202,7 @@ namespace Files.App.ViewModels
 		{
 			enumeratedCloudSyncStatus = null;
 
-#if WINDOWS
-			return await EnumerateWindowsFolderAsync(path, cancellationToken, library);
-#else
 			return await EnumerateLinuxFolderAsync(path, cancellationToken, library);
-#endif
 		}
 
 		private void CheckForSolutionFile()
@@ -2770,11 +2699,6 @@ namespace Files.App.ViewModels
 			updateTagGroupCTS?.Cancel();
 			App.Logger.LogInformation($"ShellViewModel.Dispose: CurrentFolder={LogPathHelper.RedactPath(CurrentFolder?.ItemPath)}");
 
-#if WINDOWS
-			StorageTrashBinService.Watcher.ItemAdded -= RecycleBinItemCreatedAsync;
-			StorageTrashBinService.Watcher.ItemDeleted -= RecycleBinItemDeletedAsync;
-			StorageTrashBinService.Watcher.RefreshRequested -= RecycleBinRefreshRequestedAsync;
-#endif
 			UserSettingsService.OnSettingChangedEvent -= UserSettingsService_OnSettingChangedEvent;
 			fileTagsSettingsService.OnSettingImportedEvent -= FileTagsSettingsService_OnSettingUpdated;
 			fileTagsSettingsService.OnTagsUpdated -= FileTagsSettingsService_OnSettingUpdated;

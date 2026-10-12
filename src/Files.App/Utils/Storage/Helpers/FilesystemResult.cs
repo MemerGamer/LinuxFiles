@@ -1,9 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if WINDOWS
-using Windows.Win32.Foundation;
-#endif
 
 namespace Files.App.Utils.Storage
 {
@@ -20,10 +17,6 @@ namespace Files.App.Utils.Storage
 		public static explicit operator FilesystemResult(bool res) => new(res ? FileSystemStatusCode.Success : FileSystemStatusCode.Generic);
 
 
-#if WINDOWS
-		public static implicit operator BOOL(FilesystemResult? res) => res?.ErrorCode is FileSystemStatusCode.Success;
-		public static explicit operator FilesystemResult(BOOL res) => new(res ? FileSystemStatusCode.Success : FileSystemStatusCode.Generic);
-#endif
 	}
 
 	public sealed class FilesystemResult<T> : FilesystemResult

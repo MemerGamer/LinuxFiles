@@ -12,16 +12,11 @@ namespace Files.App.Services
 	{
 		public IStorageDeviceWatcher CreateWatcher()
 		{
-#if WINDOWS
-			return new WindowsStorageDeviceWatcher();
-#else
 			return new LinuxStorageDeviceWatcher();
-#endif
 		}
 
 		public async IAsyncEnumerable<IFolder> GetDrivesAsync()
 		{
-#if !WINDOWS
 			// Mounted drives (mountinfo + UDisks2 labels), volumes that are not mounted yet and MTP devices (GVfs)
 			var entries = await LinuxDriveCatalog.EnumerateAsync().ConfigureAwait(false);
 			var linuxPending = entries.Select(entry => entry.CreateAsync()).ToList();
@@ -31,19 +26,6 @@ namespace Files.App.Services
 				if (await completed is { } linuxItem)
 					yield return linuxItem;
 			}
-#else
-			var pCloudDrivePath = App.AppModel.PCloudDrivePath;
-			var drives = await Task.Run(DriveInfo.GetDrives).ConfigureAwait(false);
-
-			// Probe drives in parallel so one slow drive doesn't delay the rest
-			var pending = drives.Select(drive => GetDriveItemAsync(drive, pCloudDrivePath)).ToList();
-
-			await foreach (var completed in Task.WhenEach(pending))
-			{
-				if (await completed is { } driveItem)
-					yield return driveItem;
-			}
-#endif
 		}
 
 		private static async Task<IFolder?> GetDriveItemAsync(DriveInfo drive, string pCloudDrivePath)
@@ -91,12 +73,8 @@ namespace Files.App.Services
 
 		public Task<IFolder?> GetPrimaryDriveAsync()
 		{
-#if WINDOWS
-			var cDrivePath = $@"{Constants.UserEnvironmentPaths.SystemDrivePath}\";
-#else
 			// LINUX-TODO(drives): primary drive is the root file system
 			var cDrivePath = "/";
-#endif
 			if (!Directory.Exists(cDrivePath))
 			{
 				App.Logger.LogWarning($"Primary system drive '{cDrivePath}' could not be found.");

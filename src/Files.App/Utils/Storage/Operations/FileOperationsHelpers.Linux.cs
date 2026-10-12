@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions.Trash;
 using Windows.ApplicationModel.DataTransfer;
 
@@ -54,4 +53,3 @@ namespace Files.App.Utils.Storage
 		}
 	}
 }
-#endif

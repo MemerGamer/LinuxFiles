@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions.Tags;
 using Microsoft.Extensions.Logging;
 using System;
@@ -183,4 +182,3 @@ namespace Files.App.Utils.FileTags
 		public static ulong? GetFileFRN(string filePath) => null;
 	}
 }
-#endif

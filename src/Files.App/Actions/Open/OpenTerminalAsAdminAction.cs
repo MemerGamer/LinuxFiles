@@ -7,11 +7,7 @@ namespace Files.App.Actions
 	internal sealed partial class OpenTerminalAsAdminAction : OpenTerminalAction
 	{
 		public override string Label
-#if WINDOWS
-			=> Strings.OpenTerminalAsAdmin.GetLocalizedResource();
-#else
 			=> Strings.OpenTerminalAsAdminLinux.GetLocalizedResource();
-#endif
 
 		public override string Description
 			=> Strings.OpenTerminalAsAdminDescription.GetLocalizedResource();
@@ -22,18 +18,5 @@ namespace Files.App.Actions
 		public override bool IsExecutable
 			=> OperatingSystem.IsWindows() && base.IsExecutable;
 
-#if WINDOWS
-		protected override ProcessStartInfo? GetProcessStartInfo(string[] paths)
-		{
-			var startInfo = base.GetProcessStartInfo(paths);
-			if (startInfo is not null)
-			{
-				startInfo.Verb = "runas";
-				startInfo.UseShellExecute = true;
-			}
-
-			return startInfo;
-		}
-#endif
 	}
 }

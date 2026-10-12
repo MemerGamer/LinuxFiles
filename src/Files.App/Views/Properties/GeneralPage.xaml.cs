@@ -150,46 +150,7 @@ namespace Files.App.Views.Properties
 			bool SaveDrive(DriveItem drive)
 			{
 				// LINUX-TODO(props): relabeling a volume needs udisks2; the label is read-only for now
-#if !WINDOWS
 				return false;
-#else
-				var fsVM = AppInstance.ShellViewModel;
-				if (!GetNewName(out var newName) || fsVM is null)
-					return false;
-
-				if (GetDriveLetterToken() is { } letterToken)
-					newName = RemoveDriveLetterToken(newName, letterToken); // Remove "(C:)" from the new label
-
-				if (drive.Type == Data.Items.DriveType.Network)
-					Win32Helper.SetNetworkDriveLabel(drive.DeviceID
-						?? throw new InvalidOperationException("The network drive does not have a device ID."), newName);
-				else
-					Win32Helper.SetVolumeLabel(drive.GetRequiredPath(), newName);
-
-				ViewModel.OriginalItemName = ViewModel.ItemName;
-
-				var drivePath = drive.Path;
-				_ = MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(async () =>
-				{
-					if (string.IsNullOrEmpty(drivePath))
-						return;
-
-					// Reload the root since the cached one still reports the old label
-					var rootModified = await FilesystemTasks.Wrap(() => StorageFolder.GetFolderFromPathAsync(drivePath).AsTask());
-					if (rootModified)
-					{
-						drive.Root = rootModified.Result!;
-						drive.Text = rootModified.Result!.DisplayName;
-					}
-
-					// Refresh the path display only when this instance is browsing the renamed drive
-					var workingDirectory = fsVM.WorkingDirectory;
-					if (Path.IsPathRooted(workingDirectory) &&
-						string.Equals(Path.GetPathRoot(workingDirectory), Path.GetPathRoot(drivePath), StringComparison.OrdinalIgnoreCase))
-						await fsVM.SetWorkingDirectoryAsync(workingDirectory);
-				});
-				return true;
-#endif
 			}
 
 			async Task<bool> SaveLibraryAsync(LibraryItem library)
@@ -265,10 +226,6 @@ namespace Files.App.Views.Properties
 					);
 				}
 
-#if WINDOWS
-				if (ViewModel.IsUnblockFileSelected)
-					Windows.Win32.PInvoke.DeleteFileFromApp($"{itemPath}:Zone.Identifier");
-#endif
 
 				if (ViewModel.IsAblumCoverModified)
 				{

@@ -3,10 +3,6 @@
 
 using System.Collections.Frozen;
 using System.Text;
-#if WINDOWS
-using Windows.Win32;
-using Windows.Win32.UI.Input.KeyboardAndMouse;
-#endif
 
 namespace Files.App.Data.Commands
 {
@@ -375,7 +371,6 @@ namespace Files.App.Data.Commands
 
 		private static string GetKeyCharacter(Keys key)
 		{
-#if !WINDOWS
 			// LINUX-TODO(keyboard): US-layout approximation of MapVirtualKey(VK_TO_CHAR); query XKB for the active layout instead
 			var vk = (uint)key;
 			return vk switch
@@ -394,14 +389,6 @@ namespace Files.App.Data.Commands
 				0xDE => "'",
 				_ => string.Empty
 			};
-#else
-			char result = (char)PInvoke.MapVirtualKey((uint)key, MAP_VIRTUAL_KEY_TYPE.MAPVK_VK_TO_CHAR);
-
-			if (result > 0)
-				return result.ToString();
-
-			return string.Empty;
-#endif
 		}
 	}
 }

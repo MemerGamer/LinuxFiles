@@ -63,15 +63,6 @@ namespace Files.App.Actions
 					return;
 				}
 
-#if WINDOWS
-				if (storageItem is SystemStorageFolder or SystemStorageFile)
-				{
-					var standardItems = await new[] { storageItem }.ToStandardStorageItemsAsync();
-					if (standardItems.Any())
-						storageItem = standardItems.First();
-				}
-
-#endif
 				dataPackage.Properties.PackageFamilyName = Windows.ApplicationModel.Package.Current.Id.FamilyName;
 				dataPackage.SetStorageItems(new[] { storageItem }, false);
 

@@ -16,13 +16,11 @@ namespace Files.App.Helpers
 	{
 		public static async Task PasteItemAsync(string destinationPath, IShellPage associatedInstance)
 		{
-#if !WINDOWS
 			if (await Files.App.Services.Desktop.DesktopFileDragHelper.TryPasteFilesAsync(destinationPath, associatedInstance))
 			{
 				associatedInstance.SlimContentPage?.ItemManipulationModel?.RefreshItemsOpacity();
 				return;
 			}
-#endif
 			if (OperatingSystem.IsLinux() && FileClipboard.HasItems)
 			{
 				// Fallback when the system clipboard is unavailable (no X selection access)
@@ -346,17 +344,6 @@ namespace Files.App.Helpers
 
 			var credentialDialogViewModel = new CredentialDialogViewModel() { CanBeAnonymous = isFtp, PasswordOnly = !isFtp };
 
-#if WINDOWS
-			if (sender is ZipStorageFolder zipFolder)
-			{
-				credentialDialogViewModel.PasswordValidator = async (password) =>
-				{
-					zipFolder.Credentials = new StorageCredential(null, Encoding.UTF8.GetString(password.Bytes));
-					return await Task.Run(zipFolder.ValidateCredentialsAsync);
-				};
-			}
-
-#endif
 			IDialogService dialogService = Ioc.Default.GetRequiredService<IDialogService>();
 			var dialogResult = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() =>
 				dialogService.ShowDialogAsync(credentialDialogViewModel));

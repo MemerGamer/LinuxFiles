@@ -956,49 +956,14 @@ namespace Files.App.Helpers
 
 		public static string? ReadStringFromFile(string filePath)
 		{
-#if !WINDOWS
 			// LINUX-TODO(ads): only NTFS alternate data streams ("file:stream") used this on Windows; settings use System.IO directly.
 			return null;
-#else
-			try
-			{
-				using SafeFileHandle hFile = OpenFileForRead(filePath);
-				if (hFile.IsInvalid)
-					return null;
-
-				using FileStream stream = new(hFile, FileAccess.Read);
-				using StreamReader reader = new(stream, detectEncodingFromByteOrderMarks: true);
-				return reader.ReadToEnd();
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-			{
-				return null;
-			}
-#endif
 		}
 
 		public static bool WriteStringToFile(string filePath, string str, FILE_FLAGS_AND_ATTRIBUTES flags = 0)
 		{
-#if !WINDOWS
 			// LINUX-TODO(ads): alternate data streams do not exist on Linux (could map to xattrs)
 			return false;
-#else
-			try
-			{
-				using SafeFileHandle hStream = PInvoke.CreateFile(filePath,
-					(uint)FILE_ACCESS_RIGHTS.FILE_GENERIC_WRITE, 0, null, FILE_CREATION_DISPOSITION.CREATE_ALWAYS, FILE_FLAGS_AND_ATTRIBUTES.FILE_FLAG_BACKUP_SEMANTICS | flags, null);
-				if (hStream.IsInvalid)
-					return false;
-
-				using FileStream stream = new(hStream, FileAccess.Write);
-				stream.Write(Encoding.UTF8.GetBytes(str));
-				return true;
-			}
-			catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-			{
-				return false;
-			}
-#endif
 		}
 
 		// https://www.pinvoke.net/default.aspx/kernel32/GetFileInformationByHandleEx.html

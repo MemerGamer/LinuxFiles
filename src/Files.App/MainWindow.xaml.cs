@@ -13,9 +13,6 @@ using System.Runtime.InteropServices;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
 using Windows.Storage;
-#if WINDOWS
-using Windows.Win32.Foundation;
-#endif
 using WinRT;
 using IO = System.IO;
 
@@ -36,15 +33,9 @@ namespace Files.App
 		{
 			InitializeComponent();
 
-#if WINDOWS
-			ExtendsContentIntoTitleBar = true;
-#else
 			ExtendsContentIntoTitleBar = UseClientSideDecorations;
-#endif
 			Title = OperatingSystem.IsLinux() ? Strings.LinuxAppDisplayName.GetLocalizedResource() : "Files";
-#if !WINDOWS
 			Title = FormatRootModeTitle(Title);
-#endif
 			AppWindow.TitleBar.ButtonBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonInactiveBackgroundColor = Colors.Transparent;
 			AppWindow.TitleBar.ButtonPressedBackgroundColor = Colors.Transparent;
@@ -271,10 +262,6 @@ namespace Files.App
 				BringToForeground();
 			}
 
-#if WINDOWS
-			if (Windows.Win32.PInvoke.IsIconic(new(WindowHandle)) && appWindow?.Presenter is OverlappedPresenter overlapped)
-				overlapped.Restore();
-#endif
 		}
 
 		private async Task EnsureContentHasKeyboardFocusAsync()
@@ -456,11 +443,7 @@ namespace Files.App
 
 		private void BringToForeground()
 		{
-#if WINDOWS
-			Win32Helper.BringToForegroundEx(new(WindowHandle));
-#else
 			Activate();
-#endif
 		}
 
 		public bool SetCanWindowToFront(bool canWindowToFront)
@@ -476,22 +459,5 @@ namespace Files.App
 			}
 		}
 
-#if WINDOWS
-		protected override bool OnWindowMessageReceived(uint message, WPARAM wParam, LPARAM lParam, ref LRESULT result)
-		{
-			if ((!CanWindowToFront) && message == Windows.Win32.PInvoke.WM_WINDOWPOSCHANGING)
-			{
-				Win32Helper.ForceWindowPosition(lParam.Value);
-				return true;
-			}
-			else if (message == Windows.Win32.PInvoke.WM_MENUCHAR && (wParam.Value & 0xFFFF) == '\r')
-			{
-				result = new(Win32PInvoke.MNC_CLOSE << 16);
-				return true;
-			}
-
-			return false;
-		}
-#endif
 	}
 }

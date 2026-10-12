@@ -95,7 +95,6 @@ namespace Files.App.Utils.Storage
 		{
 			List<PathBoxItem> pathBoxItems = [];
 
-#if !WINDOWS
 			// trash:/// is a single virtual location, not a directory chain
 			if (value.StartsWith(Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.Ordinal))
 				return [GetPathItem(Constants.UserEnvironmentPaths.RecycleBinPath, Constants.UserEnvironmentPaths.RecycleBinPath)];
@@ -103,7 +102,6 @@ namespace Files.App.Utils.Storage
 			// POSIX paths start at the root directory, which the separator scan below would skip
 			if (value.StartsWith('/'))
 				pathBoxItems.Add(new PathBoxItem() { Title = "/", Path = "/", ChevronToolTip = string.Format(Strings.BreadcrumbBarChevronButtonToolTip.GetLocalizedResource(), "/") });
-#endif
 
 			if (value.Contains('/', StringComparison.Ordinal))
 			{
@@ -157,19 +155,11 @@ namespace Files.App.Utils.Storage
 				}
 				else
 				{
-#if WINDOWS
-					var path = item.Path!;
-					BaseStorageFolder? folder = await FilesystemTasks.WrapNullable(() => DangerousGetFolderFromPathAsync(path));
-
-					if (!string.IsNullOrEmpty(folder?.DisplayName))
-						item.Title = folder.DisplayName;
-#else
 					var path = item.Path!;
 					var folder = (await StorageHelpers.GetFolderAsync(path)).Result;
 
 					if (!string.IsNullOrEmpty(folder?.Name))
 						item.Title = folder.Name;
-#endif
 				}
 
 				item.ChevronToolTip = string.Format(Strings.BreadcrumbBarChevronButtonToolTip.GetLocalizedResource(), item.Title);
@@ -251,10 +241,6 @@ namespace Files.App.Utils.Storage
 			if (path.StartsWith("Settings"))
 				return "Settings";
 
-#if WINDOWS
-			if (ShellStorageFolder.IsShellPath(path))
-				return ShellHelpers.ResolveShellPath(path);
-#endif
 
 			var pathBuilder = new StringBuilder(path);
 			var lastPathIndex = path.Length - 1;

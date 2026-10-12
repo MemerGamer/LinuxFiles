@@ -227,16 +227,12 @@ namespace Files.App.ViewModels.Dialogs
 			return Path.Exists(path) && Path.IsPathFullyQualified(path) && path != Path.GetPathRoot(path);
 		}
 
-#if !WINDOWS
 		// LINUX-TODO(shortcuts): native shortcut creation is hidden on Linux.
 		private Task SelectDestination()
 			=> Task.CompletedTask;
-#endif
 
-#if !WINDOWS
 		private Task CreateShortcutAsync()
 			=> Task.CompletedTask;
-#endif
 
 		private void AutoFillName()
 		{

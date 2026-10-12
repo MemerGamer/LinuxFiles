@@ -36,9 +36,6 @@ namespace Files.App.Utils.Library
 
 		public LibraryManager()
 		{
-#if WINDOWS
-			InitializeWatcher();
-#endif
 		}
 
 
@@ -46,11 +43,9 @@ namespace Files.App.Utils.Library
 		/// Get libraries of the current user with the help of the FullTrust process.
 		/// </summary>
 		/// <returns>List of library items</returns>
-#if !WINDOWS
 		// LINUX-TODO(libraries): shell libraries are unavailable on Linux.
 		public static Task<List<LibraryLocationItem>> ListUserLibraries()
 			=> Task.FromResult<List<LibraryLocationItem>>([]);
-#endif
 
 		public async Task UpdateLibrariesAsync()
 		{
@@ -86,10 +81,8 @@ namespace Files.App.Utils.Library
 		/// </summary>
 		/// <param name="name">The name of the new library (must be unique)</param>
 		/// <returns>The new library if successfully created</returns>
-#if !WINDOWS
 		public Task<bool> CreateNewLibrary(string name)
 			=> Task.FromResult(false);
-#endif
 
 		/// <summary>
 		/// Update library details.
@@ -99,10 +92,8 @@ namespace Files.App.Utils.Library
 		/// <param name="folders">Update the library folders or null to keep current</param>
 		/// <param name="isPinned">Update the library pinned status or null to keep current</param>
 		/// <returns>The new library if successfully updated</returns>
-#if !WINDOWS
 		public Task<LibraryLocationItem?> UpdateLibrary(string libraryPath, string? defaultSaveFolder = null, string[]? folders = null, bool? isPinned = null)
 			=> Task.FromResult<LibraryLocationItem?>(null);
-#endif
 
 		public (bool result, string reason) CanCreateLibrary(string name)
 		{
@@ -129,15 +120,11 @@ namespace Files.App.Utils.Library
 			return (true, string.Empty);
 		}
 
-#if !WINDOWS
 		public static Task ShowRestoreDefaultLibrariesDialogAsync()
 			=> Task.CompletedTask;
-#endif
 
-#if !WINDOWS
 		public static Task ShowCreateNewLibraryDialogAsync()
 			=> Task.CompletedTask;
-#endif
 
 
 

@@ -13,12 +13,7 @@ namespace Files.App.Data.Commands
 		public static Keys GetHotKeyKey(KeyRoutedEventArgs e)
 			=> (Keys)GetHotKeyVirtualKey(e);
 
-#if WINDOWS
-		public static VirtualKey GetHotKeyVirtualKey(KeyRoutedEventArgs e)
-			=> e.Key;
-#else
 		public static partial VirtualKey GetHotKeyVirtualKey(KeyRoutedEventArgs e);
-#endif
 
 		public static KeyModifiers GetCurrentKeyModifiers()
 		{

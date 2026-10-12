@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -191,4 +190,3 @@ namespace Files.App.Utils.FileTags
 		}
 	}
 }
-#endif

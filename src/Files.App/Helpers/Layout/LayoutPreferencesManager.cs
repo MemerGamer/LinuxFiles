@@ -1,9 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if WINDOWS
-using Windows.Win32;
-#endif
 
 namespace Files.App.Helpers
 {
@@ -579,34 +576,13 @@ namespace Files.App.Helpers
 		// The Windows file reference number; on Linux the layout database tracks folders by dev:ino itself (IFileStatService).
 		private static ulong? GetFolderFRN(string? path)
 		{
-#if WINDOWS
-			return Win32Helper.GetFolderFRN(path);
-#else
 			return null;
-#endif
 		}
 
 		private static LayoutPreferencesItem? GetLayoutPreferencesFromAds(string path, ulong? frn)
 		{
-#if WINDOWS
-			var str = Win32Helper.ReadStringFromFile($"{path}:files_layoutmode");
-
-			var layoutPreferences = SafetyExtensions.IgnoreExceptions(() => string.IsNullOrEmpty(str)
-				? null
-				: JsonSerializer.Deserialize(str, AppJsonSerializerContext.Default.LayoutPreferencesItem));
-
-			if (layoutPreferences is null)
-				return null;
-
-			// Port settings to the database, delete the ADS
-			if (SetLayoutPreferencesToDatabase(path, frn, layoutPreferences))
-				PInvoke.DeleteFileFromApp($"{path}:files_layoutmode");
-
-			return layoutPreferences;
-#else
 			// Alternate data streams do not exist on Linux
 			return null;
-#endif
 		}
 
 		private static LayoutPreferencesItem? GetLayoutPreferencesFromDatabase(string path, ulong? frn)
@@ -625,9 +601,7 @@ namespace Files.App.Helpers
 				return new();
 
 			if (path == Constants.UserEnvironmentPaths.DownloadsPath
-#if !WINDOWS
 				&& Files.App.UnoVirtualization.VirtualizingWrapGrid.IsSupported(out _)
-#endif
 				)
 			{
 				// Default for downloads folder is to group by date created

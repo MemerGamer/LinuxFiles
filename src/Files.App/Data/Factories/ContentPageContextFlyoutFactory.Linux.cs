@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions;
 using Files.Platform.Abstractions.Launching;
 using Files.Platform.Abstractions.Mime;
@@ -166,4 +165,3 @@ namespace Files.App.Data.Factories
 		}
 	}
 }
-#endif

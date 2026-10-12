@@ -29,10 +29,8 @@ namespace Files.App.Helpers.ContextFlyouts
 		private bool openedUp;
 		private bool placementResolved;
 		private double estimatedWidth;
-#if !WINDOWS
 		private double invocationScreenY = double.NaN;
 		private bool preserveOpenPlacement;
-#endif
 		private FrameworkElement? invocationAnchor;
 		private Point? invocationPosition;
 		private readonly Stopwatch openStopwatch = new();
@@ -57,9 +55,7 @@ namespace Files.App.Helpers.ContextFlyouts
 				App.LastOpenedFlyout = Flyout;
 				openStopwatch.Restart();
 			};
-#if !WINDOWS
 			Flyout.Closing += Flyout_Closing;
-#endif
 			Flyout.Opened += (s, e) => openStopwatch.Restart();
 			Flyout.Opened += Flyout_Opened;
 			Flyout.Closed += Flyout_Closed;
@@ -70,10 +66,8 @@ namespace Files.App.Helpers.ContextFlyouts
 		/// </summary>
 		public void Reset()
 		{
-#if !WINDOWS
 			invocationScreenY = double.NaN;
 			preserveOpenPlacement = false;
-#endif
 			Flyout.Items.Clear();
 			primaryRow = null;
 			primarySeparator = null;
@@ -92,17 +86,13 @@ namespace Files.App.Helpers.ContextFlyouts
 		/// </summary>
 		public void Build(List<ContextMenuFlyoutItemViewModel> models, bool preservePlacement = false)
 		{
-#if !WINDOWS
 			var savedPlacement = (invocationAnchor, invocationPosition, invocationScreenY, openedUp, placementResolved);
-#endif
 			Reset();
-#if !WINDOWS
 			if (preservePlacement)
 			{
 				(invocationAnchor, invocationPosition, invocationScreenY, openedUp, placementResolved) = savedPlacement;
 				preserveOpenPlacement = !double.IsNaN(invocationScreenY);
 			}
-#endif
 
 			var primary = models.Where(x => x.IsPrimary && !x.IsHidden && x.ShowItem).ToList();
 			var secondary = models
@@ -379,7 +369,6 @@ namespace Files.App.Helpers.ContextFlyouts
 		/// </summary>
 		public void ResolvePlacement(FrameworkElement? anchor = null, Point? position = null)
 		{
-#if !WINDOWS
 			if (preserveOpenPlacement)
 			{
 				placementResolved = true;
@@ -387,7 +376,6 @@ namespace Files.App.Helpers.ContextFlyouts
 				CorrectRebuiltPlacement();
 				return;
 			}
-#endif
 			invocationAnchor = anchor;
 			invocationPosition = position;
 			openedUp = PredictOpensUpward();
@@ -527,12 +515,10 @@ namespace Files.App.Helpers.ContextFlyouts
 			return subMenu;
 		}
 
-#if !WINDOWS
 		public void CorrectRebuiltPlacement()
 		{
 			Flyout_Opened(Flyout, EventArgs.Empty);
 		}
-#endif
 
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyoutPresenter))]
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
@@ -577,9 +563,7 @@ namespace Files.App.Helpers.ContextFlyouts
 				// Pull the touch/pointer point captured after the pre-render guess; the cursor is stale for touch.
 				// Direct-position callers (widget/sidebar) leave the provider null.
 				if (
-#if !WINDOWS
 					!preserveOpenPlacement &&
-#endif
 					InvocationPointProvider?.Invoke() is { } invocation)
 				{
 					invocationAnchor = invocation.Anchor;
@@ -593,15 +577,11 @@ namespace Files.App.Helpers.ContextFlyouts
 				// from the popup window's screen position; in-window popups fall back to the offset. The row goes
 				// on whichever end is nearest the invocation point - also the best answer when the menu is taller
 				// than the work area and the pointer lands mid-menu.
-#if WINDOWS
-				var referenceScreenY = GetInvocationReferenceScreenY();
-#else
 				if (!preserveOpenPlacement || double.IsNaN(invocationScreenY))
 					invocationScreenY = GetInvocationReferenceScreenY();
 				var referenceScreenY = invocationScreenY;
 				preserveOpenPlacement = true;
 				placementResolved = true;
-#endif
 				if (!double.IsNaN(referenceScreenY) && presenter.ActualHeight > 0)
 				{
 					var popupScale = presenter.XamlRoot.RasterizationScale;

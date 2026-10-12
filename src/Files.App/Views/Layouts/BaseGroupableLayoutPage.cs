@@ -12,9 +12,6 @@ using Microsoft.UI.Xaml.Media;
 using System.Runtime.InteropServices;
 using Windows.System;
 using Windows.UI.Core;
-#if WINDOWS
-using Windows.Win32;
-#endif
 using WinRT;
 
 namespace Files.App.Views.Layouts
@@ -26,21 +23,16 @@ namespace Files.App.Views.Layouts
 	{
 		// Constants
 
-#if WINDOWS
-		private const int KEY_DOWN_MASK = 0x8000;
-#endif
 
 		// Fields
 
 		protected int NextRenameIndex = 0;
-#if !WINDOWS
 		private bool isSelectingAll;
 		private Microsoft.UI.Dispatching.DispatcherQueueTimer? listJumpTimer;
 		private ListedItem? pendingListJumpItem;
 		private ListedItem? lastListJumpItem;
 		private int pendingListJumpIndex;
 		private int listJumpPageSize = 1;
-#endif
 		protected TextBox? renameTextBox;
 
 		// Properties
@@ -54,9 +46,7 @@ namespace Files.App.Views.Layouts
 
 		public BaseGroupableLayoutPage() : base()
 		{
-#if !WINDOWS
 			Unloaded += (_, _) => CancelListJump();
-#endif
 		}
 
 		// Abstract methods
@@ -113,17 +103,13 @@ namespace Files.App.Views.Layouts
 			ItemManipulationModel.ScrollToTopInvoked += ItemManipulationModel_ScrollToTopInvoked;
 			ItemManipulationModel.RefreshItemThumbnailInvoked += ItemManipulationModel_RefreshItemThumbnail;
 			ItemManipulationModel.RefreshItemsThumbnailInvoked += ItemManipulationModel_RefreshItemsThumbnail;
-#if !WINDOWS
 			ActualThemeChanged -= LinuxPage_ActualThemeChanged;
 			ActualThemeChanged += LinuxPage_ActualThemeChanged;
-#endif
 		}
 
 		protected override void UnhookEvents()
 		{
-#if !WINDOWS
 			CancelListJump();
-#endif
 			if (ItemManipulationModel is null)
 				return;
 
@@ -246,9 +232,6 @@ namespace Files.App.Views.Layouts
 
 		protected virtual void ItemManipulationModel_SelectAllItemsInvoked(object? sender, EventArgs e)
 		{
-#if WINDOWS
-			ListViewBase.SelectAll();
-#else
 			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("select-all", DispatcherQueue.HasThreadAccess);
 			// Uno doesn't implement SelectAll. Each Add raises SelectionChanged, so update the page once at the end instead of per item.
 			var selected = ListViewBase.SelectedItems.ToHashSet(ReferenceEqualityComparer.Instance);
@@ -268,7 +251,6 @@ namespace Files.App.Views.Layouts
 			}
 
 			FileList_SelectionChanged(ListViewBase, new SelectionChangedEventArgs([], added));
-#endif
 		}
 
 		protected virtual void ItemManipulationModel_ClearSelectionInvoked(object? sender, EventArgs e)
@@ -313,15 +295,12 @@ namespace Files.App.Views.Layouts
 			if (e is not null && e.AddedItems.Count == 0 && e.RemovedItems.Count == 0)
 				return;
 
-#if !WINDOWS
 			if (isSelectingAll)
 				return;
 
 			foreach (var header in ListViewBase.SelectedItems.Where(x => x is not ListedItem).ToList())
 				ListViewBase.SelectedItems.Remove(header);
-#endif
 			var selectedItems = ListViewBase.SelectedItems.OfType<ListedItem>().ToList();
-#if !WINDOWS
 			if (e is not null)
 			{
 				if (e.AddedItems.Count > 1 && ListViewBase.ItemsPanelRoot is { } panel)
@@ -336,7 +315,6 @@ namespace Files.App.Views.Layouts
 						ApplyPageThemeToContainer(ListViewBase.ContainerFromItem(added) as FrameworkElement);
 				}
 			}
-#endif
 
 			if (SelectedItems is not null && SelectedItems.SequenceEqual(selectedItems))
 				return;
@@ -367,7 +345,6 @@ namespace Files.App.Views.Layouts
 		/// Uno can leave a container (and the rename box inside it) with the application theme instead of the page's
 		/// theme after the rename box takes focus, which paints dark-theme text on a light row and vice versa.
 		/// </summary>
-#if !WINDOWS
 		/// <summary>
 		/// A selected container resolves its text brushes against the application theme instead of the page theme on Uno,
 		/// which paints white text on a light selection, so the page theme is pinned on the container.
@@ -386,7 +363,6 @@ namespace Files.App.Views.Layouts
 			foreach (var child in panel.Children)
 				ApplyPageThemeToContainer(child as FrameworkElement);
 		}
-#endif
 
 		protected void SyncContainerTheme(FrameworkElement? container)
 		{
@@ -796,13 +772,7 @@ namespace Files.App.Views.Layouts
 		protected async void RenameTextBox_KeyDown(object sender, KeyRoutedEventArgs e)
 		{
 			var textBox = (TextBox)sender;
-#if WINDOWS
-			var isShiftPressed = OperatingSystem.IsWindows()
-				? (PInvoke.GetKeyState((int)VirtualKey.Shift) & KEY_DOWN_MASK) != 0
-				: Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-#else
 			var isShiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
-#endif
 
 			switch (e.Key)
 			{

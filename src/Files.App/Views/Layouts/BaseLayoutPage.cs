@@ -22,9 +22,6 @@ using Windows.Foundation;
 using Windows.Foundation.Collections;
 using Windows.Storage;
 using Windows.System;
-#if WINDOWS
-using Windows.Win32;
-#endif
 using WinRT;
 using static Files.App.Helpers.PathNormalization;
 using DispatcherQueueTimer = Microsoft.UI.Dispatching.DispatcherQueueTimer;
@@ -75,7 +72,6 @@ namespace Files.App.Views.Layouts
 
 		private CancellationTokenSource? shellContextMenuItemCancellationToken;
 		private CancellationTokenSource? groupingCancellationToken;
-#if !WINDOWS
 		private long contextMenuVersion;
 
 		private void InvalidateContextMenuBuild()
@@ -89,7 +85,6 @@ namespace Files.App.Views.Layouts
 			if (e.PropertyName is nameof(ShellViewModel.WorkingDirectory) or nameof(ShellViewModel.CurrentFolder))
 				InvalidateContextMenuBuild();
 		}
-#endif
 
 		private bool shiftPressed;
 		private bool itemDragging;
@@ -194,11 +189,7 @@ namespace Files.App.Views.Layouts
 		/// </summary>
 		// LINUX-TODO(listing): fall back to CollectionViewSource.View once Uno's CollectionView handles bulk Reset
 		public object? LayoutItemsSource
-#if WINDOWS
-			=> CollectionViewSource.View;
-#else
 			=> linuxGroupedItemsSource?.Items ?? CollectionViewSource.Source;
-#endif
 
 		public CollectionViewSource CollectionViewSource
 		{
@@ -212,9 +203,7 @@ namespace Files.App.Views.Layouts
 					collectionViewSource.View.VectorChanged -= View_VectorChanged;
 
 				collectionViewSource = value;
-#if !WINDOWS
 				UpdateLinuxGroupedItemsSource();
-#endif
 
 				NotifyPropertyChanged(nameof(CollectionViewSource));
 				NotifyPropertyChanged(nameof(LayoutItemsSource));
@@ -333,9 +322,7 @@ namespace Files.App.Views.Layouts
 				if (value != selectedItems)
 				{
 					isSelectedItemsSorted = false;
-#if !WINDOWS
 					InvalidateContextMenuBuild();
-#endif
 					selectedItems = value;
 					var currentItems = value;
 
@@ -434,11 +421,9 @@ namespace Files.App.Views.Layouts
 
 		private void UnhookBaseEvents()
 		{
-#if !WINDOWS
 			InvalidateContextMenuBuild();
 			if (ParentShellPageInstance?.ShellViewModel is { } shellViewModel)
 				shellViewModel.PropertyChanged -= ContextMenuContextChanged;
-#endif
 			ItemManipulationModel.RefreshItemsOpacityInvoked -= ItemManipulationModel_RefreshItemsOpacityInvoked;
 			jumpTimer?.Stop();
 			if (jumpTimer is not null)
@@ -710,9 +695,7 @@ namespace Files.App.Views.Layouts
 
 			SetSelectedItemsOnNavigation();
 
-#if !WINDOWS
 			shellViewModel.PropertyChanged += ContextMenuContextChanged;
-#endif
 			ItemContextMenuFlyout.Opening += ItemContextFlyout_Opening;
 			BaseContextMenuFlyout.Opening += BaseContextFlyout_Opening;
 
@@ -754,9 +737,7 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(MenuFlyout))]
 		private async void ItemContextFlyout_Opening(object? sender, object e)
 		{
-#if !WINDOWS
 			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
-#endif
 			var token = RenewShellMenuToken();
 			try
 			{
@@ -781,9 +762,6 @@ namespace Files.App.Views.Layouts
 				shiftPressed = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift).HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
 				SelectedItemsPropertiesViewModel.CheckAllFileExtensions(selectedItems.Select(x => x.FileExtension).ToList());
 
-#if WINDOWS
-				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: selectedItems, selectedItemsPropertiesViewModel: SelectedItemsPropertiesViewModel, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: null);
-#else
 				token = RenewShellMenuToken();
 				var buildVersion = contextMenuVersion;
 				ItemContextFlyoutHost.Reset();
@@ -792,16 +770,9 @@ namespace Files.App.Views.Layouts
 				token.ThrowIfCancellationRequested();
 				if (buildVersion != contextMenuVersion || !parentShellPage.IsCurrentInstance || !parentShellPage.IsCurrentPane)
 					return;
-#endif
 				var host = ItemContextFlyoutHost;
-#if !WINDOWS
 				using (Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-flyout", true))
-#endif
-#if WINDOWS
-					host.Build(items);
-#else
 					host.Build(items, preservePlacement: true);
-#endif
 
 				// Edit tags: a submenu of the available tags (FileTagsContextMenu is a standalone MenuFlyout that
 				// can't be nested, so build the tag toggles directly).
@@ -858,9 +829,7 @@ namespace Files.App.Views.Layouts
 				}
 
 				host.FinalizePrimaryRowPosition();
-#if !WINDOWS
 				host.CorrectRebuiltPlacement();
-#endif
 			}
 			catch (OperationCanceledException) when (token.IsCancellationRequested)
 			{
@@ -1021,19 +990,15 @@ namespace Files.App.Views.Layouts
 		protected override void OnNavigatingFrom(NavigatingCancelEventArgs e)
 		{
 			base.OnNavigatingFrom(e);
-#if !WINDOWS
 			InvalidateContextMenuBuild();
 			ParentShellPageInstance.GetRequiredShellViewModel().PropertyChanged -= ContextMenuContextChanged;
-#endif
 			shellContextMenuItemCancellationToken?.Cancel();
 			navigationArguments = null;
 
 			// Remove item jumping handler
 			CharacterReceived -= Page_CharacterReceived;
 			UnhookScrollDeferTracking();
-#if !WINDOWS
 			DisposeLinuxGroupedItemsSource();
-#endif
 			var folderSettings = FolderSettings
 				?? throw new InvalidOperationException("The layout does not have folder settings.");
 			folderSettings.LayoutModeChangeRequested -= BaseFolderSettings_LayoutModeChangeRequested;
@@ -1060,9 +1025,7 @@ namespace Files.App.Views.Layouts
 
 		private async void BaseContextFlyout_Opening(object? sender, object e)
 		{
-#if !WINDOWS
 			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-build", DispatcherQueue.HasThreadAccess);
-#endif
 			var token = RenewShellMenuToken();
 			try
 			{
@@ -1078,9 +1041,6 @@ namespace Files.App.Views.Layouts
 				var currentFolder = shellViewModel.CurrentFolder
 					?? throw new InvalidOperationException("The current folder is not available.");
 				List<ListedItem> contextItems = [currentFolder];
-#if WINDOWS
-				var items = ContentPageContextFlyoutFactory.GetItemContextCommandsWithoutShellItems(currentInstanceViewModel: instanceViewModel, selectedItems: contextItems, commandsViewModel: commandsViewModel, shiftPressed: shiftPressed, itemViewModel: shellViewModel, selectedItemsPropertiesViewModel: null);
-#else
 				token = RenewShellMenuToken();
 				var buildVersion = contextMenuVersion;
 				BaseContextFlyoutHost.Reset();
@@ -1089,16 +1049,9 @@ namespace Files.App.Views.Layouts
 				token.ThrowIfCancellationRequested();
 				if (buildVersion != contextMenuVersion || !parentShellPage.IsCurrentInstance || !parentShellPage.IsCurrentPane)
 					return;
-#endif
 				var host = BaseContextFlyoutHost;
-#if !WINDOWS
 				using (Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("context-menu-flyout", true))
-#endif
-#if WINDOWS
-					host.Build(items);
-#else
 					host.Build(items, preservePlacement: true);
-#endif
 
 				if (!instanceViewModel.IsPageTypeSearchResults && !instanceViewModel.IsPageTypeZipFolder && !instanceViewModel.IsPageTypeFtp)
 				{
@@ -1127,9 +1080,7 @@ namespace Files.App.Views.Layouts
 				}
 
 				host.FinalizePrimaryRowPosition();
-#if !WINDOWS
 				host.CorrectRebuiltPlacement();
-#endif
 			}
 			catch (OperationCanceledException) when (token.IsCancellationRequested)
 			{
@@ -1189,44 +1140,11 @@ namespace Files.App.Views.Layouts
 				var sortedItems = SortingHelper.OrderFileList(itemList, folderSettings.DirectorySortOption, folderSettings.DirectorySortDirection, folderSettings.SortDirectoriesAlongsideFiles, folderSettings.SortFilesFirst).ToList();
 				var orderedItems = sortedItems.SkipWhile(x => x != firstItem).Concat(sortedItems.TakeWhile(x => x != firstItem)).ToList();
 
-#if WINDOWS
-				var shellItemList = SafetyExtensions.IgnoreExceptions(() => orderedItems.Select(item => new ShellItem(item.GetRequiredPath())).ToArray());
-				try
-				{
-					if (shellItemList?[0].FileSystemPath is not null && !instanceViewModel.IsPageTypeSearchResults)
-					{
-						var dataObject = ShellDataObject.Create(shellItemList);
-						if (ShellDataObject.GetShellIdListArray(dataObject) is byte[] data)
-						{
-							var stream = new MemoryStream(data).AsRandomAccessStream();
-							e.Data.SetData(ShellDataObject.ShellIdListArrayFormat, stream);
-						}
-					}
-					else
-					{
-						// Only support IStorageItem capable paths
-#if WINDOWS
-						var storageItemList = orderedItems.Where(x => !(x.IsHiddenItem && x.IsLinkItem && x.IsRecycleBinItem && x.IsShortcut)).Select(x => VirtualStorageItem.FromListedItem(x)).ToArray();
-						e.Data.SetStorageItems(storageItemList, false);
-#endif
-					}
-				}
-				finally
-				{
-					if (shellItemList is not null)
-					{
-						foreach (ShellItem item in shellItemList)
-							item.Dispose();
-					}
-				}
-#endif
 
 				// Set can window to front (#13255)
 				MainWindow.Instance.SetCanWindowToFront(false);
 				itemDragging = true;
-#if !WINDOWS
 				Files.App.Services.Desktop.DesktopFileDragHelper.StartExternalDrag(orderedItems.Select(x => x.ItemPath));
-#endif
 			}
 			catch (Exception)
 			{
@@ -1403,10 +1321,8 @@ namespace Files.App.Views.Layouts
 		protected void FileList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
 		{
 			HookScrollDeferTracking();
-#if !WINDOWS
 			if (args.Item is ContentControl { Content: IGroupedCollectionHeader })
 				return;
-#endif
 			RefreshContainer(args.ItemContainer, args.InRecycleQueue);
 			RefreshItem(args.ItemContainer, args.Item, args.InRecycleQueue, args);
 
@@ -1557,19 +1473,6 @@ namespace Files.App.Views.Layouts
 
 				if (!listedItem.ItemPropertiesInitialized)
 				{
-#if WINDOWS
-					uint callbackPhase = 3;
-					args.RegisterUpdateCallback(callbackPhase, async (s, c) =>
-					{
-						var shellViewModel = ParentShellPageInstance.GetRequiredShellViewModel();
-
-						// Rows realized mid-scroll are mostly flung past before the gesture ends; the settle pass loads the ones still visible
-						if (shellViewModel.IsScrollInFlight)
-							return;
-
-						await LoadItemExtendedPropertiesAsync(listedItem, shellViewModel);
-					});
-#else
 					// Uno never raises the phased update callback, so rows were never loaded until the first scroll (no tags, no properties)
 					DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, async () =>
 					{
@@ -1580,7 +1483,6 @@ namespace Files.App.Views.Layouts
 
 						await LoadItemExtendedPropertiesAsync(listedItem, shellViewModel);
 					});
-#endif
 				}
 			}
 		}
@@ -1630,10 +1532,6 @@ namespace Files.App.Views.Layouts
 		protected internal void FileListItem_PointerPressed(object sender, PointerRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
-#if WINDOWS
-			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
-				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
-#endif
 
 			if (sender is not SelectorItem selectorItem)
 				return;
@@ -1728,29 +1626,17 @@ namespace Files.App.Views.Layouts
 		protected void FileListItem_Tapped(object sender, TappedRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
-#if WINDOWS
-			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
-				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
-#endif
 		}
 
 		protected void FileListItem_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
-#if WINDOWS
-			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
-				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
-#endif
 		}
 
 		[DynamicWindowsRuntimeCast(typeof(SelectorItem))]
 		protected void FileListItem_RightTapped(object sender, RightTappedRoutedEventArgs e)
 		{
 			// Set can window to front and bring the window to the front if necessary (#13255)
-#if WINDOWS
-			if ((!itemDragging) && MainWindow.Instance.SetCanWindowToFront(true))
-				Win32Helper.BringToForegroundEx(new(MainWindow.Instance.WindowHandle));
-#endif
 
 			var rightClickedItem = GetItemFromElement(sender);
 
@@ -1792,9 +1678,7 @@ namespace Files.App.Views.Layouts
 			UnhookBaseEvents();
 			UnhookScrollDeferTracking();
 			StatusBarViewModel.Dispose();
-#if !WINDOWS
 			DisposeLinuxGroupedItemsSource();
-#endif
 			dragOverItem = null;
 			hoveredItem = null;
 			preRenamingItem = null;
@@ -1820,9 +1704,7 @@ namespace Files.App.Views.Layouts
 			{
 				// Replacing the source rebuilds the list from scratch (a visible empty flash), so keep it when unchanged
 				if (CollectionViewSource.IsSourceGrouped && ReferenceEquals(CollectionViewSource.Source, shellViewModel.FilesAndFolders.GroupedCollection)
-#if !WINDOWS
 					&& linuxGroupedItemsSource is not null
-#endif
 				)
 					return;
 
@@ -1931,11 +1813,7 @@ namespace Files.App.Views.Layouts
 							tapDebounceTimer?.Stop();
 						}
 					},
-#if WINDOWS
-					TimeSpan.FromMilliseconds(OperatingSystem.IsWindows() ? PInvoke.GetDoubleClickTime() : 500));
-#else
 					TimeSpan.FromMilliseconds(500));
-#endif
 				}
 				else
 				{

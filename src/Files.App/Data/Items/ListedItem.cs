@@ -468,13 +468,8 @@ namespace Files.App.Utils
 		public bool IsDriveRoot => ItemPath == PathNormalization.GetPathRoot(ItemPath);
 		public bool IsElevationRequired { get; set; }
 
-#if WINDOWS
-		private BaseStorageFile? itemFile;
-		public BaseStorageFile? ItemFile
-#else
 		private IFile? itemFile;
 		public IFile? ItemFile
-#endif
 		{
 			get => itemFile;
 			set => SetProperty(ref itemFile, value);

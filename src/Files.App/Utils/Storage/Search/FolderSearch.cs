@@ -12,18 +12,11 @@ namespace Files.App.Utils.Storage
 	public sealed partial class FolderSearch
 	{
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
-#if WINDOWS
-		private DrivesViewModel drivesViewModel = Ioc.Default.GetRequiredService<DrivesViewModel>();
-		private readonly IStorageTrashBinService StorageTrashBinService = Ioc.Default.GetRequiredService<IStorageTrashBinService>();
-#endif
 		private readonly IFileTagsSettingsService fileTagsSettingsService = Ioc.Default.GetRequiredService<IFileTagsSettingsService>();
 		private readonly ILogger logger = Ioc.Default.GetRequiredService<ILogger<FolderSearch>>();
 
 		private static readonly string folderTypeTextLocalized = Strings.Folder.GetLocalizedResource();
 
-#if WINDOWS
-		private const uint defaultStepSize = 500;
-#endif
 
 		public string? Query { get; set; }
 
@@ -128,21 +121,7 @@ namespace Files.App.Utils.Storage
 
 		private async Task AddItemsForHomeAsync(IList<ListedItem> results, CancellationToken token)
 		{
-#if !WINDOWS
 			await SearchLinuxAsync("Home", results, token);
-#else
-			if (IsTagQuery(AQSQuery))
-			{
-				await SearchTagsAsync("", results, token); // Search tags everywhere, not only local drives
-			}
-			else
-			{
-				foreach (var drive in drivesViewModel.Drives.ToList().Cast<DriveItem>().Where(x => !x.IsNetwork))
-				{
-					await AddItemsAsync(drive.Path!, results, token);
-				}
-			}
-#endif
 		}
 
 		public async Task<ObservableCollection<ListedItem>> SearchAsync()

@@ -247,18 +247,14 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 		private void ExecuteMountDeviceCommand(WidgetDriveCardItem? item)
 		{
-#if !WINDOWS
 			if (item is not null)
 				_ = DriveHelpers.MountVolumeAsync(item.Item.Path!);
-#endif
 		}
 
 		private void ExecuteUnmountDeviceCommand(WidgetDriveCardItem? item)
 		{
-#if !WINDOWS
 			if (item is not null)
 				_ = DriveHelpers.UnmountVolumeAsync(item.Item.Path!);
-#endif
 		}
 
 		private void ExecuteOpenPropertiesCommand(WidgetDriveCardItem? item)

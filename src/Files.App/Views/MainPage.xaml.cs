@@ -15,10 +15,6 @@ using System.Runtime.InteropServices;
 using Windows.Foundation.Metadata;
 using Windows.Graphics;
 using Windows.UI.Input;
-#if WINDOWS
-using Windows.Win32;
-using Windows.Win32.Foundation;
-#endif
 using WinRT;
 using GridSplitter = Files.App.Controls.GridSplitter;
 using VirtualKey = Windows.System.VirtualKey;
@@ -35,16 +31,10 @@ namespace Files.App.Views
 		public SidebarViewModel SidebarAdaptiveViewModel { get; }
 		public MainPageViewModel ViewModel { get; }
 
-#if WINDOWS
-		private const int HTCAPTION = 2;
-#endif
 
 		private bool keyReleased = true;
 
 		private DispatcherQueueTimer _updateDateDisplayTimer;
-#if WINDOWS
-		private WindowMessageMonitor? _titleBarMessageMonitor;
-#endif
 
 		private readonly Dictionary<TabBarItem, double> _sidebarScrollByTab = new();
 		private TabBarItem? _previousSidebarTab;
@@ -54,7 +44,6 @@ namespace Files.App.Views
 		{
 			InitializeComponent();
 
-#if !WINDOWS
 			// Uno never invokes the Control.OnPreviewKeyDown/OnPreviewKeyUp/OnLostFocus virtuals, so none of the
 			// hotkeys (ctrl+l, ctrl+t, alt+left, ...) fired on Linux. The routed events are raised, so hook those.
 			PreviewKeyDown += async (_, e) =>
@@ -68,7 +57,6 @@ namespace Files.App.Views
 
 			// Keeps content clear of the right-edge resize grip
 			RootGrid.Padding = new(0, 0, 8, 8);
-#endif
 
 			// Dependency Injection
 			UserSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
@@ -78,10 +66,6 @@ namespace Files.App.Views
 
 			if (AppLanguageHelper.IsPreferredLanguageRtl)
 			{
-#if WINDOWS
-				if (OperatingSystem.IsWindows())
-					Win32Helper.EnableRtlLayout(MainWindow.Instance.WindowHandle);
-#endif
 				FlowDirection = FlowDirection.RightToLeft;
 			}
 
@@ -96,12 +80,6 @@ namespace Files.App.Views
 
 			ApplySidebarWidthState();
 
-#if WINDOWS
-			// Realize the navigation controls before the first measure pass.
-			FindName(nameof(InnerNavigationToolbar));
-			FindName(nameof(TabControl));
-			FindName(nameof(NavToolbar));
-#endif
 		}
 
 		private void NumberedTabKeyboardAccelerator_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs e)
@@ -168,40 +146,9 @@ namespace Files.App.Views
 
 			var height = (int)TabControl.ActualHeight;
 			source.SetRegionRects(NonClientRegionKind.Passthrough, [getScaledRect(this, new RectInt32 { X = 0, Y = 0, Width = (int)(TabControl.ActualWidth + TabControl.Margin.Left - TabControl.DragArea.ActualWidth), Height = height })]);
-#if WINDOWS
-			AttachTitleBarMessageMonitor();
-#endif
 			return height;
 		}
 
-#if WINDOWS
-		// Caption regions live in a dedicated child window
-		private void AttachTitleBarMessageMonitor()
-		{
-			if (!OperatingSystem.IsWindows() || _titleBarMessageMonitor is not null)
-				return;
-
-			var titleBarHwnd = PInvoke.FindWindowEx(new(MainWindow.Instance.WindowHandle), HWND.Null, "InputNonClientPointerSource", null);
-			if (titleBarHwnd.IsNull)
-				return;
-
-			_titleBarMessageMonitor = new WindowMessageMonitor(titleBarHwnd);
-			_titleBarMessageMonitor.WindowMessageReceived += TitleBar_WindowMessageReceived;
-		}
-
-		private void TitleBar_WindowMessageReceived(object? sender, WindowMessageEventArgs e)
-		{
-			if (e.Message.MessageId is not (PInvoke.WM_NCMBUTTONDOWN or PInvoke.WM_NCMBUTTONDBLCLK) ||
-				(int)e.Message.WParam != HTCAPTION || TabControl is null)
-				return;
-
-			// Deferred because this runs inside the window procedure
-			DispatcherQueue.TryEnqueue(async () => await Commands.NewTab.ExecuteAsync());
-
-			e.Result = 0;
-			e.Handled = true;
-		}
-#endif
 
 		public async void TabItemContent_ContentChanged(object? sender, TabBarItemParameter e)
 		{
@@ -364,12 +311,10 @@ namespace Files.App.Views
 		private void Page_Loaded(object sender, RoutedEventArgs e)
 		{
 			ViewModel.OnPageLoaded();
-#if !WINDOWS
 			// LINUX-TODO(toolbar): realizing x:Load controls in the constructor leaves their x:Bind bindings uninitialized on Uno (toolbar row never shows), so defer to Loaded.
 			FindName(nameof(InnerNavigationToolbar));
 			FindName(nameof(TabControl));
 			FindName(nameof(NavToolbar));
-#endif
 
 			MainWindow.Instance.AppWindow.Changed += (_, _) => MainWindow.Instance.RaiseSetTitleBarDragRegion(SetTitleBarDragRegion);
 

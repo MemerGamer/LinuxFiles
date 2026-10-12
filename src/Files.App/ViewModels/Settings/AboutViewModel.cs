@@ -32,11 +32,7 @@ namespace Files.App.ViewModels.Settings
 		public Microsoft.UI.Xaml.Visibility WindowsOnlyVisibility => OperatingSystem.IsWindows()
 			? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
 
-#if WINDOWS
-		public PackageVersion AppVersion => Package.Current.Id.Version;
-#else
 		public System.Version AppVersion => typeof(AboutViewModel).Assembly.GetName().Version ?? new System.Version();
-#endif
 
 		public ObservableCollection<OpenSourceLibraryItem> OpenSourceLibraries { get; }
 

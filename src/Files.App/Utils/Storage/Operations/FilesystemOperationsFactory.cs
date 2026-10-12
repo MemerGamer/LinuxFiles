@@ -7,11 +7,7 @@ namespace Files.App.Utils.Storage
 	{
 		public static IFilesystemOperations Create(IShellPage? associatedInstance)
 		{
-#if WINDOWS
-			return new ShellFilesystemOperations(associatedInstance!);
-#else
 			return new LinuxFilesystemOperations(associatedInstance);
-#endif
 		}
 	}
 }

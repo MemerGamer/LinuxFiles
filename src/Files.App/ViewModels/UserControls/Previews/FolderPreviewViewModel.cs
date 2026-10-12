@@ -25,15 +25,9 @@ namespace Files.App.ViewModels.Previews
 		private async Task LoadPreviewAndDetailsAsync()
 		{
 			var itemPath = Item.ItemPath!;
-#if WINDOWS
-			var rootItem = await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(itemPath));
-			var folder = await StorageFileExtensions.DangerousGetFolderFromPathAsync(itemPath, rootItem.Result)
-				?? throw new InvalidOperationException("The preview folder could not be opened.");
-#else
 			var resolved = await Ioc.Default.GetRequiredService<IStorableResolver>().TryGetAsync(itemPath);
 			if (resolved.Item is not IFolder)
 				throw new IOException("The preview folder could not be resolved.");
-#endif
 
 			var result = await FileThumbnailHelper.GetIconAsync(
 				Item.ItemPath,
@@ -50,15 +44,9 @@ namespace Files.App.ViewModels.Previews
 			if (Item.IsDriveRoot || infoPaneViewModel?.SelectedDriveItem is not null)
 				return;
 
-#if WINDOWS
-			var info = await folder.GetBasicPropertiesAsync();
-			var dateModified = info.DateModified;
-			var dateCreated = info.DateCreated;
-#else
 			var localInfo = resolved.Item is SystemFolder ? new DirectoryInfo(itemPath) : null;
 			var dateModified = localInfo is null ? Item.ItemDateModifiedReal : new DateTimeOffset(localInfo.LastWriteTime);
 			var dateCreated = localInfo is null ? Item.ItemDateCreatedReal : new DateTimeOffset(localInfo.CreationTime);
-#endif
 
 			Item.FileDetails =
 			[

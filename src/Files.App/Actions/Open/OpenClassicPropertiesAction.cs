@@ -41,11 +41,9 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-#if !WINDOWS
 		// LINUX-TODO(properties): the Windows shell properties command is hidden on Linux.
 		public Task ExecuteAsync(object? parameter = null)
 			=> Task.CompletedTask;
-#endif
 
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

@@ -17,15 +17,6 @@ namespace Files.App.Utils.Shell
 			return false;
 		}
 
-		private static string GetShellPathLookupKey(string shPath)
-		{
-			var lookupPath = shPath.StartsWith("shell:::", StringComparison.OrdinalIgnoreCase)
-				? shPath.Substring("shell:".Length)
-				: shPath;
-
-			return lookupPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).ToUpperInvariant();
-		}
-
 		public static string GetShellNameFromPath(string shPath)
 		{
 			return shPath switch

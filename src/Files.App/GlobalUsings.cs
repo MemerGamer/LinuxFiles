@@ -33,7 +33,6 @@ global using global::Files.App.Utils.Serialization;
 global using global::Files.App.Utils.Shell;
 global using global::Files.App.Utils.StatusCenter;
 global using global::Files.App.Utils.Storage;
-global using global::Files.App.Utils.Taskbar;
 global using global::Files.App.Data.Behaviors;
 global using global::Files.App.Data.Commands;
 global using global::Files.App.Data.Contexts;

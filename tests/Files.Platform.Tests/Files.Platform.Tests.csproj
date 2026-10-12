@@ -14,6 +14,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <SupportedOSPlatform Include="linux" />
+    </ItemGroup>
+
+    <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
         <PackageReference Include="UTF.Unknown" />
         <PackageReference Include="ColorCode.Core" />

@@ -16,6 +16,7 @@ using Files.Platform.Abstractions.Archives;
 using Files.App.Storage.Archives;
 using Files.Platform.Abstractions.FileOperations;
 using Files.Platform.Linux.Archives;
+using Files.Platform.Linux.Native;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Files.Platform.Tests.Archives
@@ -44,6 +45,53 @@ namespace Files.Platform.Tests.Archives
 		{
 			if (Directory.Exists(root))
 				Directory.Delete(root, true);
+		}
+
+		[TestMethod]
+		public async Task ExtractionPublishesWithoutOpenAt2()
+		{
+			var zip = ZipWith(Path.Combine(Work, "fallback.zip"),
+				("plain.txt", Encoding.UTF8.GetBytes("plain")),
+				("one/two/nested.txt", Encoding.UTF8.GetBytes("nested")));
+			ElevationNative.OpenBeneathError.Value = 38;
+			try
+			{
+				var result = await service.ExtractAsync(zip, Out);
+				Assert.IsTrue(result.Succeeded);
+				Assert.AreEqual("plain", File.ReadAllText(Path.Combine(Out, "plain.txt")));
+				Assert.AreEqual("nested", File.ReadAllText(Path.Combine(Out, "one/two/nested.txt")));
+			}
+			finally { ElevationNative.OpenBeneathError.Value = null; }
+		}
+
+		[TestMethod]
+		[DataRow("../outside")]
+		[DataRow("/tmp")]
+		[DataRow("link")]
+		[DataRow("link/child")]
+		public void OpenBeneathFallbackRejectsEscapes(string relative)
+		{
+			Directory.CreateDirectory(Path.Combine(Work, "child"));
+			Directory.CreateSymbolicLink(Path.Combine(Out, "link"), Work);
+			var fd = ElevationNative.Open(PosixNative.AtFdCwd, Out, PosixNative.PathFlags | PosixNative.ODirectory, true);
+			ElevationNative.OpenBeneathError.Value = 38;
+			try
+			{
+				Assert.ThrowsExactly<IOException>(() => ElevationNative.OpenBeneath(fd, relative, PosixNative.PathFlags));
+			}
+			finally
+			{
+				ElevationNative.OpenBeneathError.Value = null;
+				PosixNative.Close(fd);
+			}
+		}
+
+		[TestMethod]
+		public void OpenBeneathDoesNotFallbackForPermissionErrors()
+		{
+			ElevationNative.OpenBeneathError.Value = 13;
+			try { Assert.ThrowsExactly<UnauthorizedAccessException>(() => ElevationNative.OpenBeneath(PosixNative.AtFdCwd, ".", PosixNative.PathFlags)); }
+			finally { ElevationNative.OpenBeneathError.Value = null; }
 		}
 
 		private string MakeTree()
@@ -579,6 +627,38 @@ namespace Files.Platform.Tests.Archives
 			Assert.IsTrue((await service.ExtractAsync(archive, Out)).Succeeded);
 		}
 
+		[TestMethod]
+		[DataRow("a.txt")]
+		[DataRow("./a.txt")]
+		public async Task DuplicateTarFilesUseLastContents(string secondName)
+		{
+			var tar = Path.Combine(Work, "duplicates.tar");
+			using (var stream = File.Create(tar))
+			using (var writer = new TarWriter(stream))
+			{
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "a.txt") { DataStream = new MemoryStream(Bytes("long old contents")) });
+				writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, secondName) { DataStream = new MemoryStream(Bytes("new")) });
+			}
+			var result = await service.ExtractAsync(tar, Out);
+			Assert.IsTrue(result.Succeeded, result.Error);
+			Assert.AreEqual("new", File.ReadAllText(Path.Combine(Out, "a.txt")));
+		}
+
+		[TestMethod]
+		public async Task FileOverwriteNeverRecursivelyDeletesExistingDirectory()
+		{
+			var directory = Path.Combine(Out, "a.txt");
+			Directory.CreateDirectory(directory);
+			File.WriteAllText(Path.Combine(directory, "victim"), "preserved");
+			var zip = ZipWith(Path.Combine(Work, "overwrite.zip"), ("a.txt", Bytes("incoming")));
+			var result = await service.ExtractAsync(zip, Out, new ArchiveExtractOptions
+			{
+				ResolveConflict = (_, _) => Task.FromResult(new ConflictResolution(ConflictAction.Overwrite)),
+			});
+			Assert.IsFalse(result.Succeeded);
+			Assert.AreEqual("preserved", File.ReadAllText(Path.Combine(directory, "victim")));
+		}
+
 		// ---- conflicts ----
 
 		private async Task<string> ArchiveWithAText(string content)
@@ -595,6 +675,44 @@ namespace Files.Platform.Tests.Archives
 		}
 
 		[TestMethod]
+		[DataRow("publish-opening", false, true)]
+		[DataRow("publish-opened", false, true)]
+		[DataRow("publish-renamed", false, true)]
+		[DataRow("retire-opening", true, true)]
+		[DataRow("retire-opened", true, true)]
+		[DataRow("retire-renamed", true, true)]
+		[DataRow("publish-renamed", false, false)]
+		[DataRow("retire-renamed", true, false)]
+		public async Task MovedPublicationParentIsRejectedAndRolledBack(string checkpoint, bool overwrite, bool replaceParent)
+		{
+			ExistingFile();
+			var outside = Path.Combine(root, "moved-parent");
+			var moved = false;
+			var extracting = new LinuxArchiveService
+			{
+				PublicationCheckpoint = phase =>
+				{
+					if (phase != checkpoint || moved) return;
+					Directory.Move(Path.Combine(Out, "dir"), outside);
+					// A replacement tests inode comparison; a missing path tests failed re-resolution.
+					if (replaceParent) Directory.CreateDirectory(Path.Combine(Out, "dir"));
+					moved = true;
+				},
+			};
+			var zip = ZipWith(Path.Combine(Work, "race.zip"), (overwrite ? "dir/a.txt" : "dir/new.txt", Bytes("incoming")));
+			var result = await extracting.ExtractAsync(zip, Out, new ArchiveExtractOptions
+			{
+				ResolveConflict = (_, _) => Task.FromResult(new ConflictResolution(ConflictAction.Overwrite)),
+			});
+			Assert.IsTrue(moved);
+			Assert.IsFalse(result.Succeeded);
+			Assert.AreEqual("old", File.ReadAllText(Path.Combine(outside, "a.txt")));
+			CollectionAssert.AreEquivalent(new[] { "a.txt" }, Directory.GetFileSystemEntries(outside).Select(Path.GetFileName).ToArray());
+			if (replaceParent) Assert.AreEqual(0, Directory.GetFileSystemEntries(Path.Combine(Out, "dir")).Length);
+			else Assert.IsFalse(Directory.Exists(Path.Combine(Out, "dir")));
+		}
+
+		[TestMethod]
 		public async Task ExistingFilesAreNeverOverwrittenWithoutCallback()
 		{
 			ExistingFile();
@@ -603,6 +721,68 @@ namespace Files.Platform.Tests.Archives
 			Assert.AreEqual(1, result.ItemsSkipped);
 			Assert.AreEqual("old", File.ReadAllText(Path.Combine(Out, "dir", "a.txt")));
 			Assert.AreEqual("new", File.ReadAllText(Path.Combine(Out, "new.txt")));
+		}
+
+		[TestMethod]
+		[DataRow(ConflictAction.Overwrite, false, false)]
+		[DataRow(ConflictAction.KeepBoth, false, false)]
+		[DataRow(ConflictAction.Overwrite, true, false)]
+		[DataRow(ConflictAction.Overwrite, false, true)]
+		[DataRow(ConflictAction.KeepBoth, false, true)]
+		public async Task ConflictAncestorSwapCannotModifyOutsideDestination(ConflictAction action, bool directoryConflict, bool swapRoot)
+		{
+			var outside = Path.Combine(root, "outside");
+			Directory.CreateDirectory(outside);
+			ExistingFile();
+			if (directoryConflict)
+			{
+				File.Delete(Path.Combine(Out, "dir", "a.txt"));
+				Directory.CreateDirectory(Path.Combine(Out, "dir", "a.txt"));
+				Directory.CreateDirectory(Path.Combine(outside, "a.txt"));
+				File.WriteAllText(Path.Combine(outside, "a.txt", "victim"), "outside");
+			}
+			else
+				File.WriteAllText(Path.Combine(outside, "a.txt"), "outside");
+
+			var result = await service.ExtractAsync(await ArchiveWithAText("incoming"), Out, new ArchiveExtractOptions
+			{
+				ResolveConflict = (_, _) =>
+				{
+					if (swapRoot)
+					{
+						Directory.CreateDirectory(Path.Combine(outside, "dir"));
+						File.Move(Path.Combine(outside, "a.txt"), Path.Combine(outside, "dir", "a.txt"));
+						Directory.Move(Out, Path.Combine(root, "saved"));
+						Directory.CreateSymbolicLink(Out, outside);
+					}
+					else
+					{
+						Directory.Move(Path.Combine(Out, "dir"), Path.Combine(Out, "saved"));
+						Directory.CreateSymbolicLink(Path.Combine(Out, "dir"), outside);
+					}
+					return Task.FromResult(new ConflictResolution(action));
+				},
+			});
+
+			Assert.IsFalse(result.Succeeded);
+			if (swapRoot)
+				Assert.AreEqual(1, Directory.GetFileSystemEntries(Path.Combine(outside, "dir")).Length);
+			Assert.AreEqual("outside", File.ReadAllText(swapRoot ? Path.Combine(outside, "dir", "a.txt") : directoryConflict ? Path.Combine(outside, "a.txt", "victim") : Path.Combine(outside, "a.txt")));
+			Assert.AreEqual(1, Directory.GetFileSystemEntries(outside).Length);
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
+		public async Task ExtractionRejectsSymlinkedDestinationAncestors(bool linkIsRoot)
+		{
+			var outside = Path.Combine(root, "outside");
+			Directory.CreateDirectory(outside);
+			var link = Path.Combine(Out, "link");
+			Directory.CreateSymbolicLink(link, outside);
+			var result = await service.ExtractAsync(await ArchiveWithAText("incoming"), linkIsRoot ? link : Path.Combine(link, "nested"));
+			Assert.IsFalse(result.Succeeded);
+			Assert.AreEqual(0, Directory.GetFileSystemEntries(outside).Length);
 		}
 
 		[TestMethod]

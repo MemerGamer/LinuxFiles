@@ -27,4 +27,8 @@
         <ProjectReference Include="..\Files.Platform.Abstractions\Files.Platform.Abstractions.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Files.Platform.Tests" />
+    </ItemGroup>
+
 </Project>

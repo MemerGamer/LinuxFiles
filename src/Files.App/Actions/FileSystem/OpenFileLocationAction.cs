@@ -36,10 +36,13 @@ namespace Files.App.Actions
 
 		public async Task ExecuteAsync(object? parameter = null)
 		{
-			if (context.ShellPage?.ShellViewModel is not { } shellViewModel)
+			var sourceShellPage = context.ShellPage;
+			var sourceItem = context.SelectedItem;
+			if (NavigationItemGuard.ShouldSuppress(sourceShellPage, sourceItem) ||
+				sourceShellPage?.ShellViewModel is not { } shellViewModel)
 				return;
 
-			var item = context.SelectedItem as IShortcutItem;
+			var item = sourceItem as IShortcutItem;
 
 			if (string.IsNullOrWhiteSpace(item?.TargetPath))
 				return;
@@ -68,8 +71,7 @@ namespace Files.App.Actions
 			}
 			else
 			{
-				await DialogDisplayHelper.ShowDialogAsync(Strings.InvalidItemDialogTitle.GetLocalizedResource(),
-					string.Format(Strings.InvalidItemDialogContent.GetLocalizedResource(), Environment.NewLine, destFolder.ErrorCode.ToString()));
+				await NavigationItemGuard.ShowInvalidItemAsync(sourceShellPage, destFolder.ErrorCode, sourceItem);
 			}
 		}
 

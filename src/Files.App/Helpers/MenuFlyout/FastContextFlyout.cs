@@ -61,11 +61,14 @@ namespace Files.App.Helpers.ContextFlyouts
 			Flyout.Closed += Flyout_Closed;
 		}
 
+		private bool openingSuppressed;
+
 		/// <summary>
 		/// Clears the menu and the per-open placement state. Call at the start of each invocation.
 		/// </summary>
 		public void Reset()
 		{
+			openingSuppressed = false;
 			invocationScreenY = double.NaN;
 			preserveOpenPlacement = false;
 			Flyout.Items.Clear();
@@ -76,6 +79,16 @@ namespace Files.App.Helpers.ContextFlyouts
 			placementResolved = false;
 			invocationAnchor = null;
 			invocationPosition = null;
+		}
+
+		/// <summary>
+		/// Clears retained commands and closes even if Opening fires before the popup becomes visible.
+		/// </summary>
+		public void SuppressOpening()
+		{
+			Reset();
+			openingSuppressed = true;
+			Hide();
 		}
 
 		/// <summary>
@@ -524,6 +537,12 @@ namespace Files.App.Helpers.ContextFlyouts
 		[DynamicWindowsRuntimeCast(typeof(FrameworkElement))]
 		private void Flyout_Opened(object? sender, object e)
 		{
+			if (openingSuppressed)
+			{
+				Hide();
+				return;
+			}
+
 			try
 			{
 				if (Flyout.XamlRoot is null)

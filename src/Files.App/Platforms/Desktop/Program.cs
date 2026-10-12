@@ -41,6 +41,7 @@ namespace Files.App
 		{
 			try
 			{
+				using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.root-environment");
 				RootStartupEnvironment.Apply();
 			}
 			catch (System.IO.IOException)
@@ -76,6 +77,7 @@ namespace Files.App
 				bool isPrimary;
 				try
 				{
+					using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.single-instance");
 					isPrimary = singleInstance.TryBecomePrimaryAsync(request).GetAwaiter().GetResult();
 				}
 				catch (Exception ex) when (ex is System.IO.IOException or InvalidOperationException or System.Net.Sockets.SocketException or UnauthorizedAccessException)
@@ -97,7 +99,8 @@ namespace Files.App
 			var (renderingBackend, reason) = RenderingBackendSelector.Resolve(Environment.GetEnvironmentVariable, RenderingBackendSelector.HasGpuDevice);
 			Console.Error.WriteLine($"[Files] Rendering backend: {renderingBackend} ({reason ?? "default"})");
 
-			CursorSettingsResolver.ApplyToProcess();
+			using (var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.cursor"))
+				CursorSettingsResolver.ApplyToProcess();
 
 			var host = UnoPlatformHostBuilder.Create()
 				.App(() => new App())

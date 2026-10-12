@@ -53,6 +53,7 @@ namespace Files.App
 		/// </summary>
 		public App()
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.app-resources", true);
 			InitializeComponent();
 
 			// Configure exception handlers

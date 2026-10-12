@@ -30,12 +30,9 @@ namespace Files.App
 
 			async Task ActivateAsync()
 			{
+				using var startupTrace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.activation", true);
 				var serviceProvider = AppLifecycleHelper.ConfigureHost(AppModel);
 				Ioc.Default.ConfigureServices(serviceProvider);
-				RootActionsHelper.InitializeTerminalAvailability();
-
-				if (AppLifecycleHelper.AppEnvironment is not AppEnvironment.Dev)
-					AppLifecycleHelper.ConfigureSentry();
 
 				// TODO: Replace with DI
 				QuickAccessManager = Ioc.Default.GetRequiredService<QuickAccessManager>();
@@ -46,14 +43,23 @@ namespace Files.App
 				AppModel = Ioc.Default.GetRequiredService<AppModel>();
 
 				MainWindow.Instance.RestorePlacement(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.ILocalSettingsStore>());
-				MainWindow.Instance.Activate();
-				UiResponsivenessProbe.Start(UiDispatcher!);
-
 				MainWindow.Instance.Closed += Window_Closed;
 				MainWindow.Instance.Activated += Window_Activated;
 
+				using (var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.first-backdrop", true))
+				{
+					if (!await MainWindow.Instance.ActivateWithBackdropAsync())
+						return;
+				}
+
+				RootActionsHelper.InitializeTerminalAvailability();
+				if (AppLifecycleHelper.AppEnvironment is not AppEnvironment.Dev)
+					AppLifecycleHelper.ConfigureSentry();
+				UiResponsivenessProbe.Start(UiDispatcher!);
+
 				Logger.LogInformation("App launched (desktop).");
 
+				using var navigationTrace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.navigation-and-components", true);
 				// Command line (paths, --select, -t, -n) of this process; later launches arrive through ISingleInstanceService
 				var launchOptions = Files.App.Utils.CommandLine.DesktopCommandLine.Parse(Program.LaunchArguments, Environment.CurrentDirectory);
 				if (launchOptions.IsEmpty)
@@ -144,7 +150,7 @@ namespace Files.App
 
 			if (userSettingsService.GeneralSettingsService.ContinueLastSessionOnStartUp || userSettingsService.AppSettingsService.RestoreTabsOnStartup)
 				AppLifecycleHelper.SaveSessionTabs();
-			else
+			else if (MainPageViewModel.StartupTabsLoadedTask.IsCompletedSuccessfully)
 				await commandManager.CloseAllTabs.ExecuteAsync();
 
 			// TODO: "leave app running" (background parking) is not supported on desktop yet

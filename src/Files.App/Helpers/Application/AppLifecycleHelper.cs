@@ -302,6 +302,7 @@ namespace Files.App.Helpers
 		/// <param name="appModel">Constructed on the UI thread by the caller (its ctor is UI-thread-only).</param>
 		public static IServiceProvider ConfigureHost(AppModel appModel)
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.configure-services", true);
 			var services = new ServiceCollection();
 			var fileLoggerProvider = new FileLoggerProvider(Path.Combine(ApplicationData.Current.LocalFolder.Path, "debug.log"));
 
@@ -414,6 +415,12 @@ namespace Files.App.Helpers
 		/// </summary>
 		public static void SaveSessionTabs()
 		{
+#if DESKTOP
+			// Navigation can still be restoring tabs while the window closes.
+			if (!MainPageViewModel.StartupTabsLoadedTask.IsCompletedSuccessfully)
+				return;
+#endif
+
 			var userSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
 			userSettingsService.GeneralSettingsService.LastSessionTabList = MainPageViewModel.AppInstances.DefaultIfEmpty().Select(tab =>

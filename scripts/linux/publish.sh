@@ -30,7 +30,7 @@ rm -rf "$out"
 MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet publish "$root/src/Files.App/Files.App.csproj" \
   -f net10.0-desktop -c Release -r "$rid" \
   --self-contained "$self_contained" \
-  -p:PublishTrimmed=false -p:PublishAot=false \
+  -p:PublishTrimmed=false -p:PublishAot=false -p:PublishReadyToRun=true \
   -nodeReuse:false -m:2 -o "$out"
 
 # This AOT executable is installed separately, root-owned, by native packages only.

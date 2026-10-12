@@ -31,6 +31,7 @@ namespace Files.App
 
 		public MainWindow() : base(416, 316)
 		{
+			using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.window-resources", true);
 			InitializeComponent();
 
 			ExtendsContentIntoTitleBar = UseClientSideDecorations;

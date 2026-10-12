@@ -25,6 +25,9 @@ namespace Files.Platform.Linux.Theme
 		private static DBusConnection? _connection;
 		private static bool? _isDark;
 		private static bool _watching;
+		private static bool _watchStarting;
+		private static long _updateVersion;
+		private static readonly SemaphoreSlim _connectionGate = new(1, 1);
 
 		/// <summary>
 		/// Raised (on a worker thread) when the system preference changes.
@@ -41,8 +44,13 @@ namespace Files.Platform.Linux.Theme
 		/// </summary>
 		public static bool Initialize()
 		{
+			var version = NextUpdateVersion();
 			var value = Detect();
-			_isDark = value;
+			lock (_gate)
+			{
+				if (version == _updateVersion)
+					_isDark = value;
+			}
 
 			if (OverrideValue() is null)
 				StartWatching();
@@ -110,8 +118,9 @@ namespace Files.Platform.Linux.Theme
 			return writer.CreateMessage();
 		}
 
-		private static async Task<DBusConnection?> GetConnectionAsync()
+		private static async Task<DBusConnection?> GetConnectionAsync(TimeSpan? timeout = null)
 		{
+			await _connectionGate.WaitAsync().ConfigureAwait(false);
 			try
 			{
 				var address = DBusAddress.Session;
@@ -121,7 +130,7 @@ namespace Files.Platform.Linux.Theme
 				var connection = _connection;
 				if (connection is null)
 				{
-					connection = await DBusSession.TryConnectAsync(address, TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
+					connection = await DBusSession.TryConnectAsync(address, timeout ?? TimeSpan.FromMilliseconds(250)).ConfigureAwait(false);
 					_connection = connection;
 				}
 
@@ -131,74 +140,112 @@ namespace Files.Platform.Linux.Theme
 			{
 				return null;
 			}
+			finally
+			{
+				_connectionGate.Release();
+			}
 		}
 
 		private static void StartWatching()
 		{
 			lock (_gate)
 			{
-				if (_watching)
+				if (_watching || _watchStarting)
 					return;
 
-				_watching = true;
+				_watchStarting = true;
 			}
 
 			_ = Task.Run(async () =>
 			{
-				try
+				var delay = TimeSpan.FromMilliseconds(250);
+				while (true)
 				{
-					var connection = await GetConnectionAsync();
-					if (connection is null)
+					try
+					{
+						var connection = await GetConnectionAsync(TimeSpan.FromSeconds(2)).ConfigureAwait(false);
+						if (connection is null)
+							throw new IOException("Session bus is unavailable.");
+
+						var rule = new MatchRule
+						{
+							Type = MessageType.Signal,
+							Sender = PortalService,
+							Path = PortalPath,
+							Interface = SettingsInterface,
+							Member = "SettingChanged",
+						};
+
+						await connection.AddMatchAsync(rule, static (Message message, object? _) =>
+						{
+							var reader = message.GetBodyReader();
+							var ns = reader.ReadString();
+							var key = reader.ReadString();
+							var outer = reader.ReadVariantValue();
+							if (ns != "org.freedesktop.appearance" || key != "color-scheme")
+								return (uint?)null;
+
+							return outer.Type == VariantValueType.UInt32 ? outer.GetUInt32() : (uint?)null;
+						}, static (Exception? ex, uint? value, object? _, object? _) =>
+						{
+							if (ex is not null || value is null)
+								return;
+
+							ApplyPortalValue(value.Value, NextUpdateVersion());
+						}, null, null, false, ObserverFlags.None);
+
+						lock (_gate)
+						{
+							_watching = true;
+							_watchStarting = false;
+						}
+
+						// A later signal takes precedence over this snapshot.
+						var version = NextUpdateVersion();
+						try
+						{
+							if (await ReadPortalAsync().ConfigureAwait(false) is { } current)
+								ApplyPortalValue(current, version);
+						}
+						catch (Exception) { }
 						return;
-
-					var rule = new MatchRule
+					}
+					catch (Exception)
 					{
-						Type = MessageType.Signal,
-						Sender = PortalService,
-						Path = PortalPath,
-						Interface = SettingsInterface,
-						Member = "SettingChanged",
-					};
-
-					await connection.AddMatchAsync(rule, static (Message message, object? _) =>
-					{
-						var reader = message.GetBodyReader();
-						var ns = reader.ReadString();
-						var key = reader.ReadString();
-						var outer = reader.ReadVariantValue();
-						if (ns != "org.freedesktop.appearance" || key != "color-scheme")
-							return (uint?)null;
-
-						return outer.Type == VariantValueType.UInt32 ? outer.GetUInt32() : (uint?)null;
-					}, static (Exception? ex, uint? value, object? _, object? _) =>
-					{
-						if (ex is not null || value is null)
-							return;
-
-						ApplyPortalValue(value.Value);
-					}, null, null, false, ObserverFlags.None);
-
-					// Reconcile preferences missed before subscription, including slow startup reads.
-					if (await ReadPortalAsync().ConfigureAwait(false) is { } current)
-						ApplyPortalValue(current);
-				}
-				catch (Exception)
-				{
+						await _connectionGate.WaitAsync().ConfigureAwait(false);
+						try
+						{
+							_connection?.Dispose();
+							_connection = null;
+						}
+						finally { _connectionGate.Release(); }
+					}
+					await Task.Delay(delay).ConfigureAwait(false);
+					delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 30000));
 				}
 			});
 		}
 
-		private static void ApplyPortalValue(uint value)
+		private static long NextUpdateVersion()
+		{
+			lock (_gate)
+				return ++_updateVersion;
+		}
+
+		private static void ApplyPortalValue(uint value, long version)
 		{
 			if (OverrideValue() is not null)
 				return;
 
 			var dark = value is 1 or 2 ? value == 1 : FromGtkThemeEnv() ?? FromKdeGlobals() ?? FromGSettings() ?? false;
-			if (_isDark != dark)
+			lock (_gate)
 			{
+				if (version != _updateVersion || _isDark == dark)
+					return;
+
 				_isDark = dark;
-				Changed?.Invoke(null, EventArgs.Empty);
 			}
+			Changed?.Invoke(null, EventArgs.Empty);
 		}
 
 		private static bool? FromGtkThemeEnv()

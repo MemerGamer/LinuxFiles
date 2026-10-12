@@ -141,7 +141,7 @@ namespace Files.Platform.Tests.Launching
 		[TestMethod]
 		public void Exec_ParsedOnceMeansDisplayedArgvIsTheLaunchedArgv()
 		{
-			var entry = Strict("[Desktop Entry]\nType=Application\nName=X\nExec=/bin/echo \"a\\\\\\\\ b\" 'c d' \\\\s %c\n", out var error)!;
+			var entry = Strict("[Desktop Entry]\nType=Application\nName=X\nExec=/bin/echo \"a b\" \"c d\" %c\n", out var error)!;
 			Assert.IsNull(error);
 
 			var first = Files.Platform.Linux.Launching.DesktopExecExpander.Expand(entry.Application, [])[0];

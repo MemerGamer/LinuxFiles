@@ -675,11 +675,7 @@ namespace Files.App.ViewModels.UserControls
 					{
 						var storageFile = resFile.Result
 							?? throw new InvalidOperationException("A successful file lookup did not return a storage file.");
-#if !WINDOWS
 						await NavigationHelpers.OpenPath(storageFile.Path, shellPage, FilesystemItemType.File);
-#else
-						await Win32Helper.InvokeWin32ComponentAsync(storageFile.Path, shellPage);
-#endif
 					}
 					else // Not a file or not accessible
 					{
@@ -763,11 +759,7 @@ namespace Files.App.ViewModels.UserControls
 			var path = pathItem.Path
 				?? throw new InvalidOperationException("The path box item does not have a path.");
 
-#if WINDOWS
-			var childFolders = OperatingSystem.IsWindows() ? GetSubfolders(path) : await GetSubfoldersAsync(path);
-#else
 			var childFolders = await GetSubfoldersAsync(path);
-#endif
 
 			// Fall back to StorageFolder API for non-filesystem paths (e.g. FTP)
 			if (childFolders is null)
@@ -999,11 +991,7 @@ namespace Files.App.ViewModels.UserControls
 						{
 							var storageFile = resFile.Result
 								?? throw new InvalidOperationException("A successful file lookup did not return a storage file.");
-#if !WINDOWS
 							await NavigationHelpers.OpenPath(storageFile.Path, shellPage, FilesystemItemType.File);
-#else
-							await Win32Helper.InvokeWin32ComponentAsync(storageFile.Path, shellPage);
-#endif
 						}
 						else // Not a file or not accessible
 						{
@@ -1061,15 +1049,8 @@ namespace Files.App.ViewModels.UserControls
 
 		private static async Task<bool> LaunchApplicationFromPath(string currentInput, string workingDir)
 		{
-#if !WINDOWS
 			// LINUX-TODO(launch): running commands typed into the address bar; the input is reported as an invalid path
 			return await Task.FromResult(false);
-#else
-			var args = CommandLineParser.SplitArguments(currentInput);
-			return await LaunchHelper.LaunchAppAsync(
-				args.FirstOrDefault("").Trim('"'), string.Join(' ', args.Skip(1)), workingDir
-			);
-#endif
 		}
 
 		public async Task PopulateOmnibarSuggestionsForPathMode()

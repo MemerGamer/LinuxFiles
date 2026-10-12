@@ -55,11 +55,7 @@ namespace Files.App.ViewModels.Properties
 
 		public async Task<(long size, long sizeOnDisk)> CalculateFolderSizeAsync(string path, CancellationToken token)
 		{
-#if WINDOWS
-			return await CalculateFolderSizeWindowsAsync(path, token);
-#else
 			return await CalculateFolderSizeLinuxAsync(path, token);
-#endif
 		}
 
 		private async Task<(long size, long sizeOnDisk)> CalculateFolderSizeLinuxAsync(string path, CancellationToken token)

@@ -4,9 +4,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.Win32;
-#if WINDOWS
-using SevenZip;
-#endif
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -14,9 +11,6 @@ using System.Windows.Input;
 using Windows.ApplicationModel;
 using Windows.Storage;
 using Windows.Storage.Pickers;
-#if WINDOWS
-using Windows.Win32.Storage.FileSystem;
-#endif
 
 namespace Files.App.ViewModels.Settings
 {
@@ -77,25 +71,6 @@ namespace Files.App.ViewModels.Settings
 				}
 			}
 
-#if WINDOWS
-			var dataPath = Environment.ExpandEnvironmentVariables("%LocalAppData%\\Files");
-			if (IsSetAsDefaultFileManager)
-			{
-				var sourcePath = Path.Combine(destFolder, "*");
-				var branchPath = Path.Combine(dataPath, "Branch.txt");
-				var command = $"-command \"New-Item -Force -Path {Win32Helper.ToPowerShellStringLiteral(dataPath)} -ItemType Directory; Copy-Item -Filter *.* -Path {Win32Helper.ToPowerShellStringLiteral(sourcePath)} -Recurse -Force -Destination {Win32Helper.ToPowerShellStringLiteral(dataPath)}; 'files-dev' | Out-File -Encoding utf8 -Force -FilePath {Win32Helper.ToPowerShellStringLiteral(branchPath)}\"";
-				if (!await Win32Helper.RunPowershellCommandAsync(command, PowerShellExecutionOptions.Hidden))
-				{
-					// Error copying files
-					await DetectResult();
-					return;
-				}
-			}
-			else
-			{
-				await Win32Helper.RunPowershellCommandAsync($"-command \"Remove-Item -LiteralPath {Win32Helper.ToPowerShellStringLiteral(dataPath)} -Recurse -Force\"", PowerShellExecutionOptions.Hidden);
-			}
-#endif
 
 			try
 			{
@@ -223,38 +198,14 @@ namespace Files.App.ViewModels.Settings
 
 			try
 			{
-#if WINDOWS
-				if (OperatingSystem.IsWindows())
-				{
-					var handle = Win32PInvoke.CreateFileFromAppW(
-						filePath,
-						(uint)(FILE_ACCESS_RIGHTS.FILE_GENERIC_READ | FILE_ACCESS_RIGHTS.FILE_GENERIC_WRITE),
-						Win32PInvoke.FILE_SHARE_READ | Win32PInvoke.FILE_SHARE_WRITE,
-						nint.Zero,
-						Win32PInvoke.CREATE_NEW,
-						0,
-						nint.Zero);
-
-					Win32PInvoke.CloseHandle(handle);
-				}
-				else
-				{
-					using (new FileStream(filePath, FileMode.CreateNew, FileAccess.ReadWrite)) { }
-				}
-#else
 				using (new FileStream(filePath, FileMode.CreateNew, FileAccess.ReadWrite)) { }
-#endif
 
 				var file = await StorageHelpers.ToStorageItem<BaseStorageFile>(filePath);
 				if (file is null)
 					throw new IOException($"The settings export file '{filePath}' could not be opened.");
 
-#if WINDOWS
-				await ZipStorageFolder.InitArchive(file, OutArchiveFormat.Zip);
-#else
 				// LINUX-TODO(settings): migrate legacy settings import/export to IArchiveService.
 				await ZipStorageFolder.InitArchive(file, ArchiveFormats.Zip);
-#endif
 
 				if (await ZipStorageFolder.FromStorageFileAsync(file) is not ZipStorageFolder zipFolder)
 					return;

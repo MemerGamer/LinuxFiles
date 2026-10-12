@@ -47,11 +47,9 @@ namespace Files.App.Views.Layouts
 		/// size changes, even if the layout size changes (since some layout sizes share the same icon size).
 		/// </summary>
 		private uint currentIconSize;
-#if !WINDOWS
 		private XamlRoot? iconXamlRoot;
 		private double iconRasterizationScale = 1;
 		private int iconReloadRequest;
-#endif
 		private (FolderLayoutModes? Layout, ListViewSizeKind List, CardsViewSizeKind Cards, GridViewSizeKind Grid)? itemContainerLayout;
 
 		private volatile bool shouldSetVerticalScrollMode;
@@ -182,12 +180,8 @@ namespace Files.App.Views.Layouts
 		public GridLayoutPage() : base()
 		{
 			InitializeComponent();
-#if WINDOWS
-			CommunityToolkit.WinUI.Animations.ItemsReorderAnimation.SetDuration(FileList, TimeSpan.FromMilliseconds(350));
-#else
 			HoistSemanticZoomContent(RootGridZoom);
 			// LINUX-TODO(listing): ItemsReorderAnimation is Windows-only; Uno lacks CreateImplicitAnimationCollection
-#endif
 			DataContext = this;
 
 			var selectionRectangle = RectangleSelection.Create(ListViewBase, SelectionRectangle, FileList_SelectionChanged);
@@ -199,7 +193,6 @@ namespace Files.App.Views.Layouts
 
 		protected override void ItemManipulationModel_ScrollIntoViewInvoked(object? sender, ListedItem e)
 		{
-#if !WINDOWS
 			if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid grouped)
 			{
 				grouped.EnsureItemVisible(e, () =>
@@ -209,9 +202,7 @@ namespace Files.App.Views.Layouts
 				});
 				return;
 			}
-#endif
 			FileList.ScrollIntoView(e);
-#if !WINDOWS
 			// The virtualizing panel only knows a virtual strip per item; make sure the whole cell is in view
 			if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.VirtualizingWrapGrid panel)
 			{
@@ -225,7 +216,6 @@ namespace Files.App.Views.Layouts
 						panel.EnsureItemVisible(index);
 				});
 			}
-#endif
 		}
 
 		protected override void ItemManipulationModel_ScrollToTopInvoked(object? sender, EventArgs e)
@@ -241,7 +231,6 @@ namespace Files.App.Views.Layouts
 		{
 			if (SelectedItems.Any())
 			{
-#if !WINDOWS
 				if (FileList.ItemsPanelRoot is Files.App.UnoVirtualization.GroupedVirtualizingWrapGrid grouped)
 				{
 					var item = SelectedItems.Last();
@@ -252,7 +241,6 @@ namespace Files.App.Views.Layouts
 					});
 				}
 				else
-#endif
 					FileList.ScrollIntoView(SelectedItems.Last());
 				(FileList.ContainerFromItem(SelectedItems.Last()) as GridViewItem)?.Focus(FocusState.Keyboard);
 			}
@@ -309,11 +297,9 @@ namespace Files.App.Views.Layouts
 				FolderSettings.LayoutModeChangeRequested -= FolderSettings_LayoutModeChangeRequested;
 
 			UserSettingsService.LayoutSettingsService.PropertyChanged -= LayoutSettingsService_PropertyChanged;
-#if !WINDOWS
 			if (iconXamlRoot is not null)
 				iconXamlRoot.Changed -= IconXamlRoot_Changed;
 			iconReloadRequest++;
-#endif
 		}
 
 		public override void Dispose()
@@ -323,11 +309,9 @@ namespace Files.App.Views.Layouts
 				FolderSettings.LayoutModeChangeRequested -= FolderSettings_LayoutModeChangeRequested;
 
 			UserSettingsService.LayoutSettingsService.PropertyChanged -= LayoutSettingsService_PropertyChanged;
-#if !WINDOWS
 			if (iconXamlRoot is not null)
 				iconXamlRoot.Changed -= IconXamlRoot_Changed;
 			iconReloadRequest++;
-#endif
 			base.Dispose();
 		}
 
@@ -395,7 +379,6 @@ namespace Files.App.Views.Layouts
 			}
 		}
 
-#if !WINDOWS
 		private (bool Grouped, bool Virtualized, FolderLayoutModes? Mode, ListViewSizeKind List, CardsViewSizeKind Cards, GridViewSizeKind Grid)? _appliedPanelKey;
 		private int _ensureVisibleRequest;
 		private static bool s_loggedPanelFallback;
@@ -464,7 +447,6 @@ namespace Files.App.Views.Layouts
 					ProvisionalCellSize = cellSize,
 				});
 		}
-#endif
 
 		[DynamicWindowsRuntimeCast(typeof(Style))]
 		private void SetItemTemplate()
@@ -472,13 +454,8 @@ namespace Files.App.Views.Layouts
 			var folderSettings = FolderSettings
 				?? throw new InvalidOperationException("The grid layout does not have folder settings.");
 
-#if WINDOWS
-			const string verticalStyleKey = "VerticalLayoutGridView";
-			const string horizontalStyleKey = "HorizontalLayoutGridView";
-#else
 			const string verticalStyleKey = "WrapVerticalLayoutGridView";
 			const string horizontalStyleKey = "WrapHorizontalLayoutGridView";
-#endif
 			var newFileListStyle = folderSettings.LayoutMode switch
 			{
 				FolderLayoutModes.ListView => (Style)Resources[verticalStyleKey],
@@ -491,11 +468,9 @@ namespace Files.App.Views.Layouts
 				var oldSource = FileList.ItemsSource;
 				FileList.ItemsSource = null;
 				FileList.Style = newFileListStyle;
-#if !WINDOWS
 				_appliedPanelKey = null;
 				FileList.ClearValue(ItemsControl.ItemsPanelProperty);
 				UpdateItemsPanel();
-#endif
 				FileList.ItemsSource = oldSource;
 			}
 
@@ -549,15 +524,12 @@ namespace Files.App.Views.Layouts
 				}
 			}
 			itemContainerLayout = layout;
-#if !WINDOWS
 			UpdateItemsPanel();
-#endif
 		}
 
 		private void FileList_Loaded(object sender, RoutedEventArgs e)
 		{
 			ContentScroller = FileList.FindDescendant<ScrollViewer>(x => x.Name == "ScrollViewer");
-#if !WINDOWS
 			if (iconXamlRoot is not null)
 				iconXamlRoot.Changed -= IconXamlRoot_Changed;
 			iconXamlRoot = XamlRoot;
@@ -566,10 +538,8 @@ namespace Files.App.Views.Layouts
 				iconXamlRoot.Changed += IconXamlRoot_Changed;
 				IconXamlRoot_Changed(iconXamlRoot, null!);
 			}
-#endif
 		}
 
-#if !WINDOWS
 		private void IconXamlRoot_Changed(XamlRoot sender, XamlRootChangedEventArgs args)
 		{
 			if (Math.Abs(iconRasterizationScale - sender.RasterizationScale) < 0.01)
@@ -580,7 +550,6 @@ namespace Files.App.Views.Layouts
 			Ioc.Default.GetRequiredService<IIconCacheService>().Clear();
 			_ = ReloadItemIconsAsync();
 		}
-#endif
 
 		protected override void OnSelectionChanged(SelectionChangedEventArgs e)
 		{
@@ -881,7 +850,6 @@ namespace Files.App.Views.Layouts
 			var shellViewModel = parentShellPage.GetRequiredShellViewModel();
 
 			shellViewModel.CancelExtendedPropertiesLoading();
-#if !WINDOWS
 			var request = ++iconReloadRequest;
 			// Finish realizing the new panel before loading its icons; recycling cancels per-item loads.
 			await DispatcherQueue.EnqueueAsync(() => FileList.UpdateLayout(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Low);
@@ -893,20 +861,13 @@ namespace Files.App.Views.Layouts
 				.Select(container => container.Content)
 				.OfType<ListedItem>()
 				.ToHashSet() ?? [];
-#endif
 			var filesAndFolders = shellViewModel.FilesAndFolders.ToList();
 			foreach (ListedItem listedItem in filesAndFolders)
 			{
-#if !WINDOWS
 				if (request != iconReloadRequest)
 					return;
-#endif
 				listedItem.ItemPropertiesInitialized = false;
-#if WINDOWS
-				if (FileList.ContainerFromItem(listedItem) is not null)
-#else
 				if (realizedItems.Contains(listedItem))
-#endif
 					await shellViewModel.LoadExtendedItemPropertiesAsync(listedItem);
 			}
 
@@ -1133,7 +1094,6 @@ namespace Files.App.Views.Layouts
 		[DynamicWindowsRuntimeCast(typeof(GridViewItem))]
 		private void Grid_Loaded(object sender, RoutedEventArgs e)
 		{
-#if !WINDOWS
 			var root = (Grid)sender;
 			if (root.DataContext is ListedItem listedItem)
 			{
@@ -1143,7 +1103,6 @@ namespace Files.App.Views.Layouts
 						_ = ParentShellPageInstance?.ShellViewModel?.LoadExtendedItemPropertiesAsync(listedItem);
 				});
 			}
-#endif
 			// This is the best way I could find to set the context flyout, as doing it in the styles isn't possible
 			// because you can't use bindings in the setters
 			DependencyObject item = VisualTreeHelper.GetParent(sender as Grid);

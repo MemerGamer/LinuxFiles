@@ -3,9 +3,7 @@
 
 using System.IO;
 using Files.Core.Storage.Contracts;
-#if !WINDOWS
 using OwlCore.Storage.System.IO;
-#endif
 using Files.App.ViewModels.Properties;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media.Imaging;
@@ -18,11 +16,7 @@ namespace Files.App.ViewModels.Previews
 
 		public ListedItem Item { get; }
 
-#if WINDOWS
-		protected BaseStorageFile PreviewFile
-#else
 		protected IFile PreviewFile
-#endif
 			=> Item.ItemFile ?? throw new InvalidOperationException("The preview file has not been loaded.");
 
 		private BitmapImage? fileImage;
@@ -50,10 +44,6 @@ namespace Files.App.ViewModels.Previews
 			return temp.LoadAsync();
 		}
 
-#if WINDOWS
-		public static Task<string> ReadFileAsTextAsync(BaseStorageFile file, int maxLength = 10 * 1024 * 1024)
-			=> file.ReadTextAsync(maxLength);
-#else
 		protected static async Task<IFile?> ResolvePreviewFileAsync(ListedItem item, CancellationToken cancellationToken)
 		{
 			if (item.ItemFile is null)
@@ -80,7 +70,6 @@ namespace Files.App.ViewModels.Previews
 				?? throw new IOException("The preview file could not be resolved.");
 			return await OpenPreviewReadAsync(file, cancellationToken);
 		}
-#endif
 
 		/// <summary>
 		/// Call this function when you are ready to load the preview and details.
@@ -93,13 +82,7 @@ namespace Files.App.ViewModels.Previews
 
 			if (Item.ItemFile is null)
 			{
-#if WINDOWS
-				var itemPath = Item.ItemPath!;
-				var rootItem = await FilesystemTasks.WrapNullable(() => DriveHelpers.GetRootFromPathAsync(itemPath));
-				Item.ItemFile = await StorageFileExtensions.DangerousGetFileFromPathAsync(itemPath, rootItem.Result);
-#else
 				await ResolvePreviewFileAsync(Item, LoadCancelledTokenSource.Token);
-#endif
 			}
 
 			await Task.Run(async () =>

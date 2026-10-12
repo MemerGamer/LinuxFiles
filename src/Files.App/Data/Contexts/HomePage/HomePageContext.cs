@@ -16,15 +16,11 @@ namespace Files.App.Data.Contexts
 
 		private static IHomeFolder CreateHomeFolder()
 		{
-#if WINDOWS
-			return new HomeFolder();
-#else
 			return new LinuxHomeFolder(
 				Ioc.Default.GetRequiredService<IUserDirectories>(),
 				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Volumes.IVolumeService>(),
 				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Recent.IRecentFilesStore>(),
 				Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Gvfs.INetworkLocationService>());
-#endif
 		}
 
 		private WidgetCardItem? rightClickedItem = null;

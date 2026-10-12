@@ -2,36 +2,20 @@
 <Project Sdk="Uno.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>$(WindowsTargetFramework);$(DesktopTargetFramework)</TargetFrameworks>
+        <TargetFrameworks>$(DesktopTargetFramework)</TargetFrameworks>
         <Nullable>enable</Nullable>
         <Configurations>Debug;Release</Configurations>
         <Platforms>x86;x64;arm64</Platforms>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <DefineConstants>$(DefineConstants);OMNIBAR_DEBUG</DefineConstants>
         <IsAotCompatible>true</IsAotCompatible>
-        <!--  Lets restore resolve the Windows TFM on Linux/macOS; only the net10.0-desktop target can be built there  -->
-        <EnableWindowsTargeting Condition="!$([MSBuild]::IsOSPlatform('Windows'))">true</EnableWindowsTargeting>
         <!--  Uno.Sdk is only needed to understand the -desktop TFM; keep it from injecting implicit packages/single-project items  -->
         <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
         <UnoSingleProject>false</UnoSingleProject>
     </PropertyGroup>
 
-    <!--  Windows (WinAppSDK) target  -->
-    <PropertyGroup Condition="$(TargetFramework.Contains('-windows'))">
-        <TargetPlatformMinVersion>$(MinimalWindowsVersion)</TargetPlatformMinVersion>
-        <UseWinUI>true</UseWinUI>
-        <RuntimeIdentifiers>win-x86;win-x64;win-arm64</RuntimeIdentifiers>
-    </PropertyGroup>
-
     <ItemGroup>
         <PackageReference Include="CommunityToolkit.WinUI.Extensions" />
-    </ItemGroup>
-
-    <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
-        <PackageReference Include="CommunityToolkit.Labs.WinUI.DependencyPropertyGenerator" />
-        <PackageReference Include="Microsoft.WindowsAppSDK" />
-        <PackageReference Include="Microsoft.Windows.SDK.BuildTools" />
-        <PackageReference Include="Microsoft.Windows.CsWinRT" />
     </ItemGroup>
 
     <!--  Uno Platform (Skia desktop) target  -->
@@ -47,12 +31,6 @@
 
     <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
         <PackageReference Include="Uno.WinUI" />
-    </ItemGroup>
-
-    <ItemGroup Condition="$(TargetFramework.Contains('-windows'))">
-        <PackageReference Update="Microsoft.WindowsAppSDK.AI" ExcludeAssets="all" />
-        <PackageReference Update="Microsoft.WindowsAppSDK.ML" ExcludeAssets="all" />
-        <PackageReference Update="Microsoft.WindowsAppSDK.Widgets" ExcludeAssets="all" />
     </ItemGroup>
 
     <ItemGroup>

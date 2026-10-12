@@ -276,15 +276,6 @@ namespace Files.App.ViewModels.UserControls
 				return new BasicPreview(model);
 			}
 
-#if WINDOWS
-			if (FileExtensionHelpers.IsBrowsableZipFile(item.FileExtension, out _))
-			{
-				var model = new ArchivePreviewViewModel(item);
-				await model.LoadAsync();
-
-				return new BasicPreview(model);
-			}
-#endif
 
 #if DESKTOP
 			if (item.PrimaryItemAttribute != StorageItemTypes.Folder && !item.IsFtpItem && ArchiveListingPreview.IsArchive(item))
@@ -337,16 +328,6 @@ namespace Files.App.ViewModels.UserControls
 #endif
 			}
 
-#if WINDOWS
-			if (FileExtensionHelpers.IsMarkdownFile(ext))
-			{
-				var model = new MarkdownPreviewViewModel(item);
-				await model.LoadAsync();
-
-				return new MarkdownPreview(model);
-			}
-
-#else
 			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML is shown as source, never rendered.
 			// LINUX-TODO(preview): shell scripts and other languages without a ColorCode grammar are shown as plain text
 			if (FileExtensionHelpers.IsMarkdownFile(ext) &&
@@ -357,7 +338,6 @@ namespace Files.App.ViewModels.UserControls
 				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Code, codeLanguage, token) is { } codePreview)
 				return codePreview;
 
-#endif
 			if (FileExtensionHelpers.IsImagePreviewFile(ext)
 #if DESKTOP
 				|| FileExtensionHelpers.IsPdfFile(ext)
@@ -402,43 +382,7 @@ namespace Files.App.ViewModels.UserControls
 			}*/
 
 			// LINUX-TODO(preview): implement an RTF renderer for desktop.
-#if WINDOWS
-			if (FileExtensionHelpers.IsRichTextFile(ext))
-			{
-				var model = new RichTextPreviewViewModel(item);
-				await model.LoadAsync();
-
-				return new RichTextPreview(model);
-			}
-
-#endif
-#if WINDOWS
-			if (CodePreviewViewModel.IsCodeFile(ext))
-			{
-				var model = new CodePreviewViewModel(item);
-				await model.LoadAsync();
-
-				return new CodePreview(model);
-			}
-
-#endif
-#if WINDOWS
-			if (ShellPreviewViewModel.FindPreviewHandlerFor(item.FileExtension, 0) is not null &&
-				!FileExtensionHelpers.IsFontFile(item.FileExtension) &&
-				!FileExtensionHelpers.IsExecutableFile(item.FileExtension))
-			{
-				var model = new ShellPreviewViewModel(item);
-				await model.LoadAsync();
-
-				return new ShellPreview(model);
-			}
-
-#endif
-#if WINDOWS
-			var control = await TextPreviewViewModel.TryLoadAsTextAsync(item);
-#else
 			var control = await TextPreviewViewModel.TryLoadAsTextAsync(item, token);
-#endif
 
 			return control ?? null;
 		}
@@ -609,10 +553,6 @@ namespace Files.App.ViewModels.UserControls
 			CancelPreviewLoad();
 
 			// Tear the preview host down here since the control's Unloaded event won't reliably fire while we're closing to background
-#if WINDOWS
-			if (previewPaneContent is ShellPreview shellPreview)
-				shellPreview.UnloadPreview();
-#endif
 
 			PreviewPaneContent = null;
 		}

@@ -1,3 +1,5 @@
+> **Archived historical document.** This records an earlier plan or investigation, not current developer guidance. LinuxFiles is an independent Linux-only fork with no upstream sync or Windows support. See the [current policy](upstream-policy.md) and [developer guidance](../../AGENTS.md).
+
 > Historical alpha3 plan. The [upstream policy](upstream-policy.md) supersedes its upstream-sync and soft-only Windows removal guidance.
 
 # Plan: 0.1.0-alpha3 and the road to 0.2

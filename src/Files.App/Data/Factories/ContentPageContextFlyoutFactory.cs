@@ -33,11 +33,7 @@ namespace Files.App.Data.Factories
 
 		public static Task<List<ContextMenuFlyoutItemViewModel>> GetItemContextShellCommandsAsync(string? workingDir, List<ListedItem> selectedItems, bool shiftPressed, bool showOpenMenu, CancellationToken cancellationToken)
 		{
-#if !WINDOWS
 			return GetLinuxItemContextCommandsAsync(workingDir, selectedItems, shiftPressed, showOpenMenu, cancellationToken);
-#else
-			return ShellContextFlyoutFactory.GetShellContextmenuAsync(shiftPressed: shiftPressed, showOpenMenu: showOpenMenu, workingDirectory: workingDir, selectedItems: selectedItems, cancellationToken: cancellationToken);
-#endif
 		}
 
 		public static List<ContextMenuFlyoutItemViewModel> Filter(List<ContextMenuFlyoutItemViewModel> items, List<ListedItem> selectedItems, bool shiftPressed, CurrentInstanceViewModel currentInstanceViewModel, bool removeOverflowMenu = true)
@@ -374,11 +370,7 @@ namespace Files.App.Data.Factories
 						ThemedIconStyle = state.Commands[Commands.AddItem].Glyph.ThemedIconStyle
 					},
 					Text = state.Commands[Commands.AddItem].Label,
-					#if WINDOWS
-					Items = GetNewItemItems(state.CommandsViewModel, state.CanCreateFileInPage),
-#else
 					Items = GetLinuxNewItemItems(state.CanCreateFileInPage, state.Commands[Commands.CreateFolder], cancellationToken),
-#endif
 					ShowItem = !state.ItemsSelected,
 					ShowInFtpPage = true
 				},
@@ -747,11 +739,7 @@ namespace Files.App.Data.Factories
 				i => (i.PrimaryItemAttribute == StorageItemTypes.File && !i.IsShortcut && !i.IsExecutable) || (i.PrimaryItemAttribute == StorageItemTypes.Folder && i.IsArchive));
 			bool areAllItemsFolders = selectedItems.All(i => i.PrimaryItemAttribute == StorageItemTypes.Folder);
 
-#if !WINDOWS
 			bool isLinux = true;
-#else
-			bool isLinux = false;
-#endif
 			bool isDriveRoot = !isLinux && itemViewModel?.CurrentFolder is not null && (itemViewModel.CurrentFolder.ItemPath == Path.GetPathRoot(itemViewModel.CurrentFolder.ItemPath));
 
 			bool compatibleWallpaper = selectedItemsPropertiesViewModel?.IsCompatibleToSetAsWindowsWallpaper ?? false;
@@ -890,63 +878,7 @@ namespace Files.App.Data.Factories
 
 		public static List<ContextMenuFlyoutItemViewModel> GetNewItemItems(BaseLayoutViewModel commandsViewModel, bool canCreateFileInPage)
 		{
-#if !WINDOWS
 			return GetLinuxNewItemItems(canCreateFileInPage);
-#else
-			var list = new List<ContextMenuFlyoutItemViewModel>()
-			{
-				new ContextMenuFlyoutItemViewModelBuilder(Commands.CreateFolder).Build(),
-				new ContextMenuFlyoutItemViewModel()
-				{
-					Text = Strings.File.GetLocalizedResource(),
-					Glyph = "\uE7C3",
-					Command = commandsViewModel.CreateNewFileCommand,
-					ShowInFtpPage = true,
-					ShowInZipPage = true,
-					IsEnabled = canCreateFileInPage
-				},
-				new ContextMenuFlyoutItemViewModelBuilder(Commands.CreateShortcutFromDialog).Build(),
-				new ContextMenuFlyoutItemViewModel()
-				{
-					ItemType = ContextMenuFlyoutItemType.Separator,
-				}
-			};
-
-			if (canCreateFileInPage)
-			{
-				var cachedNewContextMenuEntries = AddItemService.GetEntries();
-				cachedNewContextMenuEntries?.ForEach(i =>
-				{
-					if (!string.IsNullOrEmpty(i.IconBase64))
-					{
-						// loading the bitmaps takes a while, so this caches them
-						byte[] bitmapData = Convert.FromBase64String(i.IconBase64);
-						using var ms = new MemoryStream(bitmapData);
-						var bitmap = new BitmapImage();
-						_ = bitmap.SetSourceAsync(ms.AsRandomAccessStream());
-						list.Add(new ContextMenuFlyoutItemViewModel()
-						{
-							Text = i.Name,
-							BitmapIcon = bitmap,
-							Command = commandsViewModel.CreateNewFileCommand,
-							CommandParameter = i,
-						});
-					}
-					else
-					{
-						list.Add(new ContextMenuFlyoutItemViewModel()
-						{
-							Text = i.Name,
-							Glyph = "\xE7C3",
-							Command = commandsViewModel.CreateNewFileCommand,
-							CommandParameter = i,
-						});
-					}
-				});
-			}
-
-			return list;
-#endif
 		}
 	}
 }

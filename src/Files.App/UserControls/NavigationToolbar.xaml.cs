@@ -349,74 +349,6 @@ namespace Files.App.UserControls
 		{
 			if (e.IsRootItem)
 			{
-#if WINDOWS
-				IHomeFolder homeFolder = new HomeFolder();
-				IContentPageContext contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
-
-				e.Flyout.Items.Add(new MenuFlyoutHeaderItem() { Text = Strings.QuickAccess.GetLocalizedResource() });
-
-				await foreach (var storable in homeFolder.GetQuickAccessFolderAsync())
-				{
-					if (storable is not IWindowsStorable windowsStorable)
-						continue;
-
-					var flyoutItem = new MenuFlyoutItem()
-					{
-						Text = windowsStorable.GetDisplayName(Windows.Win32.UI.Shell.SIGDN.SIGDN_PARENTRELATIVEFORUI),
-						DataContext = windowsStorable.GetDisplayName(Windows.Win32.UI.Shell.SIGDN.SIGDN_DESKTOPABSOLUTEPARSING),
-						Icon = new FontIcon() { Glyph = "\uE8B7" }, // As a placeholder
-					};
-
-					e.Flyout.Items.Add(flyoutItem);
-
-					windowsStorable.TryGetThumbnail((int)(16f * App.AppModel.AppWindowDPI), Windows.Win32.UI.Shell.SIIGBF.SIIGBF_ICONONLY, out var thumbnailData);
-					flyoutItem.Icon = new ImageIcon() { Source = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => thumbnailData.ToBitmapAsync(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal) };
-
-					windowsStorable.Dispose();
-
-					flyoutItem.Click += (sender, args) =>
-					{
-						// NOTE: We should not pass a path string but pass the storable object itself in the future.
-						var path = flyoutItem.DataContext as string
-							?? throw new InvalidOperationException("The breadcrumb item does not have a navigation path.");
-						var shellPage = contentPageContext.ShellPage
-							?? throw new InvalidOperationException("There is no active shell page for breadcrumb navigation.");
-						shellPage.NavigateToPath(path);
-					};
-				}
-
-				e.Flyout.Items.Add(new MenuFlyoutHeaderItem() { Text = Strings.Drives.GetLocalizedResource() });
-
-				await foreach (var storable in homeFolder.GetLogicalDrivesAsync())
-				{
-					if (storable is not IWindowsStorable windowsStorable)
-						continue;
-
-					var flyoutItem = new MenuFlyoutItem()
-					{
-						Text = windowsStorable.GetDisplayName(Windows.Win32.UI.Shell.SIGDN.SIGDN_PARENTRELATIVEFORUI),
-						DataContext = windowsStorable.GetDisplayName(Windows.Win32.UI.Shell.SIGDN.SIGDN_DESKTOPABSOLUTEPARSING),
-						Icon = new FontIcon() { Glyph = "\uE8B7" }, // As a placeholder
-					};
-
-					e.Flyout.Items.Add(flyoutItem);
-
-					windowsStorable.TryGetThumbnail((int)(16f * App.AppModel.AppWindowDPI), Windows.Win32.UI.Shell.SIIGBF.SIIGBF_ICONONLY, out var thumbnailData);
-					flyoutItem.Icon = new ImageIcon() { Source = await MainWindow.Instance.DispatcherQueue.EnqueueOrInvokeAsync(() => thumbnailData.ToBitmapAsync(), Microsoft.UI.Dispatching.DispatcherQueuePriority.Normal) };
-
-					windowsStorable.Dispose();
-
-					flyoutItem.Click += (sender, args) =>
-					{
-						// NOTE: We should not pass a path string but pass the storable object itself in the future.
-						var path = flyoutItem.DataContext as string
-							?? throw new InvalidOperationException("The breadcrumb item does not have a navigation path.");
-						var shellPage = contentPageContext.ShellPage
-							?? throw new InvalidOperationException("There is no active shell page for breadcrumb navigation.");
-						shellPage.NavigateToPath(path);
-					};
-				}
-#else
 				IHomeFolder homeFolder = Ioc.Default.GetRequiredService<IHomePageContext>().HomeFolder;
 				IContentPageContext contentPageContext = Ioc.Default.GetRequiredService<IContentPageContext>();
 
@@ -444,7 +376,6 @@ namespace Files.App.UserControls
 
 				await AddItemsAsync(Strings.QuickAccess.GetLocalizedResource(), homeFolder.GetQuickAccessFolderAsync());
 				await AddItemsAsync(Strings.Drives.GetLocalizedResource(), homeFolder.GetLogicalDrivesAsync());
-#endif
 
 				return;
 			}

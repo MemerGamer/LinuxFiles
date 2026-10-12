@@ -25,37 +25,9 @@ namespace Files.App.Utils.Storage
 				? Math.Max(1u, (uint)Math.Round(scaledSize))
 				: _standardSizes.FirstOrDefault(s => s >= scaledSize, _standardSizes[^1]);
 
-#if !WINDOWS
 			// Linux theme SVGs and thumbnailers accept the actual pixel size, including HiDPI cells above 256px.
 			size = Math.Clamp((uint)Math.Ceiling(scaledSize), 1u, 1024u);
 			return await LinuxIconHelper.GetIconAsync(path, size, isFolder, iconOptions, cancellationToken);
-#else
-			if (!isFolder && !iconOptions.HasFlag(IconOptions.ReturnIconOnly) && !iconOptions.HasFlag(IconOptions.ReturnOnlyIfCached))
-			{
-				var extension = Path.GetExtension(path);
-
-				//Restrict to only %windir%\fonts
-				if (FileExtensionHelpers.IsFontFile(extension) && path is not null && PathHelpers.IsInSystemFontsFolder(path))
-				{
-					var winrtThumbnail = await FontFileHelper.GetWinRTThumbnailAsync(path, (uint)size);
-					if (winrtThumbnail is not null)
-						return winrtThumbnail;
-
-					if (!string.Equals(extension, ".fon", StringComparison.OrdinalIgnoreCase))
-					{
-						var fontThumbnail = await STATask.Run(() => FontFileHelper.GenerateFontThumbnail(path, (int)size), App.Logger);
-						if (fontThumbnail is not null)
-							return fontThumbnail;
-					}
-				}
-			}
-
-			var resolvedPath = path is not null && path.StartsWith(@"\\?\", StringComparison.Ordinal)
-				? MtpHelpers.ResolveMtpShellPath(path) ?? path
-				: path;
-
-			return await STATask.RunPooled(() => Win32Helper.GetIcon(resolvedPath, (int)size, isFolder, iconOptions), App.Logger);
-#endif
 		}
 
 		/// <summary>
@@ -67,14 +39,9 @@ namespace Files.App.Utils.Storage
 		public static async Task<byte[]?> GetIconOverlayAsync(string? path, uint requestedSize, bool isFolder)
 		{
 			// Overlays render at 32px in thumbnail layouts and 16px in details/columns; scale by DPI so the badge isn't upscaled at fractional scaling
-#if !WINDOWS
 			// Only the symlink emblem exists on Linux; cloud/sync status has no freedesktop equivalent
 			var overlaySize = (requestedSize >= 48 ? 32u : 16u) * App.AppModel.AppWindowDPI;
 			return await LinuxIconHelper.GetOverlayAsync(path, (uint)overlaySize);
-#else
-			var overlaySize = (requestedSize >= 48 ? 32u : 16u) * App.AppModel.AppWindowDPI;
-			return await STATask.RunPooled(() => Win32Helper.GetIconOverlay(path, (int)overlaySize, isFolder), App.Logger);
-#endif
 		}
 
 		[Obsolete]

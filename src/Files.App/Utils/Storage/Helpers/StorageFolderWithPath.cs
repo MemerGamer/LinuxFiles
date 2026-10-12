@@ -11,9 +11,6 @@ namespace Files.App.Utils
 		public string Path { get; }
 		public string Name => Item?.Name ?? IO.Path.GetFileName(Path)!;
 
-#if WINDOWS
-		IStorageItem? IStorageItemWithPath.Item => Item;
-#endif
 		public BaseStorageFolder? Item { get; }
 
 		public FilesystemItemType ItemType => FilesystemItemType.Directory;

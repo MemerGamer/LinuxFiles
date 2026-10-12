@@ -1,11 +1,6 @@
 // Copyright (c) Files Community
 // SPDX-License-Identifier: MPL-2.0
 
-#if WINDOWS
-#if WINDOWS
-using Windows.Win32;
-#endif
-#endif
 
 namespace Files.App.Helpers
 {
@@ -73,10 +68,6 @@ namespace Files.App.Helpers
 					if (Volatile.Read(ref trimRequested) == 0 &&
 						Environment.TickCount64 - Interlocked.Read(ref lastActivityTicks) >= QuietWindowMs)
 					{
-#if WINDOWS
-						using var process = Process.GetCurrentProcess();
-						PInvoke.K32EmptyWorkingSet(new Windows.Win32.Foundation.HANDLE(process.Handle));
-#endif
 					}
 				}
 

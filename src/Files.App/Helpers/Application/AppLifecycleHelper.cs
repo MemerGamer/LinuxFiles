@@ -104,9 +104,6 @@ namespace Files.App.Helpers
 			var userSettingsService = Ioc.Default.GetRequiredService<IUserSettingsService>();
 			var addItemService = Ioc.Default.GetRequiredService<IAddItemService>();
 			var generalSettingsService = userSettingsService.GeneralSettingsService;
-#if WINDOWS
-			var jumpListService = Ioc.Default.GetRequiredService<IWindowsJumpListService>();
-#endif
 
 			ActiveSessionTracker.ReportPersistedTime();
 
@@ -119,17 +116,11 @@ namespace Files.App.Helpers
 					App.LibraryManager.UpdateLibrariesAsync(),
 					OptionalTaskAsync(WSLDistroManager.UpdateDrivesAsync(), generalSettingsService.ShowWslSection),
 					OptionalTaskAsync(App.FileTagsManager.UpdateFileTagsAsync(), generalSettingsService.ShowFileTagsSection)
-#if WINDOWS
-					, jumpListService.InitializeAsync()
-#endif
 				);
 
 				//Start the tasks separately to reduce resource contention
 				await Task.WhenAll(
 					addItemService.InitializeAsync()
-#if WINDOWS
-					, ContextMenu.WarmUpQueryContextMenuAsync()
-#endif
 				);
 			});
 
@@ -324,13 +315,9 @@ namespace Files.App.Helpers
 
 			services
 					// Platform services
-#if WINDOWS
-					.AddWindowsPlatform()
-#else
 					.AddLinuxPlatform()
 					.AddSingleton<Files.Platform.Linux.Instance.LinuxSingleInstanceService>(_ => Program.SingleInstance ?? new Files.Platform.Linux.Instance.LinuxSingleInstanceService())
 					.AddLinuxSystemIntegration()
-#endif
 					// Settings services
 					.AddSingleton<IUserSettingsService, UserSettingsService>()
 					.AddSingleton<IAppearanceSettingsService, AppearanceSettingsService>(sp => new AppearanceSettingsService(((UserSettingsService)sp.GetRequiredService<IUserSettingsService>()).GetSharingContext()))
@@ -354,26 +341,15 @@ namespace Files.App.Helpers
 					.AddSingleton<ISidebarContext, SidebarContext>()
 					.AddSingleton<IShelfContext, ShelfContext>()
 					// Services
-#if WINDOWS
-					.AddSingleton<IWindowsRecentItemsService, WindowsRecentItemsService>()
-					.AddSingleton<IWindowsIniService, WindowsIniService>()
-					.AddSingleton<IWindowsWallpaperService, WindowsWallpaperService>()
-					.AddSingleton<IWindowsSecurityService, WindowsSecurityService>()
-#else
 					.AddSingleton<IWindowsRecentItemsService, Files.App.Services.Desktop.DesktopRecentItemsService>()
 					.AddSingleton<IWindowsIniService, Files.App.Services.Desktop.DesktopIniService>()
 					.AddSingleton<IWindowsWallpaperService, Files.App.Services.Desktop.DesktopWallpaperService>()
 					.AddSingleton<IWindowsSecurityService, Files.App.Services.Desktop.DesktopSecurityService>()
 					.AddSingleton<IWindowsCompatibilityService, Files.App.Services.Desktop.DesktopCompatibilityService>()
 					.AddSingleton<IWindowsJumpListService, Files.App.Services.Desktop.DesktopJumpListService>()
-#endif
 					.AddSingleton<IAppThemeModeService, AppThemeModeService>()
 					.AddSingleton<IDialogService, DialogService>()
-#if WINDOWS
-					.AddSingleton<ICommonDialogService, CommonDialogService>()
-#else
 					.AddSingleton<ICommonDialogService, Files.App.Services.Desktop.DesktopCommonDialogService>()
-#endif
 					.AddSingleton<IImageService, ImagingService>()
 					.AddSingleton<IThreadingService, ThreadingService>()
 					.AddSingleton<ILocalizationService, LocalizationService>()
@@ -383,45 +359,20 @@ namespace Files.App.Helpers
 					.AddSingleton<IModifiableCommandManager, ModifiableCommandManager>()
 					.AddSingleton<IStorageService, NativeStorageLegacyService>()
 					.AddSingleton<IFtpStorageService, FtpStorageService>()
-#if WINDOWS
-					.AddSingleton<IAddItemService, AddItemService>()
-#else
 					.AddSingleton<IAddItemService, Files.App.Services.Desktop.DesktopAddItemService>()
-#endif
 					.AddSingleton<IPreviewPopupService, PreviewPopupService>()
 					.AddSingleton<IDateTimeFormatterFactory, DateTimeFormatterFactory>()
 					.AddSingleton<IDateTimeFormatter, UserDateTimeFormatter>()
 					.AddSingleton<ISizeProvider, UserSizeProvider>()
-#if WINDOWS
-					.AddSingleton<IQuickAccessService, QuickAccessService>()
-#else
 					.AddSingleton<IQuickAccessService, Files.App.Services.Desktop.DesktopQuickAccessService>()
-#endif
 					.AddSingleton<IResourcesService, ResourcesService>()
-#if WINDOWS
-					.AddSingleton<IWindowsJumpListService, WindowsJumpListService>()
-#endif
-#if WINDOWS
-					.AddSingleton<IStorageTrashBinService, StorageTrashBinService>()
-#else
 					.AddSingleton<IStorageTrashBinService, Files.App.Services.Desktop.DesktopStorageTrashBinService>()
-#endif
 					.AddSingleton<IRemovableDrivesService, RemovableDrivesService>()
 					.AddSingleton<INetworkService, NetworkService>()
-#if WINDOWS
-					.AddSingleton<IStartMenuService, StartMenuService>()
-#else
 					.AddSingleton<IStartMenuService, Files.App.Services.Desktop.DesktopStartMenuService>()
-#endif
 					.AddSingleton<IStorageCacheService, StorageCacheService>()
 					.AddSingleton<IIconCacheService, IconCacheService>()
 					.AddSingleton<IStorageArchiveService, StorageArchiveService>()
-#if WINDOWS
-					.AddSingleton<IStorageSecurityService, StorageSecurityService>()
-#endif
-#if WINDOWS
-					.AddSingleton<IWindowsCompatibilityService, WindowsCompatibilityService>()
-#endif
 					.AddSingleton</*IVersionControlService,*/ LibGit2Service>()
 					// ViewModels
 					.AddSingleton<MainPageViewModel>()
@@ -449,19 +400,10 @@ namespace Files.App.Helpers
 			// Storable path resolution
 			services.AddStorables();
 			services.AddFtpStorables();
-#if !WINDOWS
 			Files.App.Storage.Archives.ArchiveServiceCollectionExtensions.AddArchiveStorables(services);
 			services.AddSingleton<Files.Platform.Abstractions.Archives.IArchivePasswordPrompt, Files.App.Actions.ArchivePasswordPrompt>();
-#endif
 
 			// Conditional DI
-#if WINDOWS
-			if (AppEnvironment is AppEnvironment.SideloadPreview or AppEnvironment.SideloadStable)
-				services.AddSingleton<IUpdateService, SideloadUpdateService>();
-			else if (AppEnvironment is AppEnvironment.StorePreview or AppEnvironment.StoreStable)
-				services.AddSingleton<IUpdateService, StoreUpdateService>();
-			else
-#endif
 				services.AddSingleton<IUpdateService, DummyUpdateService>();
 
 			return services.BuildServiceProvider();
@@ -644,9 +586,6 @@ namespace Files.App.Helpers
 				if (!showToastNotification)
 					return;
 
-#if WINDOWS
-				SafetyExtensions.IgnoreExceptions(AppToastNotificationHelper.ShowUnhandledExceptionToast);
-#endif
 
 				SafetyExtensions.IgnoreExceptions(() =>
 				{
@@ -698,12 +637,6 @@ namespace Files.App.Helpers
 
 			if (e.PropertyName == nameof(IGeneralSettingsService.ShowSystemTrayIcon))
 			{
-#if WINDOWS
-				if (generalSettingsService.ShowSystemTrayIcon)
-					App.SystemTrayIcon?.Show();
-				else
-					App.SystemTrayIcon?.Hide();
-#endif
 			}
 		}
 	}

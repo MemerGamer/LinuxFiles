@@ -13,11 +13,7 @@ namespace Files.App.Actions
 
 
 		public virtual string Label
-#if WINDOWS
-			=> Strings.OpenTerminal.GetLocalizedResource();
-#else
 			=> Strings.OpenTerminalLinux.GetLocalizedResource();
-#endif
 
 		public virtual string Description
 			=> Strings.OpenTerminalDescription.GetLocalizedResource();
@@ -50,36 +46,15 @@ namespace Files.App.Actions
 			if (paths.Length is 0)
 				return Task.CompletedTask;
 
-#if !WINDOWS
 			return OpenLinuxTerminalsAsync(paths);
-#else
-			var terminalStartInfo = GetProcessStartInfo(paths);
-			if (terminalStartInfo is null)
-				return Task.CompletedTask;
-
-			MainWindow.Instance.DispatcherQueue.TryEnqueue(() =>
-			{
-				try
-				{
-					Process.Start(terminalStartInfo);
-				}
-				catch (Win32Exception)
-				{
-				}
-			});
-
-			return Task.CompletedTask;
-#endif
 		}
 
-#if !WINDOWS
 		private static async Task OpenLinuxTerminalsAsync(string[] paths)
 		{
 			var launcher = Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.ILauncherService>();
 			foreach (var path in paths)
 				await launcher.OpenTerminalAsync(path);
 		}
-#endif
 
 
 

@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.App.ViewModels.Properties;
 using Files.Platform.Abstractions.Archives;
 
@@ -24,4 +23,3 @@ namespace Files.App.ViewModels.Previews
 		}
 	}
 }
-#endif

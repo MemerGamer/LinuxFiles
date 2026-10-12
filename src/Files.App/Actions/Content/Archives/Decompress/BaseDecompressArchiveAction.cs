@@ -1,7 +1,6 @@
 ﻿// Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.App.Dialogs;
 using Microsoft.UI.Xaml.Controls;
 using System.Text;
@@ -120,4 +119,3 @@ namespace Files.App.Actions
 	}
 }
 
-#endif

@@ -35,7 +35,6 @@ namespace Files.App.Data.Items
 			Tooltip = tooltip;
 		}
 
-#if !WINDOWS
 		/// <summary>
 		/// Creates a card for a plain folder path; there is no shell item behind it on Linux.
 		/// </summary>
@@ -50,13 +49,11 @@ namespace Files.App.Data.Items
 			Path = path;
 			Tooltip = tooltip;
 		}
-#endif
 
 		private sealed record FolderPath(string Id, string Name) : IStorable;
 
 		// Methods
 
-#if !WINDOWS
 		public async Task LoadCardThumbnailAsync()
 		{
 			if (_isDisposed || string.IsNullOrEmpty(Path))
@@ -75,7 +72,6 @@ namespace Files.App.Data.Items
 					Thumbnail = thumbnail;
 			});
 		}
-#endif
 
 		public void Dispose()
 		{

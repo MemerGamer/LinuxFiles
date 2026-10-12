@@ -4,10 +4,6 @@
 using Microsoft.UI.Xaml.Controls;
 using System.Runtime.InteropServices;
 using Windows.ApplicationModel.DataTransfer;
-#if WINDOWS
-using Windows.Win32;
-using Windows.Win32.Foundation;
-#endif
 using WinRT;
 
 namespace Files.App.Data.Models
@@ -147,16 +143,11 @@ namespace Files.App.Data.Models
 			{
 				if (_AppWindowDPI is null || _AppWindowDPI == 0f)
 				{
-#if WINDOWS
-					var dpi = PInvoke.GetDpiForWindow((HWND)MainWindow.Instance.WindowHandle);
-					_AppWindowDPI = dpi > 0 ? dpi / 96f : 1.0f; // Fallback to 1.0f if invalid DPI
-#else
 					// Not cached until the window content exists, so early callers do not pin 1.0
 					var scale = (float?)MainWindow.Instance?.Content?.XamlRoot?.RasterizationScale;
 					if (scale is null or <= 0f)
 						return 1.0f;
 					_AppWindowDPI = scale;
-#endif
 				}
 				return _AppWindowDPI.Value;
 			}

@@ -22,17 +22,11 @@ namespace Files.App.Utils
 			get => fileTags;
 			set
 			{
-#if !WINDOWS
 				if (fileTags is not null && fileTags.SequenceEqual(value, StringComparer.Ordinal))
 					return;
-#endif
 				// fileTags is null when the item is first created
-#if WINDOWS
-				var fileTagsInitialized = fileTags is not null;
-#else
 				// Tags are loaded lazily, so an item that was never loaded counts as untagged and its first edit must still be saved
 				const bool fileTagsInitialized = true;
-#endif
 				if (SetProperty(ref fileTags, value))
 				{
 					Interlocked.Increment(ref fileTagsRevision);
@@ -40,10 +34,6 @@ namespace Files.App.Utils
 					if (fileTagsInitialized)
 					{
 						var path = this.GetRequiredPath();
-#if WINDOWS
-						var dbInstance = FileTagsHelper.GetDbInstance();
-						dbInstance.SetTags(path, FileFRN, value);
-#endif
 						_ = FileTagsHelper.WriteFileTagAsync(path, value);
 					}
 
@@ -61,9 +51,6 @@ namespace Files.App.Utils
 			if (expectedRevision is not null && expectedRevision != FileTagsRevision)
 				return;
 
-#if WINDOWS
-			FileTags = tags;
-#else
 			// A deferred snapshot may predate an edit made through another item for this path.
 			if (FileTagsHelper.TryReadDatabaseFallback(this.GetRequiredPath(), out var fallbackTags))
 				tags = fallbackTags;
@@ -76,7 +63,6 @@ namespace Files.App.Utils
 				HasTags = tags.Length > 0;
 				OnPropertyChanged(nameof(FileTagsUI));
 			}
-#endif
 		}
 
 		/// <summary>
@@ -84,17 +70,10 @@ namespace Files.App.Utils
 		/// </summary>
 		public async Task EditFileTagsAsync(Func<string[], string[]> edit)
 		{
-#if WINDOWS
-			if (fileTags is null)
-				SetLoadedFileTags(FileTagsHelper.ReadFileTag(this.GetRequiredPath()));
-			FileTags = edit(fileTags ?? []);
-			await Task.CompletedTask;
-#else
 			var revision = Interlocked.Increment(ref fileTagsRevision);
 			var tags = await FileTagsHelper.EditFileTagsAsync(this.GetRequiredPath(), edit);
 			if (tags is not null)
 				SetLoadedFileTags(tags, revision);
-#endif
 		}
 	}
 }

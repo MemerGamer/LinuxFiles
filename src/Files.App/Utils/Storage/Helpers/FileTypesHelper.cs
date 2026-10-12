@@ -2,11 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 using System.Collections.Concurrent;
-#if WINDOWS
-using Windows.Win32;
-using Windows.Win32.Storage.FileSystem;
-using Windows.Win32.UI.Shell;
-#endif
 
 namespace Files.App.Utils.Storage
 {
@@ -27,32 +22,7 @@ namespace Files.App.Utils.Storage
 			if (!OperatingSystem.IsWindows())
 				return string.Empty;
 
-#if WINDOWS
-			if (typeNameCache.TryGetValue(extension, out var cached))
-				return cached;
-
-			var typeName = string.Empty;
-			SHFILEINFOW shfi = default;
-
-			fixed (char* pExtension = extension)
-			{
-				// SHGFI_USEFILEATTRIBUTES resolves from the extension alone, so this never touches disk
-				var result = PInvoke.SHGetFileInfo(
-					pExtension,
-					FILE_FLAGS_AND_ATTRIBUTES.FILE_ATTRIBUTE_NORMAL,
-					&shfi,
-					(uint)sizeof(SHFILEINFOW),
-					SHGFI_FLAGS.SHGFI_TYPENAME | SHGFI_FLAGS.SHGFI_USEFILEATTRIBUTES);
-
-				if (result != 0 && shfi.szTypeName.Value[0] != '\0')
-					typeName = shfi.szTypeName.ToString();
-			}
-
-			typeNameCache[extension] = typeName;
-			return typeName;
-#else
 			return string.Empty;
-#endif
 		}
 	}
 }

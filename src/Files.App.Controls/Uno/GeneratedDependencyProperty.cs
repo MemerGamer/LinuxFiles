@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 namespace CommunityToolkit.WinUI
 {
 	/// <summary>
@@ -14,4 +13,3 @@ namespace CommunityToolkit.WinUI
 		public object? DefaultValue { get; init; }
 	}
 }
-#endif

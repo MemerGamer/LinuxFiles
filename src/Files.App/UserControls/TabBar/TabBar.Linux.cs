@@ -12,7 +12,6 @@ namespace Files.App.UserControls.TabBar
 	{
 		private void InitializeLinuxCaptionButtons()
 		{
-#if !WINDOWS
 			if (!OperatingSystem.IsLinux())
 				return;
 
@@ -23,10 +22,8 @@ namespace Files.App.UserControls.TabBar
 			Unloaded += LinuxCaptionButtons_Unloaded;
 			UpdateLinuxCaptionButtons();
 			_ = NavigationHelpers.UpdateInstancePropertiesAsync(Items.ElementAtOrDefault(App.AppModel.TabStripSelectedIndex)?.NavigationParameter?.NavigationParameter);
-#endif
 		}
 
-#if !WINDOWS
 		private void LinuxCaptionButtons_Unloaded(object sender, RoutedEventArgs e)
 			=> MainWindow.Instance.LinuxChromeChanged -= LinuxChromeChanged;
 
@@ -44,13 +41,10 @@ namespace Files.App.UserControls.TabBar
 			LinuxMaximizeIcon.Glyph = window.IsLinuxWindowMaximized ? "\uE923" : "\uE922";
 			UpdateTitleBarInsets();
 		}
-#endif
 
 		private void ClientSideDecorationsMenuItem_Click(object sender, RoutedEventArgs e)
 		{
-#if !WINDOWS
 			MainWindow.Instance.SetClientSideDecorations(ClientSideDecorationsMenuItem.IsChecked);
-#endif
 		}
 
 		private void MinimizeWindow_Click(object sender, RoutedEventArgs e)
@@ -61,9 +55,7 @@ namespace Files.App.UserControls.TabBar
 
 		private void MaximizeWindow_Click(object sender, RoutedEventArgs e)
 		{
-#if !WINDOWS
 			MainWindow.Instance.ToggleLinuxWindowMaximize();
-#endif
 		}
 
 		private void CloseWindow_Click(object sender, RoutedEventArgs e) => MainWindow.Instance.Close();

@@ -68,9 +68,7 @@ namespace Files.App.Actions
 			return
 				context.PageType != ContentPageTypes.RecycleBin &&
 				(context.PageType != ContentPageTypes.ZipFolder
-#if !WINDOWS
 					|| Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Archives.IArchiveService>().CanWriteEntries
-#endif
 				) &&
 				context.PageType != ContentPageTypes.ReleaseNotes &&
 				context.PageType != ContentPageTypes.Settings &&

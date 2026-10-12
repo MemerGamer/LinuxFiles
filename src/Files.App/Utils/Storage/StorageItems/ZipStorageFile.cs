@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Foundation;
 
@@ -13,4 +12,3 @@ namespace Files.App.Utils.Storage
 		public static IAsyncOperation<BaseStorageFile?> FromPathAsync(string path) => Task.FromResult<BaseStorageFile?>(null).AsAsyncOperation();
 	}
 }
-#endif

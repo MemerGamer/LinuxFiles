@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions;
 using Files.Platform.Abstractions.Appearance;
 using Microsoft.UI;
@@ -126,4 +125,3 @@ namespace Files.App
 		}
 	}
 }
-#endif

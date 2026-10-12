@@ -45,26 +45,8 @@ namespace Files.App.ViewModels.UserControls.Widgets
 			PinToSidebarCommand = new AsyncRelayCommand<WidgetFolderCardItem>(ExecutePinToSidebarCommand);
 			UnpinFromSidebarCommand = new AsyncRelayCommand<WidgetFolderCardItem>(ExecuteUnpinFromSidebarCommand);
 
-#if !WINDOWS
 			App.QuickAccessManager.UpdateQuickAccessWidget += QuickAccessChanged;
-#endif
 
-#if WINDOWS
-			var automaticDestinationsPath = SystemIO.Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft", "Windows", "Recent", "AutomaticDestinations");
-			if (!SystemIO.Directory.Exists(automaticDestinationsPath))
-				return;
-
-			_quickAccessFolderWatcher = new()
-			{
-				Path = automaticDestinationsPath,
-				Filter = "f01b4d95cf55d32a.automaticDestinations-ms",
-				NotifyFilter = SystemIO.NotifyFilters.LastAccess | SystemIO.NotifyFilters.LastWrite | SystemIO.NotifyFilters.FileName
-			};
-
-			_quickAccessFolderWatcher.Changed += QuickAccessFolderWatcher_Changed;
-
-			_quickAccessFolderWatcher.EnableRaisingEvents = true;
-#endif
 		}
 
 		// Methods
@@ -75,7 +57,6 @@ namespace Files.App.ViewModels.UserControls.Widgets
 				await RefreshWidgetAsync();
 		}
 
-#if !WINDOWS
 		private async void QuickAccessChanged(object? sender, ModifyQuickAccessEventArgs e)
 		{
 			if (!isDisposed)
@@ -107,7 +88,6 @@ namespace Files.App.ViewModels.UserControls.Widgets
 			});
 		}
 
-#endif
 
 		public override List<ContextMenuFlyoutItemViewModel> GetItemMenuItems(WidgetCardItem item, bool isPinned, bool isFolder = false)
 		{
@@ -236,7 +216,6 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 		// Command methods
 
-#if !WINDOWS
 		public override async Task ExecutePinToSidebarCommand(WidgetCardItem? item)
 		{
 			if (item is not WidgetFolderCardItem folderCardItem || folderCardItem.Path is null)
@@ -244,9 +223,7 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 			await QuickAccessService.PinToSidebarAsync(folderCardItem.Path);
 		}
-#endif
 
-#if !WINDOWS
 		public override async Task ExecuteUnpinFromSidebarCommand(WidgetCardItem? item)
 		{
 			if (item is not WidgetFolderCardItem folderCardItem || folderCardItem.Path is null)
@@ -254,7 +231,6 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 			await QuickAccessService.UnpinFromSidebarAsync(folderCardItem.Path);
 		}
-#endif
 
 		private void ExecuteOpenPropertiesCommand(WidgetFolderCardItem? item)
 		{
@@ -281,17 +257,6 @@ namespace Files.App.ViewModels.UserControls.Widgets
 					ItemType = Strings.Folder.GetLocalizedResource(),
 				};
 
-#if WINDOWS
-				if (!string.Equals(itemPath, Constants.UserEnvironmentPaths.RecycleBinPath, StringComparison.OrdinalIgnoreCase))
-				{
-					BaseStorageFolder? matchingStorageFolder = (await shellViewModel.GetFolderFromPathAsync(itemPath)).Result;
-					if (matchingStorageFolder is not null)
-					{
-						var syncStatus = await shellViewModel.CheckCloudDriveSyncStatusAsync(matchingStorageFolder);
-						listedItem.SyncStatusUI = CloudDriveSyncStatusUI.FromCloudDriveSyncStatus(syncStatus);
-					}
-				}
-#endif
 
 				FilePropertiesHelpers.OpenPropertiesWindow(listedItem, shellPage);
 			}
@@ -308,9 +273,7 @@ namespace Files.App.ViewModels.UserControls.Widgets
 
 			isDisposed = true;
 			Items.CollectionChanged -= Items_CollectionChanged;
-#if !WINDOWS
 			App.QuickAccessManager.UpdateQuickAccessWidget -= QuickAccessChanged;
-#endif
 			if (_quickAccessFolderWatcher is not null)
 			{
 				_quickAccessFolderWatcher.EnableRaisingEvents = false;

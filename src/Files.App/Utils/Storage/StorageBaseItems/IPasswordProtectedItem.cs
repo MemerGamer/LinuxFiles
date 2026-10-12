@@ -5,9 +5,6 @@ using FluentFTP.Exceptions;
 using Files.Platform.Abstractions.Archives;
 using System;
 using System.Threading.Tasks;
-#if WINDOWS
-using SevenZip;
-#endif
 
 namespace Files.App.Utils.Storage
 {
@@ -20,10 +17,6 @@ namespace Files.App.Utils.Storage
 		async Task<TOut> RetryWithCredentialsAsync<TOut>(Func<Task<TOut>> func, Exception exception)
 		{
 			var handled =
-#if WINDOWS
-				exception is SevenZipOpenFailedException szofex && szofex.Result is OperationResult.WrongPassword ||
-				exception is ExtractionFailedException efex && efex.Result is OperationResult.WrongPassword ||
-#endif
 				exception is ArchivePasswordException ||
 				exception is FtpAuthenticationException ||
 				exception is ICSharpCode.SharpZipLib.Zip.ZipException szlzex && szlzex.Message.Contains("password");
@@ -39,10 +32,6 @@ namespace Files.App.Utils.Storage
 		async Task RetryWithCredentialsAsync(Func<Task> func, Exception exception)
 		{
 			var handled =
-#if WINDOWS
-				exception is SevenZipOpenFailedException szofex && szofex.Result is OperationResult.WrongPassword ||
-				exception is ExtractionFailedException efex && efex.Result is OperationResult.WrongPassword ||
-#endif
 				exception is ArchivePasswordException ||
 				exception is FtpAuthenticationException ||
 				exception is ICSharpCode.SharpZipLib.Zip.ZipException szlzex && szlzex.Message.Contains("password");

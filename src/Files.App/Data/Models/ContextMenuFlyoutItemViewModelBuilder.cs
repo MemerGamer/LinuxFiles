@@ -89,13 +89,8 @@ namespace Files.App.Data.Models
 				viewModel.GlyphFontFamilyName = glyph.FontFamily;
 			}
 
-#if WINDOWS
-			if (command.Key is { } key)
-				viewModel.KeyboardAccelerator = new Microsoft.UI.Xaml.Input.KeyboardAccelerator { Key = key, Modifiers = command.Modifiers };
-#else
 			viewModel.KeyboardAcceleratorKey = command.Key;
 			viewModel.KeyboardAcceleratorModifiers = command.Modifiers;
-#endif
 			viewModel.KeyboardAcceleratorTextOverride = command.HotKeyLabel;
 
 			return viewModel;

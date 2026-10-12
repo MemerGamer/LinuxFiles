@@ -235,34 +235,15 @@ namespace Files.App.ViewModels.UserControls.Widgets
 			{
 				var directoryName = Path.GetDirectoryName(path);
 
-#if !WINDOWS
 				_ = NavigationHelpers.OpenPath(path, ContentPageContext.ShellPage!, FilesystemItemType.File);
-#else
-				_ = Win32Helper.InvokeWin32ComponentAsync(path, ContentPageContext.ShellPage!, workingDirectory: directoryName ?? string.Empty);
-#endif
 			}
 			catch (Exception) { }
 		}
 
 		public bool CheckIsRecentItemsEnabled()
 		{
-#if !WINDOWS
 			// LINUX-TODO(recent): honour org.gnome.desktop.privacy remember-recent-files
 			return true;
-#else
-			using var explorerSubKey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer");
-			using var advSubkey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced");
-			using var userPolicySubkey = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer");
-			using var sysPolicySubkey = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\Explorer");
-			var policySubkey = userPolicySubkey ?? sysPolicySubkey;
-
-			if (Convert.ToBoolean(explorerSubKey?.GetValue("ShowRecent", true)) &&
-				Convert.ToBoolean(advSubkey?.GetValue("Start_TrackDocs", true)) &&
-				!Convert.ToBoolean(policySubkey?.GetValue("NoRecentDocsHistory", false)))
-				return true;
-
-			return false;
-#endif
 		}
 
 		// Event methods
@@ -364,12 +345,6 @@ namespace Files.App.ViewModels.UserControls.Widgets
 				}
 				else
 				{
-#if WINDOWS
-					var listedItem = await UniversalStorageEnumerator.AddFileAsync(file, null, default);
-					var shellPage = ContentPageContext.ShellPage
-						?? throw new InvalidOperationException("The shell page is not available for opening properties.");
-					FilePropertiesHelpers.OpenPropertiesWindow(listedItem!, shellPage);
-#endif
 				}
 			}
 

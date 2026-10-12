@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using TextPreview = Files.App.UserControls.FilePreviews.DesktopTextPreview;
 using ColorCode;
 using Files.App.UserControls.FilePreviews;
@@ -161,4 +160,3 @@ namespace Files.App.ViewModels.Previews
 			=> extension is ".iso" or ".pdf";
 	}
 }
-#endif

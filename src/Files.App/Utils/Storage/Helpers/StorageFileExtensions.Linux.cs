@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using System.IO;
 using Windows.Storage;
 
@@ -91,4 +90,3 @@ namespace Files.App.Utils.Storage
 			=> throw new NotSupportedException("Use IFolder.GetItemsAsync instead of the legacy WinRT storage layer.");
 	}
 }
-#endif

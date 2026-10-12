@@ -51,15 +51,6 @@ namespace Files.App.Actions
 				return;
 			}
 
-#if WINDOWS
-			var res = await Win32Helper.RunPowershellCommandAsync(
-				$"& {Win32Helper.ToPowerShellStringLiteral(_devToolsSettingsService.IDEPath)} {Win32Helper.ToPowerShellStringLiteral(workingDirectory)}",
-				PowerShellExecutionOptions.Hidden
-			);
-
-			if (!res)
-				await DynamicDialogFactory.ShowFor_IDEErrorDialog(_devToolsSettingsService.IDEName);
-#endif
 		}
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)

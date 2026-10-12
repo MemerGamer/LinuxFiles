@@ -112,29 +112,6 @@ namespace Files.App.Data.Models
 						InsertSorted(item);
 				}
 
-#if WINDOWS
-				// The broad file system access consent (ms-settings) only exists on Windows
-				var osDrive = await removableDrivesService.GetPrimaryDriveAsync();
-
-				// Show consent dialog if the OS drive could not be accessed
-				if (osDrive is null)
-				{
-					ShowUserConsentOnInit = true;
-				}
-				else
-				{
-					var osDrivePath = osDrive.Id.EndsWith(Path.DirectorySeparatorChar)
-						? osDrive.Id
-						: $"{osDrive.Id}{Path.DirectorySeparatorChar}";
-
-					bool isOsDriveMissing;
-					lock (Drives)
-						isOsDriveMissing = Drives.All(x => string.IsNullOrEmpty(x.Id) || !Path.GetFullPath(x.Id).Equals(osDrivePath, StringComparison.OrdinalIgnoreCase));
-
-					if (isOsDriveMissing)
-						ShowUserConsentOnInit = true;
-				}
-#endif
 
 				if (watcher.CanBeStarted)
 					watcher.Start();

@@ -835,9 +835,7 @@ namespace Files.App.ViewModels.UserControls
 			if (item is not INavigationControlItem navigationControlItem) return;
 			var navigationPath = item as string;
 
-#if !WINDOWS
 			navigationPath ??= (item as DriveItem)?.Path;
-#endif
 			if (await DriveHelpers.CheckEmptyDrive(navigationPath))
 				return;
 
@@ -1049,24 +1047,16 @@ namespace Files.App.ViewModels.UserControls
 
 		private void MountDevice()
 		{
-#if !WINDOWS
 			_ = DriveHelpers.MountVolumeAsync(rightClickedItem.GetRequiredPath());
-#endif
 		}
 
 		private void UnmountDevice()
 		{
-#if !WINDOWS
 			_ = DriveHelpers.UnmountVolumeAsync(rightClickedItem.GetRequiredPath());
-#endif
 		}
 
 		private static bool IsUnmountedDrive(INavigationControlItem item)
-#if !WINDOWS
 			=> DriveHelpers.IsUnmountedPath(item.Path);
-#else
-			=> false;
-#endif
 
 		private List<ContextMenuFlyoutItemViewModel> GetLocationItemMenuItems(INavigationControlItem item, FlyoutBase menu)
 		{
@@ -1495,11 +1485,7 @@ namespace Files.App.ViewModels.UserControls
 				if (!filesTags.Contains(fileTag.Uid))
 				{
 					filesTags = [.. filesTags, fileTag.Uid];
-#if WINDOWS
-					var fileFRN = await FileTagsHelper.GetFileFRN(item.Item);
-#else
 					var fileFRN = FileTagsHelper.GetFileFRN(path);
-#endif
 					dbInstance.SetTags(path, fileFRN, filesTags);
 					await FileTagsHelper.WriteFileTagAsync(path, filesTags);
 					pathToTags[path] = filesTags;

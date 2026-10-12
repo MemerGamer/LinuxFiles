@@ -38,12 +38,7 @@ namespace Files.App.Services.Settings
 			var settingsSerializer = new DefaultSettingsSerializer(message => App.Logger.LogWarning(message));
 			SettingsSerializer = settingsSerializer;
 
-			#if WINDOWS
-			Initialize(Path.Combine(ApplicationData.Current.LocalFolder.Path,
-				Constants.LocalSettings.SettingsFolderName, Constants.LocalSettings.FileTagSettingsFileName));
-#else
 			Initialize(Ioc.Default.GetRequiredService<Files.Platform.Abstractions.IAppDataPaths>().FileTagsSettingsFilePath);
-#endif
 
 			var jsonSettingsSerializer = new DefaultJsonSettingsSerializer();
 			JsonSettingsSerializer = jsonSettingsSerializer;
@@ -187,21 +182,7 @@ namespace Files.App.Services.Settings
 
 		private void UntagAllFiles(string uid)
 		{
-#if !WINDOWS
 			_ = FileTagsHelper.UntagAllFilesAsync(uid);
-#else
-			var tagDoDelete = new string[] { uid };
-
-			foreach (var item in FileTagsHelper.GetDbInstance().GetAll())
-			{
-				if (item.Tags.Contains(uid))
-				{
-					_ = FileTagsHelper.WriteFileTagAsync(
-						item.FilePath,
-						item.Tags.Except(tagDoDelete).ToArray());
-				}
-			}
-#endif
 		}
 
 		private IJsonSettingsSerializer GetJsonSettingsSerializer()

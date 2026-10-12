@@ -18,29 +18,7 @@ namespace Files.App.Utils.Storage
 
 		#region Delete
 
-#if WINDOWS
-		/// <summary>
-		/// Deletes provided <paramref name="source"/>
-		/// </summary>
-		/// <param name="source">The <paramref name="source"/> to delete</param>
-		/// <param name="showDialog">Determines whether to show delete confirmation dialog</param>
-		/// <param name="permanently">Determines whether <paramref name="source"/> is be deleted permanently</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> DeleteItemsAsync(IEnumerable<IStorageItem> source, DeleteConfirmationPolicies showDialog, bool permanently, bool registerHistory);
-#endif
 
-#if WINDOWS
-		/// <summary>
-		/// Deletes provided <paramref name="source"/>
-		/// </summary>
-		/// <param name="source">The <paramref name="source"/> to delete</param>
-		/// <param name="showDialog">Determines whether to show delete confirmation dialog</param>
-		/// <param name="permanently">Determines whether <paramref name="source"/> is be deleted permanently</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> DeleteItemAsync(IStorageItem source, DeleteConfirmationPolicies showDialog, bool permanently, bool registerHistory);
-#endif
 
 		/// <summary>
 		/// Deletes provided <paramref name="source"/>
@@ -66,27 +44,7 @@ namespace Files.App.Utils.Storage
 
 		#region Restore
 
-#if WINDOWS
-		/// <summary>
-		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source Recycle Bin item path</param>
-		/// <param name="destination">The destination fullPath to restore to</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> RestoreItemFromTrashAsync(IStorageItem source, string destination, bool registerHistory);
-#endif
 
-#if WINDOWS
-		/// <summary>
-		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source Recycle Bin item path</param>
-		/// <param name="destination">The destination fullPath to restore to</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> RestoreItemsFromTrashAsync(IEnumerable<IStorageItem> source, IEnumerable<string> destination, bool registerHistory);
-#endif
 
 		/// <summary>
 		/// Restores <paramref name="source"/> from the RecycleBin to <paramref name="destination"/> fullPath
@@ -105,9 +63,7 @@ namespace Files.App.Utils.Storage
 		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
 		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
 		Task<ReturnResult> RestoreItemsFromTrashAsync(IEnumerable<IStorageItemWithPath> source, IEnumerable<string> destination, bool registerHistory
-#if !WINDOWS
 			, Action<IStorageHistory?>? historyCallback = null
-#endif
 		);
 
 		#endregion Restore
@@ -135,29 +91,7 @@ namespace Files.App.Utils.Storage
 
 		#region Copy
 
-#if WINDOWS
-		/// <summary>
-		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source items to be copied</param>
-		/// <param name="destination">The destination fullPath</param>
-		/// <param name="showDialog">Determines whether to show copy dialog</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> CopyItemsAsync(IEnumerable<IStorageItem> source, IEnumerable<string> destination, bool showDialog, bool registerHistory);
-#endif
 
-#if WINDOWS
-		/// <summary>
-		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source item to be copied</param>
-		/// <param name="destination">The destination fullPath</param>
-		/// <param name="showDialog">Determines whether to show copy dialog</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> CopyItemAsync(IStorageItem source, string destination, bool showDialog, bool registerHistory);
-#endif
 
 		/// <summary>
 		/// Copies <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -168,9 +102,7 @@ namespace Files.App.Utils.Storage
 		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
 		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
 		Task<ReturnResult> CopyItemsAsync(IEnumerable<IStorageItemWithPath> source, IEnumerable<string> destination, bool showDialog, bool registerHistory
-#if !WINDOWS
 			, Action<IStorageHistory?>? historyCallback = null
-#endif
 		);
 
 		/// <summary>
@@ -206,29 +138,7 @@ namespace Files.App.Utils.Storage
 
 		#region Move
 
-#if WINDOWS
-		/// <summary>
-		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source items to be moved</param>
-		/// <param name="destination">The destination fullPath</param>
-		/// <param name="showDialog">Determines whether to show move dialog</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> MoveItemsAsync(IEnumerable<IStorageItem> source, IEnumerable<string> destination, bool showDialog, bool registerHistory);
-#endif
 
-#if WINDOWS
-		/// <summary>
-		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
-		/// </summary>
-		/// <param name="source">The source to move</param>
-		/// <param name="destination">The destination fullPath</param>
-		/// <param name="showDialog">Determines whether to show move dialog</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> MoveItemAsync(IStorageItem source, string destination, bool showDialog, bool registerHistory);
-#endif
 
 		/// <summary>
 		/// Moves <paramref name="source"/> to <paramref name="destination"/> fullPath
@@ -239,9 +149,7 @@ namespace Files.App.Utils.Storage
 		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
 		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
 		Task<ReturnResult> MoveItemsAsync(IEnumerable<IStorageItemWithPath> source, IEnumerable<string> destination, bool showDialog, bool registerHistory
-#if !WINDOWS
 			, Action<IStorageHistory?>? historyCallback = null
-#endif
 		);
 
 		/// <summary>
@@ -271,18 +179,6 @@ namespace Files.App.Utils.Storage
 
 		#endregion Move
 
-#if WINDOWS
-		/// <summary>
-		/// Renames <paramref name="source"/> with <paramref name="newName"/>
-		/// </summary>
-		/// <param name="source">The item to rename</param>
-		/// <param name="newName">Desired new name</param>
-		/// <param name="collision">Determines what to do if item already exists</param>
-		/// <param name="registerHistory">Determines whether <see cref="IStorageHistory"/> is saved</param>
-		/// <param name="showExtensionDialog">Determines wheteher the Extension Modified Dialog is shown</param>
-		/// <returns><see cref="ReturnResult"/> of performed operation</returns>
-		Task<ReturnResult> RenameAsync(IStorageItem source, string newName, NameCollisionOption collision, bool registerHistory, bool showExtensionDialog = true);
-#endif
 
 		/// <summary>
 		/// Renames <paramref name="source"/> fullPath with <paramref name="newName"/>

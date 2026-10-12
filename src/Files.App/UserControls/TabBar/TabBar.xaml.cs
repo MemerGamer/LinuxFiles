@@ -490,7 +490,6 @@ namespace Files.App.UserControls.TabBar
 
 		private void UpdateTitleBarInsets()
 		{
-#if !WINDOWS
 			if (OperatingSystem.IsLinux())
 			{
 				RightPaddingColumn.Width = new(MainWindow.Instance.HasClientSideDecorations ? 146 : 8);
@@ -502,7 +501,6 @@ namespace Files.App.UserControls.TabBar
 				}
 				return;
 			}
-#endif
 			var titleBarInset = ((AppLanguageHelper.IsPreferredLanguageRtl
 				? MainWindow.Instance.AppWindow.TitleBar.LeftInset
 				: MainWindow.Instance.AppWindow.TitleBar.RightInset) / DragAreaRectangle.XamlRoot.RasterizationScale) + 40;

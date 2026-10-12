@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions.Icons;
 using Files.Platform.Abstractions.Mime;
 using Files.Platform.Linux.Icons;
@@ -61,4 +60,3 @@ namespace Files.App.Helpers
 		}
 	}
 }
-#endif

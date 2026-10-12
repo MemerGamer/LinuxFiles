@@ -46,9 +46,7 @@ namespace Files.App.Views.Layouts
 		private DetailsViewSizeKind? itemContainerSize;
 
 		private DispatcherQueueTimer? _autoFitColumnsTimer;
-#if !WINDOWS
 		private ScrollViewer? linuxHeaderScroller;
-#endif
 
 		// Properties
 
@@ -93,14 +91,12 @@ namespace Files.App.Views.Layouts
 		public DetailsLayoutPage() : base()
 		{
 			InitializeComponent();
-#if !WINDOWS
 			HeaderGrid.Margin = new Thickness(0);
 			HeaderGrid.Padding = new Thickness(16, 0, 0, 0);
 			ActualThemeChanged += (_, _) => UpdateLinuxListTheme();
 			HoistSemanticZoomContent(RootGridZoom);
 			InitializeLinuxHeader();
 			Unloaded += (_, _) => DetachLinuxHeaderScroller();
-#endif
 			DataContext = this;
 			var selectionRectangle = RectangleSelection.Create(FileList, SelectionRectangle, FileList_SelectionChanged);
 			selectionRectangle.SelectionStarted += SelectionRectangle_SelectionStarted;
@@ -249,9 +245,7 @@ namespace Files.App.Views.Layouts
 
 		public override void Dispose()
 		{
-#if !WINDOWS
 			DetachLinuxHeaderScroller();
-#endif
 			Bindings.StopTracking();
 			if (FolderSettings is { } folderSettings)
 			{
@@ -808,7 +802,6 @@ namespace Files.App.Views.Layouts
 				itemContainer.ContextFlyout = ItemContextMenuFlyout;
 		}
 
-#if !WINDOWS
 		private void InitializeLinuxHeader()
 		{
 			// Uno cannot animate a scrolling header with GetScrollViewerManipulationPropertySet.
@@ -860,7 +853,6 @@ namespace Files.App.Views.Layouts
 			FileList.RequestedTheme = ActualTheme;
 			HeaderGrid.RequestedTheme = ActualTheme;
 		}
-#endif
 
 		private void Grid_PointerPressed(object sender, PointerRoutedEventArgs e)
 		{
@@ -1151,18 +1143,14 @@ namespace Files.App.Views.Layouts
 
 		private void FileList_Loaded(object sender, RoutedEventArgs e)
 		{
-#if !WINDOWS
 			UpdateLinuxListTheme();
 			DetachLinuxHeaderScroller();
-#endif
 			ContentScroller = FileList.FindDescendant<ScrollViewer>(x => x.Name == "ScrollViewer");
-#if !WINDOWS
 			if (ContentScroller is { } linuxScroller)
 			{
 				linuxScroller.ViewChanged += LinuxContentScroller_ViewChanged;
 				SynchronizeLinuxHeader();
 			}
-#endif
 			const double OffsetCorrection = 88; // HeaderGrid (40) + ListViewHeaderItem (44 + 4 margin)
 
 			if (RootGridZoom is not null)

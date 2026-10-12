@@ -165,10 +165,6 @@ namespace Files.App.Data.Items
 				if (!SetProperty(ref percentageUsed, value))
 					return;
 
-#if WINDOWS
-				if (Type == DriveType.Fixed)
-					ShowStorageSense = percentageUsed >= Constants.Widgets.Drives.LowStorageSpacePercentageThreshold;
-#endif
 			}
 		}
 
@@ -182,9 +178,7 @@ namespace Files.App.Data.Items
 		public string Id
 			=> Path ?? throw new InvalidOperationException("The drive path has not been initialized.");
 		public string Name => Root?.DisplayName
-#if !WINDOWS
 			?? Text // volumes that are not mounted yet have no root folder
-#endif
 			?? throw new InvalidOperationException("The drive root has not been initialized.");
 
 		public object? Children => IsExpandableFolder ? (childItems ??= []) : null;
@@ -260,18 +254,10 @@ namespace Files.App.Data.Items
 			if (imageStream is not null)
 				item.IconData = await imageStream.ToByteArrayAsync();
 
-#if WINDOWS
-			item.Text = type switch
-			{
-				DriveType.CDRom when !string.IsNullOrEmpty(label) => root.DisplayName.Replace(label.Left(32), label),
-				_ => root.DisplayName
-			};
-#else
 			// The label already is the display name (volume label, "<size> Volume" or "File System")
 			item.Text = !string.IsNullOrWhiteSpace(label) ? label : root.DisplayName;
 			if (string.IsNullOrWhiteSpace(item.Text) && root.Path is "/")
 				item.Text = Strings.LinuxFileSystemRoot.GetLocalizedResource();
-#endif
 			item.Type = type;
 			item.MenuOptions = new ContextMenuOptions
 			{
@@ -292,11 +278,9 @@ namespace Files.App.Data.Items
 
 		public async Task UpdatePropertiesAsync()
 		{
-#if !WINDOWS
 			// Not mounted: there is nothing to measure, the size is known from UDisks2
 			if (DriveHelpers.IsUnmountedPath(Path))
 				return;
-#endif
 
 			try
 			{
@@ -326,7 +310,6 @@ namespace Files.App.Data.Items
 					catch { }
 				}
 
-#if !WINDOWS
 				var info = await Task.Run(() =>
 				{
 					if (Files.Platform.Linux.Volumes.HeadlessDriveFixture.Find(Path) is { } synthetic)
@@ -346,7 +329,6 @@ namespace Files.App.Data.Items
 
 				OnPropertyChanged(nameof(ShowDriveDetails));
 				return;
-#endif
 				var root = Root ?? throw new InvalidOperationException("The drive root has not been initialized.");
 				var properties = await root.Properties.RetrievePropertiesAsync((string[])["System.FreeSpace", "System.Capacity", "System.Volume.FileSystem"])
 					.AsTask().WithTimeoutAsync(TimeSpan.FromSeconds(5));
@@ -404,9 +386,7 @@ namespace Files.App.Data.Items
 
 		public async Task LoadThumbnailAsync()
 		{
-#if !WINDOWS
 			IconData ??= await DriveHelpers.GetDriveIconAsync(Type, Constants.ShellIconSizes.Small);
-#endif
 			if (IconData is null && !string.IsNullOrEmpty(DeviceID) && !string.Equals(DeviceID, "network-folder"))
 			{
 				var result = await FileThumbnailHelper.GetIconAsync(

@@ -5,9 +5,6 @@ namespace Files.App.ViewModels.UserControls
 {
 	public sealed partial class StatusCenterViewModel : ObservableObject
 	{
-#if WINDOWS
-		private readonly Files.App.Storage.TaskbarManager _taskbar = Files.App.Storage.TaskbarManager.Default;
-#endif
 
 		public ObservableCollection<StatusCenterItem> StatusCenterItems { get; } = [];
 
@@ -167,26 +164,6 @@ namespace Files.App.ViewModels.UserControls
 
 		private void UpdateTaskbarProgress()
 		{
-#if WINDOWS
-			try
-			{
-				var hwnd = new Windows.Win32.Foundation.HWND(MainWindow.Instance.WindowHandle);
-
-				if (HasAnyItemInProgress)
-				{
-					_taskbar.SetProgressState(hwnd, Windows.Win32.UI.Shell.TBPFLAG.TBPF_NORMAL);
-					_taskbar.SetProgressValue(hwnd, (ulong)Math.Clamp(AverageOperationProgressValue, 0, 100), 100);
-				}
-				else
-				{
-					_taskbar.SetProgressState(hwnd, Windows.Win32.UI.Shell.TBPFLAG.TBPF_NOPROGRESS);
-				}
-			}
-			catch
-			{
-				// Ignore taskbar update failures to avoid interrupting status updates.
-			}
-#endif
 		}
 	}
 }

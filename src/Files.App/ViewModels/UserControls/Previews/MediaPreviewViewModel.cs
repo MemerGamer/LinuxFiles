@@ -25,14 +25,8 @@ namespace Files.App.ViewModels.Previews
 
 		public override Task<List<FileProperty>> LoadPreviewAndDetailsAsync()
 		{
-#if WINDOWS
-			var itemFile = Item.ItemFile
-				?? throw new InvalidOperationException("The media preview item does not have a storage file.");
-			Source = MediaSource.CreateFromStorageFile(itemFile);
-#else
 			// LINUX-TODO(media): desktop shows metadata only (MediaMetadataPreviewViewModel); playback needs libvlc
 			throw new NotSupportedException();
-#endif
 
 			return Task.FromResult(new List<FileProperty>());
 		}

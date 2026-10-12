@@ -1,7 +1,6 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
-#if !WINDOWS
 using Files.Platform.Abstractions.Archives;
 using Files.Shared.Helpers;
 using System.Collections.Concurrent;
@@ -33,4 +32,3 @@ namespace Files.App.Utils.Storage
 		public IAsyncOperation<BaseStorageFile?> CreateFileAsync(Stream contents, string name, CreationCollisionOption options) => Task.FromException<BaseStorageFile?>(new NotSupportedException()).AsAsyncOperation();
 	}
 }
-#endif

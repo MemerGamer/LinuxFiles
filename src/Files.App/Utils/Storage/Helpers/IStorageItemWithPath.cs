@@ -13,9 +13,6 @@ namespace Files.App.Utils.Storage
 
 		public string Path { get; }
 
-#if WINDOWS
-		public IStorageItem? Item { get; }
-#endif
 
 		/// <summary>
 		/// Gets the storable for this item, if one has been resolved; otherwise, <see langword="null"/>.

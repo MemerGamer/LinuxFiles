@@ -36,11 +36,9 @@ namespace Files.App.Actions
 			context.PropertyChanged += Context_PropertyChanged;
 		}
 
-#if !WINDOWS
 		// LINUX-TODO(launching): this Windows command is hidden on Linux.
 		public Task ExecuteAsync(object? parameter = null)
 			=> Task.CompletedTask;
-#endif
 
 		private void Context_PropertyChanged(object? sender, PropertyChangedEventArgs e)
 		{

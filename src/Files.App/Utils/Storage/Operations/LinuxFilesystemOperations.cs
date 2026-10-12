@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Abstractions.FileOperations;
+using Files.App.Utils.FileTags;
 using Files.Platform.Abstractions.Trash;
 using Microsoft.Extensions.Logging;
 using System.IO;
@@ -110,7 +111,7 @@ namespace Files.App.Utils.Storage
 				resolver = _ => ValueTask.FromResult(new ConflictResolution(action, true));
 			}
 
-			return new FileOperationOptions { Progress = progress, ConflictResolver = resolver };
+			return new FileOperationOptions { Progress = progress, ConflictResolver = resolver, PathChanged = FileTagsHelper.UpdatePath };
 		}
 
 		private static IStorageItemWithPath FromResult(string path, FilesystemItemType type)
@@ -306,7 +307,7 @@ namespace Files.App.Utils.Storage
 						if (batch == renamed)
 						{
 							// LINUX-TODO(fileops): a pre-existing item with the source name in the destination can clash with this staging step
-							var rename = await _fileOperations.RenameAsync(resultPath, Path.GetFileName(entry.Dest.TrimEnd('/')), cancellationToken: cancellationToken);
+							var rename = await _fileOperations.RenameAsync(resultPath, Path.GetFileName(entry.Dest.TrimEnd('/')), options: OptionsFor(FileNameConflictResolveOptionType.None, null), cancellationToken: cancellationToken);
 							if (rename.Succeeded && rename.ResultPath is not null)
 								resultPath = rename.ResultPath;
 							else
@@ -372,7 +373,9 @@ namespace Files.App.Utils.Storage
 					if (result.Succeeded)
 					{
 						var src = distinct.First(s => s.Path == result.Source);
-						succeeded.Add((src, result.Item?.TrashedPath ?? result.ResultPath));
+						var trashedPath = result.Item?.TrashedPath ?? result.ResultPath;
+						FileTagsHelper.UpdatePath(src.Path, trashedPath, true, true);
+						succeeded.Add((src, trashedPath));
 					}
 					else
 					{
@@ -389,7 +392,10 @@ namespace Files.App.Utils.Storage
 				{
 					var src = distinct.FirstOrDefault(s => s.Path == result.Source || s.Path == result.Item?.TrashedPath);
 					if (result.Succeeded && src is not null)
+					{
+						FileTagsHelper.UpdatePath(src.Path, null, true, false);
 						succeeded.Add((src, null));
+					}
 					else if (!result.Succeeded)
 						failed = true;
 				}
@@ -397,7 +403,7 @@ namespace Files.App.Utils.Storage
 			else
 			{
 				var adapter = new ProgressAdapter(fsProgress, 0, 0);
-				var results = await _fileOperations.DeleteAsync(paths, new FileOperationOptions { Progress = adapter }, cancellationToken);
+				var results = await _fileOperations.DeleteAsync(paths, new FileOperationOptions { Progress = adapter, PathChanged = FileTagsHelper.UpdatePath }, cancellationToken);
 				foreach (var result in results)
 				{
 					if (result.Succeeded)
@@ -449,7 +455,7 @@ namespace Files.App.Utils.Storage
 			{
 				NameCollisionOption.ReplaceExisting => OptionsFor(FileNameConflictResolveOptionType.ReplaceExisting, null),
 				NameCollisionOption.GenerateUniqueName => OptionsFor(FileNameConflictResolveOptionType.GenerateNewName, null),
-				_ => null,
+				_ => OptionsFor(FileNameConflictResolveOptionType.None, null),
 			};
 
 			var result = await _fileOperations.RenameAsync(source.Path, newName, options, cancellationToken);
@@ -494,6 +500,7 @@ namespace Files.App.Utils.Storage
 				if (src is null)
 					continue;
 
+				FileTagsHelper.UpdatePath(src.Path, result.ResultPath ?? result.Item?.OriginalPath, true, true);
 				movedSources.Add(src);
 				movedDestinations.Add(FromResult(result.ResultPath ?? result.Item?.OriginalPath ?? string.Empty, src.ItemType));
 			}

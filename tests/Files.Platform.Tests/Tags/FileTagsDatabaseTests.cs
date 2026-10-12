@@ -12,6 +12,107 @@ namespace Files.Platform.Tests.Tags
 	public sealed class FileTagsDatabaseTests
 	{
 		[TestMethod]
+		public async System.Threading.Tasks.Task Move_PartialMergeOnlyRekeysCompletedChildren()
+		{
+			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				var db = new FileTagsDatabase(Path.Combine(root, "tags.json"));
+				var source = Path.Combine(root, "source", "folder");
+				var destination = Path.Combine(root, "destination");
+				var target = Path.Combine(destination, "folder");
+				Directory.CreateDirectory(source);
+				Directory.CreateDirectory(target);
+				foreach (var name in new[] { "move", "skip" })
+				{
+					File.WriteAllText(Path.Combine(source, name), name);
+					db.SetTags(Path.Combine(source, name), null, [name], true);
+				}
+				File.WriteAllText(Path.Combine(target, "skip"), "existing");
+				db.SetTags(source, null, ["source-root"]);
+				db.SetTags(target, null, ["destination-root"]);
+				var options = new Files.Platform.Abstractions.FileOperations.FileOperationOptions
+				{
+					PathChanged = db.UpdatePath,
+					ConflictResolver = conflict => System.Threading.Tasks.ValueTask.FromResult(
+						new Files.Platform.Abstractions.FileOperations.ConflictResolution(
+							Path.GetFileName(conflict.Source) == "skip"
+								? Files.Platform.Abstractions.FileOperations.ConflictAction.Skip
+								: Files.Platform.Abstractions.FileOperations.ConflictAction.Overwrite))
+				};
+				var service = new Files.Platform.Linux.FileOperations.LinuxFileOperationsService();
+				await service.MoveAsync([source], destination, options);
+				Assert.IsTrue(File.Exists(Path.Combine(source, "skip")));
+				Assert.IsFalse(db.IsXattrStale(Path.Combine(source, "move")));
+				Assert.IsTrue(db.IsXattrStale(Path.Combine(target, "move")));
+				Assert.IsTrue(db.IsXattrStale(Path.Combine(source, "skip")));
+				CollectionAssert.AreEqual(new[] { "source-root" }, db.GetTags(source, null));
+				CollectionAssert.AreEqual(new[] { "destination-root" }, db.GetTags(target, null));
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
+		public async System.Threading.Tasks.Task Operations_RekeyTreesAndRemoveDeletedTags()
+		{
+			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				var databasePath = Path.Combine(root, "tags.json");
+				var db = new FileTagsDatabase(databasePath);
+				var folder = Path.Combine(root, "folder");
+				Directory.CreateDirectory(folder);
+				File.WriteAllText(Path.Combine(folder, "file"), "content");
+				db.SetTags(folder, null, ["folder-tag"]);
+				db.SetTags(Path.Combine(folder, "file"), null, [], true);
+				db.SetTags(folder + "-neighbor", null, ["neighbor"]);
+				var options = new Files.Platform.Abstractions.FileOperations.FileOperationOptions { PathChanged = db.UpdatePath };
+				var service = new Files.Platform.Linux.FileOperations.LinuxFileOperationsService((_, _) => false);
+				var rename = await service.RenameAsync(folder, "renamed", options);
+				Assert.IsTrue(rename.Succeeded);
+				var renamed = Path.Combine(root, "renamed");
+				Assert.IsFalse(db.IsXattrStale(Path.Combine(folder, "file")));
+				Assert.IsTrue(new FileTagsDatabase(databasePath).IsXattrStale(Path.Combine(renamed, "file")));
+				var destination = Path.Combine(root, "destination");
+				Directory.CreateDirectory(destination);
+				var moved = await service.MoveAsync([renamed], destination, options);
+				Assert.IsTrue(moved[0].Succeeded);
+				var target = Path.Combine(destination, "renamed");
+				CollectionAssert.AreEqual(new[] { "folder-tag" }, db.GetTags(target, null));
+				Assert.IsTrue(db.IsXattrStale(target));
+				Assert.IsTrue(db.IsXattrStale(Path.Combine(target, "file")));
+				var deleted = await service.DeleteAsync([target], options);
+				Assert.IsTrue(deleted[0].Succeeded);
+				var reloaded = new FileTagsDatabase(databasePath);
+				Assert.IsFalse(reloaded.IsXattrStale(Path.Combine(target, "file")));
+				Assert.AreEqual(0, reloaded.GetTags(target, null).Length);
+				CollectionAssert.AreEqual(new[] { "neighbor" }, reloaded.GetTags(folder + "-neighbor", null));
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
+		public void UpdatePath_UntaggedReplacementClearsDestinationAndDeletionClearsStaleEntries()
+		{
+			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				var path = Path.Combine(root, "tags.json");
+				var db = new FileTagsDatabase(path);
+				db.SetTags("/destination", null, ["old"], true);
+				db.UpdatePath("/source", "/destination", false);
+				Assert.IsFalse(new FileTagsDatabase(path).IsXattrStale("/destination"));
+				db.SetTags("/folder/empty", null, [], true);
+				db.UpdatePath("/folder", null, true);
+				Assert.IsFalse(new FileTagsDatabase(path).IsXattrStale("/folder/empty"));
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
 		public void Save_SkipsEmptyAndEqualTagsAndKeepsInputAndOutputIsolated()
 		{
 			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));

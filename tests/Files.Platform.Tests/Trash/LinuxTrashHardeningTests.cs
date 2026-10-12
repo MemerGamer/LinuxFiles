@@ -18,6 +18,44 @@ namespace Files.Platform.Tests.Trash
 	public sealed partial class LinuxTrashServiceTests
 	{
 		[TestMethod]
+		[DataRow("files")]
+		[DataRow("info")]
+		public async Task Empty_PartialLayout_DeletesExistingChild(string child)
+		{
+			var item = Single(await _service.TrashAsync([WriteFile(_home, "entry")])).Item!;
+			Directory.Delete(Path.Combine(HomeTrash, child == "files" ? "info" : "files"), true);
+			await _service.EmptyAsync();
+			Assert.IsEmpty(Directory.GetFileSystemEntries(Path.Combine(HomeTrash, child)));
+		}
+
+		[TestMethod]
+		[DataRow(false)]
+		[DataRow(true)]
+		public async Task Empty_AncestorSwapDuringTrustCheck_PreservesOutsideEntries(bool shared)
+		{
+			var item = Single(await _service.TrashAsync([WriteFile(_home, "entry")])).Item!;
+			var parent = shared ? Path.Combine(_usb, ".Trash") : _dataHome;
+			var leaf = shared ? Uid.ToString(System.Globalization.CultureInfo.InvariantCulture) : "Trash";
+			if (shared)
+			{
+				PlantEntry(Path.Combine(parent, leaf), "entry");
+				File.SetUnixFileMode(parent, UnixFileMode.StickyBit | UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+			}
+			var outside = Path.Combine(_root, "outside");
+			var victim = WriteFile(Path.Combine(outside, leaf, "files"), "victim");
+			Directory.CreateDirectory(Path.Combine(outside, leaf, "info"));
+			_inspector.AfterInspect = path =>
+			{
+				if (path != Path.Combine(parent, leaf, "info")) return;
+				_inspector.AfterInspect = null;
+				Directory.Move(parent, parent + ".old");
+				Directory.CreateSymbolicLink(parent, outside);
+			};
+			try { await _service.EmptyAsync(); } catch (IOException) { }
+			Assert.IsTrue(File.Exists(victim));
+		}
+
+		[TestMethod]
 		[DataRow("Trash")]
 		[DataRow("files")]
 		[DataRow("info")]

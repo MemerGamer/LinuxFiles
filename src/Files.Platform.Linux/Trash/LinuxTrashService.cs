@@ -180,10 +180,17 @@ namespace Files.Platform.Linux.Trash
 					try
 					{
 						using var root = OpenTrashRoot(location);
-						using var files = DirectoryHandle.OpenChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
-						using var info = DirectoryHandle.OpenChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
-						foreach (var directory in new[] { files, info })
+						foreach (var child in new[] { FilesDirectoryName, InfoDirectoryName })
 						{
+							var path = Path.Combine(location.Root, child);
+							using var directory = DirectoryHandle.TryOpen(root.Descriptor, child, path, true, out var errno);
+							if (directory is null)
+							{
+								if (PosixNative.IsNotFound(errno)) continue;
+								failures++;
+								continue;
+							}
+							ValidateTrustedDirectory(directory);
 							foreach (var name in directory.ListNames())
 							{
 								cancellationToken.ThrowIfCancellationRequested();
@@ -354,8 +361,8 @@ namespace Files.Platform.Linux.Trash
 				try
 				{
 					using var root = OpenTrashRoot(location);
-					using var files = DirectoryHandle.OpenChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
-					using var info = DirectoryHandle.OpenChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
+					using var files = OpenTrustedChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
+					using var info = OpenTrustedChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
 					var cache = new DirectorySizesCache(location.Root, root);
 					foreach (var infoName in info.ListNames().Where(n => n.EndsWith(TrashInfoFile.Extension, StringComparison.Ordinal)))
 					{
@@ -442,8 +449,8 @@ namespace Files.Platform.Linux.Trash
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
 			using var trashRoot = OpenTrashRoot(location);
-			using var files = DirectoryHandle.OpenChild(trashRoot.Descriptor, FilesDirectoryName, location.FilesDirectory);
-			using var info = DirectoryHandle.OpenChild(trashRoot.Descriptor, InfoDirectoryName, location.InfoDirectory);
+			using var files = OpenTrustedChild(trashRoot.Descriptor, FilesDirectoryName, location.FilesDirectory);
+			using var info = OpenTrustedChild(trashRoot.Descriptor, InfoDirectoryName, location.InfoDirectory);
 			if (!files.EntryExists(name))
 				return TrashOperationResult.Failure(item.TrashedPath, "The trashed item no longer exists.");
 
@@ -547,8 +554,8 @@ namespace Files.Platform.Linux.Trash
 				return TrashOperationResult.Failure(item.TrashedPath, "The item is not located in a trash folder.");
 
 			using var root = OpenTrashRoot(location);
-			using var files = DirectoryHandle.OpenChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
-			using var info = DirectoryHandle.OpenChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
+			using var files = OpenTrustedChild(root.Descriptor, FilesDirectoryName, location.FilesDirectory);
+			using var info = OpenTrustedChild(root.Descriptor, InfoDirectoryName, location.InfoDirectory);
 			if (files.EntryExists(name))
 			{
 				_options.FileOperationsHooks?.BeforeDeleteEntry?.Invoke(item.TrashedPath);
@@ -892,8 +899,31 @@ namespace Files.Platform.Linux.Trash
 			}
 		}
 
-		private static DirectoryHandle OpenTrashRoot(TrashLocation location)
-			=> DirectoryHandle.OpenPath(Path.Combine(RealPath(Path.GetDirectoryName(location.Root)!), Path.GetFileName(location.Root)));
+		private DirectoryHandle OpenTrashRoot(TrashLocation location)
+		{
+			// Walk every component with openat/O_NOFOLLOW; never resolve a checked ancestor again.
+			using var parent = DirectoryHandle.OpenPath(Path.GetDirectoryName(location.Root)!);
+			if (location.TopDirectory is not null && Path.GetFileName(parent.Path) == ".Trash")
+			{
+				if (!PosixNative.TryStat(parent.Descriptor, out var shared) || (shared.Mode & 0x200) == 0)
+					throw new IOException("Shared trash directory is not sticky.");
+			}
+			return OpenTrustedChild(parent.Descriptor, Path.GetFileName(location.Root), location.Root);
+		}
+
+		private DirectoryHandle OpenTrustedChild(int descriptor, string name, string path)
+		{
+			var directory = DirectoryHandle.OpenChild(descriptor, name, path);
+			try { ValidateTrustedDirectory(directory); return directory; }
+			catch { directory.Dispose(); throw; }
+		}
+
+		private void ValidateTrustedDirectory(DirectoryHandle directory)
+		{
+			if (!PosixNative.TryStat(directory.Descriptor, out var stat) || !stat.IsDirectory ||
+				stat.OwnerUserId != _options.UserId || (stat.Mode & 0x12) != 0)
+				throw new IOException("Trash directory is not trusted.");
+		}
 
 		private static FileStream OpenMetadataAt(int descriptor, string name, string path)
 		{

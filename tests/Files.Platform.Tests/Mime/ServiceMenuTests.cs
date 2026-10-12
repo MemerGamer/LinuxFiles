@@ -29,6 +29,21 @@ namespace Files.Platform.Tests.Mime
 			new(fx.Directories, new LinuxMimeTypeService(fx.Directories, CultureInfo.InvariantCulture), CultureInfo.GetCultureInfo("fr-FR"));
 
 		[TestMethod]
+		public void Expansion_RejectsResolvedShellAliasesInWrappers()
+		{
+			var path = Path.Combine(Path.GetTempPath(), "shell-alias-" + Guid.NewGuid().ToString("N"));
+			File.CreateSymbolicLink(path, "/bin/sh");
+			try
+			{
+				foreach (var exec in new[] { path + " -c code", "env VAR=bash " + path + " script", "env rbash -c code", "env tcsh script" })
+					Assert.AreEqual(0, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a"]).Count, exec);
+				foreach (var exec in new[] { "env VAR=bash tool %f", "bash --version", "tool VAR=bash %f" })
+					Assert.AreEqual(1, DesktopExecExpander.ExpandServiceMenu(new DesktopApplication("run", "Run", exec, "/menu.desktop"), ["/a"]).Count, exec);
+			}
+			finally { File.Delete(path); }
+		}
+
+		[TestMethod]
 		public async Task Cache_ReusesParsingButRefiltersAndInvalidatesChanges()
 		{
 			using var fx = new XdgFixture();

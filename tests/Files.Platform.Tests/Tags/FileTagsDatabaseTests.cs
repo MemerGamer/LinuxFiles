@@ -54,6 +54,51 @@ namespace Files.Platform.Tests.Tags
 		}
 
 		[TestMethod]
+		[DataRow(false, false)]
+		[DataRow(false, true)]
+		[DataRow(true, false)]
+		[DataRow(true, true)]
+		public async System.Threading.Tasks.Task Move_CompleteMergePreservesDestinationRootTags(bool crossDevice, bool taggedSource)
+		{
+			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));
+			Directory.CreateDirectory(root);
+			try
+			{
+				var databasePath = Path.Combine(root, "tags.json");
+				var db = new FileTagsDatabase(databasePath);
+				var source = Path.Combine(root, "source", "folder");
+				var destination = Path.Combine(root, "destination");
+				var target = Path.Combine(destination, "folder");
+				Directory.CreateDirectory(source);
+				Directory.CreateDirectory(target);
+				File.WriteAllText(Path.Combine(source, "child"), "data");
+				db.SetTags(Path.Combine(source, "child"), null, ["child"]);
+				if (taggedSource)
+					db.SetTags(source, null, ["source-root"], true);
+				db.SetTags(target, null, ["destination-root"], true);
+				var options = new Files.Platform.Abstractions.FileOperations.FileOperationOptions
+				{
+					PathChanged = db.UpdatePath,
+					ConflictResolver = _ => System.Threading.Tasks.ValueTask.FromResult(
+						new Files.Platform.Abstractions.FileOperations.ConflictResolution(
+							Files.Platform.Abstractions.FileOperations.ConflictAction.Overwrite))
+				};
+				var service = new Files.Platform.Linux.FileOperations.LinuxFileOperationsService((_, _) => !crossDevice);
+				var results = await service.MoveAsync([source], destination, options);
+				Assert.IsTrue(results[0].Succeeded);
+				Assert.IsFalse(Directory.Exists(source));
+				var reloaded = new FileTagsDatabase(databasePath);
+				CollectionAssert.AreEqual(new[] { "destination-root" }, reloaded.GetTags(target, null));
+				Assert.IsTrue(reloaded.IsXattrStale(target));
+				Assert.AreEqual(0, reloaded.GetTags(source, null).Length);
+				Assert.IsFalse(reloaded.IsXattrStale(source));
+				CollectionAssert.AreEqual(new[] { "child" }, reloaded.GetTags(Path.Combine(target, "child"), null));
+				Assert.AreEqual(crossDevice, reloaded.IsXattrStale(Path.Combine(target, "child")));
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
 		public async System.Threading.Tasks.Task Operations_RekeyTreesAndRemoveDeletedTags()
 		{
 			var root = Path.Combine(Path.GetTempPath(), "files-tags-" + Guid.NewGuid().ToString("N"));

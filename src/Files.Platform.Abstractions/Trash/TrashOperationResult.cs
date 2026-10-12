@@ -18,6 +18,9 @@ namespace Files.Platform.Abstractions.Trash
 		string? ResultPath = null,
 		TrashItem? Item = null)
 	{
+		/// <summary>Whether copying the item lost its extended attributes.</summary>
+		public bool XattrStale { get; init; }
+
 		/// <summary>
 		/// Creates a successful result.
 		/// </summary>

@@ -374,7 +374,7 @@ namespace Files.App.Utils.Storage
 					{
 						var src = distinct.First(s => s.Path == result.Source);
 						var trashedPath = result.Item?.TrashedPath ?? result.ResultPath;
-						FileTagsHelper.UpdatePath(src.Path, trashedPath, true, true);
+						FileTagsHelper.UpdatePath(src.Path, trashedPath, true, result.XattrStale);
 						succeeded.Add((src, trashedPath));
 					}
 					else
@@ -500,7 +500,7 @@ namespace Files.App.Utils.Storage
 				if (src is null)
 					continue;
 
-				FileTagsHelper.UpdatePath(src.Path, result.ResultPath ?? result.Item?.OriginalPath, true, true);
+				FileTagsHelper.UpdatePath(src.Path, result.ResultPath ?? result.Item?.OriginalPath, true, result.XattrStale);
 				movedSources.Add(src);
 				movedDestinations.Add(FromResult(result.ResultPath ?? result.Item?.OriginalPath ?? string.Empty, src.ItemType));
 			}

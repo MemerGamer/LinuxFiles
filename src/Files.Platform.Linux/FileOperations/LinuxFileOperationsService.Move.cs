@@ -128,7 +128,7 @@ namespace Files.Platform.Linux.FileOperations
 				try
 				{
 					PosixNative.UnlinkAt(sourceParent.Descriptor, Path.GetFileName(source), PosixNative.AtRemoveDir, source);
-					context.PathChanged(source, destination, xattrStale: true);
+					context.PathChanged(source, created ? destination : null, xattrStale: created);
 				}
 				catch (IOException ex) when (ex.HResult == 39 && sourceDirectory.ListNames().Count > 0)
 				{

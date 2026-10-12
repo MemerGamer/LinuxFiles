@@ -16,6 +16,7 @@ using Files.Platform.Abstractions.Archives;
 using Files.App.Storage.Archives;
 using Files.Platform.Abstractions.FileOperations;
 using Files.Platform.Linux.Archives;
+using Files.Platform.Linux.Native;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Files.Platform.Tests.Archives
@@ -44,6 +45,53 @@ namespace Files.Platform.Tests.Archives
 		{
 			if (Directory.Exists(root))
 				Directory.Delete(root, true);
+		}
+
+		[TestMethod]
+		public async Task ExtractionPublishesWithoutOpenAt2()
+		{
+			var zip = ZipWith(Path.Combine(Work, "fallback.zip"),
+				("plain.txt", Encoding.UTF8.GetBytes("plain")),
+				("one/two/nested.txt", Encoding.UTF8.GetBytes("nested")));
+			ElevationNative.OpenBeneathError.Value = 38;
+			try
+			{
+				var result = await service.ExtractAsync(zip, Out);
+				Assert.IsTrue(result.Succeeded);
+				Assert.AreEqual("plain", File.ReadAllText(Path.Combine(Out, "plain.txt")));
+				Assert.AreEqual("nested", File.ReadAllText(Path.Combine(Out, "one/two/nested.txt")));
+			}
+			finally { ElevationNative.OpenBeneathError.Value = null; }
+		}
+
+		[TestMethod]
+		[DataRow("../outside")]
+		[DataRow("/tmp")]
+		[DataRow("link")]
+		[DataRow("link/child")]
+		public void OpenBeneathFallbackRejectsEscapes(string relative)
+		{
+			Directory.CreateDirectory(Path.Combine(Work, "child"));
+			Directory.CreateSymbolicLink(Path.Combine(Out, "link"), Work);
+			var fd = ElevationNative.Open(PosixNative.AtFdCwd, Out, PosixNative.PathFlags | PosixNative.ODirectory, true);
+			ElevationNative.OpenBeneathError.Value = 38;
+			try
+			{
+				Assert.ThrowsExactly<IOException>(() => ElevationNative.OpenBeneath(fd, relative, PosixNative.PathFlags));
+			}
+			finally
+			{
+				ElevationNative.OpenBeneathError.Value = null;
+				PosixNative.Close(fd);
+			}
+		}
+
+		[TestMethod]
+		public void OpenBeneathDoesNotFallbackForPermissionErrors()
+		{
+			ElevationNative.OpenBeneathError.Value = 13;
+			try { Assert.ThrowsExactly<UnauthorizedAccessException>(() => ElevationNative.OpenBeneath(PosixNative.AtFdCwd, ".", PosixNative.PathFlags)); }
+			finally { ElevationNative.OpenBeneathError.Value = null; }
 		}
 
 		private string MakeTree()

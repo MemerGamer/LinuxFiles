@@ -126,7 +126,6 @@ namespace Files.Platform.Tests.Launching
 			using var fx = new XdgFixture();
 			var (svc, starter) = Create(fx);
 			var script = fx.Write("home/run.sh", "echo hi\n");
-			if (OperatingSystem.IsWindows()) return;
 			File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
 			var link = Path.Combine(fx.Home, "link.sh");
 			File.CreateSymbolicLink(link, script);
@@ -135,7 +134,6 @@ namespace Files.Platform.Tests.Launching
 			Assert.IsFalse(await svc.OpenAsync([link]));
 			Assert.AreEqual(0, starter.Launches.Count);
 
-			if (OperatingSystem.IsWindows()) return;
 			File.SetUnixFileMode(script, UnixFileMode.UserRead | UnixFileMode.UserWrite);
 			Assert.IsTrue(await svc.OpenAsync([script]));
 			Assert.AreEqual("xdg-open", starter.Launches.Single().FileName);

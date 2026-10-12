@@ -10,7 +10,7 @@ Uno 6.7's X11 host cannot publish file lists on the clipboard (`X11ClipboardExte
 | `IClipboardService`, `IFileDragSource` | `src/Files.Platform.Abstractions/Clipboard` |
 | Format logic (pure, unit tested) | `Files.Platform.Linux/Clipboard/ClipboardFormats.cs` |
 | X11 selection owner, requestor and XDND source | `Files.Platform.Linux/Clipboard/X11SelectionHost.cs` (Xlib via `LibraryImport` in `Native/X11Native.cs`) |
-| Files glue (`#if !WINDOWS` one-line hooks) | `Files.App/Platforms/Desktop/Services/DesktopFileDragHelper.cs` |
+| Files desktop glue | `Files.App/Platforms/Desktop/Services/DesktopFileDragHelper.cs` |
 | Crash guard for Uno's failed native drag | `Files.App/Platforms/Desktop/DesktopRuntimeGuards.cs` |
 
 ### Why our own Xlib connection and no managed X11 client

@@ -1,6 +1,6 @@
 # Upstream policy
 
-LinuxFiles is now an independent Linux fork of [Files](https://github.com/files-community/Files). `main` is the integration branch. We no longer merge upstream branches or run an automatic sync workflow.
+LinuxFiles is now an independent Linux fork of [Files](https://github.com/files-community/Files). `main` is the integration branch. There is no upstream sync: we do not merge upstream branches or run an automatic sync workflow. Windows is no longer supported.
 
 The `upstream` remote for `files-community/Files` stays read-only: fetch and inspect its history, but never push to it, target it with pull requests, or post comments there as part of work on this fork.
 
@@ -8,4 +8,4 @@ Bring over individual fixes selectively with `git cherry-pick -x <commit>`, on a
 
 Preserve `LICENSE-MIT`, `LICENSE-MPL`, `NOTICE.md`, `.github/NOTICE.md`, applicable file headers, and Files Community contributor credit. MIT notices continue to apply to inherited MIT code; MPL terms continue to apply to files bearing MPL headers. Independence does not change those licenses or imply endorsement by the Files Community.
 
-Stage 1 removes the Windows leaf projects and their build references, Windows CI and MSIX packaging, and the former sync/pruning automation. Windows code inside `Files.App`, including `#if WINDOWS` branches, remains for later stages.
+Windows leaf projects, Windows CI/MSIX packaging and the former sync/pruning automation have been removed. The Windows conditional blocks and `*.Windows.cs` files have also been removed. Remaining Windows-specific code is being deleted after checking for Linux consumers. Historical porting plans are archived context, not current build or maintenance instructions.

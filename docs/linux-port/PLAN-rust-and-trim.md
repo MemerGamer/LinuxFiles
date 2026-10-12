@@ -1,3 +1,5 @@
+> **Archived historical document.** This records an earlier plan or investigation, not current developer guidance. LinuxFiles is an independent Linux-only fork with no upstream sync or Windows support. See the [current policy](upstream-policy.md) and [developer guidance](../../AGENTS.md).
+
 # Plan: keep Uno, Rust backend, drop Windows code
 
 Decision (user, 2026-10-09): keep Uno for the UI, move hot backend paths to Rust, and remove Windows-specific code from the independent fork. Supersedes the "Rust no-go until benchmark" verdict in `investigations/rust.md` only in direction; the benchmark gate still applies per component.

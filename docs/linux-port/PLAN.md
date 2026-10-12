@@ -1,3 +1,5 @@
+> **Archived historical document.** This records an earlier plan or investigation, not current developer guidance. LinuxFiles is an independent Linux-only fork with no upstream sync or Windows support. See the [current policy](upstream-policy.md) and [developer guidance](../../AGENTS.md).
+
 # Files on Linux — Porting Plan
 
 > **Branching (2026-10-05):** `main` is the single integration branch. `linux/main` is retired (frozen at the last merge). Releases are tags: the rolling `nightly` pre-release (every push to `main`) and stable `linux-v*` tags.

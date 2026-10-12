@@ -1,36 +1,28 @@
-# Rules for agents working on the Linux port
+# Linux developer rules
 
-Read this first, then `PLAN.md` §0, then `CLAUDE.md`.
+Read [AGENTS.md](../../AGENTS.md) and the [independent-fork policy](upstream-policy.md). Porting plans are archived context. LinuxFiles supports Linux only and has no upstream sync.
 
-## Machine etiquette (the owner uses this machine, often for games, while agents work)
-- Never run the app on the real display. Don't use `DISPLAY=:0` or `WAYLAND_DISPLAY`, and don't run xdotool, screenshots or input against it. Run the app only through `scripts/linux/headless-run.sh`, which uses a private Xvfb display, a sandboxed throwaway HOME and cleans up after itself. Its `-a` actions file sends xdotool input and takes screenshots on the private display.
-- Never change desktop or system settings (gsettings, kwriteconfig, portal writes, xdg-mime defaults, ~/.config of the real user).
-- Build at low priority without leftover MSBuild nodes:
-  `MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet build src/Files.App -f net10.0-desktop -nodeReuse:false -m:2`
-- Tests: `MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet build tests/Files.Platform.Tests -nodeReuse:false -m:2 -warnaserror` then `nice -n 19 dotnet test --project tests/Files.Platform.Tests/Files.Platform.Tests.csproj --no-build`.
-- Kill every process you start. Leave nothing running.
-- At most one app build or test run at a time per agent (`-m:2` caps CPU). Avoid needless full rebuilds.
+## Machine and privacy
 
-## Privacy
-- Only commit screenshots made with the sandboxed HOME. headless-run.sh gives the app synthetic drives (`FILES_SANDBOX_DRIVES`, honoured only in sandboxed headless mode), so real drive labels no longer appear; still view every PNG before committing. `scripts/linux/showcase.sh` regenerates the showcase shots.
-- Never commit anything from the real home directory.
+- Use `scripts/linux/headless-run.sh` for app runs. It supplies a private Xvfb display, throwaway home and cleanup. Never run against the user's display or capture their desktop.
+- Do not alter the user's desktop settings, default applications or real home configuration.
+- Inspect headless screenshots before sharing them. Never commit private home data.
+- Run builds sequentially and clean up processes you start.
 
-## Git / GitHub
-- Branch from `origin/main` (the single integration branch; releases are tags: `nightly` rolling, `linux-v*` stable): `git fetch origin && git switch -c linux/<wp> origin/main`.
-- Commit trailer: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
-- Push: `git -c credential.helper='!gh auth git-credential' push -u origin linux/<wp>`.
-- PR: `gh pr create -R MemerGamer/LinuxFiles --base main --head linux/<wp> ...`. The body ends with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
-- Never target, push to, or comment on upstream `files-community/Files`.
+## Validation
 
-## Code
-- Linux-first: the Windows build need not stay green, but keep Windows code paths intact (`#if WINDOWS`, `*.Linux.cs` partials, desktop-only Compile items).
-- Route OS functionality through `Files.Platform.Abstractions` services implemented in `Files.Platform.Linux` (unit-tested in `tests/Files.Platform.Tests`). Don't call Win32 on Linux.
-- Native interop only via `[LibraryImport]` in `src/Files.Platform.Linux/Native/`. No `DllImport`/`ComImport`.
-- Mark stubs `// LINUX-TODO(<area>): ...`.
-- Keep edits to shared files scoped. New strings in `Strings/en-US/Resources.resw` are append-only.
-- This fork is independent: no upstream merges or automatic sync. Selectively cherry-pick reviewed fixes with attribution; follow [upstream-policy.md](upstream-policy.md).
-- Security: treat file names, `.desktop` files, archives and anything from disk as untrusted. No shell interpolation. Use fd-relative ops for recursive destructive actions (`Native/PosixNative`).
-- Match the surrounding style (license header, tabs, block namespaces).
+```sh
+dotnet build src/Files.App -f net10.0-desktop
+dotnet build tests/Files.Platform.Tests
+dotnet test --project tests/Files.Platform.Tests/Files.Platform.Tests.csproj --no-build
+```
 
-## Report back
-PR URL, what works (with headless screenshot paths), what's stubbed (LINUX-TODOs), remaining issues, and any hooks you need from other workstreams.
+Use focused reference searches when the desktop toolchain is unavailable, and report that limitation. Before deletion, check source, XAML, project exclusions and tests for Linux consumers.
+
+## Implementation and review
+
+- Use existing services in `Files.Platform.Abstractions` and implementations in `Files.Platform.Linux`.
+- Prefer existing native wrappers and `LibraryImport`. Treat filenames, desktop entries and archives as untrusted; avoid shell interpolation.
+- Follow surrounding style and localization patterns. Preserve licenses, notices and attribution.
+- Keep changes scoped and preserve CRLF where present. Commit, push or open PRs only when requested, targeting this fork.
+- Report behavior changes, verification, unresolved issues and dependencies on other workstreams.

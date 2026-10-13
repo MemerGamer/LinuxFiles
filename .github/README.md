@@ -169,7 +169,7 @@ Submit focused pull requests to `main` in [MemerGamer/LinuxFiles](https://github
 
 ## Credits
 
-- **[Files Community](https://github.com/files-community)** and all [upstream contributors](https://github.com/files-community/Files/graphs/contributors): the Files app, its design, code and translations (via [Crowdin](https://crowdin.com/project/files-app)) that this port is built on. Files is MIT licensed, Copyright (c) 2018 - present Files Community.
+- **[Files Community](https://github.com/files-community)** and all [upstream contributors](https://github.com/files-community/Files/graphs/contributors): the Files app, its design, code and translations (via [Crowdin](https://crowdin.com/project/files-app)) that this port is built on. Files is licensed under the MIT License, with some files under the Mozilla Public License 2.0 (MPL-2.0), Copyright (c) 2018 - present Files Community.
 - **[Uno Platform](https://platform.uno/)**: WinUI on Skia/X11 for Linux, which makes this port possible.
 - **[SkiaSharp](https://github.com/mono/SkiaSharp)**, **[Selawik](https://github.com/microsoft/Selawik)** (UI font) and **Uno.Fonts.Fluent** (icons).
 - **[Tmds.DBus](https://github.com/tmds/Tmds.DBus)**, **[TagLibSharp](https://github.com/mono/taglib-sharp)**, **[Markdig](https://github.com/xoofx/markdig)**, **[ColorCode](https://github.com/CommunityToolkit/ColorCode-Universal)**, **[LibGit2Sharp](https://github.com/libgit2/libgit2sharp)**, **[FluentFTP](https://github.com/robinrodricks/FluentFTP)**, **[SharpCompress](https://github.com/adamhathcock/sharpcompress)**, **[7-Zip](https://www.7-zip.org/)** and the .NET Community Toolkit.
@@ -178,4 +178,4 @@ The full list of third-party components and licenses is in [NOTICE.md](../NOTICE
 
 ## License
 
-Inherited MIT code and LinuxFiles modifications are covered by [LICENSE-MIT](../LICENSE-MIT): Copyright (c) 2018 - present Files Community; Copyright (c) 2026 LinuxFiles contributors (Linux modifications). [LICENSE-MPL](../LICENSE-MPL) applies to files bearing Mozilla Public License headers. Preserve both licenses, applicable file headers, contributor attribution and [NOTICE.md](../NOTICE.md), including the inherited [third-party notices](./NOTICE.md).
+LinuxFiles is licensed under the MIT License and the Mozilla Public License 2.0, like Files. Files that carry a Mozilla Public License header are covered by [LICENSE-MPL](../LICENSE-MPL), and changes to those files stay under MPL-2.0. All other code, including the LinuxFiles additions, is covered by [LICENSE-MIT](../LICENSE-MIT): Copyright (c) 2018 - present Files Community; Copyright (c) 2026 LinuxFiles contributors (Linux modifications). Preserve both licenses, applicable file headers, contributor attribution and [NOTICE.md](../NOTICE.md), including the inherited [third-party notices](./NOTICE.md).

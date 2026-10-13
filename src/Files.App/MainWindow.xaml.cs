@@ -62,25 +62,43 @@ namespace Files.App
 			await CompositionTarget.GetCompositorForCurrentThread().RequestCommitAsync();
 
 			var firstFrame = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+#if DESKTOP
+			// Uno Skia never raises CompositionTarget.Rendered (NotImplemented stub); the root frame loading is the closest signal
+			rootFrame.Loaded += OnLoaded;
+#else
 			CompositionTarget.Rendered += OnRendered;
+#endif
 			Closed += OnClosed;
 			try
 			{
 				Activate();
+#if DESKTOP
+				if (rootFrame.IsLoaded)
+					firstFrame.TrySetResult(true);
+#endif
 				// Let the backdrop paint before main-page construction occupies the UI thread.
 				return await firstFrame.Task;
 			}
 			finally
 			{
+#if DESKTOP
+				rootFrame.Loaded -= OnLoaded;
+#else
 				CompositionTarget.Rendered -= OnRendered;
+#endif
 				Closed -= OnClosed;
 			}
 
+#if DESKTOP
+			void OnLoaded(object sender, RoutedEventArgs args)
+				=> firstFrame.TrySetResult(true);
+#else
 			void OnRendered(object? sender, RenderedEventArgs args)
 			{
 				if (rootFrame.IsLoaded)
 					firstFrame.TrySetResult(true);
 			}
+#endif
 
 			void OnClosed(object sender, WindowEventArgs args)
 				=> firstFrame.TrySetResult(false);

@@ -1,6 +1,6 @@
 # Contributing to LinuxFiles
 
-LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files-community/Files), built with C#/.NET 10 and Uno Platform (Skia, X11/XWayland). It has no Windows support or upstream sync. Read [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [Linux agent rules](docs/linux-port/AGENT-RULES.md) and the [upstream policy](docs/linux-port/upstream-policy.md) before changing code. Historical porting plans are archived context.
+LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files-community/Files), built with C#/.NET 10 and Uno Platform (Skia, Wayland/X11). It has no Windows support or upstream sync. Read [AGENTS.md](AGENTS.md), [CLAUDE.md](CLAUDE.md), [Linux agent rules](docs/linux-port/AGENT-RULES.md) and the [upstream policy](docs/linux-port/upstream-policy.md) before changing code. Historical porting plans are archived context.
 
 ## Issues and pull requests
 
@@ -16,15 +16,19 @@ Treat file operations, clipboard, drag/drop, previews, archives, settings persis
 
 ## Build and validation
 
-Install the .NET 10 SDK and [Linux desktop dependencies](.github/README.md#building-from-source). Run affected builds first, sequentially:
+Install the .NET 10 SDK and [Linux desktop dependencies](.github/README.md#building-from-source). Linux builds default to the pinned Uno Wayland fork; obtain the public release packages before restoring. See [Wayland package setup](docs/linux-port/wayland-packages.md) and its publisher/build handoff. Run affected builds first, sequentially:
 
 ```sh
+build/fetch-uno-wayland.sh
+build/clear-uno-wayland-cache.sh
 dotnet build src/Files.App -f net10.0-desktop
 dotnet build tests/Files.Platform.Tests
 dotnet test --project tests/Files.Platform.Tests/Files.Platform.Tests.csproj --no-build
 ```
 
-Use `scripts/linux/headless-run.sh` for UI checks on a private Xvfb display with a throwaway home. Never launch checks against the user's display or alter desktop settings. Clean up started processes, inspect screenshots before sharing, and never commit private home data or screenshots. If the desktop toolchain is unavailable, use focused reference searches and state which checks were not run.
+The build opt-out is `-p:UseUnoWayland=false` (also pass it to a separate restore); `scripts/linux/publish.sh --x11` publishes without the fork. Runtime `UNO_SKIA_HOST=x11|wayland|auto` selects a host in fork-enabled builds. Use a fresh package version for fork changes; never replace published NuGet packages.
+
+Use `scripts/linux/headless-run.sh` for UI checks on a private Xvfb display with a throwaway home. It covers X11 fallback; native Wayland additionally needs a private nested/headless compositor and the checks in the Wayland handoff. Never launch checks against the user's display or alter desktop settings. Clean up started processes, inspect screenshots before sharing, and never commit private home data or screenshots. If the desktop toolchain is unavailable, use focused reference searches and state which checks were not run.
 
 ## AI assistance and attribution
 

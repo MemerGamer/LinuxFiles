@@ -3,7 +3,6 @@
 
     <!--  Linux/Uno only. Kept apart from Files.App because publicizing Uno.UI breaks the Uno XAML generator for the project that compiles XAML  -->
     <PropertyGroup>
-        <TargetFramework>$(DesktopTargetFramework)</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
         <Configurations>Debug;Release</Configurations>

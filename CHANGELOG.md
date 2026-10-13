@@ -4,6 +4,9 @@ LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files
 
 ## Unreleased
 
+- Linux builds prefer the native Uno Wayland host, retain automatic X11 fallback and support `UNO_SKIA_HOST=x11|wayland|auto`. Build with `-p:UseUnoWayland=false` or publish with `--x11` to use upstream X11 packages.
+- Distribute the eight pinned Uno fork packages through public, versioned GitHub Release assets with SHA-256 verification into a repo-local feed. CI and source publishing fetch them; AppImage, Flatpak, AUR binary and Nix consume the application release. Add Wayland runtime dependencies and the Flatpak Wayland socket. The fork's revision 4 release must be published and validated before shipping; alpha4 assets are unchanged. See [the package contract and handoff](docs/linux-port/wayland-packages.md).
+
 Pull requests merged after `linux-v0.1.0-alpha4`, from the stored `origin/main` history:
 
 - [#157](https://github.com/MemerGamer/LinuxFiles/pull/157): Update the Nix flake to alpha4 and its release hashes, including compatible NixOS root-actions support.

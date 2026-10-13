@@ -14,6 +14,7 @@
         linuxfiles = final.callPackage
           ({ lib, stdenv, fetchurl, autoPatchelfHook, makeWrapper
            , fontconfig, freetype, libGL, libx11, libxcursor, libxrandr, libxi, libxext
+           , wayland, libxkbcommon
            , icu, openssl, zlib, krb5, glib, enableRootActions ? false }:
             let
               # version and both hashes are rewritten by scripts/linux/update-nix-flake.sh
@@ -30,6 +31,7 @@
               # Opened with dlopen at runtime, so autoPatchelf cannot discover them; added to every ELF file's runpath.
               runtimeLibs = [
                 fontconfig freetype libGL libx11 libxcursor libxrandr libxi libxext
+                wayland libxkbcommon
                 icu openssl zlib krb5 glib
               ];
               id = "io.github.memergamer.LinuxFiles";

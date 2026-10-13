@@ -2,7 +2,6 @@
 <Project Sdk="Uno.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>$(DesktopTargetFramework)</TargetFrameworks>
         <DisableImplicitUnoPackages>true</DisableImplicitUnoPackages>
         <UnoSingleProject>false</UnoSingleProject>
         <Nullable>enable</Nullable>

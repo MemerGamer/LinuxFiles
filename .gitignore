@@ -405,6 +405,7 @@ FodyWeavers.xsd
 # JetBrains Rider
 *.sln.iml
 .idea/
+# Local tools and verified Uno fork package feed (.cache/uno-wayland-feed).
 .cache/
 
 # Shared opt-in Linux publish analysis profile

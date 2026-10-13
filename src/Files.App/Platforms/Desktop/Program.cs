@@ -11,7 +11,7 @@ using Uno.UI.Hosting;
 namespace Files.App
 {
 	/// <summary>
-	/// Represents the entry point of the Files app on Uno Platform (Skia desktop, X11).
+	/// Represents the entry point of the Files app on Uno Platform (Skia desktop, Wayland/X11).
 	/// Replaces <c>Program.cs</c>, which is built for Windows only (WinAppSDK AppInstance redirection).
 	/// </summary>
 	internal sealed class Program

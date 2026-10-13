@@ -2,7 +2,6 @@
 <Project Sdk="Uno.Sdk">
 
     <PropertyGroup>
-        <TargetFrameworks>$(DesktopTargetFramework)</TargetFrameworks>
         <OutputType>Exe</OutputType>
         <AssemblyName>Files</AssemblyName>
         <DefaultLanguage>en-US</DefaultLanguage>
@@ -94,11 +93,11 @@
         <ProjectReference Include="..\Files.App.UnoVirtualization\Files.App.UnoVirtualization.csproj" />
     </ItemGroup>
 
-    <!--  Opt-in native Wayland host (forked Uno packages, see Directory.Packages.props); X11 stays the fallback  -->
-    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(UseUnoWayland)' == 'true'">
+    <!--  Native Wayland host (default for the Linux desktop target, see Directory.Build.props); X11 stays the fallback  -->
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(FilesUseUnoWayland)' == 'true'">
         <DefineConstants>$(DefineConstants);UNO_WAYLAND</DefineConstants>
     </PropertyGroup>
-    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(UseUnoWayland)' == 'true'">
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(FilesUseUnoWayland)' == 'true'">
         <PackageReference Include="Uno.WinUI.Runtime.Skia.Wayland" />
     </ItemGroup>
 

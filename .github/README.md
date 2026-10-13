@@ -4,7 +4,7 @@
 
 # LinuxFiles
 
-LinuxFiles is an independent Linux-only file manager built with C#/.NET 10 and Uno Platform's Skia desktop host. It runs on X11, including XWayland on Wayland desktops, without Windows or Wine.
+LinuxFiles is an independent Linux-only file manager built with C#/.NET 10 and Uno Platform's Skia desktop host. Current source builds prefer native Wayland through the Uno 6.7 fork and fall back to X11/XWayland, without Windows or Wine. Published alpha4 assets remain X11/XWayland; native Wayland ships with the next validated release.
 
 Based on [Files](https://github.com/files-community/Files) by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors), this fork is not affiliated with or endorsed by the Files Community. LinuxFiles has no Windows support or upstream sync. Individual upstream fixes may be brought over selectively with attribution; see the [upstream policy](../docs/linux-port/upstream-policy.md).
 
@@ -23,7 +23,7 @@ See the [showcase](../docs/linux-port/SHOWCASE.md) for screenshots and [packagin
 
 ## Known limits
 
-- X11/XWayland only; native Wayland and AT-SPI accessibility are not implemented. Text and icons can look soft under XWayland, particularly with fractional scaling. See [Troubleshooting](#troubleshooting).
+- AT-SPI accessibility is not implemented. The native Wayland host still needs compositor and package validation before release; see [the Wayland handoff](../docs/linux-port/wayland-packages.md#maintainer-and-build-handoff). Alpha4 and X11 fallback can show soft text under fractional compositor scaling; see [Troubleshooting](#troubleshooting).
 - Select-all in folders with around 10,000 items remains slow because of Uno selection handling.
 - Tags use Linux extended attributes and a local database. Extended-attribute writes can fail on read-only files or unsupported filesystems; alpha4 preserves edits in the database across reloads and restarts, but those edits cannot be written back to the file when xattrs fail.
 - Release packages target x86_64. arm64 publishing is wired but untested. Network/MTP browsing requires a working GVfs session.
@@ -137,17 +137,23 @@ curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/Linu
 
 ## Troubleshooting
 
+**Choose a host (current source / future Wayland release):** `UNO_SKIA_HOST=x11 files` forces X11/XWayland; `UNO_SKIA_HOST=wayland files` requires native Wayland. The default chooses Wayland when available and falls back to X11 when `WAYLAND_DISPLAY` is unset. Restart Files when switching. See [host and package details](../docs/linux-port/wayland-packages.md).
+
 **Soft text or icons on niri / xwayland-satellite:** Enable **Detect display scale from the compositor (experimental)** in Settings > Appearance and restart Files to use niri's focused output scale when no Uno, Xft, GDK or Qt scale hint is present and both `NIRI_SOCKET` and `WAYLAND_DISPLAY` are set. Check stderr for `[display-scale]` to see whether IPC or CLI detection succeeded. Detection defaults off and may double-scale on some setups. `FILES_NIRI_SCALE=1` forces it on and `FILES_NIRI_SCALE=0` forces it off, overriding the saved preference. Launch with `UNO_DISPLAY_SCALE_OVERRIDE=1.25 files` to select a scale manually (replace `1.25` with your output scale). The scale is chosen at startup. See [display scale details](../docs/linux-port/appearance-transparency.md#display-scale-on-niri).
 
 ## Building from source
 
-Install the .NET 10 SDK and the native Linux dependencies: fontconfig, FreeType, X11 libraries (Xcursor, Xrandr, Xi and Xext), Mesa/OpenGL and GLib. An X11 server or XWayland is required to run the app. See the [AUR recipe](../packaging/linux/aur/linuxfiles-bin/PKGBUILD) for the Arch package names.
+Install the .NET 10 SDK and the native Linux dependencies: fontconfig, FreeType, Wayland client/cursor/EGL libraries, xkbcommon, X11 libraries (Xcursor, Xrandr, Xi and Xext), Mesa/OpenGL/EGL and GLib. Run with a Wayland compositor or X11/XWayland. Fetch the pinned Uno fork packages from its public GitHub Release before restoring (Bash, Python 3, curl, coreutils and util-linux required). See the [AUR recipe](../packaging/linux/aur/linuxfiles-bin/PKGBUILD) for Arch package names and [package setup](../docs/linux-port/wayland-packages.md) for the initial publisher step.
 
 ```sh
 git clone https://github.com/MemerGamer/LinuxFiles.git
 cd LinuxFiles
+build/fetch-uno-wayland.sh
+build/clear-uno-wayland-cache.sh
 dotnet build src/Files.App -f net10.0-desktop
 ```
+
+To build with upstream X11 packages, use `dotnet build src/Files.App -f net10.0-desktop -p:UseUnoWayland=false`; no fork fetch is needed. `scripts/linux/publish.sh --x11` provides the same opt-out for publishing.
 
 For self-contained publishing and a user-local install:
 
@@ -170,7 +176,7 @@ Submit focused pull requests to `main` in [MemerGamer/LinuxFiles](https://github
 ## Credits
 
 - **[Files Community](https://github.com/files-community)** and all [upstream contributors](https://github.com/files-community/Files/graphs/contributors): the Files app, its design, code and translations (via [Crowdin](https://crowdin.com/project/files-app)) that this port is built on. Files is MIT licensed, Copyright (c) 2018 - present Files Community.
-- **[Uno Platform](https://platform.uno/)**: WinUI on Skia/X11 for Linux, which makes this port possible.
+- **[Uno Platform](https://platform.uno/)**: WinUI on Skia for Linux, including the [native Wayland fork](https://github.com/MemerGamer/uno/tree/wayland/host), which makes this port possible.
 - **[SkiaSharp](https://github.com/mono/SkiaSharp)**, **[Selawik](https://github.com/microsoft/Selawik)** (UI font) and **Uno.Fonts.Fluent** (icons).
 - **[Tmds.DBus](https://github.com/tmds/Tmds.DBus)**, **[TagLibSharp](https://github.com/mono/taglib-sharp)**, **[Markdig](https://github.com/xoofx/markdig)**, **[ColorCode](https://github.com/CommunityToolkit/ColorCode-Universal)**, **[LibGit2Sharp](https://github.com/libgit2/libgit2sharp)**, **[FluentFTP](https://github.com/robinrodricks/FluentFTP)**, **[SharpCompress](https://github.com/adamhathcock/sharpcompress)**, **[7-Zip](https://www.7-zip.org/)** and the .NET Community Toolkit.
 

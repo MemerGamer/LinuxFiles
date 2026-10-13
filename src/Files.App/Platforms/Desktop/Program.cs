@@ -102,8 +102,13 @@ namespace Files.App
 			using (var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.cursor"))
 				CursorSettingsResolver.ApplyToProcess();
 
-			var host = UnoPlatformHostBuilder.Create()
-				.App(() => new App())
+			var hostBuilder = UnoPlatformHostBuilder.Create()
+				.App(() => new App());
+#if UNO_WAYLAND
+			// Preferred when WAYLAND_DISPLAY is set; UNO_SKIA_HOST=x11|wayland|auto overrides the choice
+			hostBuilder = hostBuilder.UseWayland();
+#endif
+			var host = hostBuilder
 				.UseX11(x11 => x11.RenderingBackend(renderingBackend switch
 				{
 					RenderingBackendChoice.Software => X11RenderingBackend.Software,

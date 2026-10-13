@@ -94,6 +94,14 @@
         <ProjectReference Include="..\Files.App.UnoVirtualization\Files.App.UnoVirtualization.csproj" />
     </ItemGroup>
 
+    <!--  Opt-in native Wayland host (forked Uno packages, see Directory.Packages.props); X11 stays the fallback  -->
+    <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(UseUnoWayland)' == 'true'">
+        <DefineConstants>$(DefineConstants);UNO_WAYLAND</DefineConstants>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(UseUnoWayland)' == 'true'">
+        <PackageReference Include="Uno.WinUI.Runtime.Skia.Wayland" />
+    </ItemGroup>
+
     <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)'">
         <ProjectReference Include="..\Files.Platform.Linux\Files.Platform.Linux.csproj" />
     </ItemGroup>

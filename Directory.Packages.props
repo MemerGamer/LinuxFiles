@@ -51,7 +51,7 @@
   </ItemGroup>
   <!--  Opt-in native Wayland host from the MemerGamer/uno fork (-p:UseUnoWayland=true); see nuget.wayland.config  -->
   <PropertyGroup Condition="'$(UseUnoWayland)' == 'true'">
-    <UnoWaylandVersion Condition="'$(UnoWaylandVersion)' == ''">6.7.135-wayland.1</UnoWaylandVersion>
+    <UnoWaylandVersion Condition="'$(UnoWaylandVersion)' == ''">6.7.135-wayland.2</UnoWaylandVersion>
     <RestoreConfigFile Condition="'$(RestoreConfigFile)' == ''">$(MSBuildThisFileDirectory)nuget.wayland.config</RestoreConfigFile>
   </PropertyGroup>
   <ItemGroup Condition="'$(UseUnoWayland)' == 'true'">

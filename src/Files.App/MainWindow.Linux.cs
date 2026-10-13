@@ -4,6 +4,7 @@
 using Files.Platform.Abstractions;
 using Files.Platform.Abstractions.Appearance;
 using Microsoft.UI;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml.Media;
 using Files.Platform.Linux.Windowing;
 using Files.Platform.Linux.Elevation;
@@ -22,10 +23,18 @@ namespace Files.App
 		private int _dragStart;
 		private int _titleHeight;
 		private string? _linuxWindowTitle;
+#if UNO_WAYLAND
+		private bool _waylandWindow;
+		// The Wayland host implements caption regions, move and maximize itself (InputNonClientPointerSource, presenter).
+		private bool IsWaylandWindow => _waylandWindow;
+#else
+		private static bool IsWaylandWindow => false;
+#endif
 		public bool UseClientSideDecorations => OperatingSystem.IsLinux() &&
 			Ioc.Default.GetRequiredService<ILocalSettingsStore>().Get("UseClientSideDecorations", true);
-		public bool HasClientSideDecorations => _linuxChrome?.SupportsClientSideDecorations == true && UseClientSideDecorations;
-		public bool IsLinuxWindowMaximized => _linuxChrome?.IsMaximized ?? false;
+		public bool HasClientSideDecorations => (_linuxChrome?.SupportsClientSideDecorations == true || IsWaylandWindow) && UseClientSideDecorations;
+		public bool IsLinuxWindowMaximized => _linuxChrome?.IsMaximized ??
+			(IsWaylandWindow && AppWindow.Presenter is OverlappedPresenter { State: OverlappedPresenterState.Maximized });
 		public event EventHandler? LinuxChromeChanged;
 
 		internal static string FormatRootModeTitle(string title) => title + (RootActionsAvailability.Mode.Indicator switch
@@ -40,8 +49,13 @@ namespace Files.App
 			if (!OperatingSystem.IsLinux())
 				return;
 
-			if (_linuxChrome is null && Uno.UI.Xaml.WindowHelper.GetNativeWindow(this) is X11NativeWindow native)
+			var nativeWindow = Uno.UI.Xaml.WindowHelper.GetNativeWindow(this);
+			if (_linuxChrome is null && nativeWindow is X11NativeWindow native)
 				_linuxChrome = X11WindowChrome.TryCreate((nuint)native.WindowId);
+#if UNO_WAYLAND
+			// Only the X11 and Wayland hosts are registered, so any other native window is the Wayland surface.
+			_waylandWindow = nativeWindow is not null and not X11NativeWindow;
+#endif
 
 			if (!HasClientSideDecorations)
 				_linuxChrome?.HideRegions();
@@ -109,16 +123,38 @@ namespace Files.App
 			_linuxChrome?.SetTitle(title);
 		}
 
-		public void ToggleLinuxWindowMaximize() => _linuxChrome?.ToggleMaximize();
+		public void ToggleLinuxWindowMaximize()
+		{
+			if (_linuxChrome is not null)
+				_linuxChrome.ToggleMaximize();
+			else if (IsWaylandWindow && AppWindow.Presenter is OverlappedPresenter presenter)
+			{
+				if (presenter.State == OverlappedPresenterState.Maximized)
+					presenter.Restore();
+				else
+					presenter.Maximize();
+			}
+		}
 
 		public void UpdateLinuxChromeRegions(int dragStart, int titleHeight)
 		{
 			_dragStart = dragStart;
 			_titleHeight = titleHeight;
+			if (IsWaylandWindow && !HasClientSideDecorations)
+				InputNonClientPointerSource.GetForWindowId(AppWindow.Id).ClearRegionRects(NonClientRegionKind.Caption);
 			if (!HasClientSideDecorations || Content is not FrameworkElement root || root.XamlRoot is null)
 				return;
 
 			var scale = root.XamlRoot.RasterizationScale;
+			if (IsWaylandWindow)
+			{
+				// Unhandled presses in the caption start an interactive move; double-click toggles maximize.
+				InputNonClientPointerSource.GetForWindowId(AppWindow.Id).SetRegionRects(NonClientRegionKind.Caption,
+				[
+					new() { X = (int)(dragStart * scale), Width = (int)(Math.Max(0, root.ActualWidth - dragStart - 138) * scale), Height = (int)(titleHeight * scale) },
+				]);
+				return;
+			}
 			_linuxChrome?.SetRegions((int)(root.ActualWidth * scale), (int)(root.ActualHeight * scale),
 				(int)(dragStart * scale), (int)((root.ActualWidth - dragStart - 138) * scale),
 				(int)(titleHeight * scale), Math.Max(1, (int)(5 * scale)));

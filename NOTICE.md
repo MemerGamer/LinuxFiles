@@ -6,11 +6,11 @@ LinuxFiles, "Files for Linux" (this repository, `MemerGamer/LinuxFiles`) is an u
 
 The majority of the application (UI, view models, services, storage layer, localization) originates from upstream Files and remains the work of the Files Community and its contributors. The LinuxFiles contributors added the Linux platform layer, packaging and related changes on top of it.
 
-Files is licensed under the MIT License:
+Files is licensed under the MIT License, with some files under the Mozilla Public License 2.0:
 
 > Copyright (c) 2018 - present Files Community
 
-The LinuxFiles modifications are released under the same license, Copyright (c) 2026 LinuxFiles contributors. The upstream copyright notice is retained unchanged in [LICENSE-MIT](./LICENSE-MIT). [LICENSE-MPL](./LICENSE-MPL) is inherited from upstream and applies to files that carry a Mozilla Public License header.
+The LinuxFiles modifications are released under the same licenses, Copyright (c) 2026 LinuxFiles contributors: changes to files that carry a Mozilla Public License header stay under MPL-2.0 ([LICENSE-MPL](./LICENSE-MPL)), and everything else is under the MIT License. The upstream copyright notice is retained unchanged in [LICENSE-MIT](./LICENSE-MIT).
 
 "Files" and the Files logo belong to the Files Community. This port is named LinuxFiles and uses a badged icon variant; the Files name and logo appear only to identify the upstream project this port is based on.
 

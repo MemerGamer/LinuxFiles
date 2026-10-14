@@ -93,6 +93,7 @@ namespace Files.Platform.Linux.Icons
 		private readonly Lazy<string> _themeName;
 		private readonly ConcurrentDictionary<string, IconThemeIndex?> _themes = new(StringComparer.Ordinal);
 		private readonly ConcurrentDictionary<(string Name, int Size, int Scale), IconLookupResult?> _cache = new();
+		private readonly ConcurrentDictionary<(uint Size, int Scale), uint> _nativeSizes = new();
 
 		/// <summary>
 		/// Initializes a new instance using the process environment.
@@ -157,6 +158,56 @@ namespace Files.Platform.Linux.Icons
 
 				return results;
 			}, cancellationToken);
+		}
+
+		// Small artwork is drawn for its pixel grid; resampling 22px Breeze folders to 20px blurs every stroke.
+		private const uint MaxNativeSnapSize = 64;
+
+		// The contexts file browsers draw from. Breeze has actions/24 but no places/24, so other contexts cannot vote.
+		private static readonly string[] NativeSizeContexts = ["Places", "MimeTypes"];
+
+		/// <inheritdoc/>
+		public uint GetNativeSize(uint size, int scale = 1)
+		{
+			if (size == 0 || size > MaxNativeSnapSize)
+				return size;
+
+			return _nativeSizes.GetOrAdd((size, Math.Max(1, scale)), key => FindNativeSize(key.Size, key.Scale));
+		}
+
+		private uint FindNativeSize(uint size, int scale)
+		{
+			var directories = new List<IconDirectory>();
+			var visited = new HashSet<string>(StringComparer.Ordinal);
+			CollectDirectories(CurrentThemeName, visited, directories);
+
+			var candidates = directories.Where(d => d.Scale == scale && d.Type != IconDirectoryType.Scalable).ToList();
+			var contextual = candidates.Where(d => d.Context is not null && NativeSizeContexts.Contains(d.Context, StringComparer.OrdinalIgnoreCase)).ToList();
+			if (contextual.Count > 0)
+				candidates = contextual;
+
+			if (candidates.Count == 0)
+				return size;
+
+			// Nearest declared size; a tie prefers the larger one so icons never shrink below the layout's request.
+			var best = candidates
+				.Select(d => (uint)d.Size)
+				.Distinct()
+				.OrderBy(s => Math.Abs((long)s - size))
+				.ThenByDescending(s => s)
+				.First();
+
+			return best;
+		}
+
+		private void CollectDirectories(string theme, HashSet<string> visited, List<IconDirectory> directories)
+		{
+			if (!visited.Add(theme) || GetTheme(theme) is not { } index)
+				return;
+
+			directories.AddRange(index.Directories);
+			foreach (var parent in index.Inherits)
+				CollectDirectories(parent, visited, directories);
 		}
 
 		private IconLookupResult? Resolve(string iconName, int size, int scale)

@@ -93,6 +93,53 @@ namespace Files.Platform.Tests.Icons
 		}
 
 		[TestMethod]
+		public void Index_ParsesContext()
+		{
+			var index = IconThemeIndex.Parse("[Icon Theme]\nDirectories=places/22,actions/24\n\n[places/22]\nSize=22\nContext=Places\nType=Fixed\n\n[actions/24]\nSize=24\nType=Fixed\n");
+
+			Assert.AreEqual("Places", index.Directories[0].Context);
+			Assert.IsNull(index.Directories[1].Context);
+		}
+
+		[TestMethod]
+		public void NativeSize_PicksNearestDeclaredSizeAcrossInheritance()
+		{
+			var provider = CreateProvider();
+
+			// Child declares 16 and 48, Parent 32, hicolor 64; scalable directories do not count.
+			Assert.AreEqual(16u, provider.GetNativeSize(20));
+			Assert.AreEqual(32u, provider.GetNativeSize(24)); // tie between 16 and 32 prefers the larger size
+			Assert.AreEqual(48u, provider.GetNativeSize(40));
+			Assert.AreEqual(64u, provider.GetNativeSize(64));
+			Assert.AreEqual(96u, provider.GetNativeSize(96)); // large artwork scales smoothly
+			Assert.AreEqual(0u, provider.GetNativeSize(0));
+			Assert.AreEqual(20u, provider.GetNativeSize(20, 2)); // no @2x directories
+		}
+
+		[TestMethod]
+		public void NativeSize_OnlyCountsPlacesAndMimeTypesWhenDeclared()
+		{
+			Directory.CreateDirectory(Path.Combine(_icons, "Ctx"));
+			File.WriteAllText(Path.Combine(_icons, "Ctx", "index.theme"),
+				"[Icon Theme]\nName=Ctx\nDirectories=places/22,mimetypes/16,actions/24,apps/20\n\n[places/22]\nSize=22\nContext=Places\nType=Fixed\n\n[mimetypes/16]\nSize=16\nContext=MimeTypes\nType=Fixed\n\n[actions/24]\nSize=24\nContext=Actions\nType=Fixed\n\n[apps/20]\nSize=20\nContext=Applications\nType=Fixed\n");
+			var provider = CreateProvider("Ctx");
+
+			Assert.AreEqual(22u, provider.GetNativeSize(20));
+			Assert.AreEqual(22u, provider.GetNativeSize(24));
+			Assert.AreEqual(16u, provider.GetNativeSize(16));
+		}
+
+		[TestMethod]
+		public void NativeSize_KeepsRequestWithoutFixedDirectories()
+		{
+			Directory.CreateDirectory(Path.Combine(_icons, "Vector"));
+			File.WriteAllText(Path.Combine(_icons, "Vector", "index.theme"), "[Icon Theme]\nName=Vector\nDirectories=scalable/places\n\n[scalable/places]\nSize=48\nType=Scalable\nMinSize=8\nMaxSize=512\n");
+			var provider = CreateProvider("Vector");
+
+			Assert.AreEqual(20u, provider.GetNativeSize(20));
+		}
+
+		[TestMethod]
 		public async Task Resolve_PicksExactSizeDirectory()
 		{
 			var provider = CreateProvider();

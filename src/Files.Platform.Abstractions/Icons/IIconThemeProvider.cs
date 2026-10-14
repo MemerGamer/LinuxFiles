@@ -42,5 +42,10 @@ namespace Files.Platform.Abstractions.Icons
 		/// Resolves candidates in lookup order, including alternate sizes and inherited themes, so callers can skip images that fail to decode.
 		/// </summary>
 		Task<IReadOnlyList<IconLookupResult>> ResolveIconCandidatesAsync(IReadOnlyList<string> iconNames, uint size, int scale = 1, CancellationToken cancellationToken = default);
+
+		/// <summary>
+		/// Gets the size closest to <paramref name="size"/> that the current theme draws at its own pixel grid, or <paramref name="size"/> when the theme has no fixed sizes.
+		/// </summary>
+		uint GetNativeSize(uint size, int scale = 1);
 	}
 }

@@ -28,6 +28,11 @@ namespace Files.Platform.Linux.Icons
 	public sealed record IconDirectory(string Path, int Size, int Scale, IconDirectoryType Type, int MinSize, int MaxSize, int Threshold)
 	{
 		/// <summary>
+		/// Gets the icon context (Places, MimeTypes, ...) the directory declares, if any.
+		/// </summary>
+		public string? Context { get; init; }
+
+		/// <summary>
 		/// Determines whether the directory can serve an icon of the given size and scale.
 		/// </summary>
 		public bool Matches(int iconSize, int iconScale)
@@ -130,7 +135,7 @@ namespace Files.Platform.Linux.Icons
 				var min = TryInt(s, "MinSize", out var mn) ? mn : size;
 				var max = TryInt(s, "MaxSize", out var mx) ? mx : size;
 				var threshold = TryInt(s, "Threshold", out var th) ? th : 2;
-				dirs.Add(new IconDirectory(name, size, scale, type, min, max, threshold));
+				dirs.Add(new IconDirectory(name, size, scale, type, min, max, threshold) { Context = s.GetValueOrDefault("Context") });
 			}
 
 			return new IconThemeIndex { Inherits = inherits, Directories = dirs };

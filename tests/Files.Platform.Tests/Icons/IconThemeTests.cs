@@ -160,6 +160,24 @@ namespace Files.Platform.Tests.Icons
 		}
 
 		[TestMethod]
+		public async Task Resolve_IgnoresScalableArtworkOutsideItsRange()
+		{
+			// Breeze declares places/96 as Scalable 96..256 next to fixed 16/22/32 pixel-grid artwork.
+			Directory.CreateDirectory(Path.Combine(_icons, "Big"));
+			File.WriteAllText(Path.Combine(_icons, "Big", "index.theme"),
+				"[Icon Theme]\nName=Big\nDirectories=places/16,places/22,places/96\n\n[places/16]\nSize=16\nType=Fixed\n\n[places/22]\nSize=22\nType=Fixed\n\n[places/96]\nSize=96\nType=Scalable\nMinSize=96\nMaxSize=256\n");
+			Touch("Big", "places/16", "folder.svg");
+			Touch("Big", "places/22", "folder.svg");
+			Touch("Big", "places/96", "folder.svg");
+			var provider = CreateProvider("Big");
+
+			Assert.AreEqual(Path.Combine(_icons, "Big", "places/22", "folder.svg"), (await provider.ResolveIconAsync("folder", 20))!.Value.Path);
+			Assert.AreEqual(Path.Combine(_icons, "Big", "places/22", "folder.svg"), (await provider.ResolveIconAsync("folder", 24))!.Value.Path);
+			Assert.AreEqual(Path.Combine(_icons, "Big", "places/96", "folder.svg"), (await provider.ResolveIconAsync("folder", 128))!.Value.Path);
+			Assert.AreEqual(Path.Combine(_icons, "Big", "places/96", "folder.svg"), (await provider.ResolveIconAsync("folder", 64))!.Value.Path, "Above every fixed size the scalable artwork is nearest.");
+		}
+
+		[TestMethod]
 		public async Task Resolve_PrefersScalableArtworkAtLargeAndHiDpiSizes()
 		{
 			WriteTheme("Vector", "", ("48x48/places", 48, "Fixed"), ("scalable/places", 0, "Scalable"));

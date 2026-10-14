@@ -34,7 +34,7 @@ namespace Files.App.Helpers
 				if (result is { } found)
 				{
 					if (found.IsSvg)
-						bytes = await Task.Run(() => SvgRasterizer.RenderToPng(found.Path, (int)size));
+						bytes = await Task.Run(() => SvgRasterizer.RenderToPng(found.Path, (int)size, Files.App.Utils.Storage.LinuxIconHelper.CurrentColorScheme));
 					else if (!found.Path.EndsWith(".xpm", StringComparison.OrdinalIgnoreCase))
 						bytes = await File.ReadAllBytesAsync(found.Path);
 				}

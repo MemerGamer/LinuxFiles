@@ -8,6 +8,7 @@ using Files.Platform.Abstractions.Thumbnails;
 using Files.Platform.Linux.Icons;
 using Files.Platform.Linux.Mime;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 using SkiaSharp;
 using System.Collections.Concurrent;
 using System.Globalization;
@@ -21,7 +22,7 @@ namespace Files.App.Utils.Storage
 	/// </summary>
 	internal static class LinuxIconHelper
 	{
-		private static readonly ConcurrentDictionary<(string Name, uint Size), byte[]?> _themeCache = new();
+		private static readonly ConcurrentDictionary<(string Name, uint Size, IconColorScheme Scheme), byte[]?> _themeCache = new();
 		private static readonly ConcurrentDictionary<string, (string[] Names, long At)> _mimeIconNames = new(StringComparer.Ordinal);
 		private const long MimeIconNamesTtlMs = 5000;
 
@@ -29,6 +30,24 @@ namespace Files.App.Utils.Storage
 		private static IIconThemeProvider Theme => Ioc.Default.GetRequiredService<IIconThemeProvider>();
 		private static IMimeTypeService Mime => Ioc.Default.GetRequiredService<IMimeTypeService>();
 		private static IUserDirectories Directories => Ioc.Default.GetRequiredService<IUserDirectories>();
+
+		/// <summary>
+		/// The palette for themed monochrome icons, following the application theme like KIconLoader follows the KDE scheme.
+		/// </summary>
+		internal static IconColorScheme CurrentColorScheme
+		{
+			get
+			{
+				var mode = Ioc.Default.GetService<IAppThemeModeService>()?.AppThemeMode ?? ElementTheme.Default;
+				var isDark = mode switch
+				{
+					ElementTheme.Dark => true,
+					ElementTheme.Light => false,
+					_ => Files.Platform.Linux.Theme.LinuxColorScheme.IsDark,
+				};
+				return IconColorScheme.ForTheme(isDark);
+			}
+		}
 
 		public static async Task<byte[]?> GetIconAsync(string? path, uint size, bool isFolder, IconOptions options, CancellationToken cancellationToken = default)
 		{
@@ -63,13 +82,14 @@ namespace Files.App.Utils.Storage
 					return null;
 
 				var names = await GetIconNamesAsync(path, isFolder);
-				var key = (names[0], size);
+				var scheme = CurrentColorScheme;
+				var key = (names[0], size, scheme);
 				if (_themeCache.TryGetValue(key, out var cached))
 					return cached;
 
-				var bytes = await LoadThemeIconAsync(names, size);
+				var bytes = await LoadThemeIconAsync(names, size, scheme);
 				if (bytes is null && isFolder)
-					bytes = await Task.Run(() => LoadIconFile(Path.Combine(AppContext.BaseDirectory, "Assets", "FolderIcon.png"), size));
+					bytes = await Task.Run(() => LoadIconFile(Path.Combine(AppContext.BaseDirectory, "Assets", "FolderIcon.png"), size, scheme));
 				_themeCache[key] = bytes;
 				return bytes;
 			}
@@ -90,11 +110,12 @@ namespace Files.App.Utils.Storage
 				if (string.IsNullOrEmpty(path) || new FileInfo(path).LinkTarget is null)
 					return null;
 
-				var key = ("emblem-symbolic-link", size);
+				var scheme = CurrentColorScheme;
+				var key = ("emblem-symbolic-link", size, scheme);
 				if (_themeCache.TryGetValue(key, out var cached))
 					return cached;
 
-				var bytes = await LoadThemeIconAsync(["emblem-symbolic-link", "emblem-link", "emblem-symbolic-link-symbolic"], size);
+				var bytes = await LoadThemeIconAsync(["emblem-symbolic-link", "emblem-link", "emblem-symbolic-link-symbolic"], size, scheme);
 				_themeCache[key] = bytes;
 				return bytes;
 			}
@@ -113,16 +134,17 @@ namespace Files.App.Utils.Storage
 		{
 			var icon = await Task.Run(() => DesktopEntryDisplay.TryRead(path, CultureInfo.CurrentUICulture)?.Icon);
 
+			var scheme = CurrentColorScheme;
 			if (DesktopEntryDisplay.IsSafeIconName(icon))
-				return await LoadThemeIconAsync([icon!], size);
+				return await LoadThemeIconAsync([icon!], size, scheme);
 
 			if (DesktopEntryDisplay.IsAllowedIconPath(icon, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), out var iconPath))
-				return await Task.Run(() => LoadIconFile(iconPath, size));
+				return await Task.Run(() => LoadIconFile(iconPath, size, scheme));
 
 			return null;
 		}
 
-		private static byte[]? LoadIconFile(string iconPath, uint size)
+		private static byte[]? LoadIconFile(string iconPath, uint size, IconColorScheme? scheme)
 		{
 			try
 			{
@@ -134,7 +156,7 @@ namespace Files.App.Utils.Storage
 					return null;
 
 				if (iconPath.EndsWith(".svg", StringComparison.OrdinalIgnoreCase))
-					return SvgRasterizer.RenderToPng(data, (int)size);
+					return SvgRasterizer.RenderToPng(data, (int)size, scheme);
 
 				// PNG signature
 				if (data.Length <= 8 || data[0] != 0x89 || data[1] != (byte)'P' || data[2] != (byte)'N' || data[3] != (byte)'G')
@@ -195,13 +217,13 @@ namespace Files.App.Utils.Storage
 			return null;
 		}
 
-		private static async Task<byte[]?> LoadThemeIconAsync(IReadOnlyList<string> names, uint size)
+		private static async Task<byte[]?> LoadThemeIconAsync(IReadOnlyList<string> names, uint size, IconColorScheme? scheme)
 		{
 			var result = await Theme.ResolveIconAsync(names, size);
 			if (result is null)
 				return null;
 
-			var bytes = await Task.Run(() => LoadIconFile(result.Value.Path, size));
+			var bytes = await Task.Run(() => LoadIconFile(result.Value.Path, size, scheme));
 			if (bytes is not null)
 				return bytes;
 
@@ -210,7 +232,7 @@ namespace Files.App.Utils.Storage
 				if (candidate.Path == result.Value.Path)
 					continue;
 
-				bytes = await Task.Run(() => LoadIconFile(candidate.Path, size));
+				bytes = await Task.Run(() => LoadIconFile(candidate.Path, size, scheme));
 				if (bytes is not null)
 					return bytes;
 			}

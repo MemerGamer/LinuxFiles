@@ -4,6 +4,28 @@ LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files
 
 ## Unreleased
 
+## 0.1.0-alpha6 - 2026-10-14
+
+Sixth public alpha, focused on resize smoothness, text and icon sharpness on Wayland. Expect rough edges and keep backups. Report issues at
+https://github.com/MemerGamer/LinuxFiles/issues.
+
+### Highlights
+
+- Window resizing on Wayland is much smoother: the forked Uno host now applies a new window size only after the previous frame reaches the screen, instead of on a timer, and Uno repaints the whole frame during size changes instead of computing damage regions. In testing, presented frames during a drag rose from about 18 to about 53 per second.
+- Text is crisper and darker on Linux. Skia's luminance-dependent glyph gamma made dark text on light backgrounds about 21% lighter than native Qt/FreeType rendering; glyph coverage now matches native apps within about 7%. Set `UNO_SKIA_TEXT_GAMMA=skia` to restore the previous rendering.
+- File and folder icons are sharp at 100% scale. Small icons use the icon theme's native sizes (22 px with Breeze) instead of downscaling large artwork, scalable icon directories are ranked as the icon theme specification requires, and monochrome theme icons are recoloured for the app theme so they stay visible in light mode ([#189](https://github.com/MemerGamer/LinuxFiles/pull/189)). With Breeze, small icons are monochrome line icons, as in Dolphin; colourful folders appear at 32 px and above.
+- Uses the forked Uno **6.7.135-wayland.5** packages, verified against committed SHA-256 pins. The Nix flake was updated to alpha5 ([#188](https://github.com/MemerGamer/LinuxFiles/pull/188)).
+
+### Known limitations
+
+- The native Wayland host is new; please report compositor, scaling, input or packaging issues. X11/XWayland remains available with `UNO_SKIA_HOST=x11`.
+- Resizing is smoother but not yet perfectly fluid; layout still keeps the UI thread busy during a drag.
+- Text uses greyscale antialiasing; subpixel (LCD) text is not available on Wayland yet. Some toolbar glyphs have thin strokes that can look soft. Icons at display scales above 100 percent may still be soft.
+- WebView and MediaPlayer are unsupported on Wayland. Outgoing drag-and-drop to other applications is not implemented on Wayland.
+- Select-all in folders with 10,000 items is still slow due to Uno selection handling.
+- AT-SPI accessibility is not implemented. Mica/Acrylic is not implemented on Linux.
+- The Nix flake pins alpha5 until the alpha6 release assets and hashes are published. Plain Nix installs, AppImage and Flatpak keep root actions disabled.
+
 ## 0.1.0-alpha5 - 2026-10-14
 
 Fifth public alpha, with a native Wayland host and an independent Linux-only fork. Expect rough edges and keep backups. Report issues at

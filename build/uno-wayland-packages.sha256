@@ -10,3 +10,11 @@
 6.7.135-wayland.4 a74e7982cea5d31a6ee85a1562424218f9a0d33fd3c06e255d25f284756fddcf Uno.WinUI.Runtime.Skia.6.7.135-wayland.4.nupkg
 6.7.135-wayland.4 a593d0ef3ffe84ee74b911a3ed2e318c91d138c753ccaa62140ee829d6125906 Uno.WinUI.Runtime.Skia.X11.6.7.135-wayland.4.nupkg
 6.7.135-wayland.4 dcff2c96c437cb7952d4d714568741a810c67d528e2da8bcfba2a6575f93d51c Uno.WinUI.Runtime.Skia.Wayland.6.7.135-wayland.4.nupkg
+6.7.135-wayland.5 d7ca26cbad652a09714b688b264849a75e11caad26bc50446c23d68479be295d Uno.WinUI.6.7.135-wayland.5.nupkg
+6.7.135-wayland.5 ea7539d8facaab903f0ca81bbf307330c2b365195ddd73520de1add3777a0cc5 Uno.WinRT.6.7.135-wayland.5.nupkg
+6.7.135-wayland.5 f919bb467f506d65077f957b29389d24724f43177b22da4ec8b85fcc09c95e61 Uno.Foundation.6.7.135-wayland.5.nupkg
+6.7.135-wayland.5 5a7e0546cfee95919fe43a3f454864835255a90009319511bde6eab6eaa5cb7f Uno.Foundation.Logging.6.7.135-wayland.5.nupkg
+6.7.135-wayland.5 61a801b4f99f728085725db4ee64e871a6641b2df94ca4ebc669ea005590fc8d Uno.UI.Adapter.Microsoft.Extensions.Logging.6.7.135-wayland.5.nupkg
+6.7.135-wayland.5 35ffdcfc6cda3381376afe6edb1429dde4e8121308b79408d47022b2aaae144b Uno.WinUI.Runtime.Skia.6.7.135-wayland.5.nupkg
+6.7.135-wayland.5 7fb7a565de8a62ca109226bf6537644f8335f3eaecc28bec3f219ffca3fd85db Uno.WinUI.Runtime.Skia.X11.6.7.135-wayland.5.nupkg
+6.7.135-wayland.5 eb162da7f1a55cdd0c6ed80883c831f8d9eb307dc1bd03412709ac3bf96b0d3e Uno.WinUI.Runtime.Skia.Wayland.6.7.135-wayland.5.nupkg

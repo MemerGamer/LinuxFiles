@@ -51,7 +51,7 @@
   </ItemGroup>
   <!--  Native Wayland host from the MemerGamer/uno fork; see docs/linux-port/wayland-packages.md  -->
   <PropertyGroup>
-    <UnoWaylandVersion Condition="'$(UnoWaylandVersion)' == ''">6.7.135-wayland.4</UnoWaylandVersion>
+    <UnoWaylandVersion Condition="'$(UnoWaylandVersion)' == ''">6.7.135-wayland.5</UnoWaylandVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(FilesUseUnoWayland)' == 'true'">
     <RestoreConfigFile Condition="'$(RestoreConfigFile)' == ''">$(MSBuildThisFileDirectory)nuget.wayland.config</RestoreConfigFile>
@@ -63,7 +63,7 @@
   </ItemGroup>
   <!--  Uno.Sdk rejects any Uno.WinUI other than its own release (UNOB0005); allow only the reviewed fork cohort with its unchanged 6.7.135 SDK base.
        Runs before UnoSdkVersionCheck evaluates its condition, which is the only user of PkgUno_WinUI.  -->
-  <Target Name="_FilesAllowUnoWaylandPackages" BeforeTargets="BeforeBuild;ResolveReferences" Condition="'$(FilesUseUnoWayland)' == 'true' And '$(UnoWaylandVersion)' == '6.7.135-wayland.4' And '$(UnoVersion)' == '6.7.135' And $([System.IO.Path]::GetFileName($(PkgUno_WinUI))) == '$(UnoWaylandVersion)'">
+  <Target Name="_FilesAllowUnoWaylandPackages" BeforeTargets="BeforeBuild;ResolveReferences" Condition="'$(FilesUseUnoWayland)' == 'true' And '$(UnoWaylandVersion)' == '6.7.135-wayland.5' And '$(UnoVersion)' == '6.7.135' And $([System.IO.Path]::GetFileName($(PkgUno_WinUI))) == '$(UnoWaylandVersion)'">
     <PropertyGroup>
       <PkgUno_WinUI />
     </PropertyGroup>

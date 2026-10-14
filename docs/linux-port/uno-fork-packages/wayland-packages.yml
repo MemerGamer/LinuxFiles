@@ -8,7 +8,7 @@ on:
       version:
         description: 'Fresh package version (X.Y.Z-wayland.N; never reuse a version)'
         required: true
-        default: '6.7.135-wayland.4'
+        default: '6.7.135-wayland.5'
         type: string
 
 permissions:

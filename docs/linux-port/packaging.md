@@ -174,7 +174,7 @@ The module selects the package's `enableRootActions` variant, removes its disabl
 
 `pkexec` uses `/run/wrappers/bin` before the system profile and `/usr/bin`/`/bin`. The module enables `security.polkit.enablePkexecWrapper` when present; older nixpkgs uses `security.wrappers.pkexec`. Only pkexec is setuid, never the LinuxFiles helper. A session authentication agent and an administrator identity are still required. The narrow store exception accepts a root-owned sticky `/nix/store` with group write (1775), but rejects other write there, non-root ownership, and any writable entries beneath it. Native `/usr` helper/policy checks retain their existing restrictions.
 
-**Release integration:** the current pin is `0.1.0-alpha5`; like alpha4, it includes deployment-manifest and Nix elevation-wrapper discovery. Its `passthru.supportsNixRootActions` marker is true, so the module accepts `rootActions = true`. Overrides with a false or missing marker are still rejected by the runtime-capability assertion. For future releases, verify that both runtime changes are present before retaining the compatible-runtime marker.
+**Release integration:** the current pin is `0.1.0-alpha6`; like alpha4 and alpha5, it includes deployment-manifest and Nix elevation-wrapper discovery. Its `passthru.supportsNixRootActions` marker is true, so the module accepts `rootActions = true`. Overrides with a false or missing marker are still rejected by the runtime-capability assertion. For future releases, verify that both runtime changes are present before retaining the compatible-runtime marker.
 
 Per release (after CI has attached `SHA256SUMS`; the flake's tag is `linux-v<version>`):
 

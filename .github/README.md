@@ -4,7 +4,7 @@
 
 # LinuxFiles
 
-LinuxFiles is an independent Linux-only file manager built with C#/.NET 10 and Uno Platform's Skia desktop host. Current source builds prefer native Wayland through the Uno 6.7 fork and fall back to X11/XWayland, without Windows or Wine. Published alpha4 assets remain X11/XWayland; native Wayland ships with the next validated release.
+LinuxFiles is an independent Linux-only file manager built with C#/.NET 10 and Uno Platform's Skia desktop host. Alpha5 prefers native Wayland through the forked Uno 6.7.135-wayland.4 packages and falls back to X11/XWayland, without Windows or Wine.
 
 Based on [Files](https://github.com/files-community/Files) by the [Files Community](https://github.com/files-community) and its [contributors](https://github.com/files-community/Files/graphs/contributors), this fork is not affiliated with or endorsed by the Files Community. LinuxFiles has no Windows support or upstream sync. Individual upstream fixes may be brought over selectively with attribution; see the [upstream policy](../docs/linux-port/upstream-policy.md).
 
@@ -23,7 +23,8 @@ See the [showcase](../docs/linux-port/SHOWCASE.md) for screenshots and [packagin
 
 ## Known limits
 
-- AT-SPI accessibility is not implemented. The native Wayland host still needs compositor and package validation before release; see [the Wayland handoff](../docs/linux-port/wayland-packages.md#maintainer-and-build-handoff). Alpha4 and X11 fallback can show soft text under fractional compositor scaling; see [Troubleshooting](#troubleshooting).
+- The native Wayland host is new; please report compositor, scaling, input or packaging issues. WebView and MediaPlayer are unsupported on Wayland, and outgoing drag-and-drop to other applications is not implemented there. Force X11/XWayland with `UNO_SKIA_HOST=x11`; see [Troubleshooting](#troubleshooting).
+- AT-SPI accessibility is not implemented. X11/XWayland fallback can show soft text under fractional compositor scaling.
 - Select-all in folders with around 10,000 items remains slow because of Uno selection handling.
 - Tags use Linux extended attributes and a local database. Extended-attribute writes can fail on read-only files or unsupported filesystems; alpha4 preserves edits in the database across reloads and restarts, but those edits cannot be written back to the file when xattrs fail.
 - Release packages target x86_64. arm64 publishing is wired but untested. Network/MTP browsing requires a working GVfs session.
@@ -31,12 +32,12 @@ See the [showcase](../docs/linux-port/SHOWCASE.md) for screenshots and [packagin
 
 ## Install
 
-[![Latest release](https://img.shields.io/github/v/release/MemerGamer/LinuxFiles?include_prereleases&filter=linux-v*&label=release)](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha4)
+[![Latest release](https://img.shields.io/github/v/release/MemerGamer/LinuxFiles?include_prereleases&filter=linux-v*&label=release)](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha5)
 
 > [!NOTE]
-> **0.1.0-alpha4 is the fourth public alpha release.** Expect rough edges and missing features, and keep backups of anything you care about. Please report problems in the [issue tracker](https://github.com/MemerGamer/LinuxFiles/issues).
+> **0.1.0-alpha5 is the fifth public alpha release.** Expect rough edges and missing features, and keep backups of anything you care about. Please report problems in the [issue tracker](https://github.com/MemerGamer/LinuxFiles/issues).
 
-Grab the assets from the [0.1.0-alpha4 release page](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha4). Requirements: x86_64 Linux with an X11 session or XWayland (Wayland desktops work through XWayland); the packages are self-contained, so no .NET install is needed.
+Grab the assets from the [0.1.0-alpha5 release page](https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha5). Requirements: x86_64 Linux with Wayland or X11/XWayland; the packages are self-contained, so no .NET install is needed.
 
 ### Arch Linux (AUR)
 
@@ -63,12 +64,12 @@ programs.linuxfiles = {
 };
 ```
 
-This installs a patched helper, a matching polkit action and trusted deployment manifest, and enables the pkexec wrapper. A session authentication agent is required. The flake pins alpha4, which supports this opt-in. A runtime-capability assertion rejects incompatible or unmarked package overrides. See [Nix packaging details](../docs/linux-port/packaging.md#nix-flake).
+This installs a patched helper, a matching polkit action and trusted deployment manifest, and enables the pkexec wrapper. A session authentication agent is required. The flake still pins alpha4, which supports this opt-in; its alpha5 version and hashes will be updated after the release assets are published. A runtime-capability assertion rejects incompatible or unmarked package overrides. See [Nix packaging details](../docs/linux-port/packaging.md#nix-flake).
 
 ### AppImage
 
 ```sh
-curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha4/Files-x86_64.AppImage
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha5/Files-x86_64.AppImage
 chmod +x Files-x86_64.AppImage
 ./Files-x86_64.AppImage
 ```
@@ -78,7 +79,7 @@ Root actions remain disabled in the AppImage. Administrators can separately [pro
 ### Flatpak bundle
 
 ```sh
-curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha4/Files-x86_64.flatpak
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha5/Files-x86_64.flatpak
 flatpak install --user ./Files-x86_64.flatpak
 flatpak run io.github.memergamer.LinuxFiles
 ```
@@ -88,7 +89,7 @@ The bundle needs the `org.freedesktop.Platform//25.08` runtime and a configured 
 ### Tarball
 
 ```sh
-curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha4/files-linux-x64.tar.gz
+curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/linux-v0.1.0-alpha5/files-linux-x64.tar.gz
 tar xzf files-linux-x64.tar.gz
 ./linux-x64/Files                      # run it in place
 ```
@@ -137,9 +138,9 @@ curl -LO https://github.com/MemerGamer/LinuxFiles/releases/download/nightly/Linu
 
 ## Troubleshooting
 
-**Choose a host (current source / future Wayland release):** `UNO_SKIA_HOST=x11 files` forces X11/XWayland; `UNO_SKIA_HOST=wayland files` requires native Wayland. The default chooses Wayland when available and falls back to X11 when `WAYLAND_DISPLAY` is unset. Restart Files when switching. See [host and package details](../docs/linux-port/wayland-packages.md).
+**Choose a host (alpha5):** `UNO_SKIA_HOST=x11 files` forces X11/XWayland; `UNO_SKIA_HOST=wayland files` requires native Wayland. The default chooses Wayland when available and falls back to X11 when Wayland host probing fails or `WAYLAND_DISPLAY` is unset. Restart Files when switching. See [host and package details](../docs/linux-port/wayland-packages.md).
 
-**Soft text or icons on niri / xwayland-satellite:** Enable **Detect display scale from the compositor (experimental)** in Settings > Appearance and restart Files to use niri's focused output scale when no Uno, Xft, GDK or Qt scale hint is present and both `NIRI_SOCKET` and `WAYLAND_DISPLAY` are set. Check stderr for `[display-scale]` to see whether IPC or CLI detection succeeded. Detection defaults off and may double-scale on some setups. `FILES_NIRI_SCALE=1` forces it on and `FILES_NIRI_SCALE=0` forces it off, overriding the saved preference. Launch with `UNO_DISPLAY_SCALE_OVERRIDE=1.25 files` to select a scale manually (replace `1.25` with your output scale). The scale is chosen at startup. See [display scale details](../docs/linux-port/appearance-transparency.md#display-scale-on-niri).
+**Soft text or icons with X11/XWayland fallback on niri / xwayland-satellite:** Enable **Detect display scale from the compositor (experimental)** in Settings > Appearance and restart Files to use niri's focused output scale when no Uno, Xft, GDK or Qt scale hint is present and both `NIRI_SOCKET` and `WAYLAND_DISPLAY` are set. Check stderr for `[display-scale]` to see whether IPC or CLI detection succeeded. Detection defaults off and may double-scale on some setups. `FILES_NIRI_SCALE=1` forces it on and `FILES_NIRI_SCALE=0` forces it off, overriding the saved preference. Launch with `UNO_DISPLAY_SCALE_OVERRIDE=1.25 files` to select a scale manually (replace `1.25` with your output scale). The scale is chosen at startup. See [display scale details](../docs/linux-port/appearance-transparency.md#display-scale-on-niri).
 
 ## Building from source
 

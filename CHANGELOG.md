@@ -4,16 +4,32 @@ LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files
 
 ## Unreleased
 
-- Linux builds prefer the native Uno Wayland host, retain automatic X11 fallback and support `UNO_SKIA_HOST=x11|wayland|auto`. Build with `-p:UseUnoWayland=false` or publish with `--x11` to use upstream X11 packages.
-- Distribute the eight pinned Uno fork packages through public, versioned GitHub Release assets with SHA-256 verification into a repo-local feed. CI and source publishing fetch them; AppImage, Flatpak, AUR binary and Nix consume the application release. Add Wayland runtime dependencies and the Flatpak Wayland socket. The fork's revision 4 release must be published and validated before shipping; alpha4 assets are unchanged. See [the package contract and handoff](docs/linux-port/wayland-packages.md).
+## 0.1.0-alpha5 - 2026-10-14
 
-Pull requests merged after `linux-v0.1.0-alpha4`, from the stored `origin/main` history:
+Fifth public alpha, with a native Wayland host and an independent Linux-only fork. Expect rough edges and keep backups. Report issues at
+https://github.com/MemerGamer/LinuxFiles/issues.
 
-- [#157](https://github.com/MemerGamer/LinuxFiles/pull/157): Update the Nix flake to alpha4 and its release hashes, including compatible NixOS root-actions support.
-- [#158](https://github.com/MemerGamer/LinuxFiles/pull/158): Merge the final upstream sync, including translation updates and preventing hidden progress rings from animating. This predates the independent-fork policy below.
-- [#159](https://github.com/MemerGamer/LinuxFiles/pull/159): Establish LinuxFiles as an independent Linux-only fork; remove Windows build/packaging projects and CI, retire upstream-sync automation, and document selective fixes with preserved attribution.
-- [#160](https://github.com/MemerGamer/LinuxFiles/pull/160): Remove Windows-only application branches, storage/interop code, tests and obsolete build configuration; rewrite developer guidance for Linux and mark platform tests Linux-only.
-- [#163](https://github.com/MemerGamer/LinuxFiles/pull/163): Add a native Wayland host spike report. This is investigation documentation; the app continues to use X11/XWayland.
+### Highlights
+
+- Linux now uses the native Wayland host by default through the forked Uno **6.7.135-wayland.4** packages, with sharp text at fractional scale, custom window chrome and X11/XWayland fallback. Force X11 with `UNO_SKIA_HOST=x11`; build with `-p:UseUnoWayland=false` or publish with `--x11` to opt out of the fork packages. The eight packages are distributed as public release assets and verified against committed SHA-256 pins ([#186](https://github.com/MemerGamer/LinuxFiles/pull/186), following the [#163](https://github.com/MemerGamer/LinuxFiles/pull/163) investigation; fixes [#113](https://github.com/MemerGamer/LinuxFiles/issues/113)).
+- Security review fixes keep Open With filenames out of shell code, confine archive extraction and merge to the destination, reject unsafe trash containers and bound trash metadata reads. Cross-device moves preserve originals that changed after copying, with quarantine checks before deletion ([review #174](https://github.com/MemerGamer/LinuxFiles/pull/174), [#176](https://github.com/MemerGamer/LinuxFiles/pull/176), [#177](https://github.com/MemerGamer/LinuxFiles/pull/177), [#178](https://github.com/MemerGamer/LinuxFiles/pull/178), [#179](https://github.com/MemerGamer/LinuxFiles/pull/179), [#182](https://github.com/MemerGamer/LinuxFiles/pull/182)).
+- Further hardening validates cached thumbnails, reports tar hardlinks as unsupported instead of converting them to symlinks, preserves no-replace rename safety, requires checksum-pinned AUR recipes, and escapes local-install desktop launcher paths ([#180](https://github.com/MemerGamer/LinuxFiles/pull/180)).
+- LinuxFiles is now an **independent Linux-only fork**. Windows projects, build/packaging paths and remaining Windows-only code are removed; upstream-sync automation is retired. Inherited licenses, notices and contributor attribution are preserved, and individual upstream fixes may still be brought over selectively ([#159](https://github.com/MemerGamer/LinuxFiles/pull/159), [#160](https://github.com/MemerGamer/LinuxFiles/pull/160), [#172](https://github.com/MemerGamer/LinuxFiles/pull/172), [#173](https://github.com/MemerGamer/LinuxFiles/pull/173)). The final upstream sync brought translation updates and stopped hidden progress rings from animating ([#158](https://github.com/MemerGamer/LinuxFiles/pull/158)).
+- Navigating up selects the folder you came from, using the platform directory separator. Thanks to [@lextm](https://github.com/lextm) ([#184](https://github.com/MemerGamer/LinuxFiles/pull/184)).
+- Startup no longer leaves the window blank while waiting for an event that Uno Skia never raises. Deferred startup work and bounded D-Bus waits reduce delays; theme watching retries and reconciles portal changes ([#183](https://github.com/MemerGamer/LinuxFiles/pull/183), [#175](https://github.com/MemerGamer/LinuxFiles/pull/175)). Restored sessions no longer show a spurious Invalid item dialog for placeholders ([#165](https://github.com/MemerGamer/LinuxFiles/pull/165)).
+- Tags follow files on rename, move and trash restore, including cross-device moves after the move-safety rewrite ([#164](https://github.com/MemerGamer/LinuxFiles/pull/164), [#181](https://github.com/MemerGamer/LinuxFiles/pull/181)).
+- Light-theme toolbar focus and column-header contrast are corrected; context-menu acrylic smears and the Properties dialog backdrop are fixed. Long filenames use a single-line ellipsis in Details, Tiles and Columns ([#169](https://github.com/MemerGamer/LinuxFiles/pull/169), [#170](https://github.com/MemerGamer/LinuxFiles/pull/170), [#171](https://github.com/MemerGamer/LinuxFiles/pull/171)).
+- Bulk selection batches checkbox updates, and compositor scale detection has more robust output selection, fallbacks and change detection ([#167](https://github.com/MemerGamer/LinuxFiles/pull/167), [#168](https://github.com/MemerGamer/LinuxFiles/pull/168)). Root-mode child environments and installer paths are hardened ([#166](https://github.com/MemerGamer/LinuxFiles/pull/166)).
+- Licensing wording now correctly identifies MIT and MPL-2.0: inherited files with MPL headers and changes to those files stay under MPL-2.0; other code is MIT ([#185](https://github.com/MemerGamer/LinuxFiles/pull/185)).
+
+### Known limitations
+
+- The native Wayland host is new; please report compositor, scaling, input or packaging issues. X11/XWayland remains available with `UNO_SKIA_HOST=x11`.
+- WebView and MediaPlayer are unsupported on Wayland. Outgoing drag-and-drop to other applications is not implemented on Wayland.
+- Select-all in folders with 10,000 items is still slow due to Uno selection handling, despite the bulk-update improvements.
+- X11/XWayland fallback can still soften text under fractional compositor scaling. The experimental **Detect display scale from the compositor** setting or `UNO_DISPLAY_SCALE_OVERRIDE` can help; restart required. Uno font hinting at 100 percent scale remains a limitation on that host.
+- AT-SPI accessibility is not implemented. Window opacity and backdrop support depend on the host and compositor; Mica/Acrylic is not implemented on Linux.
+- The Nix flake still pins alpha4 ([#157](https://github.com/MemerGamer/LinuxFiles/pull/157)); updating it to alpha5 is a follow-up after CI publishes the release assets and hashes. Plain Nix installs, AppImage and Flatpak keep root actions disabled; real NixOS authentication and packaged runtime checks remain pending.
 
 ## 0.1.0-alpha4 - 2026-10-10
 

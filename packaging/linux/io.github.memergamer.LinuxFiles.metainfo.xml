@@ -28,6 +28,15 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0-alpha5" date="2026-10-14" type="development">
+      <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha5</url>
+      <description>
+        <p>Linux now prefers the native Wayland host through the forked Uno 6.7.135-wayland.4 packages, with sharp text at fractional scale, custom window chrome and X11/XWayland fallback (fixes issue #113). Set UNO_SKIA_HOST=x11 to force X11; source builds can opt out with UseUnoWayland=false.</p>
+        <p>Security review fixes harden Open With argument handling, archive extraction, trash, cross-device moves, thumbnails, archive hardlinks, no-replace renames and package installation.</p>
+        <p>LinuxFiles is an independent Linux-only fork, preserving inherited licenses and attribution. Navigating up selects the previous folder, startup no longer leaves a blank window, tags follow renames and moves, and toolbar contrast, context menus, Properties and filename ellipses are corrected. Licensing wording identifies MIT and MPL-2.0 coverage.</p>
+        <p>Known limits: the Wayland host is new; please report issues. WebView, MediaPlayer and outgoing drag-and-drop to other applications are unsupported on Wayland. Select-all in folders with 10,000 items remains slow. The Nix flake still pins alpha4 until alpha5 release assets and hashes are available.</p>
+      </description>
+    </release>
     <release version="0.1.0-alpha4" date="2026-10-10" type="development">
       <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha4</url>
       <description>

@@ -33,6 +33,28 @@ namespace Files.Platform.Tests.Icons
 		}
 
 		[TestMethod]
+		public void AppliesColorSchemeToThemedIcons()
+		{
+			const string svg = "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 16 16\"><defs><style type=\"text/css\" id=\"current-color-scheme\">.ColorScheme-Text { color: #fcfcfc; } </style></defs><rect width=\"16\" height=\"16\" style=\"fill:currentColor\" class=\"ColorScheme-Text\"/></svg>";
+			var data = Encoding.UTF8.GetBytes(svg);
+
+			Assert.AreEqual(new SKColor(0xfc, 0xfc, 0xfc), CenterColor(SvgRasterizer.RenderToPng(data, 16)!), "The shipped colour stays without a scheme.");
+			Assert.AreEqual(new SKColor(0x23, 0x26, 0x29), CenterColor(SvgRasterizer.RenderToPng(data, 16, IconColorScheme.Light)!));
+			Assert.AreEqual(new SKColor(0xfc, 0xfc, 0xfc), CenterColor(SvgRasterizer.RenderToPng(data, 16, IconColorScheme.Dark)!));
+
+			var plain = "<svg xmlns=\"http://www.w3.org/2000/svg\"><style>.a { color: red; }</style></svg>";
+			Assert.AreEqual(plain, SvgRasterizer.ApplyColorScheme(plain, IconColorScheme.Light), "Only the current-color-scheme stylesheet is replaced.");
+			Assert.IsTrue(SvgRasterizer.ApplyColorScheme(svg, IconColorScheme.Dark).Contains(".ColorScheme-Highlight { color:#3daee9; }", StringComparison.Ordinal));
+		}
+
+		private static SKColor CenterColor(byte[] png)
+		{
+			using var bitmap = SKBitmap.Decode(png);
+			var color = bitmap.GetPixel(bitmap.Width / 2, bitmap.Height / 2);
+			return new SKColor(color.Red, color.Green, color.Blue);
+		}
+
+		[TestMethod]
 		public void ReturnsNullForInvalidSvg()
 		{
 			var path = Path.Combine(Path.GetTempPath(), "files-svg-" + Guid.NewGuid().ToString("N") + ".svg");

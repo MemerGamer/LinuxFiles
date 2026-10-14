@@ -581,7 +581,7 @@ namespace Files.App.Utils.Storage
 				{
 					if (found.IsSvg)
 					{
-						var png = await Task.Run(() => Files.Platform.Linux.Icons.SvgRasterizer.RenderToPng(found.Path, (int)size));
+						var png = await Task.Run(() => Files.Platform.Linux.Icons.SvgRasterizer.RenderToPng(found.Path, (int)size, LinuxIconHelper.CurrentColorScheme));
 						if (png is not null)
 							return png;
 					}

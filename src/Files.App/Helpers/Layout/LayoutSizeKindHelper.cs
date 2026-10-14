@@ -1,6 +1,10 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+#if !WINDOWS
+using Files.Platform.Abstractions.Icons;
+#endif
+
 namespace Files.App.Helpers
 {
 	public static class LayoutSizeKindHelper
@@ -16,6 +20,21 @@ namespace Files.App.Helpers
 		{
 			if (folderLayoutMode == FolderLayoutModes.GridView)
 				return (uint)Math.Max(1, GetGridViewItemWidth(LayoutSettingsService.GridViewSize) - 24);
+
+#if WINDOWS
+			return GetRequestedIconSize(folderLayoutMode);
+#else
+			// Icon themes draw small sizes for their own pixel grid (Breeze: 16/22/32), so the layout adopts the nearest one.
+			return IconThemeProvider?.GetNativeSize(GetRequestedIconSize(folderLayoutMode)) ?? GetRequestedIconSize(folderLayoutMode);
+#endif
+		}
+
+#if !WINDOWS
+		private static IIconThemeProvider? IconThemeProvider { get; } = Ioc.Default.GetService<IIconThemeProvider>();
+#endif
+
+		private static uint GetRequestedIconSize(FolderLayoutModes folderLayoutMode)
+		{
 			return folderLayoutMode switch
 			{
 				// Details

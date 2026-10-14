@@ -44,7 +44,7 @@ jobs:
     - name: Install platform test dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y --no-install-recommends xvfb xauth x11-utils x11-xkb-utils xkb-data libx11-6 libfontconfig1 fonts-dejavu-core bubblewrap ffmpeg poppler-utils dbus
+        sudo apt-get install -y --no-install-recommends xvfb xauth x11-utils x11-xkb-utils xkb-data libx11-6 libwayland-client0 libwayland-cursor0 libwayland-egl1 libxkbcommon0 libegl1 libfontconfig1 fonts-dejavu-core bubblewrap ffmpeg poppler-utils dbus
         # Ubuntu 24.04 runners block unprivileged user namespaces, which bubblewrap needs.
         sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
 
@@ -62,13 +62,22 @@ jobs:
       with:
         global-json-file: global.json
 
+    - name: Check Uno package downloader (offline)
+      run: python3 build/tests/test-fetch-uno-wayland.py
+
+    - name: Fetch verified Uno Wayland packages
+      run: build/fetch-uno-wayland.sh
+
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', 'Directory.Build.props', 'nuget.wayland.config', 'build/uno-wayland-packages.sha256') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
+
+    - name: Remove cached Uno fork packages before restore
+      run: build/clear-uno-wayland-cache.sh
 
     - name: Build Files.Shared
       run: dotnet build src/Files.Shared/Files.Shared.csproj -c Release -warnaserror

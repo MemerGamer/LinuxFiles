@@ -1,0 +1,111 @@
+# Copy to MemerGamer/uno/.github/workflows/wayland-packages.yml.
+# Uses the fork's existing desktop-only builder; preserve Uno's licenses and attribution.
+name: Build Uno Wayland packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Fresh package version (X.Y.Z-wayland.N; never reuse a version)'
+        required: true
+        default: '6.7.135-wayland.4'
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uno-wayland-${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  packages:
+    if: github.repository == 'MemerGamer/uno'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+      - name: Select release version
+        id: release
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        shell: bash
+        run: |
+          version=$INPUT_VERSION
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-wayland\.[0-9]+$ ]] || exit 2
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=uno-wayland-$version" >> "$GITHUB_OUTPUT"
+      - name: Verify source tag if present
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if git rev-parse --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+            if [[ "$(git rev-parse "$TAG^{commit}")" != "$(git rev-parse HEAD)" ]]; then
+              echo 'Existing tag points to a different source commit. Use a fresh version.' >&2
+              exit 1
+            fi
+          fi
+      - name: Build and pack net10.0 desktop packages
+        env:
+          PACKAGE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          build/wayland/build-local-packages.sh --strict \
+            --version "$PACKAGE_VERSION" --tfm net10.0 \
+            --feed "$RUNNER_TEMP/wayland-feed"
+      - name: Verify package set, metadata and consumer framework
+        env:
+          PACKAGE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          import zipfile
+
+          version = os.environ['PACKAGE_VERSION']
+          feed = Path(os.environ['RUNNER_TEMP']) / 'wayland-feed'
+          ids = ('Uno.WinUI', 'Uno.WinRT', 'Uno.Foundation', 'Uno.Foundation.Logging',
+                 'Uno.UI.Adapter.Microsoft.Extensions.Logging', 'Uno.WinUI.Runtime.Skia',
+                 'Uno.WinUI.Runtime.Skia.X11', 'Uno.WinUI.Runtime.Skia.Wayland')
+          expected = {f'{name}.{version}.nupkg' for name in ids}
+          actual = {path.name for path in feed.glob('*.nupkg')}
+          if actual != expected:
+              raise SystemExit(f'Unexpected package set: missing={expected - actual}, extra={actual - expected}')
+          for name in ids:
+              with zipfile.ZipFile(feed / f'{name}.{version}.nupkg') as package:
+                  nuspecs = [entry for entry in package.namelist() if entry.endswith('.nuspec')]
+                  if len(nuspecs) != 1:
+                      raise SystemExit(f'{name}: expected one nuspec')
+                  root = ET.fromstring(package.read(nuspecs[0]))
+                  metadata = next(child for child in root if child.tag.rsplit('}', 1)[-1] == 'metadata')
+                  fields = {child.tag.rsplit('}', 1)[-1]: child.text for child in metadata}
+                  if fields['id'] != name or fields['version'] != version:
+                      raise SystemExit(f'{name}: incorrect package identity or version')
+                  for dependency in root.iter():
+                      if dependency.tag.rsplit('}', 1)[-1] == 'dependency' and dependency.get('id') in ids:
+                          if dependency.get('version') not in (version, f'[{version}]'):
+                              raise SystemExit(f'{name}: dependency not pinned to this fork release')
+                  if name in ('Uno.WinUI', 'Uno.WinUI.Runtime.Skia', 'Uno.WinUI.Runtime.Skia.X11', 'Uno.WinUI.Runtime.Skia.Wayland'):
+                      if not any(entry.startswith(('lib/net10.0/', 'uno-runtime/net10.0/')) and entry.endswith('.dll') for entry in package.namelist()):
+                          raise SystemExit(f'{name}: missing net10.0 desktop assemblies')
+          PY
+          cd "$RUNNER_TEMP/wayland-feed"
+          sha256sum *.nupkg > SHA256SUMS
+          sha256sum --check --strict SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: uno-wayland-${{ steps.release.outputs.version }}
+          path: |
+            ${{ runner.temp }}/wayland-feed/*.nupkg
+            ${{ runner.temp }}/wayland-feed/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 30
+      # Download this exact artifact, compute/review hashes and commit LinuxFiles pins
+      # before publishing. Do not rebuild between pinning and release upload.

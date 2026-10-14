@@ -9,12 +9,34 @@ arch=('x86_64' 'aarch64')
 url='https://github.com/MemerGamer/LinuxFiles'
 license=('MIT')
 # Self-contained publish bundles the runtime; native libs below are loaded by Skia/Uno at runtime.
-depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'mesa' 'glib2' 'hicolor-icon-theme')
-makedepends=('dotnet-sdk>=10.0' 'git' 'clang' 'zlib')
+depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'wayland' 'libxkbcommon' 'libglvnd' 'mesa' 'glib2' 'hicolor-icon-theme')
+makedepends=('dotnet-sdk>=10.0' 'git' 'clang' 'zlib' 'python')
 optdepends=('polkit: authenticated root actions' 'gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives')
 options=('!strip')  # .NET single-file/self-contained binaries break when stripped
-source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/linux-v$pkgver.tar.gz")
-sha256sums=('UNGENERATED')
+# Generated from build/uno-wayland-packages.sha256; templates require complete pins.
+_uno_version=6.7.135-wayland.4
+_uno_base="https://github.com/MemerGamer/uno/releases/download/uno-wayland-$_uno_version"
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/linux-v$pkgver.tar.gz"
+  "$_uno_base/Uno.WinUI.$_uno_version.nupkg"
+  "$_uno_base/Uno.WinRT.$_uno_version.nupkg"
+  "$_uno_base/Uno.Foundation.$_uno_version.nupkg"
+  "$_uno_base/Uno.Foundation.Logging.$_uno_version.nupkg"
+  "$_uno_base/Uno.UI.Adapter.Microsoft.Extensions.Logging.$_uno_version.nupkg"
+  "$_uno_base/Uno.WinUI.Runtime.Skia.$_uno_version.nupkg"
+  "$_uno_base/Uno.WinUI.Runtime.Skia.X11.$_uno_version.nupkg"
+  "$_uno_base/Uno.WinUI.Runtime.Skia.Wayland.$_uno_version.nupkg"
+)
+noextract=(
+  "Uno.WinUI.$_uno_version.nupkg"
+  "Uno.WinRT.$_uno_version.nupkg"
+  "Uno.Foundation.$_uno_version.nupkg"
+  "Uno.Foundation.Logging.$_uno_version.nupkg"
+  "Uno.UI.Adapter.Microsoft.Extensions.Logging.$_uno_version.nupkg"
+  "Uno.WinUI.Runtime.Skia.$_uno_version.nupkg"
+  "Uno.WinUI.Runtime.Skia.X11.$_uno_version.nupkg"
+  "Uno.WinUI.Runtime.Skia.Wayland.$_uno_version.nupkg"
+)
+sha256sums=('UNGENERATED' 'UNGENERATED' 'UNGENERATED' 'UNGENERATED' 'UNGENERATED' 'UNGENERATED' 'UNGENERATED' 'UNGENERATED' 'UNGENERATED')
 
 build() {
   cd "LinuxFiles-linux-v$pkgver"
@@ -23,6 +45,8 @@ build() {
     aarch64) _rid=linux-arm64 ;;
   esac
   export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+  build/fetch-uno-wayland.sh --from "$srcdir"
+  build/clear-uno-wayland-cache.sh
   MSBUILDDISABLENODEREUSE=1 nice -n 19 dotnet publish src/Files.App/Files.App.csproj \
     -f net10.0-desktop -c Release -r "$_rid" --self-contained \
     -p:PublishTrimmed=false -p:PublishAot=false \

@@ -40,13 +40,19 @@ jobs:
       with:
         global-json-file: global.json
 
+    - name: Fetch verified Uno Wayland packages
+      run: build/fetch-uno-wayland.sh
+
     - name: Cache NuGet packages
       uses: actions/cache@v4
       with:
         path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props') }}
+        key: ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', 'Directory.Build.props', 'nuget.wayland.config', 'build/uno-wayland-packages.sha256') }}
         restore-keys: |
           ${{ runner.os }}-nuget-
+
+    - name: Remove cached Uno fork packages before restore
+      run: build/clear-uno-wayland-cache.sh
 
     - name: Publish self-contained linux-x64
       run: scripts/linux/publish.sh --rid linux-x64 --tarball

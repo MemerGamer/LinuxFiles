@@ -1,0 +1,12 @@
+# Reviewed SHA-256 pins for the published Uno Wayland packages.
+# Format: VERSION SHA256 BARE_PACKAGE_FILENAME (exactly eight rows per version).
+# Add a new version's rows only after building, reviewing and publishing those exact bytes (never rebuild).
+# See docs/linux-port/wayland-packages.md for the update procedure.
+6.7.135-wayland.4 c3927d2afb8ea381fbda5c014668a0841dc8d86d88f959456663f671b913deb7 Uno.WinUI.6.7.135-wayland.4.nupkg
+6.7.135-wayland.4 9e2967eb08dafbe3c477ba826e4c234526015556b1ca4d53150f4a36d19aac9e Uno.WinRT.6.7.135-wayland.4.nupkg
+6.7.135-wayland.4 0df9f906f7efb820722e5cb88b5b704c1aa1171b5a06a1389186fe2660286ff1 Uno.Foundation.6.7.135-wayland.4.nupkg
+6.7.135-wayland.4 99cf03c46f31d2300eac9e1e5c3d4ba4e787cb4189e65b4838aa52509c4b3f52 Uno.Foundation.Logging.6.7.135-wayland.4.nupkg
+6.7.135-wayland.4 a0f7bb012a80bf66e828997dbc162cb893ecdc1519df7bc009b2919e8c97f667 Uno.UI.Adapter.Microsoft.Extensions.Logging.6.7.135-wayland.4.nupkg
+6.7.135-wayland.4 a74e7982cea5d31a6ee85a1562424218f9a0d33fd3c06e255d25f284756fddcf Uno.WinUI.Runtime.Skia.6.7.135-wayland.4.nupkg
+6.7.135-wayland.4 a593d0ef3ffe84ee74b911a3ed2e318c91d138c753ccaa62140ee829d6125906 Uno.WinUI.Runtime.Skia.X11.6.7.135-wayland.4.nupkg
+6.7.135-wayland.4 dcff2c96c437cb7952d4d714568741a810c67d528e2da8bcfba2a6575f93d51c Uno.WinUI.Runtime.Skia.Wayland.6.7.135-wayland.4.nupkg

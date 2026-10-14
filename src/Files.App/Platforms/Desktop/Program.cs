@@ -11,7 +11,7 @@ using Uno.UI.Hosting;
 namespace Files.App
 {
 	/// <summary>
-	/// Represents the entry point of the Files app on Uno Platform (Skia desktop, X11).
+	/// Represents the entry point of the Files app on Uno Platform (Skia desktop, Wayland/X11).
 	/// Replaces <c>Program.cs</c>, which is built for Windows only (WinAppSDK AppInstance redirection).
 	/// </summary>
 	internal sealed class Program
@@ -102,8 +102,13 @@ namespace Files.App
 			using (var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.cursor"))
 				CursorSettingsResolver.ApplyToProcess();
 
-			var host = UnoPlatformHostBuilder.Create()
-				.App(() => new App())
+			var hostBuilder = UnoPlatformHostBuilder.Create()
+				.App(() => new App());
+#if UNO_WAYLAND
+			// Preferred when WAYLAND_DISPLAY is set; UNO_SKIA_HOST=x11|wayland|auto overrides the choice
+			hostBuilder = hostBuilder.UseWayland();
+#endif
+			var host = hostBuilder
 				.UseX11(x11 => x11.RenderingBackend(renderingBackend switch
 				{
 					RenderingBackendChoice.Software => X11RenderingBackend.Software,

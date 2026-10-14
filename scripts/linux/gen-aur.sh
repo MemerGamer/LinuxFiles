@@ -3,7 +3,8 @@
 # Usage: scripts/linux/gen-aur.sh <version> <dir-with-release-tarballs> [out-dir] [binary|source]
 #   <dir> holds files-linux-x64.tar.gz and files-packaging.tar.gz (artifacts/ after publish.sh --tarball
 #   plus the packaging bundle). Output: <out-dir>/PKGBUILD and .SRCINFO (default artifacts/aur).
-# Source mode requires linuxfiles-<version>.tar.gz, the exact GitHub tag archive.
+# Source mode requires linuxfiles-<version>.tar.gz and committed Uno pins.
+# The generated recipe declares all eight nupkgs for makepkg to retrieve before build().
 # AUR_BASE_URL overrides the download base (e.g. file:///path) to test the build with makepkg offline.
 set -euo pipefail
 
@@ -32,38 +33,52 @@ else
 fi
 
 mkdir -p "$out"
-python3 - "$tpl" "$out/PKGBUILD" "$tag" "$bin_sum" "$pkg_sum" "${AUR_BASE_URL:-}" "$kind" <<'PY'
-import re, sys
-tpl, dst, ver, a, b, base, kind = sys.argv[1:8]
+python3 - "$tpl" "$out/PKGBUILD" "$tag" "$bin_sum" "$pkg_sum" "${AUR_BASE_URL:-}" "$kind" "$root" <<'PY'
+import re, subprocess, sys
+from pathlib import Path
+import xml.etree.ElementTree as ET
+
+tpl, dst, ver, a, b, base, kind, root = sys.argv[1:9]
 if not all(re.fullmatch(r'[0-9a-f]{64}', digest) for digest in (a, b)):
     raise SystemExit('Invalid release checksum')
-t = open(tpl).read()
+t = Path(tpl).read_text()
 t = re.sub(r"^_tag=.*$", lambda m: "_tag=" + ver, t, flags=re.M)
 t = re.sub(r"^pkgver=.*$", lambda m: "pkgver=" + ver.replace("-", ""), t, flags=re.M)
 if kind == 'source':
-    t = re.sub(r'^pkgver=.*$', lambda m: 'pkgver=' + ver.replace('-', ''), t, flags=re.M)
-    t = re.sub(r'^source=.*$', lambda m: 'source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/linux-v' + ver + '.tar.gz")', t, flags=re.M)
+    version = ET.parse(Path(root) / 'Directory.Packages.props').find('.//UnoWaylandVersion').text
+    # Shared validator refuses missing, duplicate or incomplete repository pins.
+    result = subprocess.run([sys.executable, str(Path(root) / 'build/uno-wayland-pins.py'), version], capture_output=True, text=True)
+    if result.returncode:
+        raise SystemExit(result.stderr.strip())
+    entries = [line.split() for line in result.stdout.splitlines()]
+    archive = ('$url/archive/refs/tags/linux-v' + ver + '.tar.gz') if not base else (base + '/linuxfiles-' + ver + '.tar.gz')
+    sources = ['"$pkgname-$pkgver.tar.gz::' + archive + '"']
+    sources += ['"$_uno_base/' + name + '"' for digest, name in entries]
+    t = re.sub(r'^_uno_version=.*$', lambda m: '_uno_version=' + version, t, flags=re.M)
+    t = re.sub(r'^source=\([^)]*\)', lambda m: 'source=(' + '\n  '.join(sources) + ')', t, flags=re.M)
+    t = re.sub(r'^noextract=\([^)]*\)', lambda m: 'noextract=(' + '\n  '.join('"' + name + '"' for digest, name in entries) + ')', t, flags=re.M)
     t = t.replace('LinuxFiles-linux-v$pkgver', 'LinuxFiles-linux-v' + ver)
-    checksums = [a]
+    checksums = [a] + [digest for digest, name in entries]
 else:
     checksums = [a, b]
 t = re.sub(r"sha256sums=\([^)]*\)", lambda m: "sha256sums=(" + ' '.join("'" + x + "'" for x in checksums) + ")", t)
 if 'UNGENERATED' in re.search(r'^sha256sums=.*$', t, re.M).group() or re.search(r"['\"]SKIP['\"]", t):
     raise SystemExit('Recipe checksums are not pinned')
-if base and kind == 'source':
-    t = re.sub(r'^source=.*$', lambda m: 'source=("$pkgname-$pkgver.tar.gz::' + base + '/linuxfiles-' + ver + '.tar.gz")', t, flags=re.M)
 if base and kind == 'binary':
     t = re.sub(r'^_base=.*$', lambda m: '_base="%s"' % base, t, flags=re.M)
-open(dst, "w").write(t)
+Path(dst).write_text(t)
+
 PY
 # makepkg only exists on Arch; elsewhere (CI runs on Ubuntu) emit the same fields by sourcing the PKGBUILD.
+# shellcheck disable=SC2154
 srcinfo() {
 	if command -v makepkg >/dev/null 2>&1 && [[ "${AUR_SRCINFO_FALLBACK:-}" != 1 ]]; then
 		(cd "$out" && makepkg --printsrcinfo)
 		return
 	fi
 	(
-		# shellcheck disable=SC1091
+		# PKGBUILD supplies these variables and arrays.
+		# shellcheck disable=SC1091,SC2154
 		source "$out/PKGBUILD"
 		list() { local k="$1"; shift; local v; for v in "$@"; do [[ -n "$v" ]] || continue; printf '\t%s = %s\n' "$k" "$v"; done; }
 		printf 'pkgbase = %s\n' "$pkgname"

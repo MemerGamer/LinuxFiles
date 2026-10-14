@@ -15,7 +15,8 @@ command: files
 finish-args:
   - --env=FILES_DISABLE_ROOT_ACTIONS=1
   - --share=ipc
-  # Uno Skia desktop is X11-only; Wayland sessions use XWayland.
+  # Prefer native Wayland; retain X11 for automatic fallback and UNO_SKIA_HOST=x11.
+  - --socket=wayland
   - --socket=x11
   - --device=dri
   # A file manager must see the whole filesystem (including other users' mount points under /run/media).

@@ -13,7 +13,7 @@ arch=('x86_64')
 url='https://github.com/MemerGamer/LinuxFiles'
 license=('MIT')
 # The runtime is bundled; these are the native libraries Skia/Uno load at runtime.
-depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'mesa' 'glib2' 'hicolor-icon-theme')
+depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'wayland' 'libxkbcommon' 'libglvnd' 'mesa' 'glib2' 'hicolor-icon-theme')
 optdepends=('polkit: authenticated root actions'
             'gvfs: network and MTP locations'
             'udisks2: mount and eject drives'

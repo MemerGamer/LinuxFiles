@@ -29,6 +29,12 @@ The repo has no SVG logo, so there is no `scalable/` icon. Sizes 16/24/32/48/256
 `Square150x150Logo.scale-400.png` (so 512 is a downscale).
 A proper SVG should replace these when design provides one.
 
+## Wayland host and package feed
+
+Current source builds prefer native Wayland and retain X11 fallback. CI and `scripts/linux/publish.sh` fetch the pinned Uno fork release with `build/fetch-uno-wayland.sh`; contributors using `dotnet build` run that script first. The initial fork packages must be built, their hashes committed in LinuxFiles, and those exact bytes published before restore. Fetch/import fails until all eight reviewed pins exist. See [the release asset contract, runtime overrides and build handoff](wayland-packages.md). `-p:UseUnoWayland=false` or `scripts/linux/publish.sh --x11` uses upstream X11 packages without fetching the fork. Alpha4 release assets and the current Nix application pin remain X11-only.
+
+AUR binary and Nix packages use LinuxFiles release tarballs and require no Uno credentials/feed. Source AUR recipes declare the eight pinned Uno nupkgs, mark them `noextract`, and import them from `$srcdir` without downloads before publishing. AppImage uses host Wayland client/cursor/EGL and xkbcommon libraries; Flatpak uses its Freedesktop runtime and exposes both Wayland and X11 sockets. Validate both packaged hosts before publishing the next release and bumping Nix's application version/hashes. Previous package measurements and smoke checks below describe the older X11 builds.
+
 ## Publishing
 
 ```
@@ -66,7 +72,7 @@ release). Verified locally on Arch: all three build.
 ## AppImage
 
 `packaging/linux/appimage/build-appimage.sh [--arch x86_64|aarch64] [publish-dir]` assembles an AppDir (AppRun sets
-`FILES_LIBDIR`; the runtime is self-contained, host libs such as fontconfig/X11/GL come from the system) and runs
+`FILES_LIBDIR`; the runtime is self-contained, host libs such as fontconfig, Wayland, xkbcommon and X11/GL/EGL come from the system) and runs
 `appimagetool`. The tool (1.9.1) and the type2 runtime (20251108) are downloaded into the git-ignored `.cache/tools`
 and verified against SHA-256 sums pinned in the script (they match the digests GitHub publishes for those release
 assets). Nothing is installed system-wide; without FUSE the tool runs via `APPIMAGE_EXTRACT_AND_RUN`. Output:
@@ -103,7 +109,7 @@ found, so a launch that could not see the folders retries instead of freezing an
 
 `finish-args` rationale (each line is the minimum for a feature that exists in the code):
 
-- `--share=ipc`, `--socket=x11`, `--device=dri`: Uno Skia desktop is X11 only (XWayland on Wayland) and uses GL.
+- `--share=ipc`, `--socket=wayland`, `--socket=x11`, `--device=dri`: native Wayland with X11 fallback and graphics access. Keep unconditional X11 access so `UNO_SKIA_HOST=x11` works even when Wayland is available.
 - `--filesystem=host`: a file manager needs the whole filesystem. `--filesystem=xdg-run/gvfs`, `xdg-run/gvfs-fuse`
   and `--talk-name=org.gtk.vfs.*`: mounted network/MTP locations through GVfs.
 - `--own-name=org.freedesktop.FileManager1`: the `ShowFolders`/`ShowItems`/`ShowItemProperties` service

@@ -1,6 +1,6 @@
 # Native Wayland host spike — issue #113
 
-Investigated 2026-10-12. Documentation only; no package, host or runtime changes.
+Investigated 2026-10-12. Historical investigation; the original findings below predate the Uno fork host. Current Linux builds default to the forked native Wayland host with X11 fallback; see [package distribution and validation](wayland-packages.md).
 
 ## Decision
 

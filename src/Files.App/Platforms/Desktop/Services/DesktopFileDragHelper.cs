@@ -92,13 +92,13 @@ namespace Files.App.Services.Desktop
 		}
 
 		/// <summary>
-		/// Makes a drag of <paramref name="paths"/> available to other applications. On the native Wayland host the dragged
-		/// <paramref name="data"/> carries the file list (<c>text/uri-list</c>) and the host offers it to the compositor once the
-		/// pointer leaves the window; on X11 the Files selection host follows the pointer instead.
+		/// Makes a drag of <paramref name="paths"/> available to other applications. When the Uno host drags to other clients
+		/// itself (Wayland, and X11 with <c>UNO_X11_NATIVE_DRAG</c>) the dragged <paramref name="data"/> carries the file list
+		/// (<c>text/uri-list</c>) and the host offers it; otherwise the Files X11 selection host follows the pointer.
 		/// </summary>
 		public static void StartDrag(DataPackage data, IEnumerable<string?> paths)
 		{
-			if (!MainWindow.Instance.IsWaylandWindow)
+			if (!HostDragsToOtherApps)
 			{
 				StartExternalDrag(paths);
 				return;
@@ -136,6 +136,13 @@ namespace Files.App.Services.Desktop
 				}
 			}
 		}
+
+		// FilesUnoX11NativeDrag (Directory.Packages.props) marks Uno packages whose X11 host has its own XDND source.
+#if UNO_X11_NATIVE_DRAG
+		private static bool HostDragsToOtherApps => true;
+#else
+		private static bool HostDragsToOtherApps => MainWindow.Instance.IsWaylandWindow;
+#endif
 
 		private static List<string> ExistingPaths(IEnumerable<string?> paths) =>
 			paths

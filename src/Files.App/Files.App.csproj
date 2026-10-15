@@ -96,6 +96,7 @@
     <!--  Native Wayland host (default for the Linux desktop target, see Directory.Build.props); X11 stays the fallback  -->
     <PropertyGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(FilesUseUnoWayland)' == 'true'">
         <DefineConstants>$(DefineConstants);UNO_WAYLAND</DefineConstants>
+        <DefineConstants Condition="'$(FilesUnoX11NativeDrag)' == 'true'">$(DefineConstants);UNO_X11_NATIVE_DRAG</DefineConstants>
     </PropertyGroup>
     <ItemGroup Condition="'$(TargetFramework)' == '$(DesktopTargetFramework)' And '$(FilesUseUnoWayland)' == 'true'">
         <PackageReference Include="Uno.WinUI.Runtime.Skia.Wayland" />

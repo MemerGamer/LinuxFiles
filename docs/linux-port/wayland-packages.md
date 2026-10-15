@@ -1,22 +1,22 @@
 # Uno Wayland package distribution
 
-The Linux desktop target defaults to `UseUnoWayland=true` (effective switch: `FilesUseUnoWayland`) and pins **6.7.135-wayland.6** in `Directory.Packages.props`. The fork is [MemerGamer/uno, branch wayland/host](https://github.com/MemerGamer/uno/tree/wayland/host); LinuxFiles does not build Uno during restore. Each revision is built once from a reviewed `wayland/host` commit, pinned in the repository pin file and published byte-for-byte as a public release; revision 6 is current.
+The Linux desktop target defaults to `UseUnoWayland=true` (effective switch: `FilesUseUnoWayland`) and pins **6.7.135-wayland.7** in `Directory.Packages.props`. The fork is [MemerGamer/uno, branch wayland/host](https://github.com/MemerGamer/uno/tree/wayland/host); LinuxFiles does not build Uno during restore. Each revision is built once from a reviewed `wayland/host` commit, pinned in the repository pin file and published byte-for-byte as a public release; revision 7 is current.
 
 ## Release contract
 
-Repository: **MemerGamer/uno** (public). Tag and GitHub Release: **uno-wayland-6.7.135-wayland.6**. For subsequent revisions, replace the version consistently with `X.Y.Z-wayland.N`; never use `latest`, a rolling tag, or replace assets for an existing version.
+Repository: **MemerGamer/uno** (public). Tag and GitHub Release: **uno-wayland-6.7.135-wayland.7**. For subsequent revisions, replace the version consistently with `X.Y.Z-wayland.N`; never use `latest`, a rolling tag, or replace assets for an existing version.
 
 The release must be published (a public prerelease is fine), with these nine assets, preserving filename case:
 
 ```text
-Uno.WinUI.6.7.135-wayland.6.nupkg
-Uno.WinRT.6.7.135-wayland.6.nupkg
-Uno.Foundation.6.7.135-wayland.6.nupkg
-Uno.Foundation.Logging.6.7.135-wayland.6.nupkg
-Uno.UI.Adapter.Microsoft.Extensions.Logging.6.7.135-wayland.6.nupkg
-Uno.WinUI.Runtime.Skia.6.7.135-wayland.6.nupkg
-Uno.WinUI.Runtime.Skia.X11.6.7.135-wayland.6.nupkg
-Uno.WinUI.Runtime.Skia.Wayland.6.7.135-wayland.6.nupkg
+Uno.WinUI.6.7.135-wayland.7.nupkg
+Uno.WinRT.6.7.135-wayland.7.nupkg
+Uno.Foundation.6.7.135-wayland.7.nupkg
+Uno.Foundation.Logging.6.7.135-wayland.7.nupkg
+Uno.UI.Adapter.Microsoft.Extensions.Logging.6.7.135-wayland.7.nupkg
+Uno.WinUI.Runtime.Skia.6.7.135-wayland.7.nupkg
+Uno.WinUI.Runtime.Skia.X11.6.7.135-wayland.7.nupkg
+Uno.WinUI.Runtime.Skia.Wayland.6.7.135-wayland.7.nupkg
 SHA256SUMS
 ```
 
@@ -40,7 +40,7 @@ The trust anchor is [build/uno-wayland-packages.sha256](../../build/uno-wayland-
 
 For an offline mirror or locally built fork, use `build/fetch-uno-wayland.sh --import /path/to/nupkgs` (`--from` is an alias used by AUR). Only the eight nupkgs are required; if `SHA256SUMS` exists it is cross-checked. Explicit imports verify every supplied package even if the feed already holds a valid copy. The local build must match committed pins: an unreviewed build requires a fresh version and new reviewed pins. Do not repack an existing version or bypass verification with a custom feed.
 
-`--version VERSION` requires a complete committed pin set for that version; use `-p:UnoWaylandVersion=VERSION` consistently for restore/build. `--feed DIR` changes the output location; supply a matching `-p:RestoreConfigFile=/path/to/custom.config` if it differs from the default feed. The SDK version-check exception is restricted to the reviewed `6.7.135-wayland.6` cohort and SDK base `6.7.135`; review that exception when updating versions.
+`--version VERSION` requires a complete committed pin set for that version; use `-p:UnoWaylandVersion=VERSION` consistently for restore/build. `--feed DIR` changes the output location; supply a matching `-p:RestoreConfigFile=/path/to/custom.config` if it differs from the default feed. The SDK version-check exception is restricted to the reviewed `6.7.135-wayland.7` cohort and SDK base `6.7.135`; review that exception when updating versions.
 
 NuGet's global cache can bypass the verified feed. Run `build/clear-uno-wayland-cache.sh` before a separate restore/build (or use a fresh `NUGET_PACKAGES` directory). The CI workflows do this after restoring their caches; publishing and source AUR do it before publishing. The helper removes only the eight package ID/version directories for the configured cohort, preserving unrelated packages and upstream versions.
 

@@ -28,6 +28,13 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0-alpha8" date="2026-10-16" type="development">
+      <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha8</url>
+      <description>
+        <p>Sharper LCD-antialiased text on opaque windows. Audio/video previews use optional mpv, with play/pause, seek and volume; decoding starts at Play, with no network, scripts or playlists. HTML previews use optional WebKitGTK 4.1 for scrollable snapshots in WebKit's bubblewrap sandbox, with JavaScript off and no network; without the sandbox they fall back to text (#198). Both work on Wayland and X11. X11 drag and drop with other apps: Uno's X11 host now starts drags itself with a drag icon and cursors, and drops from Wayland apps such as Dolphin on KDE arrive on XWayland (#197). Uses the forked Uno 6.7.135-wayland.7 packages (https://github.com/MemerGamer/uno/releases/tag/uno-wayland-6.7.135-wayland.7).</p>
+        <p>Known limits: the Wayland host is new. Rotated text stays grayscale. NixOS packages lack mpv/WebKitGTK; previews fall back there, and the release notes page still uses the fallback. Touch-started drags are untested; Wayland has no link drag action. Resizing is not perfectly fluid; select-all with 10,000 items remains slow. AT-SPI and Mica/Acrylic are unsupported. Nix pins alpha7 until alpha8 assets and hashes are published; plain Nix, AppImage and Flatpak keep root actions disabled.</p>
+      </description>
+    </release>
     <release version="0.1.0-alpha7" date="2026-10-15" type="development">
       <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha7</url>
       <description>

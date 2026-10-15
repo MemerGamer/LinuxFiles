@@ -1,7 +1,8 @@
 # Clipboard and drag & drop of files (W-CLIP)
 
 Uno 6.7's X11 host cannot publish file lists on the clipboard (`X11ClipboardExtension` offers text, URI and HTML only) and
-`X11DragDropExtension.StartNativeDrag` throws `NotImplementedException`. Files works around both on its own X connection.
+`X11DragDropExtension.StartNativeDrag` throws `NotImplementedException`. Files uses its own X connection for clipboard file lists, and
+for outgoing drags when `FilesUnoX11NativeDrag=false` (the fork packages from `6.7.135-wayland.7` have Uno's own source, below).
 
 ## Pieces
 
@@ -36,7 +37,7 @@ and runs a copy or move (cut) through `IFilesystemHelpers.CopyItemsAsync` / `Mov
 
 ## Outbound drag (XDND source, version 5)
 
-`BaseLayoutPage.FileList_DragItemsStarting` calls `DesktopFileDragHelper.StartExternalDrag`. The host then follows the pointer with
+On X11 with `FilesUnoX11NativeDrag=false`, `BaseLayoutPage.FileList_DragItemsStarting` calls `DesktopFileDragHelper.StartExternalDrag`. The host then follows the pointer with
 `XQueryPointer` (Uno's window keeps the implicit pointer grab, so no second grab is needed), finds the deepest XDND-aware window under
 it (skipping windows of this process, where Uno handles the drag), and sends `XdndEnter`, `XdndPosition`, `XdndDrop`/`XdndLeave`.
 Data is served from the `XdndSelection` selection (`text/uri-list`, `text/plain`). Action is copy, or move while Shift is held; the
@@ -54,10 +55,9 @@ X connection (drag icon window from the DragView snapshot, copy/move/link/no-dro
 grab), routes the pointer back into Uno while it is over the window the drag started in, and offers `text/uri-list` plus the text
 targets. Files then only has to put the file list into `e.Data`, as on Wayland (`DesktopFileDragHelper.StartDrag`).
 
-Released packages up to `6.7.135-wayland.6` do not contain it, so `FilesUnoX11NativeDrag` (Directory.Packages.props) defaults to
-`false` and Files keeps starting its own X11 drag source. Set it to `true` together with the first `UnoWaylandVersion` that includes
-the branch; `UNO_X11_NATIVE_DRAG` then skips `StartExternalDrag` on X11. The old source and `DesktopRuntimeGuards` stay as the path
-for packages without it.
+Packages from `6.7.135-wayland.7` (alpha8) contain it, and `FilesUnoX11NativeDrag` (Directory.Packages.props) defaults to
+`true`: `UNO_X11_NATIVE_DRAG` skips `StartExternalDrag` on X11. Build with `-p:FilesUnoX11NativeDrag=false` against older packages
+(up to `6.7.135-wayland.6`); Files then starts its own X11 drag source, and that path and `DesktopRuntimeGuards` stay for them.
 
 Verified with a LinuxFiles build using `-p:FilesUnoX11NativeDrag=true` and the branch's `Uno.UI.Runtime.Skia.X11.dll`:
 - private Xvfb with a GTK3 drop target: copy, Shift move, Escape, a rejecting target (no-drop cursor), drop onto a folder in the
@@ -114,7 +114,7 @@ under `dbus-run-session` with a private `XDG_RUNTIME_DIR` (the socket path must 
 
 ## LINUX-TODO
 
-- `LINUX-TODO(dnd)`: (fixed by Uno's X11 source once `FilesUnoX11NativeDrag` is on) no drag icon or cursor feedback outside the window (the pointer is grabbed by Uno's window; changing it needs
+- `LINUX-TODO(dnd)`: (fixed by Uno's X11 source since alpha8, `FilesUnoX11NativeDrag`) no drag icon or cursor feedback outside the window (the pointer is grabbed by Uno's window; changing it needs
   `XChangeActivePointerGrab` on that connection, or the Uno extension point). Dropping on a window that answers `XdndStatus` with
   "reject" silently does nothing.
 - `LINUX-TODO(dnd)`: the guard only covers file lists (`FileList_DragItemsStarting`). Drags from the sidebar, tabs and the shelf leave

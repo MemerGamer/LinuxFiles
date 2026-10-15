@@ -66,6 +66,15 @@ Verified with a LinuxFiles build using `-p:FilesUnoX11NativeDrag=true` and the b
   On Escape KWin ends its bridged drag without telling the X source and XWayland gets no button release; the Uno source cancels
   when its target window disappears under a still pointer.
 
+The same Uno branch fixes drops *into* Files from Wayland-native apps under XWayland (broken in alpha7 too): Uno's selection readers
+threw away the host window's other X events while waiting for data, so KWin's `XdndDrop`/`XdndPosition` could be lost, after which
+KWin waited for an answer forever and ignored the window for later drags. `XdndFinished` now also waits for the drop handlers.
+Verified in a fresh nested KWin: Dolphin to the file list and onto a folder, repeated drops, Escape. Note that Files performs the
+operation it accepted in DragOver (move within a file system) even when the source requested a copy; that is Files' own drop logic.
+
+To trace a drag on a real desktop: `UNO_X11_DND_LOG=/tmp/xdnd.log` makes Uno's X11 host append every XDND message it sends and
+receives (both directions) to that file.
+
 ## Dragging out to Wayland-native apps on KDE (XWayland bridge)
 
 Files runs under XWayland, so a Wayland-native target (Dolphin, Kate) is not a window on the X server and the XDND tree walk never

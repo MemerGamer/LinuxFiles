@@ -14,7 +14,7 @@ makedepends=('dotnet-sdk>=10.0' 'git' 'clang' 'zlib' 'python')
 optdepends=('polkit: authenticated root actions' 'gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives')
 options=('!strip')  # .NET single-file/self-contained binaries break when stripped
 # Generated from build/uno-wayland-packages.sha256; templates require complete pins.
-_uno_version=6.7.135-wayland.5
+_uno_version=6.7.135-wayland.6
 _uno_base="https://github.com/MemerGamer/uno/releases/download/uno-wayland-$_uno_version"
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/linux-v$pkgver.tar.gz"
   "$_uno_base/Uno.WinUI.$_uno_version.nupkg"

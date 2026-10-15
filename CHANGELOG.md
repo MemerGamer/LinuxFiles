@@ -4,6 +4,29 @@ LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files
 
 ## Unreleased
 
+## 0.1.0-alpha7 - 2026-10-15
+
+Seventh public alpha, focused on file drag-and-drop and preview fallbacks on Wayland. Expect rough edges and keep backups. Report issues at
+https://github.com/MemerGamer/LinuxFiles/issues.
+
+### Highlights
+
+- Drag files out of LinuxFiles into Dolphin, terminals, browsers and file upload controls on Wayland. The native Wayland drag source offers file links and text, displays a drag icon, and reports the target's copy or move action back to LinuxFiles ([Uno 6.7.135-wayland.6](https://github.com/MemerGamer/uno/releases/tag/uno-wayland-6.7.135-wayland.6), [#194](https://github.com/MemerGamer/LinuxFiles/pull/194)). File links identify the files being dragged; they do not add a link drag action to Wayland.
+- Drops from other applications into LinuxFiles now receive file paths on Wayland, so a drop carries the paths of files supplied by the source Wayland application ([Uno 6.7.135-wayland.6](https://github.com/MemerGamer/uno/releases/tag/uno-wayland-6.7.135-wayland.6), [#194](https://github.com/MemerGamer/LinuxFiles/pull/194)). Both outgoing drags and incoming drops use the native Wayland host; X11/XWayland keeps its existing drag-and-drop path.
+- Previews have Wayland fallbacks: HTML shows text with "Open with default app", and audio/video shows a thumbnail and details with Open. Release notes open in the browser. X11 keeps embedded web and media views ([#192](https://github.com/MemerGamer/LinuxFiles/pull/192)). Use the default application to view or play the file.
+- Renaming in the Cards layout no longer shows a large dark box; the editor sits in the filename slot ([#193](https://github.com/MemerGamer/LinuxFiles/pull/193)).
+- Uses the forked Uno **6.7.135-wayland.6** packages, verified against committed SHA-256 pins. The Nix flake currently pins alpha6; it will be updated after the alpha7 release assets and hashes are published.
+
+### Known limitations
+
+- The native Wayland host is new; please report compositor, scaling, input or packaging issues. X11/XWayland remains available with `UNO_SKIA_HOST=x11`.
+- Resizing is smoother but not yet perfectly fluid; layout still keeps the UI thread busy during a drag.
+- Text uses greyscale antialiasing; subpixel (LCD) text is not available on Wayland yet. Some toolbar glyphs have thin strokes that can look soft. Icons at display scales above 100 percent may still be soft.
+- Embedded web/media views remain unsupported on Wayland; the preview fallbacks above apply. X11/XWayland outgoing drag keeps the existing X11 path. Touch-started drags are untested, and Wayland has no "link" drag action.
+- Select-all in folders with 10,000 items is still slow due to Uno selection handling.
+- AT-SPI accessibility is not implemented. Mica/Acrylic is not implemented on Linux.
+- The Nix flake pins alpha6 until the alpha7 release assets and hashes are published. Plain Nix installs, AppImage and Flatpak keep root actions disabled.
+
 ## 0.1.0-alpha6 - 2026-10-14
 
 Sixth public alpha, focused on resize smoothness, text and icon sharpness on Wayland. Expect rough edges and keep backups. Report issues at

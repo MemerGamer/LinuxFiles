@@ -648,7 +648,6 @@ namespace Files.App.Views.Layouts
 				textBox.Text = editText;
 				OldItemName = editText;
 				textBlock.Visibility = Visibility.Collapsed;
-				textBox.Visibility = Visibility.Visible;
 
 				if (textBox.FindParent<Grid>() is null)
 				{
@@ -666,18 +665,20 @@ namespace Files.App.Views.Layouts
 
 				textBox.Text = editText;
 				OldItemName = editText;
-				textBox.Visibility = Visibility.Visible;
 
 				if (textBox.FindParent<Grid>() is null)
 				{
 					textBox.Visibility = Visibility.Collapsed;
 					return;
 				}
+
+				textBlock.Visibility = Visibility.Collapsed;
 			}
 
 			var activeTextBox = textBox
 				?? throw new InvalidOperationException("The rename text box is not available for the selected layout.");
 			ApplyRenameBoxColors(activeTextBox);
+			activeTextBox.Visibility = Visibility.Visible;
 			activeTextBox.Focus(FocusState.Pointer);
 			activeTextBox.LostFocus += RenameTextBox_LostFocus;
 			activeTextBox.KeyDown += RenameTextBox_KeyDown;

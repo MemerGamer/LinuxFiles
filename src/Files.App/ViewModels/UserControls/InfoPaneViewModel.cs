@@ -179,6 +179,10 @@ namespace Files.App.ViewModels.UserControls
 					if (contentPageContext.SelectedItems.Count == 1)
 						tempSelectedItem = contentPageContext.SelectedItems.First();
 
+					// Stop the current preview (e.g. media playback) right away; only loading the next one is debounced
+					if (!Equals(tempSelectedItem, SelectedItem))
+						CancelPreviewLoad();
+
 					// Don't update preview pane when the selected item changes too frequently
 					const int delayBeforeUpdatingPreviewPane = 100;
 					await Task.Delay(delayBeforeUpdatingPreviewPane);

@@ -20,6 +20,7 @@ namespace Files.Platform.Linux.Previews
 		internal const int MaxHeight = 8192;
 		internal const int MaxWidth = 2048;
 		private const int MinTrimmedHeight = 100;
+		private static readonly string[] SandboxBypassVariables = ["SNAP", "SNAP_NAME", "SNAP_REVISION", "WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS"];
 		internal const string ScaleVariable = "LINUXFILES_HTML_SNAPSHOT_SCALE";
 
 		// Resource hints that connect before (or regardless of) the Content-Security-Policy check.
@@ -83,6 +84,8 @@ namespace Files.Platform.Linux.Previews
 
 			// The web process must run in WebKit's bubblewrap sandbox; without bwrap the source fallback is shown instead.
 			if (!IsOnPath("bwrap") || !IsOnPath("xdg-dbus-proxy")) throw new IOException("WebKit sandbox tools (bwrap, xdg-dbus-proxy) are unavailable.");
+			// WebKit silently skips bubblewrap inside Snap and Flatpak, or when told to; refuse instead of rendering unconfined.
+			if (!IsSandboxEnvironmentSupported(Environment.GetEnvironmentVariable, File.Exists)) throw new IOException("WebKit would run without its sandbox here.");
 			gtk_disable_setlocale();
 			if (gtk_init_check(0, 0) == 0) throw new IOException("No usable GTK display.");
 			var manager = webkit_website_data_manager_new_ephemeral();
@@ -170,14 +173,23 @@ namespace Files.Platform.Linux.Previews
 			finally { webkit_feature_list_unref(features); }
 		}
 
-		// Drops trailing rows identical to the last one (page background below short documents), keeping at least minHeight rows.
+		// Drops trailing rows of the page background (taken from the top-left pixel) below short documents, keeping at least
+		// minHeight rows. Solid content in another colour, such as a footer, is never trimmed.
 		internal static int TrimUniformBottom(ReadOnlySpan<byte> pixels, int stride, int rowBytes, int height, int minHeight = 1)
 		{
 			var last = pixels.Slice((height - 1) * stride, rowBytes);
-			for (var x = 4; x < rowBytes; x += 4)
-				if (!last.Slice(x, 4).SequenceEqual(last[..4])) return height;
+			var background = pixels[..4];
+			for (var x = 0; x < rowBytes; x += 4)
+				if (!last.Slice(x, 4).SequenceEqual(background)) return height;
 			while (height > Math.Max(1, minHeight) && pixels.Slice((height - 2) * stride, rowBytes).SequenceEqual(last)) height--;
 			return height;
+		}
+
+		internal static bool IsSandboxEnvironmentSupported(Func<string, string?> getVariable, Func<string, bool> fileExists)
+		{
+			foreach (var name in SandboxBypassVariables)
+				if (!string.IsNullOrEmpty(getVariable(name))) return false;
+			return !fileExists("/.flatpak-info");
 		}
 
 		private static bool IsOnPath(string name)

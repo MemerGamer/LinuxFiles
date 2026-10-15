@@ -65,15 +65,32 @@ namespace Files.Platform.Tests.Previews
 		[TestMethod]
 		public void TrimsOnlyUniformTrailingRows()
 		{
-			// 2x4 BGRA rows: content, content, then two background rows.
-			byte[] content = [1, 2, 3, 255, 9, 9, 9, 255];
+			// 2-pixel BGRA rows; the page background is the top-left pixel.
+			byte[] content = [7, 7, 7, 255, 9, 9, 9, 255];
 			byte[] background = [7, 7, 7, 255, 7, 7, 7, 255];
+			byte[] footer = [0, 0, 255, 255, 0, 0, 255, 255];
 			byte[] pixels = [.. content, .. content, .. background, .. background];
 			Assert.AreEqual(2 + 1, HtmlSnapshotHelper.TrimUniformBottom(pixels, 8, 8, 4));
 			byte[] noisyBottom = [.. content, .. background, .. content];
 			Assert.AreEqual(3, HtmlSnapshotHelper.TrimUniformBottom(noisyBottom, 8, 8, 3));
 			byte[] blank = [.. background, .. background];
 			Assert.AreEqual(1, HtmlSnapshotHelper.TrimUniformBottom(blank, 8, 8, 2));
+			byte[] solidFooter = [.. content, .. background, .. footer, .. footer, .. footer];
+			Assert.AreEqual(5, HtmlSnapshotHelper.TrimUniformBottom(solidFooter, 8, 8, 5));
+			byte[] blankPage = [.. background, .. background, .. background, .. background];
+			Assert.AreEqual(2, HtmlSnapshotHelper.TrimUniformBottom(blankPage, 8, 8, 4, minHeight: 2));
+		}
+
+		[TestMethod]
+		[DataRow("SNAP", "/snap/x")]
+		[DataRow("SNAP_NAME", "x")]
+		[DataRow("SNAP_REVISION", "1")]
+		[DataRow("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1")]
+		public void RefusesEnvironmentsWhereWebKitSkipsTheSandbox(string name, string value)
+		{
+			Assert.IsFalse(HtmlSnapshotHelper.IsSandboxEnvironmentSupported(n => n == name ? value : null, _ => false));
+			Assert.IsTrue(HtmlSnapshotHelper.IsSandboxEnvironmentSupported(_ => null, _ => false));
+			Assert.IsFalse(HtmlSnapshotHelper.IsSandboxEnvironmentSupported(_ => null, f => f == "/.flatpak-info"));
 		}
 
 		[TestMethod]

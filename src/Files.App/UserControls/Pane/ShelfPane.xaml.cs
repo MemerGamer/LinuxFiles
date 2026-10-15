@@ -69,7 +69,7 @@ namespace Files.App.UserControls
 				return;
 
 			e.Data.Properties["Files_ActionBinder"] = "Files_ShelfBinder";
-			Files.App.Services.Desktop.DesktopFileDragHelper.StartExternalDrag(paths);
+			Files.App.Services.Desktop.DesktopFileDragHelper.StartDrag(e.Data, paths);
 		}
 
 		private void ShelfItemsList_RightTapped(object sender, Microsoft.UI.Xaml.Input.RightTappedRoutedEventArgs e)

@@ -20,8 +20,13 @@ namespace Files.App.Utils.Storage
 				IEnumerable<string> paths;
 				if (packageView.Contains(ClipboardFormats.UriList))
 				{
-					var data = await packageView.GetDataAsync(ClipboardFormats.UriList);
-					paths = data is string text ? ClipboardFormats.ParseUriList(text) : [];
+					// Uno's X11 host exposes the list as text, the Wayland host as the raw bytes it received.
+					paths = await packageView.GetDataAsync(ClipboardFormats.UriList) switch
+					{
+						string text => ClipboardFormats.ParseUriList(text),
+						byte[] bytes => ClipboardFormats.ParseUriList(System.Text.Encoding.UTF8.GetString(bytes)),
+						_ => [],
+					};
 				}
 				else if (packageView.Contains(StandardDataFormats.StorageItems))
 				{

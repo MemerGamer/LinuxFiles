@@ -5135,4 +5135,17 @@
   <data name="LinuxDetectCompositorDisplayScaleDescription" xml:space="preserve">
     <value>Requires a restart. Uses the focused compositor output scale (niri, sway or Hyprland), KDE display scale, or GNOME text scale when no display or toolkit scale is configured. Scale changes require a restart. May double-scale on some setups.</value>
   </data>
+  <data name="LinuxMediaSeek" xml:space="preserve">
+    <value>Seek</value>
+  </data>
+  <data name="LinuxMediaVolume" xml:space="preserve">
+    <value>Volume</value>
+  </data>
+  <data name="LinuxMediaPlaybackFailed" xml:space="preserve">
+    <value>This file could not be played.</value>
+  </data>
+  <data name="LinuxMediaTimeFormat" xml:space="preserve">
+    <value>{0} / {1}</value>
+    <comment>Playback elapsed time ({0}) and total duration ({1}).</comment>
+  </data>
 </root>

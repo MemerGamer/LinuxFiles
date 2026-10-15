@@ -179,6 +179,10 @@ namespace Files.App.ViewModels.UserControls
 					if (contentPageContext.SelectedItems.Count == 1)
 						tempSelectedItem = contentPageContext.SelectedItems.First();
 
+					// Stop the current preview (e.g. media playback) right away; only loading the next one is debounced
+					if (!Equals(tempSelectedItem, SelectedItem))
+						CancelPreviewLoad();
+
 					// Don't update preview pane when the selected item changes too frequently
 					const int delayBeforeUpdatingPreviewPane = 100;
 					await Task.Delay(delayBeforeUpdatingPreviewPane);
@@ -314,15 +318,18 @@ namespace Files.App.ViewModels.UserControls
 				(FileExtensionHelpers.IsAudioFile(ext) || FileExtensionHelpers.IsVideoFile(ext)))
 			{
 #if DESKTOP
-				if (!NativePreviewSupport.IsAvailable)
+				if (!Files.Platform.Linux.Media.MpvMediaPlayer.IsAvailable && !NativePreviewSupport.IsAvailable)
 					return await NativePreviewFallback.CreateMediaAsync(item, token);
 
-				// LINUX-TODO(media): metadata only; playback needs libvlc (see MediaMetadataPreviewViewModel)
+				// Optional libmpv playback starts only when the user presses Play.
 				var model = new MediaMetadataPreviewViewModel(item);
 				using var registration = token.Register(model.LoadCancelledTokenSource.Cancel);
 				await model.LoadAsync();
+				token.ThrowIfCancellationRequested();
 
-				return new BasicPreview(model);
+				return Files.Platform.Linux.Media.MpvMediaPlayer.IsAvailable
+					? new LinuxMediaPreview(model, token)
+					: new BasicPreview(model);
 #else
 				var model = new MediaPreviewViewModel(item);
 				await model.LoadAsync();
@@ -331,10 +338,15 @@ namespace Files.App.ViewModels.UserControls
 #endif
 			}
 
+#if DESKTOP
+			if (ext is ".html" or ".htm" && Files.Platform.Linux.Previews.HtmlSnapshotRenderer.IsAvailable)
+				return new LinuxHtmlPreview(new HtmlPreviewViewModel(item), token);
+#endif
+
 			if (ext is ".html" or ".htm" && !NativePreviewSupport.IsAvailable)
 				return await NativePreviewFallback.CreateHtmlAsync(item, token);
 
-			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML is shown as source, never rendered.
+			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML falls back to source.
 			// LINUX-TODO(preview): shell scripts and other languages without a ColorCode grammar are shown as plain text
 			if (FileExtensionHelpers.IsMarkdownFile(ext) &&
 				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Markdown, null, token) is { } markdownPreview)

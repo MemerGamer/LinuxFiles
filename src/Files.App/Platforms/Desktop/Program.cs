@@ -39,6 +39,7 @@ namespace Files.App
 		[STAThread]
 		public static int Main(string[] args)
 		{
+			if (Files.Platform.Linux.Previews.HtmlSnapshotHelper.TryRunHelper(args, out var helperExitCode)) return helperExitCode;
 			try
 			{
 				using var trace = Files.Platform.Abstractions.Diagnostics.PerformanceTrace.Begin("startup.root-environment");

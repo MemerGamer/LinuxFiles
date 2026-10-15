@@ -1,0 +1,19 @@
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<UserControl
+	x:Class="Files.App.UserControls.FilePreviews.LinuxHtmlPreview"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:helpers="using:Files.App.Helpers">
+	<Grid x:Name="PreviewHost" SizeChanged="Preview_SizeChanged" RowSpacing="8">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<ScrollViewer x:Name="SnapshotScroll" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+			<Image x:Name="Snapshot" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Top" />
+		</ScrollViewer>
+		<ProgressRing x:Name="Loading" IsActive="True" HorizontalAlignment="Center" VerticalAlignment="Top" />
+		<ContentPresenter x:Name="Fallback" Grid.RowSpan="2" Visibility="Collapsed" />
+		<Button x:Name="OpenButton" Grid.Row="1" Click="Open_Click" Content="{helpers:ResourceString Key=OpenWithDefaultApp}" />
+	</Grid>
+</UserControl>

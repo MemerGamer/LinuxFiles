@@ -1,0 +1,39 @@
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<UserControl
+	x:Class="Files.App.UserControls.FilePreviews.LinuxMediaPreview"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:helpers="using:Files.App.Helpers"
+	xmlns:properties="using:Files.App.ViewModels.Properties">
+	<ScrollViewer>
+		<StackPanel Spacing="8">
+			<Grid x:Name="VideoHost" Height="220" SizeChanged="VideoHost_SizeChanged">
+				<Image x:Name="Cover" Source="{x:Bind ViewModel.FileImage}" Stretch="Uniform" />
+				<Image x:Name="Video" Stretch="Uniform" Visibility="Collapsed" />
+			</Grid>
+			<TextBlock x:Name="PlaybackError" Text="{helpers:ResourceString Key=LinuxMediaPlaybackFailed}" TextWrapping="Wrap" Visibility="Collapsed" />
+			<Grid ColumnSpacing="8">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="Auto" />
+					<ColumnDefinition Width="*" />
+				</Grid.ColumnDefinitions>
+				<Button x:Name="PlayButton" Click="Play_Click" AutomationProperties.Name="{helpers:ResourceString Key=Play}" ToolTipService.ToolTip="{helpers:ResourceString Key=Play}">
+					<FontIcon x:Name="PlayIcon" FontFamily="{ThemeResource SymbolThemeFontFamily}" Glyph="&#xE768;" />
+				</Button>
+				<Slider x:Name="SeekSlider" Grid.Column="1" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="Seek_ValueChanged" AutomationProperties.Name="{helpers:ResourceString Key=LinuxMediaSeek}" ToolTipService.ToolTip="{helpers:ResourceString Key=LinuxMediaSeek}" />
+			</Grid>
+			<TextBlock x:Name="PlaybackTime" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+			<Slider x:Name="VolumeSlider" Minimum="0" Maximum="1" StepFrequency="0.01" ValueChanged="Volume_ValueChanged" AutomationProperties.Name="{helpers:ResourceString Key=LinuxMediaVolume}" ToolTipService.ToolTip="{helpers:ResourceString Key=LinuxMediaVolume}" />
+			<ItemsControl ItemsSource="{x:Bind ViewModel.DetailsFromPreview}">
+				<ItemsControl.ItemTemplate>
+					<DataTemplate x:DataType="properties:FileProperty">
+						<StackPanel Margin="0,4" Spacing="4">
+							<TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind Name}" TextWrapping="Wrap" />
+							<TextBlock IsTextSelectionEnabled="True" Text="{x:Bind ValueText}" TextWrapping="Wrap" />
+						</StackPanel>
+					</DataTemplate>
+				</ItemsControl.ItemTemplate>
+			</ItemsControl>
+		</StackPanel>
+	</ScrollViewer>
+</UserControl>

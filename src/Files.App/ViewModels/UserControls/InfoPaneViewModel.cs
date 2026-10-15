@@ -314,15 +314,18 @@ namespace Files.App.ViewModels.UserControls
 				(FileExtensionHelpers.IsAudioFile(ext) || FileExtensionHelpers.IsVideoFile(ext)))
 			{
 #if DESKTOP
-				if (!NativePreviewSupport.IsAvailable)
+				if (!Files.Platform.Linux.Media.MpvMediaPlayer.IsAvailable && !NativePreviewSupport.IsAvailable)
 					return await NativePreviewFallback.CreateMediaAsync(item, token);
 
-				// LINUX-TODO(media): metadata only; playback needs libvlc (see MediaMetadataPreviewViewModel)
+				// Optional libmpv playback starts only when the user presses Play.
 				var model = new MediaMetadataPreviewViewModel(item);
 				using var registration = token.Register(model.LoadCancelledTokenSource.Cancel);
 				await model.LoadAsync();
+				token.ThrowIfCancellationRequested();
 
-				return new BasicPreview(model);
+				return Files.Platform.Linux.Media.MpvMediaPlayer.IsAvailable
+					? new LinuxMediaPreview(model)
+					: new BasicPreview(model);
 #else
 				var model = new MediaPreviewViewModel(item);
 				await model.LoadAsync();

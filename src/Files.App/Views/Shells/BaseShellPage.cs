@@ -407,6 +407,13 @@ namespace Files.App.Views.Shells
 						mediaPreviewContent.ViewModel.TogglePlayback();
 						args.Handled = true;
 					}
+#if DESKTOP
+					else if (Ioc.Default.GetRequiredService<InfoPaneViewModel>().PreviewPaneContent is UserControls.FilePreviews.LinuxMediaPreview linuxMediaPreview)
+					{
+						linuxMediaPreview.TogglePlayback();
+						args.Handled = true;
+					}
+#endif
 					break;
 			}
 		}

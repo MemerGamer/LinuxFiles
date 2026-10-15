@@ -10,9 +10,8 @@ using Microsoft.UI.Xaml.Media.Imaging;
 namespace Files.App.ViewModels.Previews
 {
 	/// <summary>
-	/// Audio/video preview on Linux: embedded cover art (or the thumbnail) plus tag metadata. Nothing is played.
+	/// Audio/video cover art (or the thumbnail) and tag metadata. Optional libmpv playback is created by the preview control on explicit Play.
 	/// </summary>
-	// LINUX-TODO(media): playback needs MediaPlayerElement with Uno.UI.MediaPlayer.Skia.X11 and a system libvlc; until that is verified the preview is metadata only.
 	public sealed partial class MediaMetadataPreviewViewModel : BasePreviewModel
 	{
 		private const int MaxCoverBytes = 8 * 1024 * 1024;

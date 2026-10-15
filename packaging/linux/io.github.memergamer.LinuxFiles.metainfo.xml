@@ -28,6 +28,13 @@
   </supports>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.1.0-alpha7" date="2026-10-15" type="development">
+      <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha7</url>
+      <description>
+        <p>Wayland file drags offer file links and text to other apps, with a drag icon and copy/move feedback; incoming drops receive file paths. HTML previews show text with "Open with default app", audio/video shows a thumbnail and details with Open, and release notes open in the browser (#192). X11 keeps embedded views. Uses the forked Uno 6.7.135-wayland.6 packages.</p>
+        <p>Known limits: the Wayland host is new. X11/XWayland outgoing drag keeps the existing X11 path; touch-started drags are untested; Wayland has no link drag action or embedded web/media views. Resizing is not perfectly fluid, text is greyscale-antialiased, and select-all with 10,000 items remains slow. AT-SPI and Mica/Acrylic are unsupported. Nix currently pins alpha6 until alpha7 assets and hashes are published; plain Nix, AppImage and Flatpak keep root actions disabled.</p>
+      </description>
+    </release>
     <release version="0.1.0-alpha6" date="2026-10-14" type="development">
       <url type="details">https://github.com/MemerGamer/LinuxFiles/releases/tag/linux-v0.1.0-alpha6</url>
       <description>

@@ -1,0 +1,30 @@
+<!--  Copyright (c) Files Community. Licensed under the MIT License.  -->
+<UserControl
+	x:Class="Files.App.UserControls.FilePreviews.NativePreviewFallback"
+	xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+	xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+	xmlns:helpers="using:Files.App.Helpers"
+	xmlns:properties="using:Files.App.ViewModels.Properties">
+	<Grid RowSpacing="8">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="*" />
+			<RowDefinition Height="Auto" />
+		</Grid.RowDefinitions>
+		<ScrollViewer>
+			<StackPanel Spacing="8">
+				<ContentPresenter x:Name="PreviewContent" MaxHeight="300" />
+				<ItemsControl x:Name="Metadata" ItemsSource="{x:Bind Model.DetailsFromPreview}">
+					<ItemsControl.ItemTemplate>
+						<DataTemplate x:DataType="properties:FileProperty">
+							<StackPanel Margin="0,4" Spacing="4">
+								<TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind Name}" TextWrapping="Wrap" />
+								<TextBlock IsTextSelectionEnabled="True" Text="{x:Bind ValueText}" TextWrapping="Wrap" />
+							</StackPanel>
+						</DataTemplate>
+					</ItemsControl.ItemTemplate>
+				</ItemsControl>
+			</StackPanel>
+		</ScrollViewer>
+		<Button x:Name="OpenButton" Grid.Row="1" Click="Open_Click" Content="{helpers:ResourceString Key=Open}" />
+	</Grid>
+</UserControl>

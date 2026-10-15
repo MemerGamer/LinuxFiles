@@ -140,6 +140,12 @@ namespace Files.App.Helpers
 			}
 		}
 
+		internal static async Task OpenPreviewFileAsync(string path)
+		{
+			if (!await OpenFilesLinuxAsync([path]))
+				await DialogDisplayHelper.ShowDialogAsync(Strings.LinuxOpenFailedTitle.GetLocalizedResource(), Strings.LinuxOpenFailedText.GetLocalizedFormatResource(DisplaySanitizer.Field(path)));
+		}
+
 		/// <summary>
 		/// Opens several files. Files that need a gate (executables, launchers) are opened one by one through
 		/// <see cref="OpenFileLinuxAsync"/>; plain documents are passed to their default applications together.

@@ -291,6 +291,9 @@
   <data name="Properties" xml:space="preserve">
     <value>Properties</value>
   </data>
+  <data name="OpenWithDefaultApp" xml:space="preserve">
+    <value>Open with default app</value>
+  </data>
   <data name="Open" xml:space="preserve">
     <value>Open</value>
   </data>

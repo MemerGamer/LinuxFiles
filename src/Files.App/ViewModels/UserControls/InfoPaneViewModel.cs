@@ -314,6 +314,9 @@ namespace Files.App.ViewModels.UserControls
 				(FileExtensionHelpers.IsAudioFile(ext) || FileExtensionHelpers.IsVideoFile(ext)))
 			{
 #if DESKTOP
+				if (!NativePreviewSupport.IsAvailable)
+					return await NativePreviewFallback.CreateMediaAsync(item, token);
+
 				// LINUX-TODO(media): metadata only; playback needs libvlc (see MediaMetadataPreviewViewModel)
 				var model = new MediaMetadataPreviewViewModel(item);
 				using var registration = token.Register(model.LoadCancelledTokenSource.Cancel);
@@ -327,6 +330,9 @@ namespace Files.App.ViewModels.UserControls
 				return new MediaPreview(model);
 #endif
 			}
+
+			if (ext is ".html" or ".htm" && !NativePreviewSupport.IsAvailable)
+				return await NativePreviewFallback.CreateHtmlAsync(item, token);
 
 			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML is shown as source, never rendered.
 			// LINUX-TODO(preview): shell scripts and other languages without a ColorCode grammar are shown as plain text

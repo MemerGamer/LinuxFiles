@@ -28,9 +28,12 @@ namespace Files.App.Views
 		private IShellPage AppInstance
 			=> appInstance ?? throw new InvalidOperationException("The release notes page has not been initialized.");
 
+		public bool NativeViewsAvailable { get; } = NativePreviewSupport.IsAvailable;
+
 		public ReleaseNotesPage()
 		{
 			InitializeComponent();
+			BrowserLink.Visibility = NativeViewsAvailable ? Visibility.Collapsed : Visibility.Visible;
 		}
 
 		protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -86,6 +89,24 @@ namespace Files.App.Views
 			AppInstance.ToolbarViewModel.PathComponents.Add(item);
 
 			base.OnNavigatedTo(e);
+			if (!NativeViewsAvailable)
+				await OpenReleaseNotesAsync();
+		}
+
+		private async void OpenReleaseNotes_Click(object sender, RoutedEventArgs e)
+			=> await OpenReleaseNotesAsync();
+
+		private async Task OpenReleaseNotesAsync()
+		{
+			try
+			{
+				await Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.ILauncherService>()
+					.LaunchUriAsync(new Uri(ViewModel.BlogPostUrl));
+			}
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Failed to open release notes");
+			}
 		}
 
 		protected override void OnNavigatedFrom(NavigationEventArgs e)
@@ -188,6 +209,9 @@ namespace Files.App.Views
 
 		public void Dispose()
 		{
+			if (!NativeViewsAvailable)
+				return;
+
 			BlogPostWebView.WebMessageReceived -= WebView_WebMessageReceived;
 			BlogPostWebView.Close();
 		}

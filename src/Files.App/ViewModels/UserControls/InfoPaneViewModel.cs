@@ -324,7 +324,7 @@ namespace Files.App.ViewModels.UserControls
 				token.ThrowIfCancellationRequested();
 
 				return Files.Platform.Linux.Media.MpvMediaPlayer.IsAvailable
-					? new LinuxMediaPreview(model)
+					? new LinuxMediaPreview(model, token)
 					: new BasicPreview(model);
 #else
 				var model = new MediaPreviewViewModel(item);

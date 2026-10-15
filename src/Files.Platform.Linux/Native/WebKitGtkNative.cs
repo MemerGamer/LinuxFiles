@@ -23,6 +23,10 @@ namespace Files.Platform.Linux.Native
 		[LibraryImport("libgtk-3.so.0")]
 		internal static partial void gtk_widget_show_all(nint widget);
 		[LibraryImport("libwebkit2gtk-4.1.so.0")]
+		internal static partial void webkit_web_context_set_sandbox_enabled(nint context, int enabled);
+		[LibraryImport("libwebkit2gtk-4.1.so.0")]
+		internal static partial int webkit_web_context_get_sandbox_enabled(nint context);
+		[LibraryImport("libwebkit2gtk-4.1.so.0")]
 		internal static partial void webkit_web_view_set_zoom_level(nint view, double zoomLevel);
 		[LibraryImport("libwebkit2gtk-4.1.so.0")]
 		internal static partial nint webkit_settings_get_all_features();

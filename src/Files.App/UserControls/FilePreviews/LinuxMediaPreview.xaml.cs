@@ -29,14 +29,18 @@ namespace Files.App.UserControls.FilePreviews
 		private bool commandBusy;
 		private bool failed;
 		private int unloaded;
+		private bool stopped;
 		private XamlRoot? previewRoot;
+		private readonly CancellationTokenRegistration selectionRegistration;
 
 		public MediaMetadataPreviewViewModel ViewModel { get; }
 
-		public LinuxMediaPreview(MediaMetadataPreviewViewModel viewModel)
+		public LinuxMediaPreview(MediaMetadataPreviewViewModel viewModel, CancellationToken selectionToken)
 		{
 			ViewModel = viewModel;
 			windowDispatcher = MainWindow.Instance.DispatcherQueue;
+			// The pane keeps this control while it loads the next selection; playback must stop as soon as the selection changes.
+			selectionRegistration = selectionToken.Register(() => windowDispatcher.TryEnqueue(StopPlayback));
 			InitializeComponent();
 			VolumeSlider.Value = Math.Clamp(settings.InfoPaneSettingsService.MediaVolume, 0, 1);
 			PlaybackTime.Text = FormatPlaybackTime(TimeSpan.Zero, TimeSpan.Zero);
@@ -52,7 +56,7 @@ namespace Files.App.UserControls.FilePreviews
 
 		public async void TogglePlayback()
 		{
-			if (Volatile.Read(ref unloaded) != 0 || commandBusy || failed) return;
+			if (Volatile.Read(ref unloaded) != 0 || commandBusy || failed || stopped) return;
 			commandBusy = true;
 			try
 			{
@@ -187,7 +191,7 @@ namespace Files.App.UserControls.FilePreviews
 
 		private void ShowFailure()
 		{
-			if (Volatile.Read(ref unloaded) != 0) return;
+			if (Volatile.Read(ref unloaded) != 0 || stopped) return;
 			failed = true;
 			Video.Visibility = Visibility.Collapsed;
 			Video.Source = null;
@@ -196,19 +200,33 @@ namespace Files.App.UserControls.FilePreviews
 			PlaybackError.Visibility = Visibility.Visible;
 			PlayIcon.Glyph = "\uE768";
 			PlayButton.IsEnabled = SeekSlider.IsEnabled = false;
-			player?.Dispose();
+			DisposePlayer();
+		}
+
+		private void StopPlayback()
+		{
+			if (Volatile.Read(ref unloaded) != 0 || stopped) return;
+			stopped = true;
+			PlayButton.IsEnabled = SeekSlider.IsEnabled = false;
+			PlayIcon.Glyph = "\uE768";
+			DisposePlayer();
+		}
+
+		private void DisposePlayer()
+		{
+			if (player is not { } current) return;
+			player = null;
+			current.FrameRendered -= Player_FrameRendered;
+			current.StateChanged -= Player_StateChanged;
+			current.Dispose();
 		}
 
 		private void Preview_Unloaded(object sender, RoutedEventArgs e)
 		{
 			Interlocked.Exchange(ref unloaded, 1);
+			selectionRegistration.Dispose();
 			if (previewRoot is not null) previewRoot.Changed -= Root_Changed;
-			if (player is { } current)
-			{
-				current.FrameRendered -= Player_FrameRendered;
-				current.StateChanged -= Player_StateChanged;
-				current.Dispose();
-			}
+			DisposePlayer();
 			lock (frameGate) latestFrame = null;
 			Video.Source = null;
 			bitmap = null;

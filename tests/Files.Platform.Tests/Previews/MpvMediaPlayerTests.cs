@@ -54,6 +54,25 @@ namespace Files.Platform.Tests.Previews
 		}
 
 		[TestMethod]
+		public async Task RejectsNonRegularFilesBeforeLoadingNativeCode()
+		{
+			var root = Directory.CreateTempSubdirectory("linuxfiles-mpv-fifo-").FullName;
+			try
+			{
+				var fifo = Path.Combine(root, "pipe.mp4");
+				using (var mkfifo = Process.Start(new ProcessStartInfo("mkfifo", [fifo]) { UseShellExecute = false })!)
+				{
+					await mkfifo.WaitForExitAsync();
+					Assert.AreEqual(0, mkfifo.ExitCode);
+				}
+				using var player = new MpvMediaPlayer();
+				Assert.ThrowsExactly<IOException>(() => player.Open(fifo));
+				await player.Disposal.WaitAsync(TimeSpan.FromSeconds(10));
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
 		public async Task RendersOpaqueOwnedFramesAndResizesWhilePaused()
 		{
 			RequireIntegration();

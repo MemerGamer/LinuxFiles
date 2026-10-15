@@ -63,6 +63,20 @@ namespace Files.Platform.Tests.Previews
 		}
 
 		[TestMethod]
+		public void TrimsOnlyUniformTrailingRows()
+		{
+			// 2x4 BGRA rows: content, content, then two background rows.
+			byte[] content = [1, 2, 3, 255, 9, 9, 9, 255];
+			byte[] background = [7, 7, 7, 255, 7, 7, 7, 255];
+			byte[] pixels = [.. content, .. content, .. background, .. background];
+			Assert.AreEqual(2 + 1, HtmlSnapshotHelper.TrimUniformBottom(pixels, 8, 8, 4));
+			byte[] noisyBottom = [.. content, .. background, .. content];
+			Assert.AreEqual(3, HtmlSnapshotHelper.TrimUniformBottom(noisyBottom, 8, 8, 3));
+			byte[] blank = [.. background, .. background];
+			Assert.AreEqual(1, HtmlSnapshotHelper.TrimUniformBottom(blank, 8, 8, 2));
+		}
+
+		[TestMethod]
 		public void LaunchUsesArgumentListAndDotnetEntryDll()
 		{
 			var start = HtmlSnapshotRenderer.CreateStartInfo("/usr/bin/dotnet", "/tmp/Files.dll", "/tmp/file with ' $quotes.html", 320, 2);
@@ -131,7 +145,7 @@ namespace Files.Platform.Tests.Previews
 				Assert.IsNotNull(png, "Snapshot helper failed.");
 				using var bitmap = SKBitmap.Decode(png);
 				Assert.IsNotNull(bitmap);
-				Assert.AreEqual(SKColors.Lime, bitmap.GetPixel(160, 300), "Relative local stylesheet must still load.");
+				Assert.AreEqual(SKColors.Lime, bitmap.GetPixel(160, 50), "Relative local stylesheet must still load.");
 				await Task.Delay(150);
 				Assert.AreEqual(0, Volatile.Read(ref accepted), "Local HTML made a network connection.");
 			}
@@ -178,7 +192,7 @@ namespace Files.Platform.Tests.Previews
 			try
 			{
 				var path = Path.Combine(root, "tall.html");
-				await File.WriteAllTextAsync(path, "<body style='margin:0'><div style='height:1200px;width:1000px;background:lime'></div>");
+				await File.WriteAllTextAsync(path, "<body style='margin:0'><div style='height:1200px;width:1000px;background:linear-gradient(lime,blue)'></div>");
 				var start = HtmlSnapshotRenderer.CreateStartInfo(Environment.ProcessPath!, Environment.GetCommandLineArgs()[0], path, 320, 1);
 				start.ArgumentList[^1] = "700";
 				var png = await HtmlSnapshotRenderer.RunProcessAsync(start, CancellationToken.None);
@@ -187,6 +201,22 @@ namespace Files.Platform.Tests.Previews
 				Assert.IsNotNull(bitmap);
 				Assert.AreEqual(320, bitmap.Width);
 				Assert.AreEqual(700, bitmap.Height);
+			}
+			finally { Directory.Delete(root, true); }
+		}
+
+		[TestMethod]
+		public async Task RefusesToRenderWithoutTheWebKitSandboxTools()
+		{
+			var root = Directory.CreateTempSubdirectory("linuxfiles-html-nosandbox-").FullName;
+			try
+			{
+				var path = Path.Combine(root, "page.html");
+				await File.WriteAllTextAsync(path, "<p>Sandbox</p>");
+				// The check runs before GTK is initialized, so no display is needed.
+				var start = HtmlSnapshotRenderer.CreateStartInfo(Environment.ProcessPath!, Environment.GetCommandLineArgs()[0], path, 320, 1);
+				start.Environment["PATH"] = root;
+				Assert.IsNull(await HtmlSnapshotRenderer.RunProcessAsync(start, CancellationToken.None));
 			}
 			finally { Directory.Delete(root, true); }
 		}

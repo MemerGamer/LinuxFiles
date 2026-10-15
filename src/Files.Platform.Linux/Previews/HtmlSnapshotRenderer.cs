@@ -56,7 +56,8 @@ namespace Files.Platform.Linux.Previews
 			start.ArgumentList.Add(HtmlSnapshotHelper.Switch);
 			start.ArgumentList.Add(path);
 			start.ArgumentList.Add(Math.Clamp(cssWidth, 1, HtmlSnapshotHelper.MaxWidth).ToString(CultureInfo.InvariantCulture));
-			start.ArgumentList.Add(HtmlSnapshotHelper.MaxHeight.ToString(CultureInfo.InvariantCulture));
+			// The helper's window is this tall, so it also bounds WebKit's snapshot memory.
+			start.ArgumentList.Add(Math.Min(HtmlSnapshotHelper.MaxHeight, 4096 * Math.Clamp(scale, 1, 2)).ToString(CultureInfo.InvariantCulture));
 			start.Environment[HtmlSnapshotHelper.ScaleVariable] = Math.Clamp(scale, 1, 2).ToString(CultureInfo.InvariantCulture);
 			// The helper applies the scale itself; an inherited session GDK_SCALE would multiply it on X11.
 			start.Environment["GDK_SCALE"] = "1";

@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using Files.Platform.Linux.Native;
+using Files.Platform.Linux.Previews;
 using System;
 using System.Globalization;
 using System.IO;
@@ -73,6 +74,7 @@ namespace Files.Platform.Linux.Media
 		private int targetWidth = 640;
 		private int targetHeight = 360;
 		private string? requestedPath;
+		private FileStream? pinnedFile;
 		private bool playRequested;
 		private double volume = 1;
 		private double position;
@@ -123,6 +125,9 @@ namespace Files.Platform.Linux.Media
 				requestedPath = Path.GetFullPath(absolutePath);
 				try
 				{
+					// Only regular files; mpv reads the inode checked here even if the path is swapped afterwards.
+					pinnedFile = PreviewFile.OpenRead(requestedPath);
+					requestedPath = FormattableString.Invariant($"/proc/self/fd/{pinnedFile.SafeFileHandle.DangerousGetHandle()}");
 					Initialize();
 					ThrowIfDisposed();
 					Command("loadfile", requestedPath, "replace");
@@ -468,6 +473,8 @@ namespace Files.Platform.Linux.Media
 					if (handle != 0) MpvNative.mpv_terminate_destroy(handle);
 					renderContext = handle = 0;
 					if (callbackHandle.IsAllocated) callbackHandle.Free();
+					pinnedFile?.Dispose();
+					pinnedFile = null;
 				}
 				lock (stateGate) renderSignal.Dispose();
 				disposal.TrySetResult();

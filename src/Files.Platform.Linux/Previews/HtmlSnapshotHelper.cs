@@ -19,6 +19,7 @@ namespace Files.Platform.Linux.Previews
 		internal const int MaxDocumentBytes = 8 * 1024 * 1024;
 		internal const int MaxHeight = 8192;
 		internal const int MaxWidth = 2048;
+		private const int MinTrimmedHeight = 100;
 		internal const string ScaleVariable = "LINUXFILES_HTML_SNAPSHOT_SCALE";
 
 		// Resource hints that connect before (or regardless of) the Content-Security-Policy check.
@@ -80,6 +81,8 @@ namespace Files.Platform.Linux.Previews
 			resultCode = 1;
 			initialNavigation = snapshotStarted = watchdogExpired = false;
 
+			// The web process must run in WebKit's bubblewrap sandbox; without bwrap the source fallback is shown instead.
+			if (!IsOnPath("bwrap") || !IsOnPath("xdg-dbus-proxy")) throw new IOException("WebKit sandbox tools (bwrap, xdg-dbus-proxy) are unavailable.");
 			gtk_disable_setlocale();
 			if (gtk_init_check(0, 0) == 0) throw new IOException("No usable GTK display.");
 			var manager = webkit_website_data_manager_new_ephemeral();
@@ -90,13 +93,17 @@ namespace Files.Platform.Linux.Previews
 			try
 			{
 				webkit_web_context_set_cache_model(context, 0); // DOCUMENT_VIEWER, no resource cache.
+				// Must precede the first web view of the context; no extra sandbox paths are granted.
+				webkit_web_context_set_sandbox_enabled(context, 1);
+				if (webkit_web_context_get_sandbox_enabled(context) == 0) throw new IOException("WebKit sandbox could not be enabled.");
 				ConfigureSettings(settings);
 				var view = webkit_web_view_new_with_context(context);
 				webkit_web_view_set_settings(view, settings);
 				// Page zoom renders device pixels on every GDK backend (GDK_SCALE only affects X11) while keeping the CSS width.
 				var scale = int.TryParse(Environment.GetEnvironmentVariable(ScaleVariable), NumberStyles.None, CultureInfo.InvariantCulture, out var requested) ? Math.Clamp(requested, 1, 2) : 1;
 				webkit_web_view_set_zoom_level(view, scale);
-				gtk_window_set_default_size(window, width * scale, Math.Min(height, 600));
+				// The visible region bounds WebKit's snapshot allocation; trailing background rows are trimmed afterwards.
+				gtk_window_set_default_size(window, width * scale, height);
 				gtk_container_add(window, view);
 				g_signal_connect_data(view, "load-changed", (nint)(delegate* unmanaged[Cdecl]<nint, int, nint, void>)&LoadChanged, 0, 0, 0);
 				g_signal_connect_data(view, "load-failed", (nint)(delegate* unmanaged[Cdecl]<nint, int, nint, nint, nint, int>)&LoadFailed, 0, 0, 0);
@@ -163,13 +170,30 @@ namespace Files.Platform.Linux.Previews
 			finally { webkit_feature_list_unref(features); }
 		}
 
+		// Drops trailing rows identical to the last one (page background below short documents), keeping at least minHeight rows.
+		internal static int TrimUniformBottom(ReadOnlySpan<byte> pixels, int stride, int rowBytes, int height, int minHeight = 1)
+		{
+			var last = pixels.Slice((height - 1) * stride, rowBytes);
+			for (var x = 4; x < rowBytes; x += 4)
+				if (!last.Slice(x, 4).SequenceEqual(last[..4])) return height;
+			while (height > Math.Max(1, minHeight) && pixels.Slice((height - 2) * stride, rowBytes).SequenceEqual(last)) height--;
+			return height;
+		}
+
+		private static bool IsOnPath(string name)
+		{
+			foreach (var directory in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(':', StringSplitOptions.RemoveEmptyEntries))
+				if (Path.IsPathFullyQualified(directory) && File.Exists(Path.Combine(directory, name))) return true;
+			return false;
+		}
+
 		[UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
 		private static void LoadChanged(nint view, int loadEvent, nint data)
 		{
 			if (loadEvent == 0) initialNavigation = true;
 			if (loadEvent != 3 || snapshotStarted) return; // WEBKIT_LOAD_FINISHED
 			snapshotStarted = true;
-			webkit_web_view_get_snapshot(view, 1, 0, 0, &SnapshotReady, 0); // FULL_DOCUMENT
+			webkit_web_view_get_snapshot(view, 0, 0, 0, &SnapshotReady, 0); // VISIBLE
 		}
 
 		[UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
@@ -231,6 +255,7 @@ namespace Files.Platform.Linux.Previews
 				var stride = cairo_image_surface_get_stride(surface);
 				if (format is not (0 or 1) || width is < 1 or > MaxWidth * 2 || height < 1 || surfaceWidth < width || stride < width * 4 || !BitConverter.IsLittleEndian)
 					throw new IOException("Unsupported snapshot format or dimensions.");
+				height = TrimUniformBottom(new ReadOnlySpan<byte>((void*)cairo_image_surface_get_data(surface), checked(stride * height)), stride, width * 4, height, MinTrimmedHeight);
 				// Cairo ARGB32 is native-endian premultiplied BGRA; RGB24 has an unused alpha byte.
 				using var pixels = new SKPixmap(new SKImageInfo(width, height, SKColorType.Bgra8888,
 					format == 0 ? SKAlphaType.Premul : SKAlphaType.Opaque), cairo_image_surface_get_data(surface), stride);

@@ -16,11 +16,15 @@
 		VerticalAlignment="Stretch"
 		CornerRadius="{StaticResource ControlCornerRadius}">
 
-		<WebView2
-			x:Name="WebViewControl"
-			HorizontalAlignment="Stretch"
-			VerticalAlignment="Stretch"
-			Loaded="WebViewControl_Loaded" />
+		<Grid>
+			<ContentPresenter x:Name="FallbackContent" />
+			<WebView2
+				x:Name="WebViewControl"
+				x:Load="{x:Bind NativeViewsAvailable}"
+				HorizontalAlignment="Stretch"
+				VerticalAlignment="Stretch"
+				Loaded="WebViewControl_Loaded" />
 
+		</Grid>
 	</Border>
 </UserControl>

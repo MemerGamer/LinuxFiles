@@ -19,19 +19,23 @@
 
 	<Border CornerRadius="{StaticResource ControlCornerRadius}">
 
-		<MediaPlayerElement
-			x:Name="PlayerContext"
-			AreTransportControlsEnabled="True"
-			Background="Transparent"
-			Foreground="Transparent"
-			Source="{x:Bind ViewModel.Source, Mode=OneWay}">
-			<MediaPlayerElement.TransportControls>
-				<MediaTransportControls
-					IsCompact="True"
-					IsPlaybackRateButtonVisible="False"
-					IsZoomButtonVisible="False" />
-			</MediaPlayerElement.TransportControls>
-		</MediaPlayerElement>
+		<Grid>
+			<ContentPresenter x:Name="FallbackContent" />
+			<MediaPlayerElement
+				x:Name="PlayerContext"
+				x:Load="{x:Bind NativeViewsAvailable}"
+				AreTransportControlsEnabled="True"
+				Background="Transparent"
+				Foreground="Transparent"
+				Source="{x:Bind ViewModel.Source, Mode=OneWay}">
+				<MediaPlayerElement.TransportControls>
+					<MediaTransportControls
+						IsCompact="True"
+						IsPlaybackRateButtonVisible="False"
+						IsZoomButtonVisible="False" />
+				</MediaPlayerElement.TransportControls>
+			</MediaPlayerElement>
 
+		</Grid>
 	</Border>
 </UserControl>

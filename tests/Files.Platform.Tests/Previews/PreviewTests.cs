@@ -33,6 +33,24 @@ namespace Files.Platform.Tests.Previews
 		[TestMethod]
 		[DataRow("utf-8")]
 		[DataRow("utf-16")]
+		public async Task HtmlFallbackSourceIsLiteralAndBounded(string encodingName)
+		{
+			const string html = "<!doctype html><script>alert('preview')</script><img src='https://example.invalid/image'> &amp; <p>€</p>";
+			var encoding = Encoding.GetEncoding(encodingName);
+			var text = html + new string('x', PreviewTextReader.MaxBytes);
+			using var input = new MemoryStream([.. encoding.GetPreamble(), .. encoding.GetBytes(text)]);
+			var result = await PreviewTextReader.ReadAsync(input);
+
+			Assert.IsFalse(result.LooksBinary);
+			Assert.IsTrue(result.Truncated);
+			Assert.IsTrue(result.Text.StartsWith(html, StringComparison.Ordinal));
+			Assert.IsTrue(text.StartsWith(result.Text, StringComparison.Ordinal));
+			Assert.IsTrue(input.Position <= PreviewTextReader.MaxBytes + 1L);
+		}
+
+		[TestMethod]
+		[DataRow("utf-8")]
+		[DataRow("utf-16")]
 		[DataRow("utf-16BE")]
 		[DataRow("utf-32")]
 		[DataRow("utf-32BE")]

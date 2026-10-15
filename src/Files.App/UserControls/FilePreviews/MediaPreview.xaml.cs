@@ -1,6 +1,7 @@
 using Files.App.ViewModels.Previews;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml.Input;
 using Windows.Media.Playback;
 
@@ -12,15 +13,34 @@ namespace Files.App.UserControls.FilePreviews
 	{
 		private IUserSettingsService UserSettingsService { get; } = Ioc.Default.GetRequiredService<IUserSettingsService>();
 
+		public bool NativeViewsAvailable { get; } = NativePreviewSupport.IsAvailable;
+
 		public MediaPreview(MediaPreviewViewModel model)
 		{
 			ViewModel = model;
 			InitializeComponent();
-			PlayerContext.Loaded += PlayerContext_Loaded;
+			if (NativeViewsAvailable)
+				PlayerContext.Loaded += PlayerContext_Loaded;
+			else
+				Loaded += LoadFallback;
 			Unloaded += MediaPreview_Unloaded;
 		}
 
 		public MediaPreviewViewModel ViewModel { get; set; }
+
+		private async void LoadFallback(object sender, RoutedEventArgs e)
+		{
+			Loaded -= LoadFallback;
+			try
+			{
+				FallbackContent.Content = await NativePreviewFallback.CreateMediaAsync(ViewModel.Item, ViewModel.LoadCancelledTokenSource.Token);
+			}
+			catch (OperationCanceledException) when (ViewModel.LoadCancelledTokenSource.IsCancellationRequested) { }
+			catch (Exception ex)
+			{
+				App.Logger.LogWarning(ex, "Failed to load preview fallback");
+			}
+		}
 
 		private void PlayerContext_Loaded(object sender, RoutedEventArgs e)
 		{
@@ -31,6 +51,12 @@ namespace Files.App.UserControls.FilePreviews
 
 		private void MediaPreview_Unloaded(object sender, RoutedEventArgs e)
 		{
+			if (!NativeViewsAvailable)
+			{
+				ViewModel.PreviewControlBase_Unloaded(sender, e);
+				return;
+			}
+
 			// The MediaPlayerElement isn't properly disposed by Windows so we set the source to null
 			// to avoid issues the next time the control is used.
 			PlayerContext.Source = null;
@@ -53,6 +79,9 @@ namespace Files.App.UserControls.FilePreviews
 
 		private void TogglePlaybackRequestInvoked(object? sender, EventArgs e)
 		{
+			if (!NativeViewsAvailable)
+				return;
+
 			if (PlayerContext.MediaPlayer.PlaybackSession.PlaybackState is not MediaPlaybackState.Playing)
 			{
 				PlayerContext.MediaPlayer.Play();

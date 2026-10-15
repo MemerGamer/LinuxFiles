@@ -1160,7 +1160,7 @@ namespace Files.App.Views.Layouts
 				// Set can window to front (#13255)
 				MainWindow.Instance.SetCanWindowToFront(false);
 				itemDragging = true;
-				Files.App.Services.Desktop.DesktopFileDragHelper.StartExternalDrag(orderedItems.Select(x => x.ItemPath));
+				Files.App.Services.Desktop.DesktopFileDragHelper.StartDrag(e.Data, orderedItems.Select(x => x.ItemPath));
 			}
 			catch (Exception)
 			{

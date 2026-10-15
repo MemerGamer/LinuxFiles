@@ -92,6 +92,24 @@ namespace Files.App.Services.Desktop
 		}
 
 		/// <summary>
+		/// Makes a drag of <paramref name="paths"/> available to other applications. On the native Wayland host the dragged
+		/// <paramref name="data"/> carries the file list (<c>text/uri-list</c>) and the host offers it to the compositor once the
+		/// pointer leaves the window; on X11 the Files selection host follows the pointer instead.
+		/// </summary>
+		public static void StartDrag(DataPackage data, IEnumerable<string?> paths)
+		{
+			if (!MainWindow.Instance.IsWaylandWindow)
+			{
+				StartExternalDrag(paths);
+				return;
+			}
+
+			var existing = ExistingPaths(paths);
+			if (existing.Count > 0)
+				data.SetData(Files.Platform.Linux.Clipboard.ClipboardFormats.UriList, Files.Platform.Linux.Clipboard.ClipboardFormats.BuildUriList(existing));
+		}
+
+		/// <summary>
 		/// Starts offering the dragged items to other applications while the pointer is outside this window. Returns immediately; the
 		/// drag source follows the pointer until the primary button is released.
 		/// </summary>

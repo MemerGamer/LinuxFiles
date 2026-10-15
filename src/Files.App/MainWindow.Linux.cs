@@ -26,9 +26,9 @@ namespace Files.App
 #if UNO_WAYLAND
 		private bool _waylandWindow;
 		// The Wayland host implements caption regions, move and maximize itself (InputNonClientPointerSource, presenter).
-		private bool IsWaylandWindow => _waylandWindow;
+		internal bool IsWaylandWindow => _waylandWindow;
 #else
-		private static bool IsWaylandWindow => false;
+		internal bool IsWaylandWindow => false;
 #endif
 		public bool UseClientSideDecorations => OperatingSystem.IsLinux() &&
 			Ioc.Default.GetRequiredService<ILocalSettingsStore>().Get("UseClientSideDecorations", true);

@@ -46,6 +46,26 @@ When the pointer leaves the window Uno still calls `StartNativeDrag` and raises 
 `Application.UnhandledException`. `DesktopRuntimeGuards` marks exactly that exception as handled instead of letting Files' crash
 handler exit the app (that was the reported crash). Uno then ends its own drag when the button is released.
 
+## Uno's own X11 drag source (`FilesUnoX11NativeDrag`)
+
+The MemerGamer/uno branch `wayland/host-x11dnd` gives Uno's X11 host an XDND v5 source, built like the Wayland host's
+outgoing drag: it takes the drag as soon as Uno's drag starts (`IImmediateDragDropExtension`), moves the pointer grab to a private
+X connection (drag icon window from the DragView snapshot, copy/move/link/no-drop cursors, Escape and Shift/Ctrl through a keyboard
+grab), routes the pointer back into Uno while it is over the window the drag started in, and offers `text/uri-list` plus the text
+targets. Files then only has to put the file list into `e.Data`, as on Wayland (`DesktopFileDragHelper.StartDrag`).
+
+Released packages up to `6.7.135-wayland.6` do not contain it, so `FilesUnoX11NativeDrag` (Directory.Packages.props) defaults to
+`false` and Files keeps starting its own X11 drag source. Set it to `true` together with the first `UnoWaylandVersion` that includes
+the branch; `UNO_X11_NATIVE_DRAG` then skips `StartExternalDrag` on X11. The old source and `DesktopRuntimeGuards` stay as the path
+for packages without it.
+
+Verified with a LinuxFiles build using `-p:FilesUnoX11NativeDrag=true` and the branch's `Uno.UI.Runtime.Skia.X11.dll`:
+- private Xvfb with a GTK3 drop target: copy, Shift move, Escape, a rejecting target (no-drop cursor), drop onto a folder in the
+  same window, and out to the target and back into the window;
+- nested KWin with XWayland and a Wayland-native Dolphin: Copy Here from the drop menu, Shift move, Escape, out and back.
+  On Escape KWin ends its bridged drag without telling the X source and XWayland gets no button release; the Uno source cancels
+  when its target window disappears under a still pointer.
+
 ## Dragging out to Wayland-native apps on KDE (XWayland bridge)
 
 Files runs under XWayland, so a Wayland-native target (Dolphin, Kate) is not a window on the X server and the XDND tree walk never
@@ -85,7 +105,7 @@ under `dbus-run-session` with a private `XDG_RUNTIME_DIR` (the socket path must 
 
 ## LINUX-TODO
 
-- `LINUX-TODO(dnd)`: no drag icon or cursor feedback outside the window (the pointer is grabbed by Uno's window; changing it needs
+- `LINUX-TODO(dnd)`: (fixed by Uno's X11 source once `FilesUnoX11NativeDrag` is on) no drag icon or cursor feedback outside the window (the pointer is grabbed by Uno's window; changing it needs
   `XChangeActivePointerGrab` on that connection, or the Uno extension point). Dropping on a window that answers `XdndStatus` with
   "reject" silently does nothing.
 - `LINUX-TODO(dnd)`: the guard only covers file lists (`FileList_DragItemsStarting`). Drags from the sidebar, tabs and the shelf leave

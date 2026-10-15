@@ -52,6 +52,8 @@
   <!--  Native Wayland host from the MemerGamer/uno fork; see docs/linux-port/wayland-packages.md  -->
   <PropertyGroup>
     <UnoWaylandVersion Condition="'$(UnoWaylandVersion)' == ''">6.7.135-wayland.6</UnoWaylandVersion>
+    <!--  Set to true with the first UnoWaylandVersion whose X11 host drags to other apps itself (wayland/host-x11dnd); Files then stops starting its own X11 drag source.  -->
+    <FilesUnoX11NativeDrag Condition="'$(FilesUnoX11NativeDrag)' == ''">false</FilesUnoX11NativeDrag>
   </PropertyGroup>
   <PropertyGroup Condition="'$(FilesUseUnoWayland)' == 'true'">
     <RestoreConfigFile Condition="'$(RestoreConfigFile)' == ''">$(MSBuildThisFileDirectory)nuget.wayland.config</RestoreConfigFile>

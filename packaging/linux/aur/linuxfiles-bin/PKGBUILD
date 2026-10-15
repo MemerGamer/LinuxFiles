@@ -18,7 +18,9 @@ optdepends=('polkit: authenticated root actions'
             'gvfs: network and MTP locations'
             'udisks2: mount and eject drives'
             'libsecret: saved network credentials (Secret Service provider)'
-            'gnome-disk-utility: format and manage drives')
+            'gnome-disk-utility: format and manage drives'
+            'mpv: audio and video playback in the preview pane'
+            'webkit2gtk-4.1: rendered HTML previews')
 provides=("$_pkgname")
 conflicts=("$_pkgname")
 options=('!strip' '!debug')  # stripping breaks the self-contained .NET binaries

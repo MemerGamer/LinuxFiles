@@ -11,7 +11,7 @@ license=('MIT')
 # Self-contained publish bundles the runtime; native libs below are loaded by Skia/Uno at runtime.
 depends=('fontconfig' 'freetype2' 'libx11' 'libxcursor' 'libxrandr' 'libxi' 'libxext' 'wayland' 'libxkbcommon' 'libglvnd' 'mesa' 'glib2' 'hicolor-icon-theme')
 makedepends=('dotnet-sdk>=10.0' 'git' 'clang' 'zlib' 'python')
-optdepends=('polkit: authenticated root actions' 'gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives')
+optdepends=('polkit: authenticated root actions' 'gvfs: network and MTP locations' 'gnome-disk-utility: format and manage drives' 'mpv: audio and video playback in the preview pane' 'webkit2gtk-4.1: rendered HTML previews')
 options=('!strip')  # .NET single-file/self-contained binaries break when stripped
 # Generated from build/uno-wayland-packages.sha256; templates require complete pins.
 _uno_version=6.7.135-wayland.6

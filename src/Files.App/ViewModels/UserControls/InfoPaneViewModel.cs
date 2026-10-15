@@ -334,10 +334,15 @@ namespace Files.App.ViewModels.UserControls
 #endif
 			}
 
+#if DESKTOP
+			if (ext is ".html" or ".htm" && Files.Platform.Linux.Previews.HtmlSnapshotRenderer.IsAvailable)
+				return new LinuxHtmlPreview(new HtmlPreviewViewModel(item), token);
+#endif
+
 			if (ext is ".html" or ".htm" && !NativePreviewSupport.IsAvailable)
 				return await NativePreviewFallback.CreateHtmlAsync(item, token);
 
-			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML is shown as source, never rendered.
+			// Markdown and highlighted code render as inert text with Markdig / ColorCode.Core; HTML falls back to source.
 			// LINUX-TODO(preview): shell scripts and other languages without a ColorCode grammar are shown as plain text
 			if (FileExtensionHelpers.IsMarkdownFile(ext) &&
 				await TextPreviewViewModel.TryLoadWithKindAsync(item, TextPreviewKind.Markdown, null, token) is { } markdownPreview)

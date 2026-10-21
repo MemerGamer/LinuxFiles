@@ -29,8 +29,7 @@ namespace Files.App.UserControls.FilePreviews
 			var dark = ActualTheme == ElementTheme.Dark
 				|| (ActualTheme == ElementTheme.Default && Application.Current?.RequestedTheme == ApplicationTheme.Dark);
 
-			// RichTextBlock draws nothing on Uno Skia, so the paragraphs are built in a detached block
-			// collection and each one is shown in its own wrapping TextBlock.
+			// The paragraphs are built in a detached block collection, then shown as TextBlocks (see AddParagraphTextBlocks).
 			var blocks = new RichTextBlock().Blocks;
 			switch (ViewModel.Kind)
 			{
@@ -54,26 +53,7 @@ namespace Files.App.UserControls.FilePreviews
 				}
 			}
 
-			foreach (var block in blocks.OfType<Paragraph>())
-			{
-				var textBlock = new TextBlock
-				{
-					IsTextSelectionEnabled = true,
-					TextWrapping = TextWrapping.Wrap,
-					Margin = block.Margin,
-					FontFamily = block.FontFamily,
-					FontSize = block.FontSize,
-					FontWeight = block.FontWeight,
-					FontStyle = block.FontStyle,
-				};
-				foreach (var inline in block.Inlines.ToList())
-				{
-					block.Inlines.Remove(inline);
-					textBlock.Inlines.Add(inline);
-				}
-
-				ContentPanel.Children.Add(textBlock);
-			}
+			PreviewTextRenderer.AddParagraphTextBlocks(ContentPanel, blocks);
 
 			if (!string.IsNullOrEmpty(ViewModel.Footer))
 			{

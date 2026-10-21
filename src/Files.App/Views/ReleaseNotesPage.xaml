@@ -18,10 +18,29 @@
 			<RowDefinition Height="Auto" />
 		</Grid.RowDefinitions>
 
-		<!--  WebView  -->
+		<!--  Release notes Markdown (Linux)  -->
+		<ProgressRing
+			x:Name="LoadingRing"
+			HorizontalAlignment="Center"
+			VerticalAlignment="Center"
+			IsActive="False"
+			Visibility="Collapsed" />
+
+		<ScrollViewer
+			x:Name="ReleaseNotesScrollViewer"
+			HorizontalScrollBarVisibility="Disabled"
+			Visibility="Collapsed">
+			<StackPanel
+				x:Name="ReleaseNotesPanel"
+				MaxWidth="900"
+				Padding="32,24,32,24"
+				HorizontalAlignment="Stretch" />
+		</ScrollViewer>
+
+		<!--  WebView (fallback), loaded on demand  -->
 		<WebView2
 			x:Name="BlogPostWebView"
-			x:Load="{x:Bind NativeViewsAvailable}"
+			x:Load="False"
 			HorizontalAlignment="Stretch"
 			VerticalAlignment="Stretch"
 			CoreWebView2Initialized="BlogPostWebView_CoreWebView2Initialized"
@@ -33,7 +52,8 @@
 			HorizontalAlignment="Center"
 			VerticalAlignment="Center"
 			Click="OpenReleaseNotes_Click"
-			Content="{helpers:ResourceString Key=ReleaseNotes}" />
+			Content="{helpers:ResourceString Key=ReleaseNotes}"
+			Visibility="Collapsed" />
 
 		<!--  Footer  -->
 		<Border

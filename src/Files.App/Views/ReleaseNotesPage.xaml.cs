@@ -1,9 +1,11 @@
 // Copyright (c) Files Community
 // Licensed under the MIT License.
 
+using Files.App.UserControls.FilePreviews;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Navigation;
 using Microsoft.Web.WebView2.Core;
 using Windows.System;
@@ -28,12 +30,16 @@ namespace Files.App.Views
 		private IShellPage AppInstance
 			=> appInstance ?? throw new InvalidOperationException("The release notes page has not been initialized.");
 
-		public bool NativeViewsAvailable { get; } = NativePreviewSupport.IsAvailable;
+		private readonly CancellationTokenSource loadCancellation = new();
+
+		private PreviewTextRenderer.Model? releaseNotesModel;
+
+		private bool isDisposed;
 
 		public ReleaseNotesPage()
 		{
 			InitializeComponent();
-			BrowserLink.Visibility = NativeViewsAvailable ? Visibility.Collapsed : Visibility.Visible;
+			ActualThemeChanged += (_, _) => BuildReleaseNotes();
 		}
 
 		protected override async void OnNavigatedTo(NavigationEventArgs e)
@@ -89,19 +95,85 @@ namespace Files.App.Views
 			AppInstance.ToolbarViewModel.PathComponents.Add(item);
 
 			base.OnNavigatedTo(e);
-			if (!NativeViewsAvailable)
-				await OpenReleaseNotesAsync();
+			await LoadContentAsync();
 		}
+
+		private async Task LoadContentAsync()
+		{
+			// The page can be left while OnNavigatedTo is still awaiting
+			if (isDisposed)
+				return;
+
+			if (OperatingSystem.IsLinux())
+			{
+				LoadingRing.Visibility = Visibility.Visible;
+				LoadingRing.IsActive = true;
+				try
+				{
+					releaseNotesModel = await ViewModel.LoadLinuxReleaseNotesAsync(loadCancellation.Token);
+				}
+				catch (OperationCanceledException)
+				{
+					return;
+				}
+				finally
+				{
+					LoadingRing.IsActive = false;
+					LoadingRing.Visibility = Visibility.Collapsed;
+				}
+
+				if (isDisposed)
+					return;
+
+				if (releaseNotesModel is not null)
+				{
+					BuildReleaseNotes();
+					ReleaseNotesScrollViewer.Visibility = Visibility.Visible;
+					return;
+				}
+			}
+
+			// Fallback: WebView2 has no native backend on Linux (docs/linux-port/wayland-previews.md), so open the default browser there
+			if (!OperatingSystem.IsLinux())
+			{
+				FindName(nameof(BlogPostWebView));
+				return;
+			}
+
+			BrowserLink.Visibility = Visibility.Visible;
+			await OpenReleaseNotesAsync();
+		}
+
+		private void BuildReleaseNotes()
+		{
+			ReleaseNotesPanel.Children.Clear();
+			if (releaseNotesModel is null)
+				return;
+
+			var dark = ActualTheme == ElementTheme.Dark
+				|| (ActualTheme == ElementTheme.Default && Application.Current?.RequestedTheme == ApplicationTheme.Dark);
+
+			// Links open in the default browser; images are shown as their alt text and HTML as literal text
+			var blocks = new RichTextBlock().Blocks;
+			PreviewTextRenderer.AddMarkdownBlocks(blocks, releaseNotesModel, dark, OpenLink);
+			PreviewTextRenderer.AddParagraphTextBlocks(ReleaseNotesPanel, blocks);
+		}
+
+		private async void OpenLink(Uri uri)
+			=> await LaunchUriAsync(uri);
 
 		private async void OpenReleaseNotes_Click(object sender, RoutedEventArgs e)
 			=> await OpenReleaseNotesAsync();
 
-		private async Task OpenReleaseNotesAsync()
+		private Task OpenReleaseNotesAsync()
+			=> LaunchUriAsync(new Uri(ViewModel.BlogPostUrl));
+
+		private static async Task LaunchUriAsync(Uri uri)
 		{
 			try
 			{
 				await Ioc.Default.GetRequiredService<Files.Platform.Abstractions.Launching.ILauncherService>()
-					.LaunchUriAsync(new Uri(ViewModel.BlogPostUrl));
+					.LaunchUriAsync(uri);
 			}
 			catch (Exception ex)
 			{
@@ -209,7 +281,14 @@ namespace Files.App.Views
 
 		public void Dispose()
 		{
-			if (!NativeViewsAvailable)
+			if (isDisposed)
+				return;
+
+			isDisposed = true;
+			loadCancellation.Cancel();
+			loadCancellation.Dispose();
+
+			if (BlogPostWebView is null)
 				return;
 
 			BlogPostWebView.WebMessageReceived -= WebView_WebMessageReceived;

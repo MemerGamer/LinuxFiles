@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using ColorCode;
+using System.Diagnostics.CodeAnalysis;
 using Files.App.ViewModels.Previews;
 using Markdig;
 using Markdig.Syntax;
@@ -10,6 +11,7 @@ using Markdig.Syntax.Inlines;
 using Microsoft.UI;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
 using Windows.UI;
@@ -18,7 +20,8 @@ namespace Files.App.UserControls.FilePreviews
 {
 	/// <summary>
 	/// Turns untrusted text into inert XAML inlines/blocks: syntax highlighted code and basic Markdown.
-	/// Links are rendered as underlined text only (never navigated), raw HTML is shown as literal text and images are not loaded.
+	/// Links are rendered as underlined text only unless the caller opts in to opening http(s) links,
+	/// raw HTML is shown as literal text and images are not loaded.
 	/// </summary>
 	public static class PreviewTextRenderer
 	{
@@ -117,7 +120,8 @@ namespace Files.App.UserControls.FilePreviews
 			return null;
 		}
 
-		public static void AddMarkdownBlocks(BlockCollection blocks, Model model, bool dark)
+		/// <param name="openLink">Opens absolute http(s) links when set; otherwise links are inert text.</param>
+		public static void AddMarkdownBlocks(BlockCollection blocks, Model model, bool dark, Action<Uri>? openLink = null)
 		{
 			if (model.Markdown is null)
 			{
@@ -127,12 +131,39 @@ namespace Files.App.UserControls.FilePreviews
 			try
 			{
 				foreach (var block in model.Markdown)
-					AddBlock(blocks, block, 0, dark);
+					AddBlock(blocks, block, 0, dark, openLink);
 			}
 			catch (Exception)
 			{
 				blocks.Clear();
 				blocks.Add(PlainParagraph(model.Text));
+			}
+		}
+
+		/// <summary>
+		/// RichTextBlock draws nothing on Uno Skia, so each paragraph is moved into its own wrapping TextBlock.
+		/// </summary>
+		public static void AddParagraphTextBlocks(Panel target, BlockCollection blocks)
+		{
+			foreach (var block in blocks.OfType<Paragraph>())
+			{
+				var textBlock = new TextBlock
+				{
+					IsTextSelectionEnabled = true,
+					TextWrapping = TextWrapping.Wrap,
+					Margin = block.Margin,
+					FontFamily = block.FontFamily,
+					FontSize = block.FontSize,
+					FontWeight = block.FontWeight,
+					FontStyle = block.FontStyle,
+				};
+				foreach (var inline in block.Inlines.ToList())
+				{
+					block.Inlines.Remove(inline);
+					textBlock.Inlines.Add(inline);
+				}
+
+				target.Children.Add(textBlock);
 			}
 		}
 
@@ -143,7 +174,7 @@ namespace Files.App.UserControls.FilePreviews
 			return paragraph;
 		}
 
-		private static void AddBlock(BlockCollection blocks, Block block, int depth, bool dark)
+		private static void AddBlock(BlockCollection blocks, Block block, int depth, bool dark, Action<Uri>? openLink)
 		{
 			if (depth >= 32 || blocks.Count >= 2048)
 				throw new System.IO.InvalidDataException("The Markdown preview limit was exceeded.");
@@ -160,14 +191,14 @@ namespace Files.App.UserControls.FilePreviews
 						FontSize = heading.Level switch { 1 => 24, 2 => 20, 3 => 17, _ => 15 },
 						Margin = new Thickness(depth * 20, heading.Level <= 2 ? 8 : 4, 0, 6),
 					};
-					AddInlines(paragraph.Inlines, heading.Inline, dark);
+					AddInlines(paragraph.Inlines, heading.Inline, dark, openLink);
 					blocks.Add(paragraph);
 					break;
 				}
 				case ParagraphBlock paragraphBlock:
 				{
 					var paragraph = new Paragraph { Margin = indent };
-					AddInlines(paragraph.Inlines, paragraphBlock.Inline, dark);
+					AddInlines(paragraph.Inlines, paragraphBlock.Inline, dark, openLink);
 					blocks.Add(paragraph);
 					break;
 				}
@@ -187,12 +218,12 @@ namespace Files.App.UserControls.FilePreviews
 							{
 								var paragraph = new Paragraph { Margin = new Thickness(depth * 20 + 8, 0, 0, 2) };
 								paragraph.Inlines.Add(new Run { Text = marker });
-								AddInlines(paragraph.Inlines, itemParagraph.Inline, dark);
+								AddInlines(paragraph.Inlines, itemParagraph.Inline, dark, openLink);
 								blocks.Add(paragraph);
 							}
 							else
 							{
-								AddBlock(blocks, child, depth + 1, dark);
+								AddBlock(blocks, child, depth + 1, dark, openLink);
 							}
 							first = false;
 						}
@@ -203,7 +234,7 @@ namespace Files.App.UserControls.FilePreviews
 				{
 					var firstIndex = blocks.Count;
 					foreach (var child in quote)
-						AddBlock(blocks, child, depth + 1, dark);
+						AddBlock(blocks, child, depth + 1, dark, openLink);
 
 					for (var i = firstIndex; i < blocks.Count; i++)
 					{
@@ -240,12 +271,12 @@ namespace Files.App.UserControls.FilePreviews
 				}
 				case ContainerBlock container:
 					foreach (var child in container)
-						AddBlock(blocks, child, depth, dark);
+						AddBlock(blocks, child, depth, dark, openLink);
 					break;
 			}
 		}
 
-		private static void AddInlines(InlineCollection target, ContainerInline? container, bool dark, int depth = 0)
+		private static void AddInlines(InlineCollection target, ContainerInline? container, bool dark, Action<Uri>? openLink, int depth = 0)
 		{
 			if (container is null)
 				return;
@@ -273,7 +304,7 @@ namespace Files.App.UserControls.FilePreviews
 					case EmphasisInline emphasis:
 					{
 						Span span = emphasis.DelimiterCount >= 2 ? new Bold() : new Italic();
-						AddInlines(span.Inlines, emphasis, dark, depth + 1);
+						AddInlines(span.Inlines, emphasis, dark, openLink, depth + 1);
 						target.Add(span);
 						break;
 					}
@@ -281,9 +312,25 @@ namespace Files.App.UserControls.FilePreviews
 					{
 						var alt = new Span();
 						alt.Inlines.Add(new Run { Text = "[" });
-						AddInlines(alt.Inlines, link, dark, depth + 1);
+						AddInlines(alt.Inlines, link, dark, openLink, depth + 1);
 						alt.Inlines.Add(new Run { Text = "]" });
 						target.Add(alt);
+						break;
+					}
+					case LinkInline link when openLink is not null && TryGetWebUri(link.Url, out var uri):
+					{
+						var hyperlink = new Hyperlink();
+						hyperlink.Click += (_, _) => openLink(uri);
+						AddInlines(hyperlink.Inlines, link, dark, null, depth + 1);
+						target.Add(hyperlink);
+						break;
+					}
+					case AutolinkInline auto when openLink is not null && !auto.IsEmail && TryGetWebUri(auto.Url, out var uri):
+					{
+						var hyperlink = new Hyperlink();
+						hyperlink.Click += (_, _) => openLink(uri);
+						hyperlink.Inlines.Add(new Run { Text = auto.Url });
+						target.Add(hyperlink);
 						break;
 					}
 					case LinkInline link:
@@ -291,7 +338,7 @@ namespace Files.App.UserControls.FilePreviews
 						// Rendered as text only; links are never opened from the preview.
 						var span = new Underline();
 						span.Foreground = new SolidColorBrush(dark ? Color.FromArgb(255, 117, 190, 255) : Color.FromArgb(255, 0, 90, 180));
-						AddInlines(span.Inlines, link, dark, depth + 1);
+						AddInlines(span.Inlines, link, dark, openLink, depth + 1);
 						target.Add(span);
 						break;
 					}
@@ -307,10 +354,19 @@ namespace Files.App.UserControls.FilePreviews
 						target.Add(new Run { Text = html.Tag });
 						break;
 					case ContainerInline nested:
-						AddInlines(target, nested, dark, depth + 1);
+						AddInlines(target, nested, dark, openLink, depth + 1);
 						break;
 				}
 			}
+		}
+
+		private static bool TryGetWebUri(string? url, [NotNullWhen(true)] out Uri? uri)
+		{
+			if (Uri.TryCreate(url, UriKind.Absolute, out uri) && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+				return true;
+
+			uri = null;
+			return false;
 		}
 	}
 }

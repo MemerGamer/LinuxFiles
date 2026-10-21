@@ -19,8 +19,6 @@ namespace Files.App.Services
 			private set => SetProperty(ref _areReleaseNotesAvailable, value);
 		}
 
-		public new event PropertyChangedEventHandler? PropertyChanged { add { } remove { } }
-
 		public Task CheckAndUpdateFilesLauncherAsync()
 		{
 			return Task.CompletedTask;
@@ -33,6 +31,12 @@ namespace Files.App.Services
 
 		public async Task CheckForReleaseNotesAsync()
 		{
+			if (OperatingSystem.IsLinux())
+			{
+				AreReleaseNotesAvailable = await ReleaseNotesHelper.GetLinuxReleaseNotesAsync() is not null;
+				return;
+			}
+
 			using var client = new HttpClient();
 
 			try

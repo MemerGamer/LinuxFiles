@@ -4,6 +4,8 @@ LinuxFiles is an independent Linux-only fork of [Files](https://github.com/files
 
 ## Unreleased
 
+- The Release notes page shows the LinuxFiles GitHub release notes for the running version, rendered from Markdown with clickable links. Offline or on errors it links to the release page instead.
+
 ## 0.1.0-alpha8 - 2026-10-16
 
 Eighth public alpha, focused on sharper text and real media/HTML previews on Wayland and X11. Expect rough edges and keep backups. Report issues at

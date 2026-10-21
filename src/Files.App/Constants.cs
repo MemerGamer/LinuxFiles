@@ -187,7 +187,13 @@ namespace Files.App
 			public static bool IsSupportUsAvailable => !OperatingSystem.IsLinux() || ForkSupportUsUrl.Length > 0;
 			public static string ActiveSupportUsUrl => OperatingSystem.IsLinux() ? ForkSupportUsUrl : SupportUsUrl;
 			public const string CrowdinUrl = @"https://crowdin.com/project/files-app";
-			public static readonly string ReleaseNotesUrl = $"https://files.community/blog/posts/v{Package.Current.Id.Version.Major}-{Package.Current.Id.Version.Minor}-{Package.Current.Id.Version.Build}?minimal";
+			// Release tags look like linux-v0.1.0-alpha8, built from the informational version (<Version> in Files.App.csproj).
+			public static readonly string LinuxReleaseTag = $"linux-v{ReleaseNotesHelper.AppVersionName}";
+			public static readonly string ReleaseNotesUrl = OperatingSystem.IsLinux()
+				? $"https://github.com/MemerGamer/LinuxFiles/releases/tag/{LinuxReleaseTag}"
+				: $"https://files.community/blog/posts/v{Package.Current.Id.Version.Major}-{Package.Current.Id.Version.Minor}-{Package.Current.Id.Version.Build}?minimal";
+
+			public static readonly string LinuxReleaseApiUrl = $"https://api.github.com/repos/MemerGamer/LinuxFiles/releases/tags/{LinuxReleaseTag}";
 		}
 
 		public static class DocsPath

@@ -1,6 +1,6 @@
 # Media and HTML previews without native window embedding
 
-Status: media playback and rendered HTML previews are implemented for the preview pane. The release notes page still opens the browser. This note records why, how, and what a fully interactive HTML view would cost.
+Status: media playback and rendered HTML previews are implemented for the preview pane. The release notes page renders the GitHub release Markdown. This note records why, how, and what a fully interactive HTML view would cost.
 
 ## What the X11 host actually did
 
@@ -37,9 +37,9 @@ So the Wayland work did not need to match an existing X11 implementation. The ne
 - Nix: neither library is in the flake's `runtimeLibs` yet, because WebKitGTK would add a large closure. Both previews fall back on NixOS until the flake adds them (perhaps behind an option).
 - Flatpak: not covered yet.
 
-## Release notes (not changed)
+## Release notes (implemented)
 
-`ReleaseNotesPage` points at the upstream Files blog (`files.community/blog/posts/v…?minimal`), which describes the Windows app and needs network access and interactive links. That makes it a poor fit for a snapshot. On Wayland it keeps opening the page in the default browser. A better fix is to render the LinuxFiles GitHub release body (Markdown) with the existing Markdig preview renderer, which needs a fetch and caching design of its own.
+`ReleaseNotesPage` fetches the GitHub release for the running version (`GET https://api.github.com/repos/MemerGamer/LinuxFiles/releases/tags/linux-v<Version>`, 10 s timeout, User-Agent, no authentication) and renders its `body` with the Markdig preview renderer (`PreviewTextRenderer`). Raw HTML stays literal text, images show only their alt text, and only absolute http(s) links are clickable; they open in the default browser through `ILauncherService`. A successful fetch is cached for the session. When the fetch fails (offline, 404, rate limit or an empty body), the page shows a link to the GitHub release page and opens it in the default browser, as Wayland did before. `WebView2` is no longer used on Linux, since it has no native backend there.
 
 ## Interactive HTML on Wayland: options and cost
 
